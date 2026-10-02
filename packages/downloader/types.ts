@@ -1,0 +1,495 @@
+/**
+ * 对于 Bittorrent 软件的定义
+ */
+import { AxiosRequestConfig } from "axios";
+
+export type TorrentClientFeature =
+  | "CustomPath" // 支持设置自定义目录作为下载目录
+  | "DefaultAutoStart" // 支持发送种子时自动开始
+  | "Recheck" // 支持重新校验种子
+  | "Queue" // 支持调整种子在队列中的位置
+  | "SpeedLimit" // 支持设置单个种子的上传/下载速度限制
+  | "Label" // 支持设置单个种子的标签/分类
+  | "BypassCSRF" // 支持绕过下载器的跨站请求伪造(CSRF)校验（连接时通过 DNR 移除请求的 Origin 头，目前仅 qBittorrent）
+  | "FileList" // 支持查看种子文件列表
+  | "FilePriority" // 支持设置文件优先级/选择（依赖 FileList）
+  | "PeerList" // 支持查看种子 peer 列表
+  | "TrackerList" // 支持查看带状态的 tracker 列表
+  | "TrackerManage"; // 支持增删 tracker（依赖 TrackerList）
+
+/**
+ * 客户端配置信息
+ */
+export interface DownloaderBaseConfig {
+  /**
+   * 系统使用这个信息判断并生成唯一的客户端
+   */
+  id?: string;
+
+  /**
+   * 客户端类型，与文件名相同
+   */
+  type: string;
+
+  /**
+   * 客户端名称，用于用户辨识
+   */
+  name: string;
+
+  /**
+   * The full url of torrent client webapi, like:
+   *    - transmission:  http://ip:port/transmission/rpc
+   *    - qbittorrent:   http://ip:port/
+   */
+  address: string;
+
+  username?: string;
+  password?: string;
+
+  /**
+   * request timeout
+   */
+  timeout?: number;
+
+  feature?: {
+    [feature in TorrentClientFeature]?: boolean;
+  };
+
+  // 在推送种子时，该下载器的一些专有设置
+  advanceAddTorrentOptions?: Record<string, any>;
+}
+
+// 强制要求填写用户名和密码
+export interface TorrentClientConfig extends DownloaderBaseConfig {
+  username: string;
+  password: string;
+}
+
+export interface TorrentClientFeatureMetaData {
+  allowed: boolean; // 该客户端是否允许该特征
+  description?: string; // 该特征的相关说明
+}
+
+// 最通用的自定义目录提示词
+export const CustomPathDescription =
+  "当前目录列表配置是指定硬盘上的绝对路径，如 /volume1/music/ 或 D:\\download\\music\\。请确保对应路径软件有写入权限。";
+
+/**
+ * 客户端介绍信息
+ */
+export interface TorrentClientMetaData {
+  description?: string; // 客户端介绍
+  warning?: string[]; // 用于配置时显示的警告信息，要用于一些特殊提示
+
+  feature: {
+    [feature in TorrentClientFeature]: TorrentClientFeatureMetaData;
+  };
+
+  // 在推送种子时，该下载器的一些专有设置
+  advanceAddTorrentOptions?: Array<{
+    name: string; // 选项名称
+    key: string; // 选项键名
+    description?: string; // 选项描述
+    type: "string" | "number" | "boolean"; // 选项类型
+    defaultValue?: any; // 默认值
+    required?: boolean; // 是否必填
+  }>;
+}
+
+export interface TorrentClientStatus {
+  upSpeed: number; // 上传速度（瞬间）
+  upData?: number; // 上传总量（对于不同客户端可能是total或者session）
+  dlSpeed: number;
+  dlData?: number;
+}
+
+export enum CTorrentState {
+  downloading = "downloading",
+  seeding = "seeding",
+  paused = "paused",
+  queued = "queued",
+  checking = "checking",
+  error = "error",
+  unknown = "unknown",
+}
+
+// 获得到的种子实例
+export interface CTorrent<RAW = any> {
+  id: string | number;
+  infoHash: string;
+
+  name: string;
+
+  /**
+   * progress percent out of 100
+   */
+  progress: number;
+  isCompleted: boolean;
+
+  /**
+   * 1:1 is 1, half seeded is 0.5
+   */
+  ratio: number;
+
+  /**
+   * date as timestamp (s)
+   */
+  dateAdded: number;
+
+  savePath: string;
+  label?: string;
+  state: CTorrentState;
+
+  /**
+   * total size of the torrent, in bytes
+   */
+  totalSize: number;
+
+  /**
+   * bytes per second
+   */
+  uploadSpeed: number;
+  /**
+   * bytes per second
+   */
+  downloadSpeed: number;
+
+  /**
+   * total upload in bytes
+   */
+  totalUploaded: number;
+  /**
+   * total download in bytes
+   */
+  totalDownloaded: number;
+
+  raw: RAW;
+  clientId: string;
+}
+
+// 种子筛选方法
+export interface CTorrentFilterRules {
+  ids?: any;
+  complete?: boolean;
+}
+
+// 单个种子内的文件
+export interface CTorrentFile<RAW = any> {
+  /**
+   * 客户端内文件序号（0-based）
+   */
+  index: number;
+  /**
+   * 文件名（不含路径）
+   */
+  name: string;
+  /**
+   * 相对种子根目录的完整路径
+   */
+  path: string;
+  /**
+   * 文件大小，字节
+   */
+  size: number;
+  /**
+   * 完成百分比 0-100
+   */
+  progress: number;
+  /**
+   * 归一化优先级
+   */
+  priority: TorrentFilePriority;
+  /**
+   * 是否参与下载（priority !== "skip"）
+   */
+  wanted: boolean;
+  raw?: RAW;
+}
+
+// 文件选择/优先级批量设置项
+export interface CTorrentFileSelection {
+  index: number;
+  priority: TorrentFilePriority; // "skip" 即取消下载
+}
+
+// 连接中的 peer
+export interface CTorrentPeer<RAW = any> {
+  ip: string;
+  port?: number;
+  client?: string; // peer 客户端标识
+  progress: number; // 完成百分比 0-100
+  downloadSpeed: number; // B/s
+  uploadSpeed: number; // B/s
+  totalDownloaded?: number;
+  totalUploaded?: number;
+  incoming?: boolean;
+  encrypted?: boolean;
+  obfuscated?: boolean;
+  snubbed?: boolean;
+  preferred?: boolean;
+  banned?: boolean;
+  flags?: string[]; // 可展示的标签（如 Encrypted / Banned），为空数组表示无
+  country?: string;
+  raw?: RAW;
+}
+
+// tracker 归一化状态
+export enum CTrackerState {
+  unknown = "unknown",
+  working = "working", // 正常服务器
+  updating = "updating", // 正在更新
+  disabled = "disabled", // 被禁用
+  error = "error", // 出错的 tracker
+}
+
+// 单个 tracker
+export interface CTorrentTracker<RAW = any> {
+  url: string;
+  tier: number; // 轮询级别
+  status: CTrackerState; // 归一化状态
+  statusMessage?: string; // 客户端原始状态文本
+  seeds?: number;
+  leeches?: number;
+  downloaded?: number; // scrape 到的完成次数
+  lastAnnounce?: number; // 时间戳(s)
+  enabled?: boolean;
+  raw?: RAW;
+}
+
+// 种子队列调整方向
+export type TorrentQueueDirection = "top" | "up" | "down" | "bottom";
+
+// 单个文件的优先级（归一化枚举，各客户端映射见各实体实现）
+export type TorrentFilePriority = "skip" | "low" | "normal" | "high" | "highest";
+
+// 单个种子的速度限制（单位 KiB/s，0 或 undefined 表示不限速）
+export interface TorrentSpeedLimit {
+  upload?: number;
+  download?: number;
+}
+
+// 添加种子
+export interface CAddTorrentOptions {
+  /**
+   * 是否本地下载
+   */
+  localDownload?: boolean;
+  localDownloadOption?: AxiosRequestConfig;
+
+  /**
+   * 是否将种子置于暂停状态
+   */
+  addAtPaused: boolean;
+
+  /**
+   * 种子下载地址
+   */
+  savePath: string;
+
+  /**
+   * called a label in some clients and a category in others
+   * Notice: Some clients didn't support it and will ignore this option
+   */
+  label?: string;
+
+  /**
+   * 上传速度限制，单位为 MiB/s，0 或不填时不限速
+   *
+   * 支持的下载器:
+   * - qBittorrent ✅
+   * - Transmission ✅
+   * - Deluge ✅
+   * - Aria2 ✅
+   * - uTorrent ✅
+   *
+   * 不支持的下载器 (将被忽略):
+   * - Flood ❌
+   * - ruTorrent ❌
+   * - Synology Download Station ❌
+   */
+  uploadSpeedLimit?: number;
+
+  /**
+   * 推送下载时，该下载器的一些专有设置
+   */
+  advanceAddTorrentOptions?: Record<string, any>;
+}
+
+export interface CAddTorrentResult {
+  success: boolean; // 是否添加成功
+  message?: any; // 错误信息
+  id?: string; // 添加成功后返回的种子ID
+}
+
+/**
+ * 客户端具体要实现的抽象方法
+ */
+export abstract class AbstractBittorrentClient<T extends DownloaderBaseConfig = DownloaderBaseConfig> {
+  abstract version: `v${number}.${number}.${number}`;
+  readonly config: T;
+
+  private clientVersion?: string;
+
+  protected constructor(options: T) {
+    this.config = options as T;
+  }
+
+  // 检查客户端是否可以连接
+  public abstract ping(): Promise<boolean>;
+
+  // 获取客户端版本信息( wrapper with local cache )
+  public async getClientVersion(): Promise<string> {
+    if (!this.clientVersion) {
+      this.clientVersion = await this.getClientVersionFromRemote();
+    }
+    return this.clientVersion;
+  }
+
+  // 获取客户端版本信息( wrapper with local cache )
+  protected abstract getClientVersionFromRemote(): Promise<string>;
+
+  // 获取客户端状态
+  public async getClientStatus(): Promise<TorrentClientStatus> {
+    return {
+      dlSpeed: 0,
+      upSpeed: 0,
+      dlData: 0,
+      upData: 0,
+    };
+  }
+
+  // 剩余磁盘空间
+  public async getClientFreeSpace(): Promise<number | "N/A"> {
+    return "N/A";
+  }
+
+  // 获取客户端中的已有的下载目录
+  async getClientPaths(): Promise<string[]> {
+    const torrents = await this.getAllTorrents();
+    return Array.from(new Set(torrents.map((t) => t.savePath))).filter(Boolean);
+  }
+
+  // 获取客户端中的已有的标签
+  public async getClientLabels(): Promise<string[]> {
+    const torrents = await this.getAllTorrents();
+    return Array.from(new Set(torrents.map((t) => t.label))).filter(Boolean) as string[];
+  }
+
+  /**
+   * 获取种子信息的方法
+   *
+   * 注意 abstract class 中内置了一种本地筛选种子的获取方法，
+   * 即从bt软件中获取所有种子，然后本地筛选，即 getAllTorrents -> getTorrentsBy -> getTorrent
+   * 此时只需要完成 getAllTorrents 方法的逻辑即可
+   *
+   * 如果该客户端支持在获取种子的时候进行筛选，
+   * 则建议将筛选步骤推送给bt软件，即 getTorrentsBy -> getAllTorrents/getTorrent
+   * 此时，则同时需要完成 3个方法（部分情况下为其中1个或2个）的 override
+   *
+   */
+  public abstract getAllTorrents(): Promise<CTorrent[]>;
+
+  public async getTorrentsBy(filter: CTorrentFilterRules): Promise<CTorrent[]> {
+    let torrents = await this.getAllTorrents();
+    if (filter.ids) {
+      const filterIds = Array.isArray(filter.ids) ? filter.ids : [filter.ids];
+      torrents = torrents.filter((t) => {
+        return filterIds.includes(t.infoHash);
+      });
+    }
+
+    if (filter.complete) {
+      torrents = torrents.filter((t) => t.isCompleted);
+    }
+
+    return torrents;
+  }
+
+  public async getTorrent(id: string): Promise<CTorrent> {
+    return (await this.getTorrentsBy({ ids: id }))[0];
+  }
+
+  // 添加种子
+  public abstract addTorrent(url: string, options: Partial<CAddTorrentOptions>): Promise<CAddTorrentResult>;
+
+  // 暂停种子
+  public abstract pauseTorrent(id: any): Promise<boolean>;
+
+  // 恢复种子
+  public abstract resumeTorrent(id: any): Promise<boolean>;
+
+  // 删除种子
+  public abstract removeTorrent(id: any, removeData?: boolean): Promise<boolean>;
+
+  // 获取种子的 Tracker 列表
+  public abstract getTorrentTrackers(torrent: CTorrent): Promise<string[]>;
+
+  // 重新校验种子（Recheck/Verify），默认不支持，由各客户端 override
+  public async recheckTorrent(_id: any): Promise<boolean> {
+    return false;
+  }
+
+  // 调整种子在队列中的位置（top/up/down/bottom），默认不支持，由各客户端 override
+  public async moveTorrentInQueue(_id: any, _direction: TorrentQueueDirection): Promise<boolean> {
+    return false;
+  }
+
+  // 设置单个种子的速度限制（单位 KiB/s，0 或 undefined 表示不限速），默认不支持，由各客户端 override
+  public async setTorrentSpeedLimit(_id: any, _limits: TorrentSpeedLimit): Promise<boolean> {
+    return false;
+  }
+
+  // 设置单个种子的标签/分类，默认不支持，由各客户端 override
+  public async setTorrentLabel(_id: any, _label: string): Promise<boolean> {
+    return false;
+  }
+
+  /**
+   * ─────────────────────────────────────────────
+   * 文件级 / peers / tracker 管理（追加扩展，默认不支持）
+   * 各客户端按能力矩阵 override，feature 枚举（FileList/FilePriority/PeerList/TrackerList/TrackerManage）同步声明
+   * ─────────────────────────────────────────────
+   */
+
+  // 获取种子文件列表，默认不支持（返回 []）
+  public async getTorrentFiles(_torrent: string | CTorrent): Promise<CTorrentFile[]> {
+    return [];
+  }
+
+  // 批量设置文件优先级/选择（"skip" 即不下载），建议各实体用尽量少的客户端请求完成批量，默认不支持
+  public async setTorrentFilePriority(
+    _torrent: string | CTorrent,
+    _selections: CTorrentFileSelection[],
+  ): Promise<boolean> {
+    return false;
+  }
+
+  // 获取种子的连接 peer 列表，默认不支持（返回 []）
+  public async getTorrentPeers(_torrent: string | CTorrent): Promise<CTorrentPeer[]> {
+    return [];
+  }
+
+  // 获取带状态的 tracker 列表，默认退化到现有 getTorrentTrackers 的 URL 数组
+  public async getTorrentTrackersDetail(torrent: string | CTorrent): Promise<CTorrentTracker[]> {
+    if (typeof torrent === "string") {
+      return [];
+    }
+    const urls = await this.getTorrentTrackers(torrent);
+    return urls.map((url, tier) => ({
+      url,
+      tier,
+      status: CTrackerState.unknown,
+      enabled: true,
+    }));
+  }
+
+  // 新增单个 tracker，默认不支持
+  public async addTorrentTracker(_torrent: string | CTorrent, _url: string): Promise<boolean> {
+    return false;
+  }
+
+  // 删除单个 tracker，默认不支持
+  public async removeTorrentTracker(_torrent: string | CTorrent, _url: string): Promise<boolean> {
+    return false;
+  }
+}

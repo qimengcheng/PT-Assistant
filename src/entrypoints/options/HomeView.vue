@@ -8,7 +8,7 @@ const props = defineProps<{
 const modules = [
   { name: "站点定义（340 个，按需加载）", status: "ok" as const },
   { name: "消息层 / background 中枢", status: "ok" as const },
-  { name: "站点管理（登录态、用户信息）", status: "todo" as const },
+  { name: "站点管理（添加/配置/用户信息查询）", status: "ok" as const },
   { name: "多站点搜索", status: "todo" as const },
   { name: "种子下载器对接（qBittorrent 等）", status: "todo" as const },
   { name: "备份同步（WebDAV 等）", status: "todo" as const },

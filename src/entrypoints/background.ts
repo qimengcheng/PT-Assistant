@@ -39,7 +39,8 @@ export default defineBackground({
     // ===== chrome.storage（供 site 包 adapter 的 store/retrieve 使用）=====
     onMessage("getExtStorage", async ({ data }) => {
       const result = await browser.storage.local.get(storageLocalKey(data));
-      return result[storageLocalKey(data)] ?? {};
+      // 不同 key 的值类型不同，这里无法收窄到具体键的类型，与 PT-depiler 一致返回原值
+      return (result[storageLocalKey(data)] ?? {}) as any;
     });
 
     onMessage("setExtStorage", async ({ data }) => {

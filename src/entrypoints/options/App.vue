@@ -5,8 +5,9 @@ import { sendMessage } from "@/messages.ts";
 
 import HomeView from "./HomeView.vue";
 import SiteDefinitions from "./SiteDefinitions.vue";
+import SiteManageView from "./SiteManageView.vue";
 
-type TView = "home" | "site-definitions";
+type TView = "home" | "site-manage" | "site-definitions";
 
 const version = browser.runtime.getManifest().version;
 
@@ -27,6 +28,7 @@ onMounted(async () => {
 
 const navItems: Array<{ key: TView; label: string; dev?: boolean }> = [
   { key: "home", label: "首页" },
+  { key: "site-manage", label: "站点管理" },
   { key: "site-definitions", label: "站点定义", dev: true },
 ];
 </script>
@@ -64,6 +66,7 @@ const navItems: Array<{ key: TView; label: string; dev?: boolean }> = [
 
     <main class="content">
       <HomeView v-if="activeView === 'home'" :version="version" :definition-count="definitionCount" />
+      <SiteManageView v-else-if="activeView === 'site-manage'" />
       <SiteDefinitions v-else />
     </main>
   </div>

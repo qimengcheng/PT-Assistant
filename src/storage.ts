@@ -1,13 +1,28 @@
-import type { IMetadataPiniaStorageSchema } from "@/shared/types/storages/metadata.ts";
+import { defineExtensionStorage } from "@webext-core/storage";
 
-/**
- * 扩展本地存储（browser.storage.local）的顶层 schema。
- * 骨架阶段只保留 config / metadata 两个键，后续随功能扩展补充
- * （userInfo / searchResultSnapshot / keepUploadTask 等，见 PT-depiler entries/storage.ts）。
- */
+import type {
+  IConfigPiniaStorageSchema,
+  IMetadataPiniaStorageSchema,
+  TUserInfoStorageSchema,
+  TSearchResultSnapshotStorageSchema,
+  TKeepUploadTaskStorageSchema,
+} from "@/shared/types.ts";
+
 export interface IExtensionStorageSchema {
-  config: Record<string, any>;
+  // 既可以被 pinia 使用，也可以被其他地方使用
+  config: IConfigPiniaStorageSchema;
+
   metadata: IMetadataPiniaStorageSchema;
+
+  userInfo: TUserInfoStorageSchema; // 用于存储用户信息
+  searchResultSnapshot: TSearchResultSnapshotStorageSchema; // 用于存储搜索结果快照
+  keepUploadTask: TKeepUploadTaskStorageSchema; // 用于存储辅种任务
 }
 
 export type TExtensionStorageKey = keyof IExtensionStorageSchema;
+
+/**
+ * 注意 extStore 不能在 offscreen 中使用，如果在 offscreen 中有需要，请使用 sw 提供的
+ * sendMessage('getExtStorage' | 'setExtStorage')（与 PT-depiler 一致）。
+ */
+export const extStore = defineExtensionStorage<IExtensionStorageSchema>(browser.storage.local);

@@ -2,9 +2,12 @@
 import type { ISiteMetadata, TSite } from "@ptd/site"; // type-only：构建时擦除，不会把 @ptd/site 的 eager 链（utils → social → sizzle）带进 SW
 
 import { onMessage } from "@/messages.ts";
+import { extStore } from "@/storage.ts";
 import { setupOffscreenDocumentSafe } from "./utils/offscreen.ts";
 // cookies 相关 handler（含 setCookie 的字段白名单与 checkAndExtendCookies）统一在本模块注册
 import "./utils/cookies.ts";
+// 右键菜单（划词搜索/豆瓣·IMDb 链接搜索/下载链接推送），挂载于 tabs 激活事件
+import "./utils/contextMenus.ts";
 
 // 只需要「站点定义数量」时，用 import.meta.glob 拿文件名键即可（不会加载任何模块）。
 // ⚠️ 不能 import { definitionList } from "@ptd/site"：那会把 site index 的 eager import 链
@@ -22,8 +25,6 @@ interface definitionEntity {
 // sizzle 的 UMD 工厂在模块顶层访问 window，MV3 SW 无 window，启动即崩。
 const definitionModules = import.meta.glob<definitionEntity>("/packages/site/definitions/*.ts");
 const definitionCount = Object.keys(definitionModules).length;
-
-const storageLocalKey = (key: string) => `extStorage:${key}`;
 
 export default defineBackground({
   // type: 'module' 至关重要：
@@ -47,15 +48,18 @@ export default defineBackground({
       definitionCount,
     }));
 
-    // ===== chrome.storage（供 site 包 adapter 的 store/retrieve 使用）=====
-    onMessage("getExtStorage", async ({ data }) => {
-      const result = await browser.storage.local.get(storageLocalKey(data));
-      // 不同 key 的值类型不同，这里无法收窄到具体键的类型，与 PT-depiler 一致返回原值
-      return (result[storageLocalKey(data)] ?? {}) as any;
+    // ===== chrome.storage（供 offscreen / site 包 adapter 的 store/retrieve 使用）=====
+    // ⚠️ 必须走 @/storage.ts 的 extStore，不能自己拼 storage.local 的 key：
+    // options 页的 pinia 持久化（persistWebExt，key = store.$id）写的是裸 key "metadata"，
+    // 若这里换成 `extStorage:${key}`，两套命名空间互不相通 —— 备份恢复写进去的数据
+    // options 页永远读不到（MyData 表格空白），offscreen 侧也永远读不到用户的站点配置。
+    onMessage("getExtStorage", async ({ data: key }) => {
+      // 不同 key 的值类型不同，这里无法收窄到具体键的类型
+      return (await extStore.getItem(key)) as any;
     });
 
-    onMessage("setExtStorage", async ({ data }) => {
-      await browser.storage.local.set({ [storageLocalKey(data.key)]: data.value });
+    onMessage("setExtStorage", async ({ data: { key, value } }) => {
+      await extStore.setItem(key, value);
     });
 
     // ===== chrome.downloads（供备份本地导出等使用）=====

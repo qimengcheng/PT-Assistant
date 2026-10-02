@@ -2,7 +2,20 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { message } from "antdv-next";
-import { BarChartOutlined, CloudUploadOutlined, DownloadOutlined, FileTextOutlined, GlobalOutlined, HomeOutlined, PlayCircleOutlined, SearchOutlined, SettingOutlined } from "@antdv-next/icons";
+import {
+  BarChartOutlined,
+  CloudUploadOutlined,
+  DownloadOutlined,
+  FileTextOutlined,
+  FolderOpenOutlined,
+  GlobalOutlined,
+  HistoryOutlined,
+  HomeOutlined,
+  InboxOutlined,
+  PlayCircleOutlined,
+  SearchOutlined,
+  SettingOutlined,
+} from "@antdv-next/icons";
 
 import { sendMessage } from "@/messages.ts";
 import { antdLocaleMap } from "@/options/plugins/antd.ts";
@@ -38,6 +51,9 @@ const navItems = [
   { path: "/sites", label: "站点管理", icon: GlobalOutlined },
   { path: "/search", label: "搜索", icon: SearchOutlined },
   { path: "/my-data", label: "我的数据", icon: BarChartOutlined },
+  { path: "/search-result-snapshot", label: "搜索快照", icon: FolderOpenOutlined },
+  { path: "/download-history", label: "下载历史", icon: HistoryOutlined },
+  { path: "/keep-upload-task", label: "辅种任务", icon: InboxOutlined },
   { path: "/set-backup", label: "数据备份", icon: CloudUploadOutlined },
   { path: "/set-downloader", label: "下载器", icon: DownloadOutlined },
   { path: "/set-media-server", label: "媒体服务器", icon: PlayCircleOutlined },

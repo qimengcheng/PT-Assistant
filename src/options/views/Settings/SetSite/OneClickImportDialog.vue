@@ -21,6 +21,7 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useResetableRef } from "@/options/directives/useResetableRef.ts";
 
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import CheckSwitchButton from "@/options/components/CheckSwitchButton.vue";
 
 import { getCanAddedSiteMetadata } from "./utils.ts";
 
@@ -209,21 +210,8 @@ async function dialogEnter() {
         </span>
       </template>
       <template #action>
-        <!-- 原 CheckSwitchButton（新仓库暂无该组件），按旧组件语义内联 全选/全不选/反选 -->
         <a-space :size="4">
-          <a-button size="small" type="text" @click="importStatus.toWork = [...realCanAutoAddSiteId]">
-            {{ t("common.checkbox.all") }}
-          </a-button>
-          <a-button size="small" type="text" @click="importStatus.toWork = []">
-            {{ t("common.checkbox.none") }}
-          </a-button>
-          <a-button
-            size="small"
-            type="text"
-            @click="importStatus.toWork = realCanAutoAddSiteId.filter((id: TSiteID) => !importStatus.toWork.includes(id))"
-          >
-            {{ t("common.checkbox.invert") }}
-          </a-button>
+          <CheckSwitchButton v-model="importStatus.toWork" :all="realCanAutoAddSiteId" />
         </a-space>
       </template>
     </a-alert>

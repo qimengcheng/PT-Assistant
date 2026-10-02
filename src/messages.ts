@@ -1,6 +1,7 @@
 /// <reference types="chrome" />
 import { defineExtensionMessaging } from "@webext-core/messaging";
 
+import type { ISiteUserConfig, TSiteID } from "@ptd/site";
 import type { TExtensionStorageKey, IExtensionStorageSchema } from "@/storage.ts";
 import { isDebug } from "~/helper.ts";
 
@@ -27,6 +28,9 @@ export interface ProtocolMap extends TMessageMap {
   setCookie(data: chrome.cookies.SetDetails): boolean;
   getCookie(data: chrome.cookies.CookieDetails): chrome.cookies.Cookie | null;
   removeCookie(data: chrome.cookies.CookieDetails | chrome.cookies.SetDetails): chrome.cookies.CookieDetails | null;
+
+  // 4. 站点服务（当前注册在 options 页上下文，见 options/services/site.ts）
+  getSiteUserConfig(data: { siteId: TSiteID; flush?: boolean }): ISiteUserConfig;
 }
 
 // 全局消息处理函数映射

@@ -4,6 +4,11 @@ import { defineConfig } from "wxt";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
+// 与 PT-depiler vite.config 一致：mediaServer 等包会在运行时展示扩展版本号。
+// 注意：不要在这里 execSync("git describe")——沙箱内 spawn cmd.exe 会被 EBUSY 拦截，
+// 改用 package.json 的 version（发布流程本来就三处同步 bump）。
+const pkgVersion = (await import("./package.json", { with: { type: "json" } })).default.version;
+
 export default defineConfig({
   srcDir: "src",
   modules: ["@wxt-dev/module-vue"],
@@ -26,6 +31,7 @@ export default defineConfig({
     // PT-depiler 沿用的编译期常量（site 包 favicon / 定义引用）
     define: {
       __BROWSER__: JSON.stringify(process.env.TARGET || "chrome"),
+      __EXT_VERSION__: JSON.stringify(`v${pkgVersion}`),
       // TODO: 平移 public/icons/site 后改为真实图标清单
       __RESOURCE_SITE_ICONS__: JSON.stringify([]),
     },

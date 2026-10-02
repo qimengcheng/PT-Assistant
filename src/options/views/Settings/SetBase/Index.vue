@@ -41,20 +41,79 @@ watch(activeKey, (key) => {
       <span class="hint">变更即时保存，无需手动确认</span>
     </div>
 
-    <a-tabs v-model:activeKey="activeKey" type="card">
-      <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label">
-        <component :is="tab.component" />
-      </a-tab-pane>
-    </a-tabs>
+    <div class="set-base-body">
+      <a-tabs v-model:activeKey="activeKey" type="card" size="small">
+        <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label">
+          <component :is="tab.component" />
+        </a-tab-pane>
+      </a-tabs>
+    </div>
   </div>
 </template>
+
+<style>
+/* SetBase 通用布局（非 scoped，供各子窗口复用）：
+   内容限宽、分组紧凑化、开关两列排布，避免大片留白 */
+.set-base .set-base-body {
+  max-width: 960px;
+}
+
+.set-base .group {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.set-base .group-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+/* 开关两列网格：每项 switch + label 水平排列 */
+.set-base .switch-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 24px;
+  row-gap: 10px;
+}
+
+.set-base .switch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.set-base .switch-item .label {
+  margin-left: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.set-base .compact-form :deep(.ant-form-item) {
+  margin-bottom: 10px;
+}
+
+.set-base .compact-form :deep(.ant-form-item-label) {
+  padding-bottom: 2px;
+}
+
+.set-base .compact-form :deep(.ant-select) {
+  width: 260px;
+}
+</style>
 
 <style scoped>
 .page-header {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .page-header h2 {

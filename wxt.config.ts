@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "wxt";
+import vuetify from "vite-plugin-vuetify";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -15,7 +16,20 @@ export default defineConfig({
   manifest: {
     name: "PT Assistant",
     description: "PT 站点辅助扩展（WXT + Vue 3 重构版）",
-    permissions: ["cookies", "declarativeNetRequest", "storage"],
+    // 与 PT-depiler 权限清单对齐（offscreen 由 Chrome 端追加；nativeMessaging 仍为可选权限，后续轮次再定）
+    permissions: [
+      "activeTab",
+      "alarms",
+      "clipboardWrite",
+      "contextMenus",
+      "cookies",
+      "downloads",
+      "declarativeNetRequest",
+      "storage",
+      "unlimitedStorage",
+      "notifications",
+      "offscreen",
+    ],
     host_permissions: ["*://*/*"],
     icons: {
       "16": "/icon/16.png",
@@ -42,6 +56,21 @@ export default defineConfig({
         "@": path.resolve(rootDir, "src"),
         "~": path.resolve(rootDir, "src"),
       },
+    },
+    plugins: [
+      // vuetify 组件按需自动导入 + styles 注入，配置与 PT-depiler 一致
+      vuetify({ styles: { configFile: "./src/styles/vuetify/settings.scss" } }) as any,
+    ],
+    // Vuetify 4: 强制 Vite 预打包 overlay 相关模块，避免 dev 模式下浮层 z-index 失效
+    // （仅影响 dev 模式，生产构建不受影响）。
+    optimizeDeps: {
+      include: [
+        "vuetify/components/VOverlay",
+        "vuetify/components/VDialog",
+        "vuetify/components/VMenu",
+        "vuetify/components/VSelect",
+        "vuetify/components/VTooltip",
+      ],
     },
   }),
 });

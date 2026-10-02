@@ -1,36 +1,139 @@
 /// <reference types="chrome" />
 import { defineExtensionMessaging } from "@webext-core/messaging";
 
-import type { ISiteUserConfig, TSiteID } from "@ptd/site";
+import type {
+  IAdvancedSearchRequestConfig,
+  ISearchResult,
+  ISiteUserConfig,
+  ITorrent,
+  IUserInfo,
+  TSiteID,
+  getFaviconMetadata,
+} from "@ptd/site";
+import type {
+  ISocialInformation,
+  ISocialRecommendationItem,
+  ISocialRecommendationsResult,
+  TSupportSocialSite$1,
+} from "@ptd/social";
+import type { IMediaServerId, IMediaServerSearchOptions, IMediaServerSearchResult } from "@ptd/mediaServer";
+import type { TorrentClientStatus } from "@ptd/downloader";
+
 import type { TExtensionStorageKey, IExtensionStorageSchema } from "@/storage.ts";
+import type {
+  IDownloaderMetadata,
+  IDownloadTorrentOption,
+  IDownloadTorrentResult,
+  ILoggerItem,
+  ISearchData,
+  ITorrentDownloadMetadata,
+  IKeepUploadTask,
+  TKeepUploadTaskKey,
+  TSearchSnapshotKey,
+  TTorrentDownloadKey,
+  TTorrentDownloadStatus,
+} from "@/shared/types.ts";
 import { isDebug } from "~/helper.ts";
 
 /**
- * 精简版消息协议（对应 PT-depiler messages.ts 的 269 行全量协议，此处只保留骨架需要的部分）：
- * 1. chrome cookies / DNR —— site 包的 axios 拦截器（unsafe header 替换、Cloudflare 重试）依赖
- * 2. extStorage —— site 包 adapter.ts 的 store/retrieve 依赖
+ * 消息协议（对齐 PT-depiler messages.ts 的全量协议，按已平移模块裁剪：
+ * 未平移的 backup / nativeMessaging / CLI 分组暂不声明，走索引签名宽松兜底）：
+ * 1. background —— chrome cookies / DNR / storage
+ * 2. offscreen —— 站点解析、搜索、下载器、用户信息、社交信息、辅种
  */
 type TMessageMap = Record<string, (data: any) => any>;
 
 export interface ProtocolMap extends TMessageMap {
   ping(data?: null): { version: string; definitionCount: number };
 
-  // 1. chrome.storage
+  // ===== 1. chrome.storage（供 site 包 adapter 的 store/retrieve 使用）=====
   getExtStorage<T extends TExtensionStorageKey>(key: T): IExtensionStorageSchema[T];
   setExtStorage<T extends TExtensionStorageKey>(data: { key: T; value: IExtensionStorageSchema[T] }): void;
 
-  // 2. chrome.declarativeNetRequest
+  // ===== 1.1 chrome.declarativeNetRequest（供 unsafe header 替换使用）=====
   updateDNRSessionRules(data: { rule: chrome.declarativeNetRequest.Rule; extOnly?: boolean }): void;
   removeDNRSessionRuleById(data: chrome.declarativeNetRequest.Rule["id"]): void;
 
-  // 3. chrome.cookies
+  // ===== 1.2 chrome.cookies（供 Cloudflare 重试与站点登录态使用）=====
   getAllCookies(data: chrome.cookies.GetAllDetails): chrome.cookies.Cookie[];
   setCookie(data: chrome.cookies.SetDetails): boolean;
   getCookie(data: chrome.cookies.CookieDetails): chrome.cookies.Cookie | null;
   removeCookie(data: chrome.cookies.CookieDetails | chrome.cookies.SetDetails): chrome.cookies.CookieDetails | null;
 
-  // 4. 站点服务（当前注册在 options 页上下文，见 options/services/site.ts）
+  // ===== 2. offscreen：站点基础 ( utils/site ) =====
   getSiteUserConfig(data: { siteId: TSiteID; flush?: boolean }): ISiteUserConfig;
+  getSiteFavicon(data: { site: TSiteID | getFaviconMetadata; flush?: boolean }): string;
+  clearSiteFaviconCache(): void;
+
+  // ===== 2.1 offscreen：站点搜索、搜索快照 ( utils/search ) =====
+  getSiteSearchResult(data: {
+    siteId: TSiteID;
+    keyword?: string;
+    searchEntry?: IAdvancedSearchRequestConfig;
+  }): ISearchResult;
+  getMediaServerSearchResult(data: {
+    mediaServerId: IMediaServerId;
+    keywords?: string;
+    options?: IMediaServerSearchOptions;
+  }): IMediaServerSearchResult;
+  getSearchResultSnapshotData(snapshotId: TSearchSnapshotKey): ISearchData;
+  saveSearchResultSnapshotData(data: { snapshotId: TSearchSnapshotKey; data: ISearchData }): void;
+  removeSearchResultSnapshotData(snapshotId: TSearchSnapshotKey): void;
+
+  // ===== 2.2 offscreen：下载器、下载历史 ( utils/download ) =====
+  getDownloaderConfig(downloaderId: string): IDownloaderMetadata;
+  getDownloaderVersion(downloaderId: string): string;
+  getDownloaderStatus(downloaderId: string): TorrentClientStatus;
+  getTorrentDownloadLink(torrent: ITorrent): string;
+  getTorrentInfoForVerification(torrent: ITorrent): ITorrentInfoForVerification;
+  downloadTorrent(data: IDownloadTorrentOption): IDownloadTorrentResult;
+  getDownloadHistory(): ITorrentDownloadMetadata[];
+  getDownloadHistoryById(downloadId: TTorrentDownloadKey): ITorrentDownloadMetadata;
+  setDownloadHistoryStatus(data: { downloadId: TTorrentDownloadKey; status: TTorrentDownloadStatus }): void;
+  deleteDownloadHistoryById(downloadId: TTorrentDownloadKey): void;
+  clearDownloadHistory(): void;
+
+  // ===== 2.3 offscreen：用户信息 ( utils/userInfo ) =====
+  getSiteUserInfoResult(siteId: TSiteID): IUserInfo;
+  setSiteLastUserInfo(userInfo: IUserInfo): void;
+  cancelUserInfoQueue(): void;
+  getSiteUserInfo(siteId: TSiteID): Record<string, IUserInfo>;
+  removeSiteUserInfo(data: { siteId: TSiteID; date: string[] }): void;
+
+  // ===== 2.4 offscreen：社交信息 ( utils/socialInformation ) =====
+  getSocialInformation(data: { site: TSupportSocialSite$1; sid: string }): ISocialInformation;
+  // 判断 URL 命中的社交站点（供 content-script 引导做轻量预筛，见上游 issue #1467）
+  matchSocialPage(url: string): TSupportSocialSite$1 | null;
+  getSocialRecommendations(data?: {
+    flush?: boolean;
+    enrichment?: "all" | "none" | "visible";
+  }): ISocialRecommendationsResult;
+  getSocialRecommendationItem(data: { item: ISocialRecommendationItem; enrichment?: "all" | "visible" }): {
+    item: ISocialRecommendationItem;
+  };
+  clearSocialInformationCache(): void;
+
+  // ===== 2.5 offscreen：辅种任务 ( utils/keepUploadTask ) =====
+  getKeepUploadTasks(): IKeepUploadTask[];
+  getKeepUploadTaskById(taskId: TKeepUploadTaskKey): IKeepUploadTask;
+  createKeepUploadTask(task: IKeepUploadTask): void;
+  updateKeepUploadTask(task: IKeepUploadTask): void;
+  deleteKeepUploadTask(taskId: TKeepUploadTaskKey): void;
+  clearKeepUploadTasks(): void;
+
+  // ===== 2.6 日志 ( utils/logger ) =====
+  logger(data: ILoggerItem): void;
+}
+
+/** 可序列化的种子信息，用于辅种检测（与 PT-depiler messages.ts 定义一致） */
+export interface ITorrentInfoForVerification {
+  infoHash: string;
+  name: string;
+  length: number;
+  files: Array<{
+    path: string;
+    length: number;
+  }>;
 }
 
 // 全局消息处理函数映射

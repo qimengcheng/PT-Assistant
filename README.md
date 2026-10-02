@@ -69,11 +69,12 @@ pnpm zip            # 商店发布包
 
 ## Roadmap
 
-- [ ] downloader 包平移（qBittorrent/Transmission 等 9 客户端，扩展 ProtocolMap）
-- [ ] mediaServer / backupServer 包平移
-- [ ] offscreen 入口（页面解析宿主）+ 搜索流程
+- [x] ~~mediaServer / backupServer 包平移~~（v0.2.0）
+- [x] ~~offscreen 入口（页面解析宿主）+ 搜索流程~~（v0.3.0，含 Vuetify/vue-router 接入）
+- [x] ~~数据备份/导入：本地导出(zip)+文件恢复 + WebDAV/S3/B2 远程备份（加密/保留策略/历史）~~（v0.4.0）
+- [ ] downloader 配置页与种子推送流程 UI（downloader 包本体已随 v0.2.0 平移）
 - [ ] content script（siteHostMap 预匹配，去掉无条件 matchSocialPage 往返）
-- [ ] Vuetify → 轻量组件库选型（Naive UI / PrimeVue）或继续手写
+- [ ] 站点图标资源目录平移（__RESOURCE_SITE_ICONS__ 目前为空数组）
 - [ ] i18n：默认语言静态注册 + 切换语言动态 import 合并
 - [ ] ESLint (eslint-plugin-vue + typescript-eslint) + Vitest
 - [ ] axios → ofetch 迁移评估（新代码先行）

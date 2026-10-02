@@ -81,6 +81,11 @@ export const routes: RouteRecordRaw[] = [
     name: "SetBackup",
     component: () => import("../views/Settings/SetBackup/Index.vue"),
   },
+  {
+    path: "/set-search-solution",
+    name: "SetSearchSolution",
+    component: () => import("../views/Settings/SetSearchSolution/Index.vue"),
+  },
 
   // ===== 开发调试 =====
   {

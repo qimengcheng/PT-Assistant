@@ -3,6 +3,8 @@ import type { ISiteMetadata, TSite } from "@ptd/site"; // type-only：构建时�
 
 import { onMessage } from "@/messages.ts";
 import { setupOffscreenDocumentSafe } from "./utils/offscreen.ts";
+// cookies 相关 handler（含 setCookie 的字段白名单与 checkAndExtendCookies）统一在本模块注册
+import "./utils/cookies.ts";
 
 // 只需要「站点定义数量」时，用 import.meta.glob 拿文件名键即可（不会加载任何模块）。
 // ⚠️ 不能 import { definitionList } from "@ptd/site"：那会把 site index 的 eager import 链
@@ -73,29 +75,7 @@ export default defineBackground({
       await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [data] });
     });
 
-    // ===== chrome.cookies（供 Cloudflare 重试与站点登录态使用）=====
-    onMessage("getCookie", async ({ data }) => {
-      return (await chrome.cookies.get(data)) ?? null;
-    });
-
-    onMessage("getAllCookies", async ({ data }) => {
-      return await chrome.cookies.getAll(data);
-    });
-
-    onMessage("setCookie", async ({ data }) => {
-      await chrome.cookies.set(data);
-      return true;
-    });
-
-    onMessage("removeCookie", async ({ data }) => {
-      const details = data as chrome.cookies.SetDetails;
-      const domain = (details.domain ?? "").replace(/^\./, "");
-      if (!domain || !details.name) {
-        return null;
-      }
-      const url = `${details.secure ? "https" : "http"}://${domain}${details.path || "/"}`;
-      await chrome.cookies.remove({ url, name: details.name });
-      return { url, name: details.name };
-    });
+    // ===== chrome.cookies 的 getAllCookies / getCookie / setCookie / removeCookie /
+    //      checkAndExtendCookies 已在 ./utils/cookies.ts 注册
   },
 });

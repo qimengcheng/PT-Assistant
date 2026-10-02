@@ -3,9 +3,11 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 
 import { sendMessage } from "@/messages.ts";
+import { useRuntimeStore } from "@/options/stores/runtime.ts";
 
 const version = browser.runtime.getManifest().version;
 const route = useRoute();
+const runtimeStore = useRuntimeStore();
 
 const backgroundOk = ref<boolean | null>(null);
 
@@ -78,5 +80,8 @@ const activePath = computed(() => route.path);
     <v-main class="content">
       <router-view />
     </v-main>
+
+    <!-- 全局提示条：各页面 runtimeStore.showSnakebar() 的渲染出口（漏挂时所有成功/失败提示都不可见） -->
+    <v-snackbar-queue v-model="runtimeStore.uiGlobalSnakebar" closable />
   </v-app>
 </template>

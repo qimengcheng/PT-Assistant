@@ -128,7 +128,7 @@ function toAntdSortOrder(key: string): "ascend" | "descend" | null {
  * category 这类对象列取 name。
  * ⚠️ antd 的受控排序要求 column.sorter 提供真正的 compare 函数——
  * `sorter: true` / `{ multiple: n }`（无 compare）时 antd 内部 getSortFunction 返回 false，
- * 排序器被静默跳过，表现为「箭头会动、数据不排」（v0.12.1 排序失效的根因）。
+ * 排序器被静默跳过，表现为「箭头会动、数据不排」（v0.7.0 排序失效的根因）。
  */
 function makeSorter(key: string) {
   return (a: any, b: any): number => {
@@ -186,7 +186,7 @@ const { tableFilterRef, tableWaitFilterRef, tableFilterFn, buildAdvanceItemProps
  * v-data-table 的 :search + :custom-filter 在 a-table 里没有对应 prop，
  * 这里用 computed 复现同一个判断：tableFilterFn 的第三个参数形如 { raw: item }。
  *
- * 防御性约束（v0.12.1）：过滤器/数据异常时「宁可多显示，绝不清空表格」——
+ * 防御性约束（v0.7.0）：过滤器/数据异常时「宁可多显示，绝不清空表格」——
  * 单行判断抛错按通过处理，整体 filter 抛错回退为未过滤列表。
  */
 const tableItems = computed<any[]>(() => {

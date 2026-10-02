@@ -2,6 +2,13 @@
 import { ref, computed, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { toMerged } from "es-toolkit";
+import {
+  AppstoreOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  CloseOutlined,
+  EllipsisOutlined,
+} from "@antdv-next/icons";
 
 import { type ITorrent } from "@ptd/site";
 import {
@@ -48,6 +55,11 @@ const addTorrentOptions = ref<Required<Omit<CAddTorrentOptions, "localDownloadOp
 const suggestFolders = computed(() => selectedDownloader.value?.suggestFolders ?? []);
 const suggestTags = computed(() => selectedDownloader.value?.suggestTags ?? []);
 
+// ⚠️ antdv-next 的 AutoComplete 传字符串数组（string[]）options 会渲染成空控件
+// （顶部下载器那个传 {value,label} 对象数组就是正常的），这里统一对象化
+const suggestFolderOptions = computed(() => suggestFolders.value.map((v) => ({ value: v, label: v })));
+const suggestTagOptions = computed(() => suggestTags.value.map((v) => ({ value: v, label: v })));
+
 const currentSiteIds = computed(() => [...new Set(torrentItems.map((t) => t.site).filter(Boolean))]);
 const enabledDownloadersBySite = computed(() => {
   const ids = currentSiteIds.value;
@@ -62,6 +74,23 @@ const sortedEnabledDownloadersBySite = computed(() =>
 
 const downloaderTitle = (downloader: IDownloaderMetadata) => `${downloader.name} [${downloader.address}]`;
 const getDownloaderIcon = (x: string) => chrome.runtime.getURL(getDownloaderIconRaw(x));
+
+// antd 的 Select/AutoComplete 绑定的是标量，这里用 id 作为 v-model 的值，
+// 再映射回 metadataStore.downloaders 里的完整对象，保持下游逻辑不变。
+const selectedDownloaderId = computed<string | undefined>({
+  get: () => selectedDownloader.value?.id,
+  set: (id) => {
+    selectedDownloader.value = id ? (metadataStore.downloaders[id] ?? null) : null;
+  },
+});
+
+const downloaderOptions = computed(() =>
+  sortedEnabledDownloadersBySite.value.map((d) => ({ value: d.id, label: downloaderTitle(d), raw: d })),
+);
+
+function onDownloaderChange() {
+  restoreAddTorrentOptions(selectedDownloader.value ?? undefined);
+}
 
 function restoreAddTorrentOptions(downloader?: IDownloaderMetadata) {
   addTorrentOptions.value.localDownload = true;
@@ -164,196 +193,214 @@ function dialogLeave() {
 </script>
 
 <template>
-  <v-dialog
-    v-model="showDialog"
-    :persistent="isSending"
-    max-width="800"
-    scrollable
-    @after-enter="dialogEnter"
-    @after-leave="dialogLeave"
+  <a-modal
+    v-model:open="showDialog"
+    :width="800"
+    :mask-closable="!isSending"
+    :closable="!isSending"
+    :keyboard="!isSending"
+    @after-open-change="(open: boolean) => open && dialogEnter()"
+    @after-close="dialogLeave"
   >
-    <v-card>
-      <v-card-title class="pa-0">
-        <v-toolbar color="blue-grey-darken-2">
-          <v-toolbar-title>{{ t("SentToDownloaderDialog.title", [torrentItems.length]) }}</v-toolbar-title>
-          <template #append>
-            <v-btn icon="mdi-close" :title="t('common.dialog.close')" @click="showDialog = false" />
-          </template>
-        </v-toolbar>
-      </v-card-title>
+    <template #title>
+      <span style="color: #455a64">{{ t("SentToDownloaderDialog.title", [torrentItems.length]) }}</span>
+      <a-button
+        type="text"
+        size="small"
+        :title="t('common.dialog.close')"
+        style="float: right"
+        @click="showDialog = false"
+      >
+        <template #icon><CloseOutlined /></template>
+      </a-button>
+    </template>
 
-      <v-card-text>
-        <v-alert v-if="isSending" type="info" variant="tonal">
-          {{
-            t("SentToDownloaderDialog.isSending", {
-              name: selectedDownloader?.name,
-              address: selectedDownloader?.address,
-            })
-          }}
-        </v-alert>
+    <a-alert v-if="isSending" type="info" show-icon>
+      {{
+        t("SentToDownloaderDialog.isSending", {
+          name: selectedDownloader?.name,
+          address: selectedDownloader?.address,
+        })
+      }}
+    </a-alert>
 
-        <v-form v-else>
-          <!-- 快速下载选项 -->
-          <v-container v-if="quickSendToClient" class="pa-0">
-            <v-list v-if="sortedEnabledDownloadersBySite.length > 0">
-              <template v-for="downloader in sortedEnabledDownloadersBySite" :key="downloader.id">
-                <v-list-item
-                  v-for="path in ['', ...(downloader.suggestFolders ?? [])]"
-                  :key="path"
-                  :prepend-avatar="getDownloaderIcon(downloader.type)"
-                  :subtitle="path"
-                  :title="downloaderTitle(downloader)"
-                  @click.stop="() => quickSendToDownloader(downloader, path)"
+    <a-form v-else layout="vertical">
+      <!-- 快速下载选项 -->
+      <div v-if="quickSendToClient" style="padding: 0">
+        <!-- 不传 data-source：antdv List 传空数组会渲染内置「暂无数据」占位，这里直接渲染子项 -->
+        <a-list v-if="sortedEnabledDownloadersBySite.length > 0" size="small">
+          <template v-for="downloader in sortedEnabledDownloadersBySite" :key="downloader.id">
+            <a-list-item
+              v-for="path in ['', ...(downloader.suggestFolders ?? [])]"
+              :key="path"
+              style="cursor: pointer"
+              @click="() => quickSendToDownloader(downloader, path)"
+            >
+              <template #extra>
+                <a-dropdown
+                  v-if="(downloader.suggestTags ?? []).length > 0"
+                  trigger="click"
+                  @click.stop
                 >
-                  <v-menu activator="parent" open-on-hover location="end">
-                    <v-list density="compact">
-                      <v-list-item
+                  <a-button type="text" size="small">
+                    <template #icon><EllipsisOutlined /></template>
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item
                         v-for="tag in downloader.suggestTags"
                         :key="tag"
-                        :title="tag"
                         @click.stop="() => quickSendToDownloader(downloader, path, tag)"
-                      />
-                    </v-list>
-                  </v-menu>
-                </v-list-item>
+                      >
+                        {{ tag }}
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
-            </v-list>
-            <v-alert v-else type="warning" variant="tonal">
-              {{
-                currentSiteIds.length > 0 && configStore.download.allowDownloaderFilterForSite
-                  ? t("SentToDownloaderDialog.noDownloaderForSite")
-                  : t("SentToDownloaderDialog.noDownloader")
-              }}
-            </v-alert>
-          </v-container>
 
-          <!-- 普通下载选项 -->
-          <v-container v-else class="pb-0">
-            <v-row>
-              <v-autocomplete
-                v-model="selectedDownloader"
-                :filter-keys="['raw.name', 'raw.address', 'raw.username']"
-                :items="sortedEnabledDownloadersBySite"
-                clearable
-                :placeholder="t('SentToDownloaderDialog.selectDownloader')"
-                @update:model-value="restoreAddTorrentOptions"
-              >
-                <template #selection="{ item: downloader }">
-                  <v-list-item
-                    :prepend-avatar="getDownloaderIcon(downloader.type)"
-                    :title="downloaderTitle(downloader)"
-                  />
+              <a-list-item-meta>
+                <template #avatar>
+                  <img class="downloader-avatar" :src="getDownloaderIcon(downloader.type)" :alt="downloader.type" />
                 </template>
-                <template #item="{ props, item: downloader }">
-                  <v-list-item
-                    v-bind="props"
-                    :prepend-avatar="getDownloaderIcon(downloader.type)"
-                    :title="downloaderTitle(downloader)"
-                  >
-                    <template #append>
-                      <v-chip color="indigo" label>{{ downloader.type }}</v-chip>
-                    </template>
-                  </v-list-item>
-                </template>
-              </v-autocomplete>
-            </v-row>
-            <v-row>
-              <v-col class="py-0 pl-0" cols="6">
-                <v-combobox
-                  v-model="addTorrentOptions.savePath"
-                  :items="suggestFolders"
-                  :hint="t('SentToDownloaderDialog.savePathHint')"
-                  :label="t('SentToDownloaderDialog.savePath')"
-                  persistent-hint
-                >
-                </v-combobox>
-              </v-col>
-              <v-col class="py-0 pr-0" cols="6">
-                <v-combobox
-                  v-model="addTorrentOptions.label"
-                  :items="suggestTags"
-                  :hint="t('SentToDownloaderDialog.labelHint')"
-                  :label="t('SentToDownloaderDialog.label')"
-                  persistent-hint
-                ></v-combobox>
-              </v-col>
-            </v-row>
+                <a-list-item-meta-title>
+                  <a-list-item-meta-title :title="downloaderTitle(downloader)" :subtitle="path" />
+                </a-list-item-meta-title>
+              </a-list-item-meta>
+            </a-list-item>
+          </template>
+        </a-list>
+        <a-alert v-else type="warning" show-icon>
+          {{
+            currentSiteIds.length > 0 && configStore.download.allowDownloaderFilterForSite
+              ? t("SentToDownloaderDialog.noDownloaderForSite")
+              : t("SentToDownloaderDialog.noDownloader")
+          }}
+        </a-alert>
+      </div>
 
-            <v-row>
-              <v-col>
-                <!-- FIXME 添加设置项，默认 disabled -->
-                <v-switch
-                  v-model="addTorrentOptions.localDownload"
-                  color="success"
-                  :disabled="!configStore.download.allowDirectSendToClient"
-                  hide-details
-                  :label="t('SentToDownloaderDialog.localRelay')"
-                />
-              </v-col>
-              <v-col>
-                <v-switch
-                  v-model="addTorrentOptions.addAtPaused"
-                  color="success"
-                  hide-details
-                  :label="t('SentToDownloaderDialog.pauseOnAdd')"
-                />
-              </v-col>
-            </v-row>
-            <v-row>
-              <v-col class="pa-0">
-                <v-expansion-panels
-                  :disabled="!((selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []).length > 0)"
-                >
-                  <v-expansion-panel :title="t('common.advancedSettings')">
-                    <v-expansion-panel-text>
-                      <v-switch
-                        v-for="opt in selectedDownloaderMetadata.advanceAddTorrentOptions"
-                        :key="opt.key"
-                        v-model="addTorrentOptions.advanceAddTorrentOptions![opt.key]"
-                        color="success"
-                        :label="opt.name"
-                        :messages="opt.description"
-                        :hide-details="!opt.description"
-                      />
-                    </v-expansion-panel-text>
-                  </v-expansion-panel>
-                </v-expansion-panels>
-              </v-col>
-            </v-row>
-          </v-container>
-        </v-form>
-      </v-card-text>
-      <v-divider />
-      <v-card-actions>
-        <v-btn
-          :title="t('SentToDownloaderDialog.moreOptions')"
-          icon="mdi-cards"
-          @click="quickSendToClient = !quickSendToClient"
-        />
+      <!-- 普通下载选项 -->
+      <div v-else style="padding-bottom: 0">
+        <a-row>
+          <a-col :span="24">
+            <a-auto-complete
+              v-model:value="selectedDownloaderId"
+              :options="downloaderOptions"
+              option-label-prop="label"
+              :placeholder="t('SentToDownloaderDialog.selectDownloader')"
+              allow-clear
+              style="width: 100%"
+              @change="onDownloaderChange"
+            >
+              <template #option="{ value }">
+                <a-list-item-meta style="padding: 4px 0">
+                  <template #avatar>
+                    <img class="downloader-avatar" :src="getDownloaderIcon(value.raw.type)" :alt="value.raw.type" />
+                  </template>
+                  <a-list-item-meta-content>
+                    <a-list-item-meta-title :title="value.label" />
+                  </a-list-item-meta-content>
+                  <template #extra>
+                    <a-tag color="blue">{{ value.raw.type }}</a-tag>
+                  </template>
+                </a-list-item-meta>
+              </template>
+            </a-auto-complete>
+          </a-col>
+        </a-row>
 
-        <v-spacer />
-        <v-btn
-          :disabled="isSending"
-          color="info"
-          prepend-icon="mdi-close-circle"
-          variant="text"
-          @click="showDialog = false"
-        >
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item :label="t('SentToDownloaderDialog.savePath')" :extra="t('SentToDownloaderDialog.savePathHint')">
+              <a-auto-complete
+                v-model:value="addTorrentOptions.savePath"
+                :options="suggestFolderOptions"
+                :placeholder="t('SentToDownloaderDialog.savePathHint')"
+                allow-clear
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item :label="t('SentToDownloaderDialog.label')" :extra="t('SentToDownloaderDialog.labelHint')">
+              <a-auto-complete
+                v-model:value="addTorrentOptions.label"
+                :options="suggestTagOptions"
+                :placeholder="t('SentToDownloaderDialog.labelHint')"
+                allow-clear
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item :label="t('SentToDownloaderDialog.localRelay')" :colon="false">
+              <a-switch
+                v-model:checked="addTorrentOptions.localDownload"
+                :disabled="!configStore.download.allowDirectSendToClient"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item :label="t('SentToDownloaderDialog.pauseOnAdd')" :colon="false">
+              <a-switch v-model:checked="addTorrentOptions.addAtPaused" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-row>
+          <a-col :span="24" style="padding: 0">
+            <a-collapse
+              ghost
+              :disabled="!((selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []).length > 0)"
+            >
+              <a-collapse-panel key="1" :header="t('common.advancedSettings')">
+                <a-form-item
+                  v-for="opt in selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []"
+                  :key="opt.key"
+                  :label="opt.name"
+                  :extra="opt.description"
+                  :colon="false"
+                >
+                  <a-switch v-model:checked="addTorrentOptions.advanceAddTorrentOptions![opt.key]" />
+                </a-form-item>
+              </a-collapse-panel>
+            </a-collapse>
+          </a-col>
+        </a-row>
+      </div>
+    </a-form>
+
+    <template #footer>
+      <div style="display: flex; align-items: center">
+        <a-button :title="t('SentToDownloaderDialog.moreOptions')" type="text" @click="quickSendToClient = !quickSendToClient">
+          <template #icon><AppstoreOutlined /></template>
+        </a-button>
+
+        <div style="flex: 1"></div>
+
+        <a-button :disabled="isSending" type="text" @click="showDialog = false">
+          <template #icon><CloseCircleOutlined /></template>
           <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
-        </v-btn>
-        <v-btn
+        </a-button>
+        <a-button
           :disabled="!selectedDownloader || quickSendToClient"
           :loading="isSending"
-          color="error"
-          variant="text"
+          danger
+          type="text"
           @click="sendToDownloader"
         >
-          <v-icon icon="mdi-check-circle-outline" />
+          <template #icon><CheckCircleOutlined /></template>
           <span class="ml-1">{{ t("common.dialog.ok") }}</span>
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+        </a-button>
+      </div>
+    </template>
+  </a-modal>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.downloader-avatar {
+  width: 24px;
+  height: 24px;
+}
+</style>

@@ -44,7 +44,7 @@ export default defineConfig({
   vite: () => ({
     // PT-depiler 沿用的编译期常量（site 包 favicon / 定义引用）
     define: {
-      __BROWSER__: JSON.stringify(process.env.TARGET || "chrome"),
+      __BROWSER__: JSON.stringify(browser),
       __EXT_VERSION__: JSON.stringify(`v${pkgVersion}`),
       // TODO: 平移 public/icons/site 后改为真实图标清单
       __RESOURCE_SITE_ICONS__: JSON.stringify([]),
@@ -73,4 +73,4 @@ export default defineConfig({
       ],
     },
   }),
-});
+}));

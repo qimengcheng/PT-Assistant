@@ -136,21 +136,28 @@ function doRestore() {
     return;
   }
 
-  let warnRestore = compareVersion(restoreData.value.manifest.version, __EXT_VERSION__) == 1;
-  if (!warnRestore || confirm(t("SetBackup.RestoreDialog.versionWarning"))) {
-    sendMessage("restoreBackupData", { restoreData: restoreData.value!, restoreOptions: restoreOptions.value })
-      .then(() => {
-        runtimeStore.showSnakebar(t("SetBackup.RestoreDialog.success"), { color: "success" });
-        showDialog.value = false;
-      })
-      .catch((err) => {
-        runtimeStore.showSnakebar(t("SetBackup.RestoreDialog.failure", { error: err }), { color: "error" });
-        console.error(err);
-      })
-      .finally(() => {
-        isDoingRestore.value = false;
-      });
+  const warnRestore = compareVersion(restoreData.value.manifest.version, __EXT_VERSION__) == 1;
+  // ⚠️ 上游用原生 confirm()，但 MV3 扩展页面禁用原生对话框（静默返回 false）→ 点完成无任何反应。
+  // 改为 snackbar 警告后继续恢复。
+  if (warnRestore) {
+    runtimeStore.showSnakebar(
+      t("SetBackup.RestoreDialog.versionWarning") + " (backup: " + restoreData.value.manifest.version + ")",
+      { color: "warning", timeout: 8000 },
+    );
   }
+
+  sendMessage("restoreBackupData", { restoreData: restoreData.value!, restoreOptions: restoreOptions.value })
+    .then(() => {
+      runtimeStore.showSnakebar(t("SetBackup.RestoreDialog.success"), { color: "success" });
+      showDialog.value = false;
+    })
+    .catch((err) => {
+      runtimeStore.showSnakebar(t("SetBackup.RestoreDialog.failure", { error: err }), { color: "error" });
+      console.error(err);
+    })
+    .finally(() => {
+      isDoingRestore.value = false;
+    });
 }
 
 function convertIsoDurationToMinutes(duration: string): number {

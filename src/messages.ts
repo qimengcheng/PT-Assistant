@@ -59,9 +59,10 @@ export interface ProtocolMap extends TMessageMap {
 
   // ===== 1.2 chrome.cookies（供 Cloudflare 重试与站点登录态使用）=====
   getAllCookies(data: chrome.cookies.GetAllDetails): chrome.cookies.Cookie[];
-  setCookie(data: chrome.cookies.SetDetails): boolean;
+  setCookie(data: chrome.cookies.SetDetails): void;
   getCookie(data: chrome.cookies.CookieDetails): chrome.cookies.Cookie | null;
   removeCookie(data: chrome.cookies.CookieDetails | chrome.cookies.SetDetails): chrome.cookies.CookieDetails | null;
+  checkAndExtendCookies(url: string): void;
 
   // ===== 2. offscreen：站点基础 ( utils/site ) =====
   getSiteUserConfig(data: { siteId: TSiteID; flush?: boolean }): ISiteUserConfig;

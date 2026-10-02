@@ -38,7 +38,12 @@ onMounted(() => {
         size="small"
         @change="
           (checked: boolean | string | number) =>
-            metadataStore.simplePatch("sites", item.id, `merge.searchEntry.${String(entryKey)}.enabled`, !!checked)
+            metadataStore.simplePatch(
+              'sites',
+              item.id,
+              `merge.searchEntry.${String(entryKey)}.enabled`,
+              !!checked,
+            )
         "
       />
       <span class="search-entry-name">{{ searchEntry.name }}</span>

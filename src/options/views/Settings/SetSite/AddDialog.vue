@@ -1,0 +1,259 @@
+<script setup lang="ts">
+import { computed, provide, ref, shallowRef } from "vue";
+import { useI18n } from "vue-i18n";
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  LeftOutlined,
+  QuestionCircleOutlined,
+  RightOutlined,
+} from "@antdv-next/icons";
+import { ISiteMetadata, type ISiteUserConfig, type TSiteID } from "@ptd/site";
+
+import { useMetadataStore } from "@/options/stores/metadata.ts";
+import { getCanAddedSiteMetadata } from "./utils.ts";
+
+import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import Editor from "./Editor.vue";
+
+import { REPO_URL } from "~/helper.ts";
+
+const showDialog = defineModel<boolean>();
+
+const { t } = useI18n();
+const metadataStore = useMetadataStore();
+
+const currentStep = ref<0 | 1>(0);
+const selectedSiteId = ref<TSiteID | null>(null);
+const storedSiteUserConfig = ref<ISiteUserConfig>({});
+const isFormValid = ref<boolean>(false);
+
+provide("storedSiteUserConfig", storedSiteUserConfig);
+
+function resetDialog() {
+  currentStep.value = 0;
+  selectedSiteId.value = null;
+  storedSiteUserConfig.value = {};
+}
+
+const showDeadSite = ref<boolean>(false);
+const allUnAddedSites = shallowRef<ISiteMetadata[]>([]);
+const canAddSites = computed(() =>
+  allUnAddedSites.value.filter((site) => (showDeadSite.value && site.isDead) || !site.isDead),
+);
+
+async function loadCanAddSites() {
+  // Load the sites that can be added
+  const sites = await getCanAddedSiteMetadata();
+  allUnAddedSites.value = Object.values(sites);
+}
+
+async function saveSite() {
+  await metadataStore.addSite(selectedSiteId.value!, storedSiteUserConfig.value!);
+  showDialog.value = false;
+}
+
+// 下面两个纯渲染辅助函数只服务 a-select 的插槽，替代 Vuetify 的 item-title/item-value/filter-keys 配置
+const siteOptions = computed(() =>
+  canAddSites.value.map((site) => ({ value: site.id, label: site.name, site })),
+);
+
+function findCanAddSite(id: string | number): ISiteMetadata | undefined {
+  return canAddSites.value.find((site) => site.id === id);
+}
+
+function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boolean {
+  if (!input) return true;
+  const site = option?.site;
+  if (!site) return false;
+  // 与旧版 filter-keys: ["raw.name", "raw.urls", "raw.aka"] 等价
+  const haystack = [site.name, ...(site.aka ?? []), ...(site.urls ?? [])].join(" ").toLowerCase();
+  return haystack.includes(input.toLowerCase());
+}
+</script>
+
+<template>
+  <a-modal
+    v-model:open="showDialog"
+    :width="800"
+    :closable="false"
+    :body-style="{ maxHeight: '70vh', overflowY: 'auto' }"
+    @after-open-change="(open: boolean) => (open ? loadCanAddSites() : resetDialog())"
+  >
+    <template #title>
+      <div class="dialog-title">
+        <span>{{ t("SetSite.add.title") }}</span>
+        <div class="dialog-title-spacer" />
+        <a-button
+          size="small"
+          type="text"
+          color="green"
+          :title="t('layout.header.wiki')"
+          :href="`${REPO_URL}/wiki/config-site`"
+          rel="noopener noreferrer nofollow"
+          target="_blank"
+        >
+          <template #icon>
+            <QuestionCircleOutlined />
+          </template>
+        </a-button>
+      </div>
+    </template>
+
+    <!-- 选取可添加的站点 -->
+    <div v-if="currentStep === 0">
+      <a-select
+        v-model:value="selectedSiteId"
+        :autofocus="true"
+        :show-search="true"
+        :options="siteOptions"
+        :filter-option="filterSiteOption"
+        :placeholder="selectedSiteId ? '' : t('SetSite.add.selectSitePlaceholder')"
+        class="site-select"
+      >
+        <template #labelRender="{ value }">
+          <SiteFavicon :site-id="String(value)" :size="18" class="mr-2" flush-on-no-image />
+          <span :class="{ 'line-through': findCanAddSite(value)?.isDead }">
+            {{ findCanAddSite(value)?.name ?? "" }}
+          </span>
+        </template>
+        <template #optionRender="{ option }">
+          <div class="site-option">
+            <SiteFavicon :site-id="option.data.site.id" :size="24" class="mr-2" />
+            <div class="site-option-main">
+              <div>
+                <b :class="{ 'line-through': option.data.site.isDead }">{{ option.data.site.name ?? "" }}</b>
+                <!-- 站点类型 -->
+                <a-tag :color="option.data.site.type === 'private' ? 'blue' : 'default'" class="ml-2">
+                  {{
+                    option.data.site.schema ??
+                    (option.data.site.type === "private" ? "AbstractPrivateSite" : "AbstractBittorrentSite")
+                  }}
+                </a-tag>
+                <a-tag v-if="option.data.site.version" color="green" class="ml-2">
+                  v{{ option.data.site.version }}
+                </a-tag>
+              </div>
+              <div class="site-option-desc text-ellipsis" :title="option.data.site.description ?? ''">
+                {{ option.data.site.description ?? "" }}
+              </div>
+            </div>
+            <div class="site-option-tags">{{ option.data.site.tags?.join(", ") ?? "" }}</div>
+          </div>
+        </template>
+      </a-select>
+      <div class="site-hint">
+        {{ canAddSites.find((i: ISiteMetadata) => i.id === selectedSiteId)?.description ?? "" }}
+      </div>
+    </div>
+    <!-- 具体配置站点 -->
+    <div v-else>
+      <Editor ref="editor" v-model="selectedSiteId!" @update:form-valid="(v: boolean) => (isFormValid = v)" />
+    </div>
+
+    <template #footer>
+      <div class="footer-bar">
+        <label v-if="currentStep === 0" class="switch-row">
+          <a-switch v-model:checked="showDeadSite" size="small" />
+          <span>{{ t("SetSite.AddDialog.showDeadSite") }}</span>
+        </label>
+        <div class="footer-bar-spacer" />
+        <a-button size="small" type="text" danger @click="showDialog = false">
+          <template #icon>
+            <CloseCircleOutlined />
+          </template>
+          <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
+        </a-button>
+        <a-button v-if="currentStep === 1" size="small" type="text" color="blue" @click="currentStep = 0">
+          <template #icon>
+            <LeftOutlined />
+          </template>
+          <span class="ml-1">{{ t("common.dialog.prev") }}</span>
+        </a-button>
+        <a-button
+          v-if="currentStep === 0"
+          size="small"
+          type="text"
+          color="blue"
+          :disabled="selectedSiteId == null"
+          @click="currentStep = 1"
+        >
+          <span>{{ t("common.dialog.next") }}</span>
+          <RightOutlined class="ml-1" />
+        </a-button>
+        <a-button v-if="currentStep === 1" size="small" type="text" color="green" :disabled="!isFormValid" @click="saveSite">
+          <template #icon>
+            <CheckCircleOutlined />
+          </template>
+          <span class="ml-1">{{ t("common.dialog.ok") }}</span>
+        </a-button>
+      </div>
+    </template>
+  </a-modal>
+</template>
+
+<style scoped lang="scss">
+.dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dialog-title-spacer {
+  flex: 1 1 0;
+}
+
+.site-select {
+  width: 100%;
+}
+
+.site-hint {
+  min-height: 22px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.line-through {
+  text-decoration: line-through;
+}
+
+.site-option {
+  display: flex;
+  align-items: center;
+}
+
+.site-option-main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.site-option-desc {
+  max-width: 500px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.site-option-tags {
+  margin-left: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.footer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-bar-spacer {
+  flex: 1 1 0;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+</style>

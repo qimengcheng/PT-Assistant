@@ -1,0 +1,41 @@
+{
+  "name": "pt-assistant-wxt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PT Assistant — PT-depiler 的 WXT + Vue 3 全新架构重写版（骨架）",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "compile": "vue-tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@webext-core/messaging": "^4.0.0",
+    "axios": "^1.20.0",
+    "crypto-js": "^4.2.0",
+    "date-fns": "^4.4.0",
+    "es-toolkit": "^1.52.0",
+    "p-queue": "^9.3.3",
+    "sizzle": "^2.3.10",
+    "url-join": "^5.0.0",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.0",
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^26.6.3",
+    "@types/sizzle": "^2.3.10",
+    "@wxt-dev/module-vue": "^1.0.3",
+    "tinyexec": "^1.3.1",
+    "typescript": "~6.0.3",
+    "vue-tsc": "^3.3.11",
+    "wxt": "^0.21.0"
+  }
+}

@@ -1,0 +1,346 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    "Microsoft YaHei",
+    sans-serif;
+  font-size: 13px;
+  color: #1f2328;
+  background: #f6f8fa;
+}
+
+/* ===== 外层壳：左侧导航 + 内容区 ===== */
+.shell {
+  display: flex;
+  height: 100vh;
+}
+
+.nav {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #d0d7de;
+  background: #fff;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid #eaeef2;
+}
+
+.brand .logo {
+  width: 32px;
+  height: 32px;
+}
+
+.brand h1 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.brand .version {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.menu {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+  color: #1f2328;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: #f0f6ff;
+}
+
+.menu-item.active {
+  background: #dbeafe;
+  font-weight: 600;
+}
+
+.badge {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 10px;
+}
+
+.nav-footer {
+  margin-top: auto;
+  padding: 12px 14px;
+  border-top: 1px solid #eaeef2;
+}
+
+.status {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.status.ok {
+  color: #15803d;
+}
+
+.status.bad {
+  color: #b91c1c;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ===== 首页 ===== */
+.home {
+  max-width: 640px;
+  padding: 32px 40px;
+}
+
+.home h2 {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.home .sub {
+  color: #6b7280;
+  margin-bottom: 24px;
+}
+
+.cards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.card {
+  flex: 1;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-label {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.card-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.card-value small {
+  font-size: 12px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.home h3 {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.modules {
+  list-style: none;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.modules li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.modules li + li {
+  border-top: 1px solid #eaeef2;
+}
+
+.modules .pending {
+  color: #6b7280;
+}
+
+.dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.dot.ok {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.dot.todo {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.pending-tag {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+/* ===== 站点定义（开发调试视图） ===== */
+.layout {
+  display: flex;
+  height: 100vh;
+}
+
+.layout .defs {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #d0d7de;
+  background: #fff;
+}
+
+.layout .defs header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 14px 10px;
+}
+
+.layout .defs h1 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.count {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.search {
+  margin: 0 14px 10px;
+  padding: 7px 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  outline: none;
+}
+
+.search:focus {
+  border-color: #2563eb;
+}
+
+.site-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  padding: 4px 0;
+}
+
+.site-list li {
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+.site-list li:hover {
+  background: #f0f6ff;
+}
+
+.site-list li.active {
+  background: #dbeafe;
+  font-weight: 600;
+}
+
+.defs-detail {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+}
+
+.defs-detail h2 {
+  margin-bottom: 16px;
+  font-size: 18px;
+}
+
+.hint {
+  color: #6b7280;
+  padding-top: 40px;
+  text-align: center;
+}
+
+.hint.error {
+  color: #b91c1c;
+}
+
+.detail {
+  border-collapse: collapse;
+}
+
+.detail th {
+  text-align: left;
+  padding: 8px 16px 8px 0;
+  color: #6b7280;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.detail td {
+  padding: 8px 0;
+}
+
+.tag {
+  display: inline-block;
+  margin: 0 6px 4px 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.url {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  margin-bottom: 4px;
+}

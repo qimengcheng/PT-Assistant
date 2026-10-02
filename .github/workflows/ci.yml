@@ -1,0 +1,320 @@
+name: CI
+
+# 单文件流水线：push / PR 都跑「校验 + 构建」，push 到 master 或手动触发时额外发 Release。
+# 之前拆成 build.yml + release.yml（release 用 workflow_call 复用 build），
+# 拆开有两个实际问题：一是 workflow_call 的 outputs 要手工接线，二是两处 action 版本容易只升一处。
+#
+# action 版本说明（GitHub 已弃用 Node 20 运行时，v5+ 起默认 Node 24）：
+#   actions/checkout        v7  （v7.0.0 起 ESM 化）
+#   actions/setup-node      v6
+#   actions/upload-artifact v7  （v7.0.0 起 ESM 化）
+#   actions/download-artifact v8（v8 起 digest 不匹配默认报错）
+#   pnpm/action-setup       v6  （v5.0.0 起 Node 24，v6 加 pnpm 11 支持）
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # 提交信息必须带版本号，且与 package.json 一致。
+  # 独立成一个 job：只需要 checkout + node，不需要装依赖，几秒就能出结论，
+  # 不用等 build 跑完 1 分钟才发现提交信息写错了。
+  #
+  # 注意 squash 合并：GitHub 生成的合并 commit message 来自 PR 标题，
+  # 所以走 PR 合并时要把 vX.Y.Z 写进 PR 标题，否则这里会拦。
+  verify:
+    name: Verify commit prefix and version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      # 早期阶段标记：仓库根有 .ci/early 就说明「那时还没有工程化体系」，
+      # 此时 build job 整个跳过，但 release 仍然跑（打 tag + 出更新内容），
+      # 这样历史每个版本都有 tag，gen-release-notes.mjs 才找得到上一次的起点。
+      early: ${{ steps.stage.outputs.early }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect stage
+        id: stage
+        run: |
+          if [ -f .ci/early ]; then
+            echo "early=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::检测到 .ci/early —— 这是工程化体系建立之前的提交，跳过构建与静态检查，但仍会打 tag 发更新内容"
+          else
+            echo "early=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: meta
+        name: Read version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # 三条硬规则，全部只看**标题行**（%s），不看正文：
+      #   ① 前缀必须是 [agent名]-[模型名]，两者各自独立方括号（方括号内可含空格，如 [DeepSeek Harness]）
+      #   ② 必须含 vX.Y.Z 版本号
+      #   ③ 版本号必须与 package.json 一致
+      - name: Commit subject must carry agent-model prefix and matching version
+        run: |
+          set -euo pipefail
+          SUBJECT="$(git log -1 --pretty=%s)"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          echo "::group::提交标题"
+          echo "$SUBJECT"
+          echo "::endgroup::"
+          echo "package.json 版本：v${PKG_VERSION}"
+
+          if ! printf '%s' "$SUBJECT" | grep -qE '^\[[^]]+\]-\[[^]]+\]'; then
+            echo "::error::提交标题必须以 [agent名]-[模型名] 开头，例如 [WorkBuddy]-[Space Bunny] v0.18.4 描述"
+            exit 1
+          fi
+
+          if ! printf '%s' "$SUBJECT" | grep -qE 'v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::提交标题里没有版本号。要求格式：[agent名]-[模型名] vX.Y.Z 描述"
+            exit 1
+          fi
+
+          if ! printf '%s' "$SUBJECT" | grep -qF "v${PKG_VERSION}"; then
+            echo "::error::提交标题里的版本号与 package.json 不一致（package.json 是 v${PKG_VERSION}）"
+            exit 1
+          fi
+
+  build:
+    # 两个条件都要显式写：
+    #   success() —— job 里一旦出现 `if:`，GitHub 就不再自动附加「所有 needs 必须成功」
+    #                的默认语义。不写这一句，verify 挂了 build 照样跑，
+    #                版本号不一致的提交会被构建、打包、发版，等于守卫形同虚设。
+    #   early == false —— .ci/early 存在时整job跳过（见下方注释）。
+    needs: verify
+    if: success() && needs.verify.outputs.early == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # pnpm/action-setup 优先读 package.json 的 packageManager 字段（已固定为 12.8.1）
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - id: meta
+        name: Read version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Type check (vue-tsc)
+        run: pnpm compile
+
+      # 两条都是「静态比对注册名表」的防线，不依赖构建产物，放在构建前尽早失败：
+      # 1) 全仓扫描写错的 a-* 标签（antdv-next 没有 a-list/a-step，写错不会报错，
+      #    只是把整块内容静默丢掉 —— 带命名插槽时原生元素分支根本不渲染 children）；
+      # 2) content 侧 antd 是按需注册（src/content-script/antd-lite.ts），漏注册同样静默。
+      - name: Check antd tag usage
+        run: node scripts/check-antd-tags.mjs
+
+      - name: Check content-script antd coverage
+        run: node scripts/check-content-antd-lite.mjs
+
+      # 第三条静态防线：vue-i18n 拿不到键时不抛异常、不进 vue-tsc、不进构建，
+      # 而是把键路径本身当文案渲染到界面上（内部标识符进 UI 是 §3.5 的零容忍项）。
+      - name: Check i18n keys resolve in both locales
+        run: node scripts/check-locale-keys.mjs
+
+      # 第四条静态防线：传给 a-* 组件的死 prop / 死插槽。
+      # vue-tsc 抓不到（a-* 的类型来自 GlobalComponents 声明，允许任意 attr），
+      # 而 antdv-next 运行时是 inheritAttrs 默认行为 —— 没声明的 prop 被当普通 attr
+      # 塞进根 DOM，不报错、不警告、生产环境完全静默；没匹配的命名插槽渲染成空。
+      # 判据是运行时实跑 install() 拿到的注册表与 dist 下的 .d.ts，不抄文档。
+      - name: Check dead props and slots on a-* components
+        run: node scripts/check-dead-props.mjs
+
+      # 版本号守卫的**兜底**（主防线是本地 .githooks 里的 pre-commit / commit-msg：
+      # CI 只在 push 时触发，本地连提 5 次它一次都不跑，等历史定型就晚了）。
+      # 这里检查 HEAD 这一条：「提交消息版本号 == package.json」且「== 父提交最大 + 1」。
+      # clone 出来的仓库没有本地 hook，且 --no-verify 能绕过，所以 CI 必须再挂一份。
+      - name: Check version number is continuous and consistent
+        run: node scripts/check-version.mjs --committed
+
+      # 用 WXT 自带的 `wxt zip` 而不是系统 zip：
+      # 1) 不依赖 runner 是否预装 zip；2) 同时产出 -sources.zip，
+      #    那是 Firefox Add-ons 强制要求的源码包；3) 本地已逐条验证过产物命名。
+      # 产物名带上版本号：Release 页面里多个版本的 zip 并排时能一眼分清，
+      # 下载到本地也不会和旧版本的包混淆。
+      - name: Build and package
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          pnpm exec wxt zip
+          pnpm exec wxt zip -b firefox
+          mkdir -p build
+          mv .output/pt-assistant-wxt-*-chrome.zip   "build/PT-Assistant-${VERSION}-chrome.zip"
+          mv .output/pt-assistant-wxt-*-firefox.zip  "build/PT-Assistant-${VERSION}-firefox.zip"
+          mv .output/pt-assistant-wxt-*-sources.zip  "build/PT-Assistant-${VERSION}-sources.zip"
+          ls -l build
+
+      # 把 MV3 service worker 产物真的 import 一次。v0.4.x 那次「popup 卡住、消息永远无响应」
+      # 是 classic SW 把 sizzle 内联进来、顶层访问 window 导致 SW 启动即崩 —— 类型检查和
+      # 源码层面的测试都看不见，只有加载打包产物才暴露。详见 scripts/smoke-background.mjs。
+      - name: Smoke test background service worker
+        run: node scripts/smoke-background.mjs
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: build-zip-${{ steps.meta.outputs.version }}
+          path: build/*.zip
+
+  release:
+    needs: [verify, build]
+    # PR 只做校验出包，不发版；push 到 master 或手动触发才发。
+    # always() 的唯一作用是覆盖「build 被 .ci/early 跳过」—— 被跳过的 job 会让
+    # 默认的 success() 判定为失败，不写它早期版本就发不出 tag。
+    # 但 always() 会无视**所有** needs 的成败，所以失败必须逐个显式挡：
+    #   needs.verify.result == 'success'                     verify 失败 → 不发版
+    #   needs.build.result == 'success'                      build 失败 → 不发版
+    #   || needs.verify.outputs.early == 'true'               早期阶段 → 允许（但无产物）
+    if: >-
+      always() && github.event_name != 'pull_request' &&
+      needs.verify.result == 'success' &&
+      (needs.build.result == 'success' || needs.verify.outputs.early == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      released: ${{ steps.gh.outputs.id != '' }}
+    steps:
+      # 生成更新内容要读 git 历史 + 上一个 release tag（算「本次改了什么」的范围），
+      # 所以这里需要完整克隆；fetch-depth: 0 才会把 tag 一起取下来。
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        if: needs.build.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: build-zip-*
+          merge-multiple: true
+
+      # 更新内容来自本仓库的提交历史（[agent]-[model] vX.Y.Z 描述 这种格式），
+      # 比 GitHub 按 PR 自动生成的 notes 更贴近「这次到底改了什么」。
+      # 两者不冲突：bodyPath 在前，自动 notes（含 PR 链接与贡献者）附在后。
+      - name: Generate release notes
+        run: node scripts/gen-release-notes.mjs release-notes.md
+
+      # 注意参数名是 `bodyFile`，**没有** `bodyPath` 这个参数（旧版 v0.19.1 那次就
+      # 因为写成 bodyPath 被静默忽略，Release 页面只剩 GitHub 自动生成的那行
+      # Full Changelog）。相对路径以 workspace 为基准。
+      #
+      # version 改从 verify job 取（它只需要 checkout + node，早期阶段 build 被跳过时
+      # 仍然有值）；artifacts 在早期阶段没有产物，必须留空 —— 写死文件名会让
+      # release-action 因为找不到文件而整步失败。
+      - id: gh
+        uses: ncipollo/release-action@v1
+        with:
+          name: v${{ needs.verify.outputs.version }}
+          tag: v${{ needs.verify.outputs.version }}
+          skipIfReleaseExists: true
+          bodyFile: release-notes.md
+          generateReleaseNotes: true
+          artifacts: ${{ needs.build.result == 'success' && format('PT-Assistant-{0}-chrome.zip,PT-Assistant-{0}-firefox.zip,PT-Assistant-{0}-sources.zip', needs.verify.outputs.version) || '' }}
+
+      # ── 以下为可选的商店发布：secret 未配置时整段跳过，不影响 GitHub Release ──
+      #
+      # 早期阶段（.ci/early）没有构建产物，wepub 会找不到 zip 而报错，
+      # 所以两段都要求 needs.build.result == 'success'。
+      #
+      # Chrome Web Store 走 service account 自签 JWT 换 access token：
+      # 不用 gcloud，因为 `gcloud auth print-access-token` 不带 --impersonate 时会按
+      # GCP 自身的 scope 白名单校验，chromewebstore 不在其列，必然报 Invalid scopes value。
+      # 走 access token 模式时不可再设置 WEPUB_CHROME_REFRESH_TOKEN，
+      # 且 CLIENT_ID / CLIENT_SECRET 必须一并移除，否则 wepub 会因这两个变量报错。
+      - name: Publish to Chrome Web Store
+        if: ${{ steps.gh.outputs.id != '' && needs.build.result == 'success' }}
+        continue-on-error: true
+        env:
+          WEPUB_CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          WEPUB_CHROME_ITEM_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_SERVICE_ACCOUNT_JSON: ${{ secrets.CHROME_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$WEPUB_CHROME_PUBLISHER_ID" ] || [ -z "$CHROME_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::notice::未配置 Chrome Web Store 凭证，跳过"
+            exit 0
+          fi
+
+          # 自签 JWT 换 access token，并立即注册脱敏规则，
+          # 避免 token 经 set -x / wepub 自身日志泄漏到 Actions log
+          TOKEN="$(node -e '
+            const crypto = require("crypto");
+            (async () => {
+              const key = JSON.parse(process.env.CHROME_SERVICE_ACCOUNT_JSON);
+              const b64 = (s) => Buffer.from(s).toString("base64url");
+              const now = Math.floor(Date.now() / 1000);
+              const input =
+                b64(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." +
+                b64(JSON.stringify({
+                  iss: key.client_email,
+                  scope: "https://www.googleapis.com/auth/chromewebstore",
+                  aud: "https://oauth2.googleapis.com/token",
+                  iat: now, exp: now + 3600,
+                }));
+              const assertion = input + "." + crypto.createSign("RSA-SHA256")
+                .update(input).sign(key.private_key).toString("base64url");
+
+              const res = await fetch("https://oauth2.googleapis.com/token", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                  grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                  assertion,
+                }),
+              });
+              const json = await res.json();
+              if (!json.access_token) {
+                console.error(res.status, JSON.stringify(json));
+                process.exit(1);
+              }
+              process.stdout.write(json.access_token);
+            })().catch((e) => { console.error(e); process.exit(1); });
+          ')"
+          if [ -z "$TOKEN" ]; then
+            echo "::error::获取 Chrome Web Store access token 失败"
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          export WEPUB_CHROME_ACCESS_TOKEN="$TOKEN"
+
+          # iorate/wepub：Chrome / Firefox / Edge 三家商店统一 CLI
+          curl -fsSL https://unpkg.com/wepub@latest/install.sh | sh
+          wepub chrome PT-Assistant-*-chrome.zip
+
+      - name: Publish to Firefox Add-ons
+        if: ${{ steps.gh.outputs.id != '' && needs.build.result == 'success' }}
+        continue-on-error: true
+        env:
+          WEPUB_FIREFOX_ADDON_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+          WEPUB_FIREFOX_API_KEY: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          WEPUB_FIREFOX_API_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+          FIREFOX_CHANNEL: ${{ secrets.FIREFOX_CHANNEL }}
+        run: |
+          if [ -z "$WEPUB_FIREFOX_ADDON_ID" ]; then
+            echo "::notice::未配置 Firefox Add-ons 凭证，跳过"
+            exit 0
+          fi
+          # AMO 强制要求同时提交源码包，用构建阶段产出的 -sources.zip
+          wepub firefox PT-Assistant-*-firefox.zip \
+            --source PT-Assistant-*-sources.zip \
+            --channel "${FIREFOX_CHANNEL:-listed}"

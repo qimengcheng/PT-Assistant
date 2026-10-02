@@ -123,23 +123,48 @@ function toAntdSortOrder(key: string): "ascend" | "descend" | null {
   return found?.order === "asc" ? "ascend" : found?.order === "desc" ? "descend" : null;
 }
 
-const tableHeader = computed<Record<string, any>[]>(() =>
-  fullTableHeader.value
-    .filter(
-      (item) => item?.props?.disabled || configStore.tableBehavior.SearchEntity.columns!.includes(item.key!),
-    )
-    .map(({ props, sortable, ...rest }) => ({
+/**
+ * 通用比较器：数值优先（size/seeders/time 等都是数字），回退字符串比较；
+ * category 这类对象列取 name。
+ * ⚠️ antd 的受控排序要求 column.sorter 提供真正的 compare 函数——
+ * `sorter: true` / `{ multiple: n }`（无 compare）时 antd 内部 getSortFunction 返回 false，
+ * 排序器被静默跳过，表现为「箭头会动、数据不排」（v0.12.1 排序失效的根因）。
+ */
+function makeSorter(key: string) {
+  return (a: any, b: any): number => {
+    const pick = (row: any) => {
+      const v = row?.[key];
+      return v && typeof v === "object" ? (v.name ?? "") : v;
+    };
+    const ra = pick(a);
+    const rb = pick(b);
+    const na = typeof ra === "number" ? ra : Number.parseFloat(ra);
+    const nb = typeof rb === "number" ? rb : Number.parseFloat(rb);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+    return String(ra ?? "").localeCompare(String(rb ?? ""), "zh-CN");
+  };
+}
+
+const tableHeader = computed<Record<string, any>[]>(() => {
+  // 旧 storage 里 columns 可能缺失/非数组（Vuetify 时期格式），守卫回退为全部列
+  const savedColumns = configStore.tableBehavior?.SearchEntity?.columns;
+  const visibleColumns: string[] = Array.isArray(savedColumns) ? savedColumns : [];
+  return fullTableHeader.value
+    .filter((item) => item?.props?.disabled || visibleColumns.length === 0 || visibleColumns.includes(item.key!))
+    .map(({ props, sortable, ...rest }, colIdx) => ({
       ...rest,
       // 不可排序的列直接不带 sorter 键，a-table 就不会渲染排序箭头、点击也不会触发 change；
-      // 开启多列排序时 antd 要用 sorter: { multiple: 优先级 } 而不是 true。
+      // 多列排序时 antd 用 { compare, multiple: 优先级 }，单列排序直接给 compare 函数。
       ...(sortable === false
         ? {}
         : {
-            sorter: configStore.enableTableMultiSort ? { multiple: 1 } : true,
+            sorter: configStore.enableTableMultiSort
+              ? { compare: makeSorter(rest.key), multiple: colIdx + 1 }
+              : makeSorter(rest.key),
             sortOrder: toAntdSortOrder(rest.key),
           }),
-    })),
-);
+    }));
+});
 
 /** a-select(mode="multiple") 的 options 形如 { value, label } */
 const columnOptions = computed(() => fullTableHeader.value.map((item) => ({ value: item.key, label: item.title })));
@@ -160,12 +185,27 @@ const { tableFilterRef, tableWaitFilterRef, tableFilterFn, buildAdvanceItemProps
 /**
  * v-data-table 的 :search + :custom-filter 在 a-table 里没有对应 prop，
  * 这里用 computed 复现同一个判断：tableFilterFn 的第三个参数形如 { raw: item }。
+ *
+ * 防御性约束（v0.12.1）：过滤器/数据异常时「宁可多显示，绝不清空表格」——
+ * 单行判断抛错按通过处理，整体 filter 抛错回退为未过滤列表。
  */
-const tableItems = computed<any[]>(() =>
-  runtimeStore.search.searchResult.filter((item: any) =>
-    tableFilterFn(null, tableFilterRef.value, { raw: item }),
-  ),
-);
+const tableItems = computed<any[]>(() => {
+  const items = (runtimeStore.search.searchResult ?? []) as any[];
+  try {
+    return items.filter((item: any) => {
+      if (!item || typeof item !== "object") return false; // 脏条目直接丢弃
+      try {
+        return tableFilterFn(null, tableFilterRef.value, { raw: item });
+      } catch (e) {
+        console.warn("[SearchEntity] row filter error, show row anyway:", (e as Error)?.message, item?.uniqueId);
+        return true;
+      }
+    });
+  } catch (e) {
+    console.warn("[SearchEntity] tableItems fallback to unfiltered list:", e);
+    return items;
+  }
+});
 
 // 使用 shallowRef 优化：种子对象数组不需要深度响应性，提升性能
 const tableSelectedRaw = shallowRef<ISearchResultTorrent[]>([]);
@@ -177,7 +217,11 @@ const tableSelectedRaw = shallowRef<ISearchResultTorrent[]>([]);
 
 /** a-table 的分页是受控的，v-data-table 原本把这块状态收在组件内部 */
 const tablePage = ref(1);
-const tablePageSize = computed(() => configStore.tableBehavior.SearchEntity.itemsPerPage);
+const tablePageSize = computed(() => {
+  // 旧版本/迁移期 storage 里可能存有非法值（0/NaN/字符串），统一守卫回退默认
+  const v = configStore.tableBehavior?.SearchEntity?.itemsPerPage as unknown;
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 50;
+});
 
 /** 过滤条件变化后如果还停在旧页码上，antd 会显示空表，这里跟随 Vuetify 的行为回到第一页 */
 watch([tableFilterRef, tablePageSize], () => {

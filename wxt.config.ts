@@ -41,10 +41,14 @@ export default defineConfig({
       default_title: "PT Assistant",
     },
   },
-  vite: () => ({
+  // env.browser 是 WXT 从 CLI `-b/--browser` 解析出的目标浏览器。
+  // ⚠️ 不要再用 `process.env.TARGET || "chrome"`：WXT 全程不设置 process.env.TARGET，
+  // 那样写会让 __BROWSER__ 恒为 "chrome"，实测 `pnpm build:firefox` 产出的 hdsky
+  // chunk 仍然走 chrome 分支（Firefox 下下载链接选择器会取错）。
+  vite: (env) => ({
     // PT-depiler 沿用的编译期常量（site 包 favicon / 定义引用）
     define: {
-      __BROWSER__: JSON.stringify(browser),
+      __BROWSER__: JSON.stringify(env.browser),
       __EXT_VERSION__: JSON.stringify(`v${pkgVersion}`),
       // TODO: 平移 public/icons/site 后改为真实图标清单
       __RESOURCE_SITE_ICONS__: JSON.stringify([]),
@@ -73,4 +77,4 @@ export default defineConfig({
       ],
     },
   }),
-}));
+});

@@ -31,37 +31,33 @@ async function dialogEnter() {
 </script>
 
 <template>
-  <v-dialog v-model="showDialog" :persistent="isDeleting" width="300" @after-enter="dialogEnter">
-    <v-card>
-      <v-card-title class="bg-red-lighten-2">
-        {{ t("common.dialog.title.confirmAction") }}
-      </v-card-title>
+  <!-- footer prop 传 null 会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...），底部按钮全消失，故不设 footer -->
+  <a-modal
+    v-model:open="showDialog"
+    :width="340"
+    :mask-closable="!isDeleting"
+    :closable="!isDeleting"
+    :keyboard="!isDeleting"
+    @after-open-change="(open: boolean) => open && dialogEnter()"
+  >
+    <template #title>
+      <span style="color: #cf1322">{{ t("common.dialog.title.confirmAction") }}</span>
+    </template>
 
-      <v-card-text class="text-body-large">
-        {{ t("common.dialog.deleteText", [toDeleteIds!.length]) }}
+    <div class="text-body-large">
+      {{ t("common.dialog.deleteText", [toDeleteIds!.length]) }}
+      <slot name="append-text" />
+    </div>
 
-        <slot name="append-text" />
-      </v-card-text>
-
-      <v-divider />
-
-      <v-card-actions>
-        <v-spacer />
-        <v-btn color="info" prepend-icon="mdi-close-circle" variant="text" @click="showDialog = false">
-          <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
-        </v-btn>
-        <v-btn
-          :loading="isDeleting"
-          color="error"
-          prepend-icon="mdi-check-circle-outline"
-          variant="text"
-          @click="confirmDelete"
-        >
-          <span class="ml-1">{{ t("common.dialog.ok") }}</span>
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <template #footer>
+      <a-button type="text" @click="showDialog = false">
+        <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
+      </a-button>
+      <a-button danger :loading="isDeleting" type="text" @click="confirmDelete">
+        <span class="ml-1">{{ t("common.dialog.ok") }}</span>
+      </a-button>
+    </template>
+  </a-modal>
 </template>
 
 <style scoped lang="scss"></style>

@@ -2,6 +2,7 @@
 import type { ISiteMetadata, TSite } from "@ptd/site"; // type-only：构建时擦除，不会把 @ptd/site 的 eager 链（utils → social → sizzle）带进 SW
 
 import { onMessage } from "@/messages.ts";
+import { setupOffscreenDocumentSafe } from "./utils/offscreen.ts";
 
 // 只需要「站点定义数量」时，用 import.meta.glob 拿文件名键即可（不会加载任何模块）。
 // ⚠️ 不能 import { definitionList } from "@ptd/site"：那会把 site index 的 eager import 链
@@ -25,6 +26,9 @@ export default defineBackground({
   // 2. module 模式下站点定义保持为独立懒加载 chunk，只有真正用到某站点时才加载。
   type: "module",
   main() {
+    // ===== offscreen 文档（站点解析/搜索/下载等服务宿主，具备 DOM）=====
+    setupOffscreenDocumentSafe();
+
     // ===== 基础 =====
     // 点扩展图标直接打开完整标签页（无 popup 入口时 onClicked 才会触发）
     browser.action.onClicked.addListener(() => {

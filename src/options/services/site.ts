@@ -1,10 +1,10 @@
 /**
- * 站点服务（本轮运行在 options 页上下文，具备 DOM，可做页面解析）。
- * 移植自 PT-depiler entries/offscreen/utils/site.ts（去掉 favicon/indexdb 部分），
- * 后续引入 offscreen 入口时把 onMessage 注册迁移过去，options 侧保留同名本地处理器即可
- * （消息 wrapper 优先本地调用，两端不冲突）。
+ * 站点服务（纯函数层，供 options 页面直接调用）。
+ * 消息协议（getSiteUserConfig/getSiteFavicon 等）的处理器注册已迁移到 offscreen
+ * 文档（src/entrypoints/offscreen/，由 background 启动时创建），页面经
+ * sendMessage 调用时由 offscreen 响应。
  *
- * ⚠️ 本模块不能在 background（service worker）中注册：它 import 了 @ptd/site，
+ * ⚠️ 本模块不能在 background（service worker）中 import：它 import 了 @ptd/site，
  * 其 eager 链会拉进 sizzle（顶层访问 window），SW 无 window 会崩。
  */
 import { isEmpty } from "es-toolkit/compat";
@@ -16,7 +16,7 @@ import {
   type TSiteID,
 } from "@ptd/site";
 
-import { onMessage, sendMessage } from "@/messages.ts";
+import { sendMessage } from "@/messages.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types.ts";
 
 export async function getSiteUserConfig(siteId: TSiteID, flush = false) {
@@ -51,8 +51,6 @@ export async function getSiteUserConfig(siteId: TSiteID, flush = false) {
 
   return storedSiteUserConfig;
 }
-
-onMessage("getSiteUserConfig", async ({ data: { siteId, flush } }) => await getSiteUserConfig(siteId, flush));
 
 export async function getSiteInstance<TYPE extends "private" | "public">(
   siteId: TSiteID,

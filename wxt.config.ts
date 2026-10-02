@@ -1,9 +1,19 @@
 import path from "node:path";
+import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "wxt";
-import vuetify from "vite-plugin-vuetify";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+
+// 站点图标清单（编译期注入，供 favicon 匹配本地图标；与 PT-depiler vite.config 一致）
+const siteIconsDir = path.resolve(rootDir, "public/icons/site");
+const siteIconFiles = (() => {
+  try {
+    return readdirSync(siteIconsDir);
+  } catch {
+    return [];
+  }
+})();
 
 // 与 PT-depiler vite.config 一致：mediaServer 等包会在运行时展示扩展版本号。
 // 注意：不要在这里 execSync("git describe")——沙箱内 spawn cmd.exe 会被 EBUSY 拦截，
@@ -50,8 +60,7 @@ export default defineConfig({
     define: {
       __BROWSER__: JSON.stringify(env.browser),
       __EXT_VERSION__: JSON.stringify(`v${pkgVersion}`),
-      // TODO: 平移 public/icons/site 后改为真实图标清单
-      __RESOURCE_SITE_ICONS__: JSON.stringify([]),
+      __RESOURCE_SITE_ICONS__: JSON.stringify(siteIconFiles),
     },
     resolve: {
       alias: {
@@ -61,20 +70,29 @@ export default defineConfig({
         "~": path.resolve(rootDir, "src"),
       },
     },
+    /**
+     * content script 的「轻量引导 + 按需加载 app」拆分。
+     *
+     * WXT 默认把 content script / unlisted script 都编成 IIFE（build.lib.formats: ["iife"]），
+     * IIFE 不能被 `import()` 动态加载，所以引导脚本必须自包含整个应用。
+     * 引导脚本匹配所有 http/https 页面（URL pattern 通配），等于每个页面都要解析一整个 Vue+antd 的 IIFE。
+     *
+     * 这里把 **content-app 这一个** unlisted script 改成 ES 输出，
+     * 让引导脚本可以 `import(chrome.runtime.getURL("content-app.js"))` 在命中站点时才加载。
+     * 其余入口（尤其 content 引导本身）必须保持 IIFE，否则 manifest 注入会失败。
+     *
+     * lib.name 即 WXT 的 entrypoint 名（见 wxt/dist/core/builders/vite/index.mjs）。
+     */
     plugins: [
-      // vuetify 组件按需自动导入 + styles 注入，配置与 PT-depiler 一致
-      vuetify({ styles: { configFile: "./src/styles/vuetify/settings.scss" } }) as any,
+      {
+        name: "ptd-content-app-esm",
+        enforce: "post" as const,
+        config(config: any) {
+          if (config?.build?.lib?.name === "content-app") {
+            config.build.lib.formats = ["es"];
+          }
+        },
+      },
     ],
-    // Vuetify 4: 强制 Vite 预打包 overlay 相关模块，避免 dev 模式下浮层 z-index 失效
-    // （仅影响 dev 模式，生产构建不受影响）。
-    optimizeDeps: {
-      include: [
-        "vuetify/components/VOverlay",
-        "vuetify/components/VDialog",
-        "vuetify/components/VMenu",
-        "vuetify/components/VSelect",
-        "vuetify/components/VTooltip",
-      ],
-    },
   }),
 });

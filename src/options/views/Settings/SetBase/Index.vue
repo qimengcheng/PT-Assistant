@@ -53,14 +53,15 @@ watch(activeKey, (key) => {
 
 <style>
 /* SetBase 通用布局（非 scoped，供各子窗口复用）：
-   内容限宽、分组紧凑化、开关两列排布，避免大片留白 */
+   内容限宽、分组卡片化（灰底白卡）、开关两列排布 */
 .set-base .set-base-body {
   max-width: 960px;
 }
 
 .set-base .group {
   margin-bottom: 14px;
-  padding: 10px 14px;
+  padding: 14px 18px;
+  background: #fff;
   border: 1px solid #f0f0f0;
   border-radius: 8px;
 }
@@ -68,7 +69,7 @@ watch(activeKey, (key) => {
 .set-base .group-title {
   font-weight: 600;
   font-size: 13px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   color: rgba(0, 0, 0, 0.88);
 }
 
@@ -96,7 +97,7 @@ watch(activeKey, (key) => {
 }
 
 .set-base .compact-form :deep(.ant-form-item) {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .set-base .compact-form :deep(.ant-form-item-label) {
@@ -105,6 +106,12 @@ watch(activeKey, (key) => {
 
 .set-base .compact-form :deep(.ant-select) {
   width: 260px;
+}
+
+.set-base .page-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 14px 18px 6px;
 }
 </style>
 

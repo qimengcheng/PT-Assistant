@@ -19,6 +19,11 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("../views/Overview/SearchEntity/Index.vue"),
   },
   {
+    path: "/set-backup",
+    name: "SetBackup",
+    component: () => import("../views/Settings/SetBackup/Index.vue"),
+  },
+  {
     path: "/debug/site-definitions",
     name: "DebugSiteDefinitions",
     component: () => import("../views/SiteDefinitions.vue"),

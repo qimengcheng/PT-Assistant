@@ -18,6 +18,7 @@ import type {
 } from "@ptd/social";
 import type { IMediaServerId, IMediaServerSearchOptions, IMediaServerSearchResult } from "@ptd/mediaServer";
 import type { TorrentClientStatus } from "@ptd/downloader";
+import type { IBackupData, IBackupFileInfo } from "@ptd/backupServer";
 
 import type { TExtensionStorageKey, IExtensionStorageSchema } from "@/storage.ts";
 import type {
@@ -32,6 +33,8 @@ import type {
   TSearchSnapshotKey,
   TTorrentDownloadKey,
   TTorrentDownloadStatus,
+  IRestoreOptions,
+  TBackupFields,
 } from "@/shared/types.ts";
 import { isDebug } from "~/helper.ts";
 
@@ -121,8 +124,19 @@ export interface ProtocolMap extends TMessageMap {
   deleteKeepUploadTask(taskId: TKeepUploadTaskKey): void;
   clearKeepUploadTasks(): void;
 
+  // ===== 1.3 chrome.downloads（供备份本地导出等使用）=====
+  downloadFile(downloadOptions: chrome.downloads.DownloadOptions): number;
+
   // ===== 2.6 日志 ( utils/logger ) =====
   logger(data: ILoggerItem): void;
+
+  // ===== 2.7 备份与恢复 ( utils/backup ) =====
+  exportBackupData(data: { backupServerId: string | "local"; backupFields: TBackupFields[] }): boolean;
+  getBackupHistory(backupServerId: string): IBackupFileInfo[];
+  deleteBackupHistory(data: { backupServerId: string; path: string }): boolean;
+  applyBackupRetention(data: { backupServerId: string; keepFilename?: string }): IBackupFileInfo[];
+  restoreBackupData(data: { restoreData: IBackupData; restoreOptions?: IRestoreOptions }): boolean;
+  getRemoteBackupData(data: { backupServerId: string; path: string; decryptKey?: string }): IBackupData;
 }
 
 /** 可序列化的种子信息，用于辅种检测（与 PT-depiler messages.ts 定义一致） */

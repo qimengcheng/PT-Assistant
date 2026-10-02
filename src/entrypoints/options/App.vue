@@ -22,6 +22,7 @@ const navItems = [
   { path: "/", label: "首页", icon: "mdi-home" },
   { path: "/sites", label: "站点管理", icon: "mdi-web" },
   { path: "/search", label: "搜索", icon: "mdi-magnify" },
+  { path: "/set-backup", label: "数据备份", icon: "mdi-backup-restore" },
   { path: "/debug/site-definitions", label: "站点定义", icon: "mdi-file-tree", dev: true },
 ];
 

@@ -51,6 +51,11 @@ export default defineBackground({
       await browser.storage.local.set({ [storageLocalKey(data.key)]: data.value });
     });
 
+    // ===== chrome.downloads（供备份本地导出等使用）=====
+    onMessage("downloadFile", async ({ data }) => {
+      return await chrome.downloads.download(data);
+    });
+
     // ===== chrome.declarativeNetRequest（供 unsafe header 替换使用）=====
     onMessage("updateDNRSessionRules", async ({ data }) => {
       await chrome.declarativeNetRequest.updateSessionRules({

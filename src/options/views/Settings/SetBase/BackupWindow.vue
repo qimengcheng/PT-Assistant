@@ -26,20 +26,3 @@ const configStore = useConfigStore();
   </div>
 </template>
 
-<style scoped>
-.compact-form :deep(.ant-form-item) {
-  margin-bottom: 10px;
-}
-
-.group {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-}
-
-.group-title {
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-</style>

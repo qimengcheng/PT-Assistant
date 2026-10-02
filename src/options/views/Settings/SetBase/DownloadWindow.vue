@@ -19,68 +19,51 @@ const localMethodOptions = [
     <a-form layout="vertical" class="compact-form">
       <div class="group">
         <div class="group-title">本地下载方式</div>
-        <a-form-item label="下载种子文件的方式">
-          <a-select v-model:value="configStore.download.localDownloadMethod" :options="localMethodOptions" />
-        </a-form-item>
-        <a-form-item>
-          <a-switch v-model:checked="configStore.download.ignoreSiteDownloadIntervalWhenLocalDownload" />
-          <span class="label">本地下载时忽略站点的下载间隔限制</span>
-        </a-form-item>
+        <div class="switch-item" style="margin-bottom: 10px">
+          <span class="label" style="min-width: 110px">下载种子文件的方式</span>
+          <a-select v-model:value="configStore.download.localDownloadMethod" :options="localMethodOptions" style="width: 280px" />
+        </div>
+        <div class="switch-grid">
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.download.ignoreSiteDownloadIntervalWhenLocalDownload" size="small" />
+            <span class="label">本地下载时忽略站点的下载间隔限制</span>
+          </div>
+        </div>
       </div>
 
       <div class="group">
         <div class="group-title">发送到下载器</div>
-        <a-form-item>
-          <a-switch v-model:checked="configStore.download.allowDirectSendToClient" />
-          <span class="label">允许直接推送到下载器（不经过确认对话框）</span>
-        </a-form-item>
-        <a-form-item>
-          <a-switch v-model:checked="configStore.download.useQuickSendToClient" />
-          <span class="label">启用快速推送（使用默认下载器）</span>
-        </a-form-item>
-        <a-form-item>
-          <a-switch v-model:checked="configStore.download.saveLastDownloader" />
-          <span class="label">记住上一次使用的下载器</span>
-        </a-form-item>
-        <a-form-item>
-          <a-switch v-model:checked="configStore.download.initDownloaderTorrentOnEnter" />
-          <span class="label">进入下载器页面时自动刷新种子列表</span>
-        </a-form-item>
-        <a-form-item>
-          <a-switch v-model:checked="configStore.download.allowDownloaderFilterForSite" />
-          <span class="label">允许为每个下载器配置可用的站点过滤器</span>
-        </a-form-item>
+        <div class="switch-grid">
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.download.allowDirectSendToClient" size="small" />
+            <span class="label">允许直接推送到下载器（不弹确认）</span>
+          </div>
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.download.useQuickSendToClient" size="small" />
+            <span class="label">启用快速推送（使用默认下载器）</span>
+          </div>
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.download.saveLastDownloader" size="small" />
+            <span class="label">记住上一次使用的下载器</span>
+          </div>
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.download.initDownloaderTorrentOnEnter" size="small" />
+            <span class="label">进入下载器页面时自动刷新列表</span>
+          </div>
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.download.allowDownloaderFilterForSite" size="small" />
+            <span class="label">允许为下载器配置站点过滤器</span>
+          </div>
+        </div>
       </div>
 
       <div class="group">
         <div class="group-title">下载历史</div>
-        <a-form-item>
-          <a-switch v-model:checked="configStore.download.saveDownloadHistory" />
+        <div class="switch-item">
+          <a-switch v-model:checked="configStore.download.saveDownloadHistory" size="small" />
           <span class="label">保存下载历史记录</span>
-        </a-form-item>
+        </div>
       </div>
     </a-form>
   </div>
 </template>
-
-<style scoped>
-.compact-form :deep(.ant-form-item) {
-  margin-bottom: 10px;
-}
-
-.group {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-}
-
-.group-title {
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-.label {
-  margin-left: 10px;
-}
-</style>

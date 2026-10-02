@@ -1,0 +1,21 @@
+/**
+ * 注入到 shadow DOM 的样式。
+ * 原 PT-depiler 这里还会 @import vuetify 全量样式；换成 antdv-next 后
+ * 组件样式由 CSS-in-JS 运行时注入，通过 <a-style-provider :container="shadowRoot">
+ * 定向到 shadow root，不需要再静态打包 UI 库样式。
+ */
+
+/*noinspection CssUnknownTarget*/
+#ptd-content-script-app {
+  all: initial;
+  box-sizing: border-box;
+  word-break: normal;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    "Microsoft YaHei",
+    sans-serif;
+  font-size: 13px;
+  color: #1f2328;
+}

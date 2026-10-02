@@ -24,6 +24,11 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("../views/Settings/SetBackup/Index.vue"),
   },
   {
+    path: "/set-media-server",
+    name: "SetMediaServer",
+    component: () => import("../views/Settings/SetMediaServer/Index.vue"),
+  },
+  {
     path: "/debug/site-definitions",
     name: "DebugSiteDefinitions",
     component: () => import("../views/SiteDefinitions.vue"),

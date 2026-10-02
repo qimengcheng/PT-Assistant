@@ -1,6 +1,6 @@
 {
   "name": "pt-assistant-wxt",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "private": true,
   "type": "module",
   "description": "PT Assistant — PT-depiler 的 WXT + Vue 3 全新架构重写版（骨架）",
@@ -26,6 +26,7 @@
     "crypto-js": "^4.2.0",
     "date-fns": "^4.4.0",
     "es-toolkit": "^1.52.0",
+    "file-saver": "2.0.5",
     "filesize": "^11.0.25",
     "idb": "^8.0.3",
     "jszip": "^3.10.2",
@@ -50,6 +51,7 @@
   "devDependencies": {
     "@types/chrome": "^0.3.0",
     "@types/crypto-js": "^4.2.2",
+    "@types/file-saver": "2.0.7",
     "@types/node": "^26.6.3",
     "@types/sizzle": "^2.3.10",
     "@wxt-dev/module-vue": "^1.0.3",

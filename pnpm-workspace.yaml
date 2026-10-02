@@ -1,0 +1,4 @@
+nodeLinker: hoisted
+
+overrides:
+  vite: ^7.0.0

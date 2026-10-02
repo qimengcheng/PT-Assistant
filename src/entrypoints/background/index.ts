@@ -13,7 +13,12 @@ interface definitionEntity {
   default?: TSite;
   siteMetadata: ISiteMetadata & Required<Pick<ISiteMetadata, "schema">>;
 }
-const definitionModules = import.meta.glob<definitionEntity>("../../packages/site/definitions/*.ts");
+// ⚠️ glob 必须用「项目根绝对路径」形式（/ 开头）：WXT 会用虚拟模块包装 entrypoint，
+// "../" 相对 pattern 的解析基准会失效，静默匹配出空 map（v0.4.0 的 definitionCount=0 根因）。
+// 另外这里只用文件名键、不加载任何模块：不能 import { definitionList } from "@ptd/site"，
+// 那会把 site index 的 eager 链（→ utils → @ptd/social → sizzle）拉进 SW，
+// sizzle 的 UMD 工厂在模块顶层访问 window，MV3 SW 无 window，启动即崩。
+const definitionModules = import.meta.glob<definitionEntity>("/packages/site/definitions/*.ts");
 const definitionCount = Object.keys(definitionModules).length;
 
 const storageLocalKey = (key: string) => `extStorage:${key}`;

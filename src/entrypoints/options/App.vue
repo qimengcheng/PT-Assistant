@@ -10,11 +10,20 @@ const route = useRoute();
 const backgroundOk = ref<boolean | null>(null);
 
 onMounted(async () => {
-  try {
-    const pong = await sendMessage("ping", null);
-    backgroundOk.value = pong.definitionCount > 0;
-  } catch {
-    backgroundOk.value = false;
+  // SW 冷启动（module SW 加载 + offscreen 创建）实测约 3s，一次性 ping 会撞上启动窗口误报「未响应」，
+  // 因此带重试：成功或拿到 definitionCount>0 即终止，全部失败才判定为未响应
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const pong = await sendMessage("ping", null);
+      if (pong.definitionCount > 0) {
+        backgroundOk.value = true;
+        return;
+      }
+      backgroundOk.value = false;
+    } catch {
+      backgroundOk.value = false;
+    }
+    await new Promise((r) => setTimeout(r, 1500));
   }
 });
 

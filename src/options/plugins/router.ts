@@ -29,6 +29,26 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("../views/Settings/SetMediaServer/Index.vue"),
   },
   {
+    path: "/download-history",
+    name: "DownloadHistory",
+    component: () => import("../views/Overview/DownloadHistory/Index.vue"),
+  },
+  {
+    path: "/search-snapshot",
+    name: "SearchResultSnapshot",
+    component: () => import("../views/Overview/SearchResultSnapshot/Index.vue"),
+  },
+  {
+    path: "/keep-upload-task",
+    name: "KeepUploadTask",
+    component: () => import("../views/Overview/KeepUploadTask/Index.vue"),
+  },
+  {
+    path: "/about/logger",
+    name: "AboutLogger",
+    component: () => import("../views/About/Logger.vue"),
+  },
+  {
     path: "/debug/site-definitions",
     name: "DebugSiteDefinitions",
     component: () => import("../views/SiteDefinitions.vue"),

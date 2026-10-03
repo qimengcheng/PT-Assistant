@@ -387,6 +387,28 @@
       "create": "Create Task",
       "createError": "Failed to create reseed task",
       "createSuccess": "Reseed task created successfully",
+      "fingerprint": {
+        "local": {
+          "candidate": "Suspicious: title+size only",
+          "identical": "Already local",
+          "sameSite": "Seeding on same site"
+        },
+        "localIndex": {
+          "excludeLocal": "Exclude already-local ({0})",
+          "loading": "Loading local torrent fingerprint index...",
+          "needDownloader": "Pick a downloader to compare against local torrents",
+          "ready": "Local index: {0} torrents, {1} comparable by file list",
+          "refresh": "Rebuild local fingerprint index",
+          "unavailable": "This client cannot export a file list; only title+size screening"
+        },
+        "suggestPieceVerify": "Sampling piece hashes is recommended before concluding",
+        "verifiedBy": {
+          "files": "file list fingerprint matched",
+          "infoHash": "same infoHash",
+          "legacy": "file-by-file comparison",
+          "pieces": "piece sample matched"
+        }
+      },
       "fileCount": "Files: ",
       "keepUpload": "Reseed Check",
       "noVerifiedItem": "No verified torrents",
@@ -1112,6 +1134,7 @@
       "close": "Close",
       "confirm": "Confirm",
       "deleteText": "Are you sure to delete these {0} item?",
+      "deleteFailed": "Failed to delete {0} item(s). Please retry.",
       "next": "Next",
       "ok": "Complete",
       "prev": "Prev",

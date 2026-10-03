@@ -212,6 +212,31 @@ export interface CTorrentFileSelection {
   priority: TorrentFilePriority; // "skip" 即取消下载
 }
 
+/**
+ * 指纹所需的「文件清单」——第 2 层指纹（sha256(排序后的 相对路径:字节数)）的原料。
+ *
+ * 为什么不让客户端直接算指纹：指纹算法属于业务策略（怎么剥顶层目录、怎么排序），
+ * 放在上层维护一份就能对「站点侧的 .torrent」和「下载器侧的本地种子」用完全
+ * 相同的规范化逻辑 —— 这正是跨站识别能不能稳住的前提。
+ *
+ * 注意 piece 部分：绝大多数客户端（含 qBittorrent WebAPI）**不暴露 piece 哈希**，
+ * 所以 `pieces` 恒为 undefined，上层要能接受「只有第 2 层」的降级结果。
+ */
+export interface CTorrentFileList {
+  /** 种子名（多文件种的顶层目录名），上层用它剥离顶层目录 */
+  name?: string;
+  /** 文件清单；空数组 / 缺省表示单文件种，此时用 length */
+  files?: Array<{ path: string; size: number }>;
+  /** 单文件种的字节数（也用作总大小兜底） */
+  length?: number;
+  /** piece 长度（字节） */
+  pieceLength?: number;
+  /** piece 总数 */
+  pieceNum?: number;
+  /** 极少数客户端能提供的 piece 哈希样本（hex 数组） */
+  pieces?: string[];
+}
+
 // 连接中的 peer
 export interface CTorrentPeer<RAW = any> {
   ip: string;
@@ -409,6 +434,18 @@ export abstract class AbstractBittorrentClient<T extends DownloaderBaseConfig = 
     return (await this.getTorrentsBy({ ids: id }))[0];
   }
 
+  /**
+   * 从种子入参中取哈希：字符串入参即哈希本身；CTorrent 优先取 infoHash，缺省回退 id。
+   * 以哈希为种子标识的客户端（qBittorrent / Deluge / Flood / ruTorrent / uTorrent）共用，
+   * Transmission 用数字 id，另有自己的 getTorrentId。
+   */
+  protected getTorrentHash(torrent: string | CTorrent): string {
+    if (typeof torrent === "string") {
+      return torrent;
+    }
+    return (torrent.infoHash || (torrent.id as string)) as string;
+  }
+
   // 添加种子
   public abstract addTorrent(url: string, options: Partial<CAddTorrentOptions>): Promise<CAddTorrentResult>;
 
@@ -454,6 +491,26 @@ export abstract class AbstractBittorrentClient<T extends DownloaderBaseConfig = 
   // 获取种子文件列表，默认不支持（返回 []）
   public async getTorrentFiles(_torrent: string | CTorrent): Promise<CTorrentFile[]> {
     return [];
+  }
+
+  /**
+   * 导出指纹所需的文件清单（第 2 层指纹的原料）。
+   *
+   * 默认实现从 getTorrentFiles 派生，所以任何认领了 feature.FileList 的客户端
+   * 自动就具备了第 2 层指纹能力，无需单独声明 feature；认领了 FileList 又想少发
+   * 一次请求的客户端（例如 qBittorrent 的文件列表与指纹原料是同一个接口），
+   * 直接覆写本方法即可。返回 null 表示该客户端拿不到文件清单。
+   */
+  public async getTorrentFileList(torrent: string | CTorrent): Promise<CTorrentFileList | null> {
+    const files = await this.getTorrentFiles(torrent);
+    if (files.length === 0) {
+      return null;
+    }
+    return {
+      name: typeof torrent === "string" ? undefined : torrent.name,
+      files: files.map((file) => ({ path: file.path || file.name, size: file.size })),
+      length: typeof torrent === "string" ? undefined : torrent.totalSize,
+    };
   }
 
   // 批量设置文件优先级/选择（"skip" 即不下载），建议各实体用尽量少的客户端请求完成批量，默认不支持

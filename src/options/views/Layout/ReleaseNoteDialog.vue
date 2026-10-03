@@ -91,11 +91,16 @@ function onAfterOpenChange(open: boolean) {
           {{ t("layout.releaseNote.changelog") }}
         </a>
         <a-divider type="vertical" />
+        <!--
+          这里原来挂的是「Wiki 帮助」但 href 指向 /releases，文案与目标不符；
+          本仓库也没有对应的 wiki 页面，改成指向 Releases 的「下载」。
+        -->
         <a :href="`${REPO_URL}/releases`" rel="noopener noreferrer nofollow" target="_blank">
-          {{ t("layout.releaseNote.wiki") }}
+          {{ t("layout.releaseNote.download") }}
         </a>
         <a-divider type="vertical" />
-        <a :href="`${REPO_URL}/discussions/316`" rel="noopener noreferrer nofollow" target="_blank">
+        <!-- 原来写死上游的 /discussions/316，那是上游 FAQ 讨论帖的编号，本仓库不存在该号 -->
+        <a :href="`${REPO_URL}/discussions`" rel="noopener noreferrer nofollow" target="_blank">
           {{ t("layout.releaseNote.faq") }}
         </a>
       </div>

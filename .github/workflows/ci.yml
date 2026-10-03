@@ -21,6 +21,49 @@ permissions:
   contents: read
 
 jobs:
+  # 提交信息必须带版本号，且与 package.json 一致。
+  # 独立成一个 job：只需要 checkout + node，不需要装依赖，几秒就能出结论，
+  # 不用等 build 跑完 1 分钟才发现提交信息写错了。
+  #
+  # 注意 squash 合并：GitHub 生成的合并 commit message 来自 PR 标题，
+  # 所以走 PR 合并时要把 vX.Y.Z 写进 PR 标题，否则这里会拦。
+  verify:
+    name: Verify commit prefix and version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      # 三条硬规则，全部只看**标题行**（%s），不看正文：
+      #   ① 前缀必须是 [agent名]-[模型名]，两者各自独立方括号（方括号内可含空格，如 [DeepSeek Harness]）
+      #   ② 必须含 vX.Y.Z 版本号
+      #   ③ 版本号必须与 package.json 一致
+      - name: Commit subject must carry agent-model prefix and matching version
+        run: |
+          set -euo pipefail
+          SUBJECT="$(git log -1 --pretty=%s)"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          echo "::group::提交标题"
+          echo "$SUBJECT"
+          echo "::endgroup::"
+          echo "package.json 版本：v${PKG_VERSION}"
+
+          if ! printf '%s' "$SUBJECT" | grep -qE '^\[[^]]+\]-\[[^]]+\]'; then
+            echo "::error::提交标题必须以 [agent名]-[模型名] 开头，例如 [WorkBuddy]-[Space Bunny] v0.5.12 描述"
+            exit 1
+          fi
+
+          if ! printf '%s' "$SUBJECT" | grep -qE 'v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::提交标题里没有版本号。要求格式：[agent名]-[模型名] vX.Y.Z 描述"
+            exit 1
+          fi
+
+          if ! printf '%s' "$SUBJECT" | grep -qF "v${PKG_VERSION}"; then
+            echo "::error::提交标题里的版本号与 package.json 不一致（package.json 是 v${PKG_VERSION}）"
+            exit 1
+          fi
+
   build:
     runs-on: ubuntu-latest
     permissions:

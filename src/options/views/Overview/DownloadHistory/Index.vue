@@ -169,8 +169,6 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <a-alert class="mb-2" type="info" show-icon :message="t('route.Overview.DownloadHistory')" />
-
   <a-card size="small">
     <template #title>
       <div class="toolbar">

@@ -20,9 +20,11 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("../views/HomeView.vue"),
   },
   {
+    // 站点管理走与旧版一一对应的正式页（表格 + 站点图标 + 分组筛选 + 增删改 + 一键导入 + 重建映射表）。
+    // 早期这里挂的是 SiteManageView.vue —— 一个只有纯文字列表的简易调试页，已移入 tobedeleted。
     path: "/sites",
     name: "SiteManage",
-    component: () => import("../views/SiteManageView.vue"),
+    component: () => import("../views/Settings/SetSite/Index.vue"),
   },
 
   // ===== Overview =====
@@ -30,6 +32,18 @@ export const routes: RouteRecordRaw[] = [
     path: "/my-data",
     name: "MyData",
     component: () => import("../views/Overview/MyData/Index.vue"),
+  },
+  {
+    // MyData「统计图表」二级页，入口在 MyData/Index.vue 的 viewStatistic（hasRoute 守卫）
+    path: "/user-data-statistic",
+    name: "UserDataStatistic",
+    component: () => import("../views/Overview/MyData/UserDataStatistic/Index.vue"),
+  },
+  {
+    // MyData「时间线」二级页（konva 绘制），入口同上，走 viewTimeline 的 hasRoute 守卫
+    path: "/user-data-timeline",
+    name: "UserDataTimeline",
+    component: () => import("../views/Overview/MyData/UserDataTimeline/Index.vue"),
   },
   {
     // 上游 path 是 /search-entity，保留 alias 兼容 content script 等处的跳转
@@ -53,6 +67,16 @@ export const routes: RouteRecordRaw[] = [
     path: "/keep-upload-task",
     name: "KeepUploadTask",
     component: () => import("../views/Overview/KeepUploadTask/Index.vue"),
+  },
+  {
+    path: "/my-client",
+    name: "MyClient",
+    component: () => import("../views/Overview/MyClient/Index.vue"),
+  },
+  {
+    path: "/media-server-entity",
+    name: "MediaServerEntity",
+    component: () => import("../views/Overview/MediaServerEntity/Index.vue"),
   },
 
   // ===== Settings =====
@@ -85,6 +109,23 @@ export const routes: RouteRecordRaw[] = [
     path: "/set-search-solution",
     name: "SetSearchSolution",
     component: () => import("../views/Settings/SetSearchSolution/Index.vue"),
+  },
+
+  // ===== About =====
+  {
+    path: "/technology-stack",
+    name: "TechnologyStack",
+    component: () => import("../views/About/TechnologyStack.vue"),
+  },
+  {
+    path: "/special-thank",
+    name: "SpecialThank",
+    component: () => import("../views/About/SpecialThank.vue"),
+  },
+  {
+    path: "/logger",
+    name: "Logger",
+    component: () => import("../views/About/Logger.vue"),
   },
 
   // ===== 开发调试 =====

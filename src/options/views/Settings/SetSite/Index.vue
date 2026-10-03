@@ -211,8 +211,6 @@ function keywordChecked(keyword: string) {
 </script>
 
 <template>
-  <a-alert class="mb-2" type="info" show-icon :message="t('route.Settings.SetSite')" />
-
   <a-card size="small">
     <template #title>
       <div class="toolbar">

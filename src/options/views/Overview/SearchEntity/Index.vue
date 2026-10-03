@@ -39,6 +39,7 @@ import AdvanceFilterGenerateDialog from "./AdvanceFilterGenerateDialog.vue";
 // 主要助手方法
 import { tableCustomFilter } from "./utils/filter";
 import { doSearch, retrySearch, searchPlanStatus, searchQueue } from "./utils/search";
+import RecommendationMenu from "@/options/views/Layout/RecommendationMenu.vue";
 
 // 本文件名为 Index.vue，与 MyData/Index.vue 同名；<script setup> 推断出的
 // __name 会是 "Index"，导致 App.vue 的 KeepAlive :include 无法区分两者（会互相顶掉缓存）。
@@ -298,6 +299,12 @@ function startSearchEntity() {
   });
 }
 
+// 热门推荐：点选推荐条目后把标题灌进关键词并立即搜索（query watch 会触发 doSearch）
+function searchRecommendation(title: string) {
+  searchKey.value = title;
+  startSearchEntity();
+}
+
 // 地址栏变化时同步输入框显示（右键菜单/外部跳转带 search 参数进来的场景）
 watch(
   () => route.query,
@@ -404,6 +411,11 @@ const hiddenTagNamesText = computed({
     enterkeyhint="search"
     style="max-width: 480px"
     @search="startSearchEntity"
+  />
+  <RecommendationMenu
+    v-if="configStore.searchEntity.showHotRecommendations"
+    :disabled="runtimeStore.search.isSearching"
+    @search="searchRecommendation"
   />
 </div>
   <a-alert type="info">

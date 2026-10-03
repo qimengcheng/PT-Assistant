@@ -57,6 +57,24 @@ export default defineConfig({
     omnibox: {
       keyword: "ptd",
     },
+
+    /**
+     * content script 引导在命中站点后会 `import(chrome.runtime.getURL("content-app.js"))`。
+     * 扩展页面之外默认拿不到资源，必须显式声明 web_accessible_resources，
+     * 否则动态 import 会被跨源策略拦掉。
+     *
+     * `content-app*.js` 同时覆盖 ES 入口本身和它按需 import 的代码 chunk
+     * （chunk 名带哈希，如 content-app-DrhOtjws.js），两者都在产物根目录。
+     * 产物根目录下的其它 chunk（site/social 等被 app 间接依赖的）用 `*.js` 兜住。
+     *
+     * 用通配避免依赖拓扑变化后漏配（refs: PT-depiler issue #1467）。
+     */
+    web_accessible_resources: [
+      {
+        resources: ["content-app*.js", "*.js", "assets/*", "icon/*", "icons/*"],
+        matches: ["*://*/*"],
+      },
+    ],
   },
   // env.browser 是 WXT 从 CLI `-b/--browser` 解析出的目标浏览器。
   // ⚠️ 不要再用 `process.env.TARGET || "chrome"`：WXT 全程不设置 process.env.TARGET，
@@ -94,8 +112,13 @@ export default defineConfig({
       {
         name: "ptd-content-app-esm",
         enforce: "post" as const,
-        config(config: any) {
-          if (config?.build?.lib?.name === "content-app") {
+        // 必须用 configResolved 而不是 config：WXT 的 build.lib 是在用户 config
+        // 钩子之后才合并进去的，在 config() 里读到的 build.lib 是 undefined。
+        // 匹配用 lib.fileName（= content-app），它与引导里
+        // chrome.runtime.getURL("content-app.js") 的产物名一一对应；
+        // lib.name 是从文件名推的驼峰形式（contentApp），对不上。
+        configResolved(config: any) {
+          if (config?.build?.lib?.fileName === "content-app") {
             config.build.lib.formats = ["es"];
           }
         },

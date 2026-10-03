@@ -8,13 +8,23 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 |---|---|---|
 | 扩展框架 | vite-plugin-web-extension（手写 manifest 构建） | **WXT 0.21**（entrypoints 约定、自动 manifest、跨浏览器） |
 | 构建内核 | Vite 6（rollup） | **Vite 7（rollup）** —— 见下方踩坑记录 |
-| UI | Vue 3 + Vuetify 4（主 chunk ~444KB） | Vue 3 + 手写轻量 CSS（无重 UI 库） |
+| UI | Vue 3 + **Vuetify 4**（主 chunk ~444KB） | Vue 3 + **antdv-next**（Ant Design Vue 3，CSS-in-JS） |
 | 消息层 | @webext-core/messaging + 自建 wrapper（269 行协议） | 同款 wrapper（精简协议，随功能平移扩充） |
 | 站点定义 | 340 个 definition，import.meta.glob 按需加载 | **原样平移，零修改**（packages/site） |
 | Buffer polyfill | 全局注入（background 464KB） | 不注入 |
-| konva | 全局注册（主 chunk ~200KB） | 不引入 |
-| i18n | vue-i18n 双语言全量注册（~118KB） | 骨架阶段 zh_CN 内联，后期单语言注册+动态合并 |
+| i18n | vue-i18n 双语言全量注册（~118KB） | vue-i18n 双语言全量注册 |
 | 测试 | 无 | 预留（WXT 自带 Vitest 集成，roadmap） |
+
+> **UI 框架已从 Vuetify 换成 antdv-next**（v0.15.0）。迁移规范见
+> [`ANTD-MIGRATION.md`](./ANTD-MIGRATION.md)，含完整标签映射表。
+>
+> 换框架的附带收益：antdv-next 走 CSS-in-JS **运行时注入样式**，
+> 不再有 Vuetify 那种「构建期拆 CSS chunk + 动态 `<link>` 注入」的链路 ——
+> 那条链路在扩展页里加载不可靠，表现为懒加载路由的页面完全没有样式。
+>
+> 迁移期保留 `src/entrypoints/options/vuetify-compat.css`：复刻了已平移视图里
+> 用到的 Vuetify 原子类（`pa-0` `text-no-wrap` `d-flex` 等），避免为了换框架
+> 去逐个重写纯样式 class 名。模板清理完成后可以整体删除。
 
 ## 目录结构
 

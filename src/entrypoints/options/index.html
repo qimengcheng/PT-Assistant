@@ -6,6 +6,9 @@
     <title>PT Assistant - 设置</title>
     <!-- 与 PT-Plugin-Plus/PT-depiler 行为一致：点扩展图标打开完整标签页，而非嵌入式弹窗 -->
     <meta name="manifest.open_in_tab" content="true" />
+    <!-- UserDataTimeline 的 konva 文本节点直接用码位绘制图标字形，
+         需要这份 @font-face（资源来自 public/lib/mdi/） -->
+    <link href="/lib/mdi/fontface.css" rel="stylesheet" />
     <!-- 扩展 UI 是纯浅色设计（含下拉/对话框等弹层）。不声明时，浏览器「自动深色模式」
          会把透明背景的弹层强制填成黑底（v0.4.2 搜索页列筛选下拉黑到看不清的根因）。
          "only light" 是标准机制：告知浏览器本页只支持浅色，禁止自动深色化。 -->

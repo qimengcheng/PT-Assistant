@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useDisplay } from "vuetify/framework";
+import { useBreakpoint } from "antdv-next";
+import { CheckCircleFilled, GlobalOutlined, HddOutlined } from "@antdv-next/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { formatSize } from "@/options/utils.ts";
@@ -18,7 +19,13 @@ const { selectedTorrents } = defineProps<{
 
 const { t } = useI18n();
 const configStore = useConfigStore();
-const display = useDisplay();
+
+/**
+ * useBreakpoint() 返回的是**单个 Ref**，其 .value 上挂着 { xs, sm, md, lg, xl, ... }。
+ * Vuetify 的 display.smAndDown 表示「比 lg 窄」，这里用 !lg 近似同一断点。
+ */
+const screens = useBreakpoint();
+const smAndDown = computed(() => !screens.value?.lg);
 
 const { advanceFilterDictRef, advanceItemPropsRef, updateTableFilterValueFn } = tableCustomFilter;
 
@@ -55,69 +62,68 @@ function updateQuickSiteFilter() {
   advanceFilterDictRef.value.site.exclude = [];
   updateTableFilterValueFn();
 }
+
+/**
+ * v-chip-group(filter + mandatory) 在 antd 里没有等价物（a-checkable-tag-group 只能吃
+ * options 数组、渲染不了站点图标 + 站点名），改为可横向滚动的 a-tag 行：
+ * 选中项用实心 tag 表示，点任意一个站点即快速筛选该站点。
+ */
+function selectSite(siteId: string) {
+  selectedSite.value = siteId;
+  updateQuickSiteFilter();
+}
 </script>
 
 <template>
-  <v-alert class="px-2 py-1 mb-0" color="info" density="compact" variant="tonal">
-    <div class="d-flex align-center">
-      <!-- 站点筛选器 -->
-      <template v-if="configStore.searchEntity.quickSiteFilter">
-        <!-- "全部"选项 -->
-        <v-chip
-          class="chip_limit_width"
-          :class="{ chip_content_hidden_fix: display.smAndDown.value }"
-          size="small"
-          @click.stop="clearSiteFilter"
-          variant="outlined"
-          prepend-icon="mdi-web"
-        >
-          {{ display.smAndDown.value ? "" : t("SearchEntity.siteFilter.all") }}
-        </v-chip>
-
-        <!-- 分站点选项 -->
-        <v-chip-group
-          id="site-filter-chips"
-          v-model="selectedSite"
-          :mobile="false"
-          color="primary"
-          filter
-          mandatory
-          scroll-to-active
-          show-arrows="always"
-          variant="outlined"
-          @update:model-value="updateQuickSiteFilter"
-        >
-          <!-- 各站点选项 -->
-          <v-chip
-            v-for="siteId in advanceItemPropsRef.site"
-            :key="siteId"
-            :value="siteId"
-            size="small"
-            class="mr-1 mb-1"
+  <a-alert type="info" class="px-2 py-1 mb-0">
+    <template #message>
+      <div class="d-flex align-center">
+        <!-- 站点筛选器 -->
+        <template v-if="configStore.searchEntity.quickSiteFilter">
+          <!-- "全部"选项 -->
+          <a-tag
+            class="chip_limit_width"
+            :class="{ chip_content_hidden_fix: smAndDown }"
+            @click.stop="clearSiteFilter"
           >
-            <SiteFavicon :site-id="siteId" :size="14" class="mr-1" />
-            <SiteName :site-id="siteId" tag="span" />
-          </v-chip>
-        </v-chip-group>
-      </template>
+            <template #icon><GlobalOutlined /></template>
+            {{ smAndDown ? "" : t("SearchEntity.siteFilter.all") }}
+          </a-tag>
 
-      <v-spacer />
+          <!-- 分站点选项（可横向滚动，对应 v-chip-group 的 scroll-to-active + show-arrows） -->
+          <div class="site-filter-scroll d-flex flex-nowrap align-center">
+            <a-tag
+              v-for="siteId in advanceItemPropsRef.site"
+              :key="siteId"
+              :color="siteId === selectedSite ? 'blue' : undefined"
+              :bordered="siteId !== selectedSite"
+              class="mr-1 mb-1"
+              @click.stop="selectSite(siteId)"
+            >
+              <SiteFavicon :site-id="siteId" :size="14" class="mr-1" />
+              <SiteName :site-id="siteId" tag="span" />
+            </a-tag>
+          </div>
+        </template>
 
-      <!-- 选中种子信息条 -->
-      <v-divider vertical inset class="mx-2" />
-      <v-chip class="my-2 chip_limit_width" color="primary" size="small" variant="outlined">
-        <v-icon icon="mdi-checkbox-marked-circle" start />
-        {{
-          display.smAndDown.value
-            ? selectedTorrentsInfo.count
-            : t("SearchEntity.index.selectedTorrents", [selectedTorrentsInfo.count])
-        }}
-        <v-divider class="mx-2" vertical />
-        <v-icon icon="mdi-harddisk" start />
-        {{ formatSize(selectedTorrentsInfo.totalSize) }}
-      </v-chip>
-    </div>
-  </v-alert>
+        <div class="flex-1-1-0" />
+
+        <!-- 选中种子信息条 -->
+        <a-divider orientation="vertical" class="mx-2" />
+        <a-tag class="my-2 chip_limit_width" color="blue" :bordered="true">
+          <CheckCircleFilled class="mr-1" />
+          {{
+            smAndDown
+              ? selectedTorrentsInfo.count
+              : t("SearchEntity.index.selectedTorrents", [selectedTorrentsInfo.count])
+          }}
+          <a-divider orientation="vertical" class="mx-2" />
+          <HddOutlined class="mr-1" />
+          {{ formatSize(selectedTorrentsInfo.totalSize) }}
+        </a-tag>
+      </div>
+    </template>
+  </a-alert>
 </template>
 
 <style lang="scss" scoped>
@@ -125,15 +131,28 @@ function updateQuickSiteFilter() {
   min-width: fit-content;
 }
 
+.site-filter-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
 /**
- * 在smAndDown环境下，全部站点的 chip 中 文字内容被隐藏，但是由于使用了 prepend-icon 来设置图标，所以此处通过 hack css 的方法
- * 将 chip 整体变为圆形，并移除 icon 两侧的margin来居中
+ * 在窄屏下，「全部站点」这一项的文字内容被隐藏（见模板中的 smAndDown），
+ * 由于改用了 tag 的 icon 插槽，这里用 hack css 把它压紧，避免图标两侧留白过大。
  */
 .chip_content_hidden_fix {
-  padding: 0 5px !important; // 0 10px -> 0 5px
+  padding: 0 5px !important;
 
-  :deep(i.v-icon) {
-    margin: 0; // 0 4px -> 0
+  :deep(.ant-tag-icon) {
+    margin: 0;
   }
+}
+
+/**
+ * a-alert 的内容统一渲染在 .ant-alert-title 里（默认字重 500），
+ * 而这里原本是 v-alert 的默认插槽（常规字重），还原成常规字重。
+ */
+:deep(.ant-alert-title) {
+  font-weight: 400;
 }
 </style>

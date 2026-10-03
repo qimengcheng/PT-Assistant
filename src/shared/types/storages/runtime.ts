@@ -1,8 +1,6 @@
 /**
  * 此文件用于描述 sessionStorage['__ptd_runtime_store'] 中字段格式
  */
-import type { VNodeProps } from "vue";
-import type { VSnackbar } from "vuetify/components";
 import type { ISearchResult, ITorrent, TSiteID } from "@ptd/site";
 import type { IMediaServerItem, IMediaServerSearchResult } from "@ptd/mediaServer";
 
@@ -44,24 +42,17 @@ export interface ISearchData {
   searchResult: ISearchResultTorrent[];
 }
 
-export type SnackbarMessageOptions = Partial<
-  Omit<
-    VSnackbar["$props"],
-    | "modelValue"
-    | "onUpdate:modelValue"
-    | "activator"
-    | "activatorProps"
-    | "closeDelay"
-    | "openDelay"
-    | "openOnClick"
-    | "openOnFocus"
-    | "openOnHover"
-    | "$children"
-    | "v-slots"
-    | `v-slot:${string}`
-    | keyof VNodeProps
-  >
->;
+/**
+ * 全局提示条选项。原先是 Vuetify VSnackbar 的 props 子集，改为按 antdv-next 的
+ * message API 收敛：`color` 决定提示类型，`timeout` 为 0 表示不自动关闭。
+ * 全量提示条在 App.vue 里被转成 antd 的 message 调用。
+ */
+export interface SnackbarMessageOptions {
+  color?: "success" | "info" | "warning" | "error";
+  timeout?: number;
+  closable?: boolean;
+  [key: string]: unknown;
+}
 
 export interface IRuntimePiniaStorageSchema {
   search: ISearchData;

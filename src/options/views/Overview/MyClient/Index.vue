@@ -37,6 +37,7 @@ import { formatSize, formatDate } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
+import { buildSortOrderMap, toTableColumns } from "@/options/components/tableSorters.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
 import PushToDownloaderDialog from "./PushToDownloaderDialog.vue";
@@ -170,13 +171,21 @@ const fullTableHeader = computed(
     ] as any[],
 );
 
+/**
+ * 列定义。⚠️ 必须给每列都带上真正的 compare 函数（makeSorter）：
+ * 原来这里只做了 `{ ...item, dataIndex: item.key }`，整张表一个 sorter 都没有，
+ * 而 antd 只在列上带 sorter 时才渲染排序箭头 —— 结果是「客户端」页面完全无法排序，
+ * handleTableChange 收到的 sorter 恒为空对象，configStore.tableBehavior.MyClient.sortBy
+ * 是个死配置（表格可以排但排完记不下来）。
+ */
 const tableHeader = computed<TableColumnsType<CTorrent>>(
   () =>
-    fullTableHeader.value
-      .filter(
+    toTableColumns<CTorrent>(
+      fullTableHeader.value.filter(
         (item) => item?.props?.disabled || (configStore.tableBehavior["MyClient"] as any)?.columns?.includes(item.key),
-      )
-      .map((item) => ({ ...item, dataIndex: item.key })) as TableColumnsType<CTorrent>,
+      ),
+      tableSortOrder.value,
+    ),
 );
 
 /** 列显隐多选：v-model 走 configStore，setter 里调 updateTableBehavior 保持原「双写」语义 */
@@ -327,21 +336,19 @@ function torrentKey(torrent: CTorrent) {
 const rowSelection = computed<TableRowSelection<CTorrent>>(() => ({
   selectedRowKeys: tableSelected.value.map((t) => torrentKey(t)),
   onChange: (keys: (string | number)[]) => {
-    tableSelected.value = filteredTorrents.value.filter((t) => keys.map(String).includes(torrentKey(t)));
+    // 用 Set 查找：原来在 filter 回调里 keys.map(String).includes(...)，
+    // 每行都重新 map + 线性扫描，5000 行 × 100 选中 = 每次选择变化 50 万次字符串比较。
+    const keySet = new Set(keys.map(String));
+    tableSelected.value = filteredTorrents.value.filter((t) => keySet.has(torrentKey(t)));
   },
 }));
 
 const tablePage = ref(1);
 const pageSize = computed(() => (configStore.tableBehavior["MyClient"] as any)?.itemsPerPage ?? 25);
 
-const tableSortOrder = computed<Record<string, string>>(() => {
-  const sortBy = (configStore.tableBehavior["MyClient"] as any)?.sortBy as { key: string; order: string }[] | undefined;
-  const out: Record<string, string> = {};
-  for (const s of sortBy ?? []) {
-    out[s.key] = s.order === "desc" ? "descend" : "ascend";
-  }
-  return out;
-});
+const tableSortOrder = computed(() =>
+  buildSortOrderMap((configStore.tableBehavior["MyClient"] as any)?.sortBy),
+);
 
 function handleTableChange(pagination: any, _filters: any, sorter: any) {
   const s = Array.isArray(sorter) ? sorter : [sorter];
@@ -506,7 +513,6 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
         size: 'default',
         total: filteredTorrents.length,
       }"
-      :sort-order="(columnKey: string) => tableSortOrder[columnKey]"
       size="small"
       class="table-stripe table-header-no-wrap"
       @change="handleTableChange"

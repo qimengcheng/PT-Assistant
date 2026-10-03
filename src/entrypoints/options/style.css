@@ -31,9 +31,12 @@ body {
 
 /* 工具栏与下方表格/内容的间距。多数页面的 .toolbar 定义在 scoped style 里且只写了
    gap / padding，没有 margin-bottom，这里统一补上；scoped 的特异性更高，
-   但它们没声明 margin-bottom，所以本规则仍会生效。 */
+   但它们没声明 margin-bottom，所以本规则仍会生效。
+   flex-wrap 也统一补：窄窗口（options 是独立窗口，可被拖到 600px 宽）下
+   按钮+筛选输入框不换行就会横向溢出卡片。 */
 .toolbar {
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 /* ===== 外层壳：左侧导航 + 内容区 ===== */
@@ -78,6 +81,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* 矮窗口（17 个菜单项 + 顶部 brand + 底部状态）：菜单区占满剩余高度并内部滚动，
+     没有这三行时 .nav-footer 会被菜单项顶出视口、整列导航溢出且无法滚动。 */
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .menu-item {
@@ -375,4 +383,17 @@ body {
    所以带语义色的标题统一走 wrap-class-name + 这里的全局规则。 */
 .modal-title--danger .ant-modal-title {
   color: #cf1322;
+}
+
+/* ===== Modal：超长内容限高，标题与底部按钮保持可见 =====
+   宽度不用在这里兜：antdv-next 的 .ant-modal 自带 max-width: calc(100vw - 32px)
+   （<576px 屏宽时为 16px），写死的 :width=1200 等在窄窗口里会被自动压窄。
+   但长表单/长表格弹窗（KeepUpload、Restore、HistoryDataView 等）超高时，antdv-next 默认让
+   整个弹窗随 .ant-modal-wrap 一起滚，确认按钮会被顶出视口。这里只给 body 加限高内滚动。
+   220px 固定占用 = top 100 + container 上 padding 16 + 标题行 24 + 标题下间距 8
+   + 底部按钮区 40（marginTop 8 + 按钮 32）+ container 下 padding 16 + 16 余量。
+   弹层（select 下拉、popover 等）默认 teleport 到 body，不在本容器内，不会被裁剪。 */
+.ant-modal-body {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
 }

@@ -388,7 +388,7 @@ const hiddenTagNamesText = computed({
 </div>
   <a-alert type="info">
     <template #message>
-      <div class="d-flex align-center">
+      <div class="d-flex align-center flex-wrap search-action-bar">
         <div class="flex-1-1-0">
           <template v-if="runtimeStore.search.startAt === 0">
             {{ t("SearchEntity.index.alert.enterKeyword") }}
@@ -723,7 +723,14 @@ const hiddenTagNamesText = computed({
 <style scoped>
 .search-toolbar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
   margin-bottom: 10px;
+}
+
+/* alert 内整行操作条换行后的行间距（元素自身间距靠 mx-2/ml-2，行间没人管） */
+.search-action-bar {
+  row-gap: 8px;
 }
 </style>

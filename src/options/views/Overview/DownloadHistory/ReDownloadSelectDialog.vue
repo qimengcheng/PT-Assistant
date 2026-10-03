@@ -90,11 +90,11 @@ function dialogEnter() {
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('DownloadHistory.ReDownloadSelectDialog.title', [torrentItems.length])"
     :width="600"
     :footer="null"
     @after-open-change="(open: boolean) => open && dialogEnter()"
   >
-    <template #title>{{ t("DownloadHistory.ReDownloadSelectDialog.title", [torrentItems.length]) }}</template>
 
     <a-space class="redownload-actions" direction="vertical">
       <a-button

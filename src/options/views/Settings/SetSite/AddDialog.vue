@@ -75,30 +75,28 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('SetSite.add.title')"
     :width="800"
     :closable="false"
     :body-style="{ maxHeight: '70vh', overflowY: 'auto' }"
     @after-open-change="(open: boolean) => (open ? loadCanAddSites() : resetDialog())"
   >
-    <template #title>
-      <div class="dialog-title">
-        <span>{{ t("SetSite.add.title") }}</span>
-        <div class="dialog-title-spacer" />
-        <a-button
-          size="small"
-          type="text"
-          color="green"
-          :title="t('layout.header.wiki')"
-          :href="`${REPO_URL}/wiki/config-site`"
-          rel="noopener noreferrer nofollow"
-          target="_blank"
-        >
-          <template #icon>
-            <QuestionCircleOutlined />
-          </template>
-        </a-button>
-      </div>
-    </template>
+    <!-- wiki 入口原先挂在 #title 插槽里（富标题会和右上角相撞），移到内容区顶部 -->
+    <div class="d-flex justify-end">
+      <a-button
+        size="small"
+        type="text"
+        color="green"
+        :title="t('layout.header.wiki')"
+        :href="`${REPO_URL}/wiki/config-site`"
+        rel="noopener noreferrer nofollow"
+        target="_blank"
+      >
+        <template #icon>
+          <QuestionCircleOutlined />
+        </template>
+      </a-button>
+    </div>
 
     <!-- 选取可添加的站点 -->
     <div v-if="currentStep === 0">
@@ -193,16 +191,6 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
 </template>
 
 <style scoped lang="scss">
-.dialog-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.dialog-title-spacer {
-  flex: 1 1 0;
-}
-
 .site-select {
   width: 100%;
 }

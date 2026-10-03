@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, computed } from "vue";
+import { ref, shallowRef, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { saveAs } from "file-saver";
 import { EResultParseStatus, type IUserInfo, type TSiteID } from "@ptd/site";
@@ -7,7 +7,6 @@ import type { TableColumnsType } from "antdv-next";
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
-  CloseOutlined,
   DeleteOutlined,
   ExportOutlined,
   EyeOutlined,
@@ -18,9 +17,9 @@ import { formatNumber, formatSize, formatDate } from "@/options/utils.ts";
 import { formatRatio } from "./utils/format.ts";
 import { loadSiteHistoryData } from "./utils/lastUserData.ts";
 
-import SiteName from "@/options/components/SiteName.vue";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import { toTableColumns } from "@/options/components/tableSorters.ts";
+import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 
 const showDialog = defineModel<boolean>();
@@ -29,6 +28,35 @@ const { siteId } = defineProps<{
 }>();
 const { t } = useI18n();
 const runtimeStore = useRuntimeStore();
+const metadataStore = useMetadataStore();
+
+/**
+ * 站点名要拼进 title：原来把 <SiteName> 组件塞在 #title 插槽里，
+ * 而 antdv-next 的 modal header 没有 padding、关闭按钮是绝对定位在右上角，
+ * 插槽里的额外内容会压到 X 上。改成 title 属性后站点名得自己解析（getSiteName 内部带缓存）。
+ */
+const siteName = ref<string>("");
+watch(
+  () => siteId,
+  async (id) => {
+    if (!id) {
+      siteName.value = "";
+      return;
+    }
+    try {
+      siteName.value = await metadataStore.getSiteName(id);
+    } catch (e) {
+      console.error("[PTD] load site name failed", id, e);
+      siteName.value = "";
+    }
+  },
+  { immediate: true },
+);
+
+const dialogTitle = computed(() => {
+  const base = t("MyData.HistoryDataView.title");
+  return siteName.value ? `${base} @ ${siteName.value}` : base;
+});
 
 const currentDate = formatDate(+new Date(), "yyyy-MM-dd");
 const jsonData = ref<any>({});
@@ -136,20 +164,11 @@ function afterEnter() {
   <!-- footer prop 传 null 会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...），底部按钮全消失，故不设 footer -->
   <a-modal
     v-model:open="showDialog"
+    :title="dialogTitle"
     :width="1200"
     :after-close="() => (siteHistoryData = [])"
     @after-open-change="(open: boolean) => open && afterEnter()"
   >
-    <template #title>
-      <div class="d-flex align-center">
-        <span class="flex-1-1-0">
-          {{ t("MyData.HistoryDataView.title") }} @ <SiteName :site-id="siteId!" class="" tag="span" />
-        </span>
-        <a-button type="text" size="small" :title="t('common.dialog.close')" @click="showDialog = false">
-          <CloseOutlined />
-        </a-button>
-      </div>
-    </template>
 
     <a-divider class="ma-0" />
 
@@ -263,7 +282,7 @@ function afterEnter() {
       </template>
     </a-table>
 
-    <a-modal v-model:open="showStoreDataDialog" :width="800" :footer="null">
+    <a-modal v-model:open="showStoreDataDialog" :title="t('MyData.HistoryDataView.action.viewRaw')" :width="800" :footer="null">
       <pre>{{ JSON.stringify(jsonData, null, 2) }}</pre>
     </a-modal>
   </a-modal>

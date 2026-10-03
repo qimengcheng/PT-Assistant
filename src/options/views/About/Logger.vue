@@ -91,8 +91,7 @@ onUnmounted(() => {
     </template>
   </a-table>
 
-  <a-modal v-model:open="showLogDataDialog" :width="800" :footer="null">
-    <template #title>{{ t("Logger.action.details") }}</template>
+  <a-modal v-model:open="showLogDataDialog" :title="t('Logger.action.details')" :width="800" :footer="null">
     <pre class="log-json">{{ JSON.stringify(logData, null, 2) }}</pre>
   </a-modal>
 </template>

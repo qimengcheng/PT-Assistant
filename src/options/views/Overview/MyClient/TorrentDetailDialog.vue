@@ -241,15 +241,13 @@ function formatTimestamp(timestamp: number | undefined): string {
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('MyClient.detail.title')"
     :width="900"
     :footer="null"
     destroy-on-hidden
     @after-open-change="(open: boolean) => open && afterEnter()"
     @after-close="resetDialog"
   >
-    <template #title>
-      <span style="color: #455a64">{{ t("MyClient.detail.title") }}</span>
-    </template>
 
     <template v-if="torrent">
       <a-tabs v-model:active-key="activeTab" @change="onTabChange">

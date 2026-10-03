@@ -21,6 +21,16 @@ const { t } = useI18n();
 const runtimeStore = useRuntimeStore();
 const metadataStore = useMetadataStore();
 
+/**
+ * 标题第二行原本是内部方案键 `<site:xxx>`：一是按 §3.5「内部 id 不进 UI」不该出现，
+ * 二是两行富文本标题只能走 #title 插槽，会和右上角关闭按钮相撞。改成单行 title 属性。
+ */
+const dialogTitle = computed(() =>
+  t("SearchEntity.SearchStatusDialog.title", [
+    metadataStore.getSearchSolutionName(runtimeStore.search.searchPlanKey),
+  ]),
+);
+
 function getSearchSolution(planKey: string, entryName: string) {
   return metadataStore.solutions[planKey]?.solutions.find((x) => x.id === entryName)!;
 }
@@ -56,18 +66,7 @@ const filteredSearchPlan = computed(() => {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="800">
-    <template #title>
-      <div>
-        {{
-          t("SearchEntity.SearchStatusDialog.title", [
-            metadataStore.getSearchSolutionName(runtimeStore.search.searchPlanKey),
-          ])
-        }}
-        <br />
-        <p class="text-body-small"><{{ runtimeStore.search.searchPlanKey }}></p>
-      </div>
-    </template>
+  <a-modal v-model:open="showDialog" :title="dialogTitle" :width="800">
 
     <div>
       <!-- v-chip-group(filter + multiple) → a-checkbox-group 多选 -->

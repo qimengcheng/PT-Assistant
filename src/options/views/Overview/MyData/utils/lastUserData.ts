@@ -24,6 +24,9 @@ const metadataStore = useMetadataStore();
 export const perSiteLastUserData = ref<Record<TSiteID, IUserInfoItem>>({});
 export const tableData = computed(() => Object.values(perSiteLastUserData.value));
 
+/** 表格初始/全量加载进行中标志（onMounted 与 watch 两处入口共用） */
+export const isTableLoading = ref<boolean>(false);
+
 async function updatePerSiteData(siteId: TSiteID, siteUserInfoData: IUserInfo) {
   const currentDate = new Date();
 
@@ -47,46 +50,62 @@ async function updatePerSiteData(siteId: TSiteID, siteUserInfoData: IUserInfo) {
   };
 }
 
-export async function initTableData() {
+export async function initTableData(options: { silent?: boolean } = {}) {
   const configStore = useConfigStore();
+  const runtimeStore = useRuntimeStore();
 
-  const siteIds = Object.keys(metadataStore.sites);
+  // silent 用于 offscreen 后台数据变化触发的静默重建：不亮表格 loading，避免每 5s 闪一次
+  if (!options.silent) {
+    isTableLoading.value = true;
+  }
+  try {
+    const siteIds = Object.keys(metadataStore.sites);
 
-  // 预加载所有已配置的站点基本属性，同时预加载的变量在全局统一，这样可以加快 Timeline 和 Statistic 的加载速度
-  const addedSiteMetaData = await loadAllAddedSiteMetadata(siteIds);
+    // 预加载所有已配置的站点基本属性，同时预加载的变量在全局统一，这样可以加快 Timeline 和 Statistic 的加载速度
+    const addedSiteMetaData = await loadAllAddedSiteMetadata(siteIds);
 
-  const tasks: Promise<void>[] = [];
+    const tasks: Promise<void>[] = [];
 
-  for (const [siteId, siteUserConfig] of Object.entries(metadataStore.sites)) {
-    const siteMeta = addedSiteMetaData[siteId];
+    for (const [siteId, siteUserConfig] of Object.entries(metadataStore.sites)) {
+      const siteMeta = addedSiteMetaData[siteId];
 
-    // siteMeta 缺失说明该站点没能在 loadAllAddedSiteMetadata 里建好条目（那里已 catch 并打日志）。
-    // 这里必须 continue 而不能继续访问 siteMeta.type —— 那会抛 TypeError 中断整个循环，
-    // 导致后面所有站点都不出现在表格里，且现象是「没有报错但表格空白」。
-    if (!siteMeta) continue;
+      // siteMeta 缺失说明该站点没能在 loadAllAddedSiteMetadata 里建好条目（那里已 catch 并打日志）。
+      // 这里必须 continue 而不能继续访问 siteMeta.type —— 那会抛 TypeError 中断整个循环，
+      // 导致后面所有站点都不出现在表格里，且现象是「没有报错但表格空白」。
+      if (!siteMeta) continue;
 
-    if (
-      // 只显示私有站点的用户信息
-      siteMeta.type === "public" ||
-      // 根据配置决定是否显示已死亡站点的用户信息
-      (!configStore.userInfo.showDeadSiteInOverview && siteMeta.isDead) ||
-      // 根据配置决定是否显示设置了离线模式或不允许查询用户信息的站点
-      (!siteMeta.isDead &&
-        !configStore.userInfo.showPassedSiteInOverview &&
-        (siteUserConfig.isOffline || siteUserConfig.allowQueryUserInfo === false))
-    ) {
-      continue;
+      if (
+        // 只显示私有站点的用户信息
+        siteMeta.type === "public" ||
+        // 根据配置决定是否显示已死亡站点的用户信息
+        (!configStore.userInfo.showDeadSiteInOverview && siteMeta.isDead) ||
+        // 根据配置决定是否显示设置了离线模式或不允许查询用户信息的站点
+        (!siteMeta.isDead &&
+          !configStore.userInfo.showPassedSiteInOverview &&
+          (siteUserConfig.isOffline || siteUserConfig.allowQueryUserInfo === false))
+      ) {
+        continue;
+      }
+
+      const siteUserInfoData = metadataStore.lastUserInfo[siteId] ?? {};
+      tasks.push(
+        updatePerSiteData(siteId as TSiteID, siteUserInfoData).catch((e) => {
+          console.error(`initTableData: updatePerSiteData failed for ${siteId}`, e);
+        }),
+      );
     }
 
-    const siteUserInfoData = metadataStore.lastUserInfo[siteId] ?? {};
-    tasks.push(
-      updatePerSiteData(siteId as TSiteID, siteUserInfoData).catch((e) => {
-        console.error(`initTableData: updatePerSiteData failed for ${siteId}`, e);
-      }),
-    );
+    await Promise.allSettled(tasks);
+  } catch (e) {
+    // loadAllAddedSiteMetadata 等前置步骤整体失败时必须给用户反馈，
+    // 否则表格一直转圈后只剩空白，用户不知道是加载失败还是没数据
+    console.error("[MyData] initTableData failed", e);
+    runtimeStore.showSnakebar("加载用户数据失败", { color: "error" });
+  } finally {
+    if (!options.silent) {
+      isTableLoading.value = false;
+    }
   }
-
-  await Promise.allSettled(tasks);
 }
 
 export function flushSiteLastUserInfo(sites: TSiteID[]) {
@@ -97,9 +116,14 @@ export function flushSiteLastUserInfo(sites: TSiteID[]) {
     sendMessage("getSiteUserInfoResult", site)
       .then((userInfo) => updatePerSiteData(site, userInfo))
       .catch((e) => {
-        // 首先检查是否还在刷新，如果没有，则说明队列已经取消了，此时不报错
-        if (!runtimeStore.userInfo.flushPlan[site]) {
-          runtimeStore.showSnakebar(`获取站点 [${site}] 用户信息失败`, { color: "error" });
+        // flushPlan[site] 已被置为 false 有两种情况：① 用户主动取消（cancelFlushSiteLastUserInfo）；
+        // ② 本链路自己的 finally 刚执行完。catch 先于 finally 跑，所以此刻仍为 true 才说明是
+        // 「没被取消的真失败」——旧代码条件写反（!flushPlan），导致正常失败不提示、取消后迟到的
+        // 失败反而弹错误。
+        if (runtimeStore.userInfo.flushPlan[site]) {
+          // 面向用户的提示一律用站点名，不暴露内部 id（AGENTS.md §3.5）
+          const siteName = perSiteLastUserData.value[site]?.siteName ?? site;
+          runtimeStore.showSnakebar(`获取站点 [${siteName}] 用户信息失败`, { color: "error" });
           console.error(e);
         }
       })
@@ -115,7 +139,12 @@ export async function cancelFlushSiteLastUserInfo() {
     runtimeStore.userInfo.flushPlan[runtimeStoreKey] = false;
   }
 
-  await sendMessage("cancelUserInfoQueue", undefined);
+  try {
+    await sendMessage("cancelUserInfoQueue", undefined);
+  } catch (e) {
+    // 本地计划已经作废，SW 侧取消失败不能让「已取消」提示也丢掉
+    console.error("cancelUserInfoQueue failed", e);
+  }
 
   runtimeStore.showSnakebar(`用户信息刷新队列已取消`, { color: "error" });
 }

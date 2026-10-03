@@ -53,6 +53,7 @@
       "errorMessage": "失败原因"
     },
     "filterPlaceholder": "过滤下载记录",
+    "loadError": "加载下载历史失败",
     "reDownload": "重新下载",
     "refresh": "刷新下载记录列表",
     "searchTorrent": "全站搜索此种子",
@@ -983,6 +984,7 @@
     },
     "index": {
       "flushFaviconFinish": "所选站点的图标已成功刷新！",
+      "flushFaviconFailed": "刷新站点图标失败",
       "oneClickImport": "一键导入站点",
       "reBuildMap": "重建站点映射",
       "settingNote": ["只有配置过的站点才会显示插件图标及相应的功能；", "已离线的站点不再参与搜索和信息获取；"],

@@ -1,5 +1,5 @@
 import { throttle } from "es-toolkit";
-import { computed, reactive, shallowRef, type Component } from "vue";
+import { computed, reactive, ref, shallowRef, type Component } from "vue";
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -9,12 +9,17 @@ import {
 
 import { sendMessage } from "@/messages.ts";
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
+import { useRuntimeStore } from "@/options/stores/runtime.ts";
+import { useConfigStore } from "@/options/stores/config.ts";
 
 import type { ITorrentDownloadMetadata, TTorrentDownloadKey } from "@/shared/types.ts";
 
 // 使用 shallowRef 优化大量下载历史数据的性能
 export const downloadHistory = shallowRef<Record<TTorrentDownloadKey, ITorrentDownloadMetadata>>({});
 export const downloadHistoryList = computed(() => Object.values(downloadHistory.value));
+
+/** 列表加载中标志：供 a-table :loading 与刷新按钮 :loading 共用，防止加载期间重复刷新 */
+export const isLoadingHistory = ref<boolean>(false);
 
 export const tableCustomFilter = useTableCustomFilter({
   parseOptions: {
@@ -58,20 +63,41 @@ export function clearWatchingMap() {
   }
 }
 
-function loadDownloadHistory() {
+async function loadDownloadHistory() {
   // 首先清除所有的下载状态监听
   clearWatchingMap();
 
-  sendMessage("getDownloadHistory", undefined).then((history: ITorrentDownloadMetadata[]) => {
-    downloadHistory.value = {}; // 清空目前的下载记录
+  // 刷新进行中直接忽略后续调用（节流窗口外仍可能连点），避免多条请求竞态互相覆盖
+  if (isLoadingHistory.value) {
+    return;
+  }
+  isLoadingHistory.value = true;
+  try {
+    const history: ITorrentDownloadMetadata[] = await sendMessage("getDownloadHistory", undefined);
+
+    // 先在普通对象里把整表拼好，再一次性替换 shallowRef：
+    // 旧写法先置 {} 再逐 key 赋值，shallowRef 对逐 key 变更不触发更新，
+    // 表格只能靠后续副作用碰巧刷新，且中途会短暂闪成空表。
+    const historyMap: Record<TTorrentDownloadKey, ITorrentDownloadMetadata> = {};
     history.forEach((item) => {
-      downloadHistory.value[item.id!] = item;
+      historyMap[item.id!] = item;
       if (item.downloadStatus == "downloading" || item.downloadStatus == "pending") {
         watchDownloadHistory(item.id!);
       }
     });
+    downloadHistory.value = historyMap;
     tableCustomFilter.buildAdvanceItemPropsFn();
-  });
+  } catch (e) {
+    console.error("[DownloadHistory] load download history failed", e);
+    useRuntimeStore().showSnakebar(i18nLoadErrorText(), { color: "error" });
+  } finally {
+    isLoadingHistory.value = false;
+  }
+}
+
+/** 非组件模块拿不到 useI18n 注入，按 configStore.lang 选双语文案，避免错误提示只给中文 */
+function i18nLoadErrorText(): string {
+  return useConfigStore().lang === "en" ? "Failed to load download history" : "加载下载历史失败";
 }
 
 export const throttleLoadDownloadHistory = throttle(loadDownloadHistory, 1e3);

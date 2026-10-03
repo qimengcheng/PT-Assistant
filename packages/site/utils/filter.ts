@@ -193,11 +193,18 @@ export const definedFilters: Record<string, TQueryFilterFn> = {
   },
 
   // Social Site Parser
-  extAnidbId: socialParseUrlMap.anidb,
-  extBangumiId: socialParseUrlMap.bangumi,
-  extDoubanId: socialParseUrlMap.douban,
-  extImdbId: socialParseUrlMap.imdb,
-  extTvmazeId: socialParseUrlMap.tvmaze,
+  //
+  // 必须延迟取值，不能写成 `socialParseUrlMap.anidb`：这三个 map 由 packages/social/index.ts
+  // 在**模块求值期的循环**里填充，而 site ↔ social 是循环引用。rollup（Vite 7）恰好把 social
+  // 排在前面所以一直没暴露；rolldown（Vite 8）换了求值顺序后，这里顶层读到的 map 是 undefined，
+  // 直接抛 "Cannot read properties of undefined (reading 'anidb')"。因为 definedFilters 是顶层
+  // 常量，整个模块图随之崩掉 —— offscreen 的 onMessage 全都没注册上，表现为所有走 offscreen 的
+  // 消息报 "The message port closed before a response was received."（数据备份/恢复、站点解析等）。
+  extAnidbId: (query: any) => socialParseUrlMap.anidb(query),
+  extBangumiId: (query: any) => socialParseUrlMap.bangumi(query),
+  extDoubanId: (query: any) => socialParseUrlMap.douban(query),
+  extImdbId: (query: any) => socialParseUrlMap.imdb(query),
+  extTvmazeId: (query: any) => socialParseUrlMap.tvmaze(query),
 
   /**
    * Print the query to the console.

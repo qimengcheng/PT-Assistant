@@ -53,7 +53,7 @@ const {
   tableFilterRef,
   tableFilterFn,
   advanceFilterDictRef,
-  toggleKeywordStateFn,
+  setKeywordRequiredFn,
   buildFilterDictFn,
   updateTableFilterValueFn,
 } = useTableCustomFilter<ISiteTableItem>({
@@ -137,11 +137,18 @@ const filteredItems = computed(() => {
 
 const tableSelected = ref<TSiteID[]>([]);
 
-const pagination = computed<TablePaginationConfig>(() => ({
-  pageSize: configStore.tableBehavior.SetSite?.itemsPerPage ?? 10,
-  showSizeChanger: true,
-  size: "small",
-}));
+const pagination = computed<TablePaginationConfig>(() => {
+  // 旧版（Vuetify）用 -1 表示「不分页」，这个约定被原样搬到了 config 默认值里。
+  // 但 antd Table 是前端分页，pageSize=-1 会让 slice(0, -1) 吃掉最后一行、
+  // 页数也算成负数。必须兜底成正整数 —— 与 SearchEntity 的处理保持一致。
+  const raw = configStore.tableBehavior.SetSite?.itemsPerPage as unknown;
+  const pageSize = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : 10;
+  return {
+    pageSize,
+    showSizeChanger: true,
+    size: "small",
+  };
+});
 
 function handleTableChange(
   page: TablePaginationConfig,
@@ -191,12 +198,16 @@ async function flushSiteFavicon(siteId: TSiteID | TSiteID[]) {
 }
 
 function toggleUserConfigFilter(keyword: string, checked: boolean) {
-  toggleKeywordStateFn(`userConfig.${keyword}`, checked ? "1" : "");
+  // 用 setKeywordRequiredFn 而不是 toggleKeywordStateFn：
+  // 这里是无 checkbox-group 的受控复选框，required 没人维护，
+  // 用三态函数只会去动 exclude，勾选等于没反应。
+  // value 恒为 "1"（取消时传空串会让 exclude 去筛一个空字符串，更错）。
+  setKeywordRequiredFn(`userConfig.${keyword}`, "1", checked);
   updateTableFilterValueFn();
 }
 
 function toggleGroupFilter(group: string, checked: boolean) {
-  toggleKeywordStateFn("userConfig.groups", checked ? group : "");
+  setKeywordRequiredFn("userConfig.groups", group, checked);
   updateTableFilterValueFn();
 }
 

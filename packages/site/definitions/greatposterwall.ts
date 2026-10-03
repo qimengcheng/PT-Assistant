@@ -3,8 +3,8 @@
  * @PTPPDefinitions https://github.com/pt-plugins/PT-Plugin-Plus/blob/dev/resource/sites/greatposterwall.com/config.json
  */
 import { buildCategoryOptionsFromList, parseTimeWithZone, extractContent } from "../utils";
-import { ISiteMetadata, ITorrent, ITorrentTag, IUserInfo } from "../types";
-import GazelleJSONAPI, { groupBrowseResult, groupTorrent, SchemaMetadata } from "../schemas/GazelleJSONAPI.ts";
+import { type ISiteMetadata, type ITorrent, type ITorrentTag, type IUserInfo } from "../types";
+import GazelleJSONAPI, { type groupBrowseResult, type groupTorrent, SchemaMetadata } from "../schemas/GazelleJSONAPI.ts";
 
 interface gpwBrowseResult extends groupBrowseResult {
   groupSubName: string;

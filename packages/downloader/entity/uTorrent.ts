@@ -4,19 +4,19 @@
  */
 import {
   AbstractBittorrentClient,
-  CAddTorrentOptions,
-  CTorrent,
-  TorrentClientConfig,
-  TorrentClientMetaData,
+  type CAddTorrentOptions,
+  type CTorrent,
+  type TorrentClientConfig,
+  type TorrentClientMetaData,
   CTorrentState,
-  CAddTorrentResult,
-  TorrentQueueDirection,
-  TorrentSpeedLimit,
-  CTorrentFile,
-  CTorrentFileSelection,
-  CTorrentTracker,
+  type CAddTorrentResult,
+  type TorrentQueueDirection,
+  type TorrentSpeedLimit,
+  type CTorrentFile,
+  type CTorrentFileSelection,
+  type CTorrentTracker,
   CTrackerState,
-  TorrentFilePriority,
+  type TorrentFilePriority,
 } from "../types";
 import urlJoin from "url-join";
 

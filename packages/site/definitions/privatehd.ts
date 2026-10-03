@@ -1,8 +1,8 @@
 /**
  * @JackettDefinitions https://github.com/Jackett/Jackett/blob/master/src/Jackett.Common/Indexers/Definitions/PrivateHD.cs
  */
-import { ISiteMetadata, ISearchInput, ITorrent, ITorrentTag } from "../types";
-import AvistazNetwork, { SchemaMetadata, IAvzNetRawTorrent } from "../schemas/AvistazNetwork.ts";
+import { type ISiteMetadata, type ISearchInput, type ITorrent, type ITorrentTag } from "../types";
+import AvistazNetwork, { SchemaMetadata, type IAvzNetRawTorrent } from "../schemas/AvistazNetwork.ts";
 
 const categoryMap: Record<number, string> = {
   0: "All",

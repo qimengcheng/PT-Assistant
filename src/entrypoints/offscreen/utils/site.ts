@@ -4,7 +4,7 @@ import PQueue from "p-queue";
 import {
   getDefinedSiteMetadata,
   getFavicon,
-  getFaviconMetadata,
+  type getFaviconMetadata,
   getSite as createSiteInstance,
   NO_IMAGE,
   type ISiteUserConfig,

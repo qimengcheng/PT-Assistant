@@ -8,7 +8,7 @@ import {
   QuestionCircleOutlined,
   RightOutlined,
 } from "@antdv-next/icons";
-import { ISiteMetadata, type ISiteUserConfig, type TSiteID } from "@ptd/site";
+import { type ISiteMetadata, type ISiteUserConfig, type TSiteID } from "@ptd/site";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { getCanAddedSiteMetadata } from "./utils.ts";

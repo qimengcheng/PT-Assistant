@@ -4,7 +4,7 @@ import { refDebounced } from "@vueuse/core";
 import { computed, type Ref, ref, unref, watch, isRef } from "vue";
 import { flatten, flattenDeep, isEqual, uniq, uniqBy } from "es-toolkit";
 import { startOfDay, startOfMonth, startOfQuarter, startOfWeek, startOfYear } from "date-fns";
-import searchQueryParser, { type SearchParserOptions, SearchParserResult as TFilter } from "search-query-parser";
+import searchQueryParser, { type SearchParserOptions, type SearchParserResult as TFilter } from "search-query-parser";
 
 import { parseSizeString, parseValidTimeString } from "@ptd/site";
 import { formatDate } from "@/options/utils.ts";

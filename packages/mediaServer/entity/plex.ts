@@ -1,15 +1,15 @@
 import urlJoin from "url-join";
 import { toMerged } from "es-toolkit";
 
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { EResultParseStatus } from "@ptd/site";
 import {
   AbstractMediaServer,
-  IMediaServerBaseConfig,
-  IMediaServerItem,
-  IMediaServerMetadata,
-  IMediaServerSearchOptions,
-  IMediaServerSearchResult,
+  type IMediaServerBaseConfig,
+  type IMediaServerItem,
+  type IMediaServerMetadata,
+  type IMediaServerSearchOptions,
+  type IMediaServerSearchResult,
 } from "@ptd/mediaServer";
 
 export const mediaServerMetaData: IMediaServerMetadata = {

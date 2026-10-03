@@ -5,7 +5,7 @@ import { computedAsync } from "@vueuse/core";
 import { nanoid } from "nanoid";
 import { CheckCircleOutlined, CloseCircleOutlined, LeftOutlined, QuestionCircleOutlined, RightOutlined } from "@antdv-next/icons";
 
-import { BackupFields, IBackupServerMetadata } from "@/shared/types.ts";
+import { BackupFields, type IBackupServerMetadata } from "@/shared/types.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import {
   entityList,

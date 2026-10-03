@@ -1,5 +1,5 @@
 import { openDB, type IDBPDatabase } from "idb";
-import { IPtdDBSchemaV1, IPtdDBSchema, IPtdDBSchemaV2 } from "@/shared/types.ts";
+import { type IPtdDBSchemaV1, type IPtdDBSchema, type IPtdDBSchemaV2 } from "@/shared/types.ts";
 
 export const ptdIndexDb = openDB<IPtdDBSchema>("ptd", 4, {
   upgrade(db, oldVersion) {

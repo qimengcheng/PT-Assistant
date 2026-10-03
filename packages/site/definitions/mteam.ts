@@ -10,11 +10,11 @@ import { build as buildImdb } from "@ptd/social/entity/imdb.ts";
 
 import {
   type ILevelRequirement,
-  ISearchInput,
-  ISiteMetadata,
-  ITorrent,
-  ITorrentTag,
-  TSchemaMetadataListSelectors,
+  type ISearchInput,
+  type ISiteMetadata,
+  type ITorrent,
+  type ITorrentTag,
+  type TSchemaMetadataListSelectors,
   ETorrentStatus,
 } from "../types";
 import PrivateSite from "../schemas/AbstractPrivateSite.ts";

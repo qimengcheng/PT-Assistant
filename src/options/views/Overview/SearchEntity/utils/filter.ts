@@ -1,5 +1,5 @@
 import { computed, watch } from "vue";
-import { ITorrentTag } from "@ptd/site";
+import { type ITorrentTag } from "@ptd/site";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";

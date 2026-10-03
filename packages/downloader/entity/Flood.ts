@@ -7,22 +7,22 @@
 
 import {
   AbstractBittorrentClient,
-  CAddTorrentOptions,
+  type CAddTorrentOptions,
   CustomPathDescription,
-  CTorrent,
-  TorrentClientConfig,
-  TorrentClientMetaData,
+  type CTorrent,
+  type TorrentClientConfig,
+  type TorrentClientMetaData,
   CTorrentState,
-  TorrentClientStatus,
-  CAddTorrentResult,
-  CTorrentFile,
-  CTorrentFileSelection,
-  CTorrentPeer,
-  CTorrentTracker,
+  type TorrentClientStatus,
+  type CAddTorrentResult,
+  type CTorrentFile,
+  type CTorrentFileSelection,
+  type CTorrentPeer,
+  type CTorrentTracker,
   CTrackerState,
-  TorrentFilePriority,
+  type TorrentFilePriority,
 } from "../types";
-import { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import { AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { axios, getRemoteTorrentFile } from "../utils";
 
 export const clientConfig: TorrentClientConfig = {

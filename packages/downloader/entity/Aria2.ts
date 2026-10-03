@@ -4,19 +4,19 @@
  * 但是允许用户填入 http:// 开头的地址
  */
 import {
-  CAddTorrentOptions,
+  type CAddTorrentOptions,
   CustomPathDescription,
-  CTorrent,
-  DownloaderBaseConfig,
-  TorrentClientMetaData,
+  type CTorrent,
+  type DownloaderBaseConfig,
+  type TorrentClientMetaData,
   CTorrentState,
-  TorrentClientStatus,
+  type TorrentClientStatus,
   AbstractBittorrentClient,
-  CAddTorrentResult,
-  TorrentQueueDirection,
-  TorrentSpeedLimit,
-  CTorrentFile,
-  TorrentFilePriority,
+  type CAddTorrentResult,
+  type TorrentQueueDirection,
+  type TorrentSpeedLimit,
+  type CTorrentFile,
+  type TorrentFilePriority,
 } from "../types";
 import { getRemoteTorrentFile } from "../utils";
 import urlJoin from "url-join";

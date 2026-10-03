@@ -5,7 +5,7 @@ import { computedAsync } from "@vueuse/core";
 import { cloneDeep } from "es-toolkit";
 import type { FormInstance } from "antdv-next";
 import { FilterOutlined } from "@antdv-next/icons";
-import { getBackupServer, getBackupServerMetaData, IBackupMetadata } from "@ptd/backupServer";
+import { getBackupServer, getBackupServerMetaData, type IBackupMetadata } from "@ptd/backupServer";
 import type { IBackupRetention } from "@ptd/backupServer";
 import { DEFAULT_BACKUP_RETENTION_SAMPLE_RULES, hasBackupRetentionToApply } from "@ptd/backupServer/utils.ts";
 

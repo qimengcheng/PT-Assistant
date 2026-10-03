@@ -1,10 +1,10 @@
 import axios from "axios";
 import { uniq } from "es-toolkit";
 import {
-  IFetchSocialSiteInformationConfig,
-  ISocialInformation,
-  ISocialSitePageInformation,
-  TSupportSocialSitePageParserMatches,
+  type IFetchSocialSiteInformationConfig,
+  type ISocialInformation,
+  type ISocialSitePageInformation,
+  type TSupportSocialSitePageParserMatches,
 } from "../types";
 
 function isNonEmptyString(value: string | undefined): value is string {

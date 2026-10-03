@@ -141,10 +141,22 @@ jobs:
     outputs:
       released: ${{ steps.gh.outputs.id != '' }}
     steps:
+      # 生成更新内容要读 git 历史 + 上一个 release tag（算「本次改了什么」的范围），
+      # 所以这里需要完整克隆；fetch-depth: 0 才会把 tag 一起取下来。
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v8
         with:
           pattern: build-zip-*
           merge-multiple: true
+
+      # 更新内容来自本仓库的提交历史（[agent]-[model] vX.Y.Z 描述 这种格式），
+      # 比 GitHub 按 PR 自动生成的 notes 更贴近「这次到底改了什么」。
+      # 两者不冲突：bodyPath 在前，自动 notes（含 PR 链接与贡献者）附在后。
+      - name: Generate release notes
+        run: node scripts/gen-release-notes.mjs release-notes.md
 
       # 版本号取自 package.json，skipIfReleaseExists 保证同版本不会重复发
       - id: gh
@@ -153,6 +165,7 @@ jobs:
           name: v${{ needs.build.outputs.version }}
           tag: v${{ needs.build.outputs.version }}
           skipIfReleaseExists: true
+          bodyPath: release-notes.md
           generateReleaseNotes: true
           artifacts: PT-Assistant-${{ needs.build.outputs.version }}-chrome.zip,PT-Assistant-${{ needs.build.outputs.version }}-firefox.zip,PT-Assistant-${{ needs.build.outputs.version }}-sources.zip
 

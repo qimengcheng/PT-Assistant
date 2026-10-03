@@ -1,10 +1,10 @@
 import axios from "axios";
 import {
-  IFetchSocialSiteInformationConfig,
-  IPtgenApiResponse,
-  ISocialInformation,
-  ISocialSitePageInformation,
-  TSupportSocialSitePageParserMatches,
+  type IFetchSocialSiteInformationConfig,
+  type IPtgenApiResponse,
+  type ISocialInformation,
+  type ISocialSitePageInformation,
+  type TSupportSocialSitePageParserMatches,
 } from "../types";
 
 const imdbUrlPattern = /^(?:https?:\/\/)?(?:www\.)?imdb\.com\/title\/(tt\d+)\/?/;

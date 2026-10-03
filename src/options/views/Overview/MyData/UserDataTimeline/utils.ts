@@ -8,7 +8,7 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import type { IStoredUserInfo, TUserInfoStorageSchema } from "@/shared/types.ts";
 
 import { fixUserInfo, realFormatRatio } from "../utils/format.ts";
-import { allAddedSiteMetadata, TOptionSiteMetadatas } from "../utils/siteMetadata.ts";
+import { allAddedSiteMetadata, type TOptionSiteMetadatas } from "../utils/siteMetadata.ts";
 import { extStore } from "@/storage.ts";
 
 const metadataStore = useMetadataStore();

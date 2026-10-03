@@ -1,5 +1,5 @@
 import urlJoin from "url-join";
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 
 import AbstractBackupServer from "../AbstractBackupServer.ts";
 import type { IBackupConfig, IBackupData, IBackupFileInfo, IBackupFileListOption, IBackupMetadata } from "../type";

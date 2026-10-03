@@ -4,7 +4,7 @@
  * @PDSDefinitions https://github.com/mantou568/pre-dessert-sites/blob/main/site_config/sites/pttime.json
  * @PTMDefinitions https://github.com/JustLookAtNow/pt_mate/blob/master/assets/sites/pttime.json
  */
-import { ISiteMetadata, IUserInfo } from "../types";
+import { type ISiteMetadata, type IUserInfo } from "../types";
 import NexusPHP, { CategoryIncldead, CategorySpstate, SchemaMetadata } from "../schemas/NexusPHP";
 import { createDocument, parseSizeString } from "../utils";
 import { mergeWith } from "es-toolkit";

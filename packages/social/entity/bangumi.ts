@@ -3,11 +3,11 @@ import { uniq } from "es-toolkit";
 
 import { commonParseFactory } from "../utils";
 import {
-  IFetchSocialSiteInformationConfig,
-  IPtgenApiResponse,
-  ISocialInformation,
-  ISocialSitePageInformation,
-  TSupportSocialSitePageParserMatches,
+  type IFetchSocialSiteInformationConfig,
+  type IPtgenApiResponse,
+  type ISocialInformation,
+  type ISocialSitePageInformation,
+  type TSupportSocialSitePageParserMatches,
 } from "../types";
 
 import { REPO_URL } from "~/helper.ts";

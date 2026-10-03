@@ -16,7 +16,7 @@
  */
 
 import CryptoJS from "crypto-js";
-import axios, { AxiosRequestConfig } from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import AbstractBackupServer from "../AbstractBackupServer.ts";
 import { localSort } from "../utils.ts";
 import type {

@@ -5,17 +5,17 @@
  */
 import {
   AbstractBittorrentClient,
-  CAddTorrentOptions,
-  CTorrent,
-  TorrentClientConfig,
-  TorrentClientMetaData,
-  CTorrentFilterRules,
+  type CAddTorrentOptions,
+  type CTorrent,
+  type TorrentClientConfig,
+  type TorrentClientMetaData,
+  type CTorrentFilterRules,
   CTorrentState,
-  TorrentClientStatus,
-  CAddTorrentResult,
+  type TorrentClientStatus,
+  type CAddTorrentResult,
 } from "../types";
 import urlJoin from "url-join";
-import { AxiosRequestConfig } from "axios";
+import { type AxiosRequestConfig } from "axios";
 import { axios, getRemoteTorrentFile } from "../utils";
 
 export const clientConfig: TorrentClientConfig = {

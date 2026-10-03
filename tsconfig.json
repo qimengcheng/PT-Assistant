@@ -4,7 +4,9 @@
     "strict": true,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": false,
+    // 纯类型导入必须写 `import type`：Vite 8 的 rolldown 内核把「运行时找不到该导出」
+    // 从警告升级为硬错误，裸 `import { IType }` 会直接断构建（见 pnpm-workspace.yaml 的 vite override）。
+    "verbatimModuleSyntax": true,
     "noUncheckedIndexedAccess": false,
     "paths": {
       "~/*": ["./src/*"],

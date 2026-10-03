@@ -1,7 +1,7 @@
 // noinspection ES6PreferShortImport
 
 import type { AxiosRequestConfig } from "axios";
-import { TSiteID, TSiteHost, TSiteUrl, TSiteFullUrl, TPatterns } from "./base";
+import { type TSiteID, type TSiteHost, type TSiteUrl, type TSiteFullUrl, type TPatterns } from "./base";
 import type { ITorrent } from "./torrent";
 import type { ILevelRequirement, IUserInfo } from "./userinfo";
 import type { IElementQuery, ISearchCategories, ISearchConfig, ISearchEntryRequestConfig } from "./search";

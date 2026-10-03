@@ -5,7 +5,7 @@
 import type { ISearchInput, ISiteMetadata, ITorrent, ITorrentTag } from "../types";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 
-import { TPreDefinedTorrentTagName } from "../utils/tags";
+import { type TPreDefinedTorrentTagName } from "../utils/tags";
 import PrivateSite from "../schemas/AbstractPrivateSite";
 
 /**

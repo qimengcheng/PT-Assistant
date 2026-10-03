@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import {
-  IImplicitUserInfo,
-  isoDuration,
+  type IImplicitUserInfo,
+  type isoDuration,
   convertIsoDurationToDate,
   convertSecondsToIsoDuration,
   type IUserInfo,

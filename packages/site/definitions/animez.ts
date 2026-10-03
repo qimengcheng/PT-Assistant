@@ -1,8 +1,8 @@
 /**
  * @JackettDefinitions https://github.com/Jackett/Jackett/blob/master/src/Jackett.Common/Indexers/Definitions/AnimeZ.cs
  */
-import { ISearchInput, ISiteMetadata, ITorrent, ITorrentTag, IUserInfo } from "../types";
-import AvistazNetwork, { SchemaMetadata, IAvzNetRawTorrent } from "../schemas/AvistazNetwork.ts";
+import { type ISearchInput, type ISiteMetadata, type ITorrent, type ITorrentTag, type IUserInfo } from "../types";
+import AvistazNetwork, { SchemaMetadata, type IAvzNetRawTorrent } from "../schemas/AvistazNetwork.ts";
 import { definedFilters } from "../utils/filter.ts";
 
 const profileRootSelector = "main > div > div > div:first-child";

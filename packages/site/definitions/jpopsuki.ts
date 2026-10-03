@@ -4,7 +4,7 @@
  * @PDSDefinitions https://github.com/mantou568/pre-dessert-sites/blob/main/site_config/sites/jpop.json
  * @PTMDefinitions https://github.com/JustLookAtNow/pt_mate/blob/master/assets/sites/jpopsuki.json
  */
-import { ISiteMetadata, ITorrent, IUserInfo, ISearchInput } from "../types";
+import { type ISiteMetadata, type ITorrent, type IUserInfo, type ISearchInput } from "../types";
 import Gazelle, {
   SchemaMetadata,
   GazelleUtils,

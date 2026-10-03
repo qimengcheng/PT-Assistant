@@ -1,11 +1,11 @@
 import {
   AbstractEmbyCompatibleServer,
-  IEmbyQueryItem,
-  IEmbyQueryResult,
-  IMediaServerBaseConfig,
-  IMediaServerMetadata,
-  IMediaServerSearchOptions,
-  IMediaServerSearchResult,
+  type IEmbyQueryItem,
+  type IEmbyQueryResult,
+  type IMediaServerBaseConfig,
+  type IMediaServerMetadata,
+  type IMediaServerSearchOptions,
+  type IMediaServerSearchResult,
 } from "@ptd/mediaServer";
 import { AxiosError, type AxiosRequestConfig } from "axios";
 import { EResultParseStatus } from "@ptd/site";

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type IImplicitUserInfo, type ILevelRequirement, IUserInfo } from "@ptd/site";
+import { type IImplicitUserInfo, type ILevelRequirement, type IUserInfo } from "@ptd/site";
 import { ArrowRightOutlined } from "@antdv-next/icons";
 
 import UserLevelsComponent from "./UserLevelsComponent.vue";

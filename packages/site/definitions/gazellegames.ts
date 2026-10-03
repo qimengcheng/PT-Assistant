@@ -11,7 +11,7 @@ import type {
   ISearchResult,
   TUserInfoParseKey,
 } from "../types.ts";
-import { AxiosRequestConfig, AxiosResponse } from "axios";
+import { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import {
   parseValidTimeString,
   extractContent,
@@ -20,7 +20,7 @@ import {
 } from "../utils.ts";
 import urlJoin from "url-join";
 import GazelleJSONAPI from "../schemas/GazelleJSONAPI.ts";
-import { SchemaMetadata, jsonResponse, infoJsonResponse, userJsonResponse } from "../schemas/GazelleJSONAPI.ts";
+import { SchemaMetadata, type jsonResponse, type infoJsonResponse, type userJsonResponse } from "../schemas/GazelleJSONAPI.ts";
 
 interface groupResult {
   Artists: {

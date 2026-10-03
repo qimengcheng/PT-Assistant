@@ -11,7 +11,7 @@
  */
 
 import { merge } from "es-toolkit";
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 
 import AbstractBackupServer from "../AbstractBackupServer.ts";
 import { localSort } from "../utils";

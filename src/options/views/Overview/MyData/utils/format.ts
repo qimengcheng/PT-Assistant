@@ -1,6 +1,6 @@
 import { isValid } from "date-fns";
 
-import { fixRatio, IUserInfo } from "@ptd/site";
+import { fixRatio, type IUserInfo } from "@ptd/site";
 import { deepToRaw } from "@/options/utils.ts";
 
 export function fixUserInfo<T extends IUserInfo = IUserInfo>(userInfo: Partial<T>): Required<T> {

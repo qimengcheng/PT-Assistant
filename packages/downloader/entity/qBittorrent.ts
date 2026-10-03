@@ -5,26 +5,26 @@
  */
 import {
   AbstractBittorrentClient,
-  CAddTorrentOptions,
+  type CAddTorrentOptions,
   CustomPathDescription,
-  CTorrent,
-  TorrentClientConfig,
-  TorrentClientMetaData,
-  CTorrentFilterRules,
+  type CTorrent,
+  type TorrentClientConfig,
+  type TorrentClientMetaData,
+  type CTorrentFilterRules,
   CTorrentState,
-  TorrentClientStatus,
-  CAddTorrentResult,
-  TorrentQueueDirection,
-  TorrentSpeedLimit,
-  CTorrentFile,
-  CTorrentFileList,
-  CTorrentFileSelection,
-  CTorrentPeer,
-  CTorrentTracker,
+  type TorrentClientStatus,
+  type CAddTorrentResult,
+  type TorrentQueueDirection,
+  type TorrentSpeedLimit,
+  type CTorrentFile,
+  type CTorrentFileList,
+  type CTorrentFileSelection,
+  type CTorrentPeer,
+  type CTorrentTracker,
   CTrackerState,
-  TorrentFilePriority,
+  type TorrentFilePriority,
 } from "../types";
-import { AxiosRequestConfig, AxiosResponse } from "axios";
+import { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import urlJoin from "url-join";
 import { axios, getRemoteTorrentFile } from "../utils";
 import { merge } from "es-toolkit";

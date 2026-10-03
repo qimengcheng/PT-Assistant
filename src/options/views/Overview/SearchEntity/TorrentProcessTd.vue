@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { ETorrentStatus } from "@ptd/site";
 import { ArrowDownOutlined, ArrowUpOutlined, CheckOutlined, DisconnectOutlined } from "@antdv-next/icons";
 
-import { ISearchResultTorrent } from "@/shared/types.ts";
+import { type ISearchResultTorrent } from "@/shared/types.ts";
 
 const { torrent } = defineProps<{
   torrent: ISearchResultTorrent;

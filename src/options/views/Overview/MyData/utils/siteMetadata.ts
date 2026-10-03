@@ -1,6 +1,6 @@
 import { shallowReactive } from "vue";
 
-import { definitionList, ISiteMetadata, NO_IMAGE, TSiteID } from "@ptd/site";
+import { definitionList, type ISiteMetadata, NO_IMAGE, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

@@ -1,9 +1,9 @@
 import axios from "axios";
 import {
-  IFetchSocialSiteInformationConfig,
-  ISocialInformation,
-  ISocialSitePageInformation,
-  TSupportSocialSitePageParserMatches,
+  type IFetchSocialSiteInformationConfig,
+  type ISocialInformation,
+  type ISocialSitePageInformation,
+  type TSupportSocialSitePageParserMatches,
 } from "../types";
 import { commonParseFactory } from "../utils.ts";
 

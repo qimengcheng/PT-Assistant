@@ -1,7 +1,7 @@
 /**
  * @PTPPDefinitions https://github.com/pt-plugins/PT-Plugin-Plus/blob/dev/resource/sites/gay-torrents.org/config.json
  */
-import { ISiteMetadata } from "../types";
+import { type ISiteMetadata } from "../types";
 
 export const siteMetadata: ISiteMetadata = {
   id: "gtorg",

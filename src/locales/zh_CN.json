@@ -603,13 +603,13 @@
       "versionWarning": "备份数据版本高于当前扩展版本，恢复可能会导致数据不兼容或丢失，是否继续？"
     },
     "fields": {
-      "config": "插件配置（config）",
-      "cookies": "站点 Cookies（cookies）",
-      "downloadHistory": "下载历史（downloadHistory）",
-      "keepUploadTask": "辅种任务（keepUploadTask）",
-      "metadata": "站点与服务配置（metadata）",
-      "searchResultSnapshot": "搜索结果快照（searchResultSnapshot）",
-      "userInfo": "用户信息（userInfo）"
+      "config": "插件配置",
+      "cookies": "站点 Cookies",
+      "downloadHistory": "下载历史",
+      "keepUploadTask": "辅种任务",
+      "metadata": "站点与服务配置",
+      "searchResultSnapshot": "搜索结果快照",
+      "userInfo": "用户信息"
     },
     "localExport": "本地导出",
     "localImport": "本地导入",

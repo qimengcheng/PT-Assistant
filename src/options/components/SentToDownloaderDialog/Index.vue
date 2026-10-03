@@ -283,29 +283,34 @@ function dialogLeave() {
       <div v-else style="padding-bottom: 0">
         <a-row>
           <a-col :span="24">
-            <a-auto-complete
+            <!-- 下载器是固定列表，不需要自由输入：用 Select 而非 AutoComplete。
+                 AutoComplete（combobox 模式）选中后输入框显示的是选项的 value，
+                 也就是下载器那串随机 id，option-label-prop 在这种组件里不接管显示，
+                 用户看到的就是「osuXXXX_...」这种编号。Select 单选时输入框固定显示 label。 -->
+            <a-select
               v-model:value="selectedDownloaderId"
               :options="downloaderOptions"
-              option-label-prop="label"
+              show-search
+              option-filter-prop="label"
               :placeholder="t('SentToDownloaderDialog.selectDownloader')"
               allow-clear
               style="width: 100%"
               @change="onDownloaderChange"
             >
-              <template #option="{ value }">
+              <template #option="opt">
                 <a-list-item-meta style="padding: 4px 0">
                   <template #avatar>
-                    <img class="downloader-avatar" :src="getDownloaderIcon(value.raw.type)" :alt="value.raw.type" />
+                    <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.type" />
                   </template>
                   <a-list-item-meta-content>
-                    <a-list-item-meta-title :title="value.label" />
+                    <a-list-item-meta-title :title="opt.label" />
                   </a-list-item-meta-content>
                   <template #extra>
-                    <a-tag color="blue">{{ value.raw.type }}</a-tag>
+                    <a-tag color="blue">{{ opt.raw.type }}</a-tag>
                   </template>
                 </a-list-item-meta>
               </template>
-            </a-auto-complete>
+            </a-select>
           </a-col>
         </a-row>
 

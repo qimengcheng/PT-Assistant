@@ -8,6 +8,17 @@ import { setupOffscreenDocumentSafe } from "./utils/offscreen.ts";
 import "./utils/cookies.ts";
 // 右键菜单（划词搜索/豆瓣·IMDb 链接搜索/下载链接推送），挂载于 tabs 激活事件
 import "./utils/contextMenus.ts";
+// openOptionsPage 消息：content-script 划词搜索等跳转选项页
+import "./utils/base.ts";
+// DNR session 规则（unsafe header 注入，正向圈定本扩展请求 #1465/#1486）
+import "./utils/webRequest.ts";
+// 地址栏 ptd + Tab 搜索
+import "./utils/omnibox.ts";
+// 定时任务：自动刷新站点数据 / 自动备份 / 冷却后重新推送种子
+import "./utils/alarms.ts";
+// 原生通信桥（可选权限 nativeMessaging）：本机 ptd CLI ↔ 扩展，未授权时自动休眠
+import "./utils/nativeMessaging.ts";
+import { fixAllStoredUserInfo } from "./utils/fixer.ts";
 
 // 只需要「站点定义数量」时，用 import.meta.glob 拿文件名键即可（不会加载任何模块）。
 // ⚠️ 不能 import { definitionList } from "@ptd/site"：那会把 site index 的 eager import 链
@@ -67,19 +78,16 @@ export default defineBackground({
       return await chrome.downloads.download(data);
     });
 
-    // ===== chrome.declarativeNetRequest（供 unsafe header 替换使用）=====
-    onMessage("updateDNRSessionRules", async ({ data }) => {
-      await chrome.declarativeNetRequest.updateSessionRules({
-        addRules: [data.rule],
-        removeRuleIds: [data.rule.id],
-      });
-    });
-
-    onMessage("removeDNRSessionRuleById", async ({ data }) => {
-      await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [data] });
-    });
+    // ===== chrome.declarativeNetRequest 的 updateDNRSessionRules /
+    //      removeDNRSessionRuleById 已在 ./utils/webRequest.ts 注册 =====
 
     // ===== chrome.cookies 的 getAllCookies / getCookie / setCookie / removeCookie /
-    //      checkAndExtendCookies 已在 ./utils/cookies.ts 注册
+    //      checkAndExtendCookies 已在 ./utils/cookies.ts 注册 =====
+
+    // ===== 安装/升级时修复历史版本写入的坏数据（字符串型 ratio/seeding/joinTime 等）=====
+    browser.runtime.onInstalled.addListener(() => {
+      console.debug("[PTD] Installed!");
+      void fixAllStoredUserInfo();
+    });
   },
 });

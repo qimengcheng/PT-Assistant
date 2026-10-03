@@ -130,7 +130,7 @@ async function deleteSiteUserInfo(date: string[]) {
     tableSelected.value = [];
   } catch (e) {
     console.error("[MyData] remove site user info failed", e);
-    runtimeStore.showSnakebar(t("MyData.HistoryDataView.deleteConfirm"), { color: "error" });
+    runtimeStore.showSnakebar(t("MyData.HistoryDataView.deleteError"), { color: "error" });
   }
 }
 
@@ -166,7 +166,7 @@ function afterEnter() {
     v-model:open="showDialog"
     :title="dialogTitle"
     :width="1200"
-    :after-close="() => (siteHistoryData = [])"
+    @after-close="() => (siteHistoryData = [])"
     @after-open-change="(open: boolean) => open && afterEnter()"
   >
 
@@ -283,7 +283,8 @@ function afterEnter() {
     </a-table>
 
     <a-modal v-model:open="showStoreDataDialog" :title="t('MyData.HistoryDataView.action.viewRaw')" :width="800" :footer="null">
-      <pre>{{ JSON.stringify(jsonData, null, 2) }}</pre>
+      <!-- 大 JSON 要限高滚动，否则会把二级弹窗整体撑出视口 -->
+      <pre style="max-height: 50vh; overflow: auto; margin: 0">{{ JSON.stringify(jsonData, null, 2) }}</pre>
     </a-modal>
   </a-modal>
 </template>

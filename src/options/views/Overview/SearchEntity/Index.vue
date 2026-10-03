@@ -504,7 +504,7 @@ const hiddenTagNamesText = computed({
           </a-button>
         </a-space-compact>
 
-        <a-divider orientation="vertical" class="mx-2" />
+        <a-divider type="vertical" class="mx-2" />
 
         <!-- 创建搜索快照 -->
         <a-button
@@ -517,11 +517,11 @@ const hiddenTagNamesText = computed({
           <template #icon><CameraOutlined /></template>
         </a-button>
 
-        <a-divider orientation="vertical" class="mx-2" />
+        <a-divider type="vertical" class="mx-2" />
 
         <ActionTd :torrent-items="tableSelectedRaw" />
 
-        <a-divider orientation="vertical" class="mx-2" />
+        <a-divider type="vertical" class="mx-2" />
 
         <!-- 显示偏好设置 -->
         <a-popover trigger="click" placement="bottomLeft">

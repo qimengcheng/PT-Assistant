@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -13,7 +13,8 @@ const showDialog = defineModel<boolean>();
 const metadataStore = useMetadataStore();
 const runtimeStore = useRuntimeStore();
 
-const snapshotName = computed(
+// 默认名（只读，仅用于每次打开弹窗时给可编辑的 snapshotName 赋初值）
+const defaultSnapshotName = computed(
   () =>
     "[" +
     metadataStore.getSearchSolutionName(runtimeStore.search.searchPlanKey) +
@@ -23,6 +24,15 @@ const snapshotName = computed(
     formatDate(runtimeStore.search.startAt) +
     ")",
 );
+
+// ⚠️ 这里必须是可写的 ref：原先直接把只读 computed 绑给 v-model，
+// 用户一输入就触发 "Write operation failed: computed value is readonly"，名字永远改不了。
+const snapshotName = ref<string>("");
+watch(showDialog, (open) => {
+  if (open) {
+    snapshotName.value = defaultSnapshotName.value;
+  }
+});
 
 function saveSearchSnapshotData() {
   metadataStore.saveSearchSnapshotData(snapshotName.value);

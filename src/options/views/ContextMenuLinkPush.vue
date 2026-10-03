@@ -52,14 +52,17 @@ function onCancel() {
 
 <template>
   <div class="link-push">
-    <a-modal
-      :open="showDialog"
-      title="推送到下载器"
-      :footer="null"
-      :mask-closable="false"
+    <!--
+      SentToDownloaderDialog 自身就是 a-modal（含标题/遮罩/底部按钮）。
+      这里原来又套了一层 a-modal，造成双弹窗 + 双遮罩。中转页只需要把它直接渲染出来，
+      关闭（cancel）或发送完成（done）后跳回首页即可。
+    -->
+    <SentToDownloaderDialog
+      v-if="torrentItems.length"
+      v-model="showDialog"
+      :torrent-items="torrentItems"
       @cancel="onCancel"
-    >
-      <SentToDownloaderDialog v-if="torrentItems.length" v-model="showDialog" :torrent-items="torrentItems" />
-    </a-modal>
+      @done="onCancel"
+    />
   </div>
 </template>

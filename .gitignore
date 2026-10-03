@@ -10,3 +10,7 @@ stats.html
 dist-latest/
 dist-latest_prev*/
 .tmp-build/
+
+# IDE
+.idea/
+.vscode/

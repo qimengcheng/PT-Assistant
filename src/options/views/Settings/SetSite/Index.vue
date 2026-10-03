@@ -30,7 +30,6 @@ import OneClickImportDialog from "./OneClickImportDialog.vue";
 import RebuildMapDialog from "./RebuildMapDialog.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
-import NavButton from "@/options/components/NavButton.vue";
 
 // 数据来源
 import { allAddedSiteInfo, type ISiteTableItem } from "./utils.ts";
@@ -214,19 +213,13 @@ function keywordChecked(keyword: string) {
   <a-card size="small">
     <template #title>
       <div class="toolbar">
-        <NavButton :icon="PlusOutlined" :text="t('common.btn.add')" @click="showAddDialog = true" />
+        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span class="ml-1">{{ t('common.btn.add') }}</span></a-button>
 
-        <NavButton
-          :disabled="tableSelected.length === 0"
-          danger
-          :icon="MinusOutlined"
-          :text="t('common.remove')"
-          @click="deleteSite(tableSelected)"
-        />
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
 
         <a-divider type="vertical" class="mx-2" />
 
-        <NavButton :icon="AimOutlined" :text="t('SetSite.index.oneClickImport')" @click="showOneClickImportDialog = true" />
+        <a-button type="primary" @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span class="ml-1">{{ t('SetSite.index.oneClickImport') }}</span></a-button>
 
         <a-divider type="vertical" class="mx-2" />
 
@@ -243,7 +236,7 @@ function keywordChecked(keyword: string) {
           <span class="ml-1">{{ t("SetSite.index.table.flushFavicon") }}</span>
         </a-button>
 
-        <NavButton :icon="ToolOutlined" :text="t('SetSite.index.reBuildMap')" @click="showRebuildMapDialog = true" />
+        <a-button type="primary" @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span class="ml-1">{{ t('SetSite.index.reBuildMap') }}</span></a-button>
 
         <div class="toolbar-spacer" />
 

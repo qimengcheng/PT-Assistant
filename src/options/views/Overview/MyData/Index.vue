@@ -35,7 +35,6 @@ import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import ResultParseStatus from "@/options/components/ResultParseStatus.vue";
-import NavButton from "@/options/components/NavButton.vue";
 import UserLevelRequirementsTd from "./UserLevelRequirementsTd.vue";
 import HistoryDataViewDialog from "./HistoryDataViewDialog.vue";
 import BonusFormatSpan from "./BonusFormatSpan.vue";
@@ -345,43 +344,28 @@ const showExportDialog = ref(false);
   <a-card variant="outlined">
     <div class="my-data-toolbar">
       <!-- 刷新，取消刷新 -->
-      <NavButton
-        v-if="runtimeStore.isUserInfoFlush"
-        :text="t('MyData.index.flushCancel')"
-        :icon="StopOutlined"
-        @click="cancelFlushSiteLastUserInfo"
-      />
+      <a-button type="primary" v-if="runtimeStore.isUserInfoFlush" @click="cancelFlushSiteLastUserInfo"><template #icon><StopOutlined /></template><span class="ml-1">{{ t('MyData.index.flushCancel') }}</span></a-button>
 
-      <NavButton
-        v-else
-        :text="t('MyData.index.flushSelectSite')"
-        :icon="SyncOutlined"
-        @click="multiFlush"
-      />
+      <a-button type="primary" v-else @click="multiFlush"><template #icon><SyncOutlined /></template><span class="ml-1">{{ t('MyData.index.flushSelectSite') }}</span></a-button>
 
-      <NavButton
-        :disabled="tableSelected.length === 0"
-        :icon="ExportOutlined"
-        :text="t('MyData.index.multiOpen')"
-        @click="multiOpen"
-      />
+      <a-button type="primary" :disabled="tableSelected.length === 0" @click="multiOpen"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('MyData.index.multiOpen') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
-      <NavButton :icon="LineChartOutlined" :text="t('MyData.index.viewTimeline')" @click="viewTimeline" />
-      <NavButton :icon="BarChartOutlined" :text="t('MyData.index.viewStatistic')" @click="viewStatistic" />
+      <a-button type="primary" @click="viewTimeline"><template #icon><LineChartOutlined /></template><span class="ml-1">{{ t('MyData.index.viewTimeline') }}</span></a-button>
+      <a-button type="primary" @click="viewStatistic"><template #icon><BarChartOutlined /></template><span class="ml-1">{{ t('MyData.index.viewStatistic') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
       <!-- 导出按钮 -->
-      <NavButton :icon="ExportOutlined" :text="t('MyData.index.exportData')" @click="showExportDialog = true" />
+      <a-button type="primary" @click="showExportDialog = true"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('MyData.index.exportData') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
       <!-- 表格设置面板：原 v-menu + v-list，antdv-next 没有 a-list，改用 a-popover + 普通 div -->
       <a-popover trigger="click" placement="bottomLeft">
         <template #default>
-          <NavButton :icon="SettingOutlined" :text="t('MyData.index.setting')" class="mr-1" />
+          <a-button type="primary" class="mr-1"><template #icon><SettingOutlined /></template><span class="ml-1">{{ t('MyData.index.setting') }}</span></a-button>
         </template>
         <template #content>
           <div class="table-setting-panel">

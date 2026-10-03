@@ -22,7 +22,6 @@ import { formatDate } from "@/options/utils.ts";
 import { BackupFields, type IBackupServerMetadata, type TBackupServerKey } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
 
-import NavButton from "@/options/components/NavButton.vue";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
 import AddDialog from "./AddDialog.vue";
 import EditDialog from "./EditDialog.vue";
@@ -131,35 +130,13 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 
   <a-card class="set-backup">
     <div class="table-toolbar">
-      <NavButton
-        :text="t('common.btn.add')"
-        color="green"
-        :icon="PlusOutlined"
-        @click="showAddDialog = true"
-      />
-      <NavButton
-        :disabled="tableSelected.length === 0"
-        :text="t('common.remove')"
-        color="danger"
-        :icon="MinusOutlined"
-        @click="deleteBackupServer(tableSelected)"
-      />
+      <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span class="ml-1">{{ t('common.btn.add') }}</span></a-button>
+      <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupServer(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
 
       <div class="toolbar-divider" />
 
-      <NavButton
-        :loading="doBackupStatus[localBackup]"
-        color="green"
-        :icon="DatabaseOutlined"
-        :text="t('SetBackup.localExport')"
-        @click="doBackup(localBackup)"
-      />
-      <NavButton
-        color="blue"
-        :icon="ImportOutlined"
-        :text="t('SetBackup.localImport')"
-        @click="() => (showRestoreDialog = true)"
-      />
+      <a-button type="primary" :loading="doBackupStatus[localBackup]" @click="doBackup(localBackup)"><template #icon><DatabaseOutlined /></template><span class="ml-1">{{ t('SetBackup.localExport') }}</span></a-button>
+      <a-button type="primary" @click="() => (showRestoreDialog = true)"><template #icon><ImportOutlined /></template><span class="ml-1">{{ t('SetBackup.localImport') }}</span></a-button>
 
       <div style="flex: 1" />
 

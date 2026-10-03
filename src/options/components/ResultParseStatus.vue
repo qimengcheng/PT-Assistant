@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { EResultParseStatus } from "@ptd/site";
 
@@ -7,40 +8,44 @@ const { status } = defineProps<{
 }>();
 
 const { t } = useI18n();
+
+/**
+ * 状态 → a-tag 的颜色/文案映射。
+ * 原来这里是 10 个 v-if 分支 + Vuetify 兼容层里的 text-red / text-green 等彩色文字类，
+ * 换成 a-tag 后状态标签的视觉与其他页面的标签统一，也不再依赖兼容层。
+ */
+const meta = computed<{ text: string; color?: string; title?: string }>(() => {
+  switch (status) {
+    case EResultParseStatus.unknownError:
+      return { text: t("resultParseStatus.unknownError"), color: "error" };
+    case EResultParseStatus.waiting:
+      return { text: t("resultParseStatus.waiting"), color: "processing" };
+    case EResultParseStatus.working:
+      return { text: t("resultParseStatus.working"), color: "processing" };
+    case EResultParseStatus.success:
+      return { text: t("resultParseStatus.success"), color: "success" };
+    case EResultParseStatus.parseError:
+      return { text: t("resultParseStatus.parseError"), color: "error" };
+    case EResultParseStatus.passParse:
+      return { text: t("resultParseStatus.passParse"), color: "warning" };
+    case EResultParseStatus.CFBlocked:
+      return { text: t("resultParseStatus.CFBlocked"), title: t("resultParseStatus.CFBlockedNotes") };
+    case EResultParseStatus.needLogin:
+      return { text: t("resultParseStatus.needLogin"), color: "error" };
+    case EResultParseStatus.noUserInput:
+      return { text: t("resultParseStatus.noUserInput"), color: "error" };
+    case EResultParseStatus.noResults:
+      return { text: t("resultParseStatus.noResults"), color: "warning" };
+    default:
+      return { text: t("resultParseStatus.unknown") };
+  }
+});
 </script>
 
 <template>
-  <span v-if="status === EResultParseStatus.unknownError" class="text-red">
-    {{ t("resultParseStatus.unknownError") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.waiting" class="text-indigo">
-    {{ t("resultParseStatus.waiting") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.working" class="text-indigo">
-    {{ t("resultParseStatus.working") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.success" class="text-green">
-    {{ t("resultParseStatus.success") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.parseError" class="text-red">
-    {{ t("resultParseStatus.parseError") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.passParse" class="text-yellow-darken-2">
-    {{ t("resultParseStatus.passParse") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.CFBlocked" :title="t('resultParseStatus.CFBlockedNotes')">
-    {{ t("resultParseStatus.CFBlocked") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.needLogin" class="text-red">
-    {{ t("resultParseStatus.needLogin") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.noUserInput" class="text-red">
-    {{ t("resultParseStatus.noUserInput") }}
-  </span>
-  <span v-else-if="status === EResultParseStatus.noResults" class="text-red">
-    {{ t("resultParseStatus.noResults") }}
-  </span>
-  <span v-else class="text-blue-grey">{{ t("resultParseStatus.unknown") }}</span>
+  <a-tag :color="meta.color" :title="meta.title" :bordered="false" style="margin-inline-end: 0">
+    {{ meta.text }}
+  </a-tag>
 </template>
 
 <style scoped lang="scss"></style>

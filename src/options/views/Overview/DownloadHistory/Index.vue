@@ -27,7 +27,6 @@ import SiteName from "@/options/components/SiteName.vue";
 import TorrentTitleTd from "@/options/components/TorrentTitleTd.vue";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
 import DownloaderLabel from "@/options/components/DownloaderLabel.vue";
-import NavButton from "@/options/components/NavButton.vue";
 import ReDownloadSelectDialog from "./ReDownloadSelectDialog.vue";
 import AdvanceFilterGenerateDialog from "./AdvanceFilterGenerateDialog.vue";
 
@@ -172,22 +171,10 @@ onUnmounted(() => {
   <a-card size="small">
     <template #title>
       <div class="toolbar">
-        <NavButton :icon="SyncOutlined" :text="t('DownloadHistory.refresh')" @click="() => throttleLoadDownloadHistory()" />
+        <a-button type="primary" @click="() => throttleLoadDownloadHistory()"><template #icon><SyncOutlined /></template><span class="ml-1">{{ t('DownloadHistory.refresh') }}</span></a-button>
         <a-divider type="vertical" class="mx-2" />
-        <NavButton
-          :disabled="tableSelected.length === 0"
-          type="primary"
-          :icon="DownloadOutlined"
-          :text="t('DownloadHistory.reDownload')"
-          @click="() => reDownloadTorrent(tableSelected)"
-        />
-        <NavButton
-          :disabled="tableSelected.length === 0"
-          danger
-          :icon="MinusOutlined"
-          :text="t('common.remove')"
-          @click="deleteDownloadHistory(tableSelected)"
-        />
+        <a-button type="primary" :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('DownloadHistory.reDownload') }}</span></a-button>
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
         <div class="toolbar-spacer" />
         <a-input
           v-model:value="tableWaitFilterRef"

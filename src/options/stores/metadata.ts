@@ -13,16 +13,16 @@ import {
 } from "@ptd/site";
 
 import {
-  IBackupServerMetadata,
-  IDownloaderMetadata,
-  IMediaServerMetadata,
-  IMetadataPiniaStorageSchema,
-  ISearchSolution,
-  TDownloaderKey,
-  TMediaServerKey,
-  TSearchSnapshotKey,
-  TSolutionKey,
-  ISearchSolutionMetadata,
+  type IBackupServerMetadata,
+  type IDownloaderMetadata,
+  type IMediaServerMetadata,
+  type IMetadataPiniaStorageSchema,
+  type ISearchSolution,
+  type TDownloaderKey,
+  type TMediaServerKey,
+  type TSearchSnapshotKey,
+  type TSolutionKey,
+  type ISearchSolutionMetadata,
 } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
 import { useConfigStore } from "@/options/stores/config.ts";

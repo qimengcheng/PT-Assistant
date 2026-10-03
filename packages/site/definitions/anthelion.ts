@@ -3,7 +3,7 @@
  * @PTPPDefinitions https://github.com/pt-plugins/PT-Plugin-Plus/blob/dev/resource/sites/anthelion.me/config.json
  */
 import Gazelle, { SchemaMetadata, GazelleUtils, commonPagesList, detailPageList } from "../schemas/Gazelle.ts";
-import { ISiteMetadata, ITorrent, ISearchInput, ETorrentStatus } from "../types.ts";
+import { type ISiteMetadata, type ITorrent, type ISearchInput, ETorrentStatus } from "../types.ts";
 import { buildCategoryOptionsFromList } from "../utils.ts";
 
 const tagKeywords = ["Internal", "Pollen"];

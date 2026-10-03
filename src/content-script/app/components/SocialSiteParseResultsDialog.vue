@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ISocialSitePageInformation } from "@ptd/social";
+import { type ISocialSitePageInformation } from "@ptd/social";
 import { doKeywordSearch, type IPtdData } from "../utils.ts";
 import { computed, inject } from "vue";
 import { useI18n } from "vue-i18n";

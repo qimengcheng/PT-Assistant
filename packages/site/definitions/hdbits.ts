@@ -3,10 +3,10 @@
  * @PTPPDefinitions https://github.com/pt-plugins/PT-Plugin-Plus/blob/dev/resource/sites/hdbits.org/config.json
  * @PDSDefinitions https://github.com/mantou568/pre-dessert-sites/blob/main/site_config/sites/hdbits.json
  */
-import { ETorrentStatus, ISearchCategories, ISearchInput, ISiteMetadata, ITorrent } from "../types";
+import { ETorrentStatus, type ISearchCategories, type ISearchInput, type ISiteMetadata, type ITorrent } from "../types";
 import PrivateSite from "../schemas/AbstractPrivateSite";
 import { set } from "es-toolkit/compat";
-import { AxiosRequestConfig, AxiosResponse } from "axios";
+import { type AxiosRequestConfig, type AxiosResponse } from "axios";
 
 const category = {
   1: "Movies",

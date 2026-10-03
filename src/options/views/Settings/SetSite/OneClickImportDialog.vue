@@ -13,7 +13,7 @@ import {
   QuestionCircleOutlined,
   ToolOutlined,
 } from "@antdv-next/icons";
-import { EResultParseStatus, ISiteMetadata, ISiteUserConfig, TSiteID } from "@ptd/site";
+import { EResultParseStatus, type ISiteMetadata, type ISiteUserConfig, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";

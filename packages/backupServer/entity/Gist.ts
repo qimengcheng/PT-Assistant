@@ -16,17 +16,17 @@
  * 1. Gist 不支持删除历史记录，如果需要删除，请在 github 上手动删除对应 gist，并创建一个新的。
  */
 
-import axios, { AxiosRequestConfig } from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import CryptoJS from "crypto-js";
 import AbstractBackupServer from "../AbstractBackupServer.ts";
 import { localSort, decryptData, encryptData } from "../utils.ts";
 import {
-  IBackupConfig,
-  IBackupData,
-  IBackupFileInfo,
-  IBackupFileListOption,
-  IBackupFileManifest,
-  IBackupMetadata,
+  type IBackupConfig,
+  type IBackupData,
+  type IBackupFileInfo,
+  type IBackupFileListOption,
+  type IBackupFileManifest,
+  type IBackupMetadata,
 } from "../type.ts";
 
 interface GistConfig extends IBackupConfig {

@@ -1,7 +1,7 @@
 /**
  * 对于 Bittorrent 软件的定义
  */
-import { AxiosRequestConfig } from "axios";
+import { type AxiosRequestConfig } from "axios";
 
 export type TorrentClientFeature =
   | "CustomPath" // 支持设置自定义目录作为下载目录

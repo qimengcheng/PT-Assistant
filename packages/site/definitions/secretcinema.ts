@@ -12,10 +12,10 @@ import {
 import Sizzle from "sizzle";
 import GazelleJSONAPI, {
   SchemaMetadata,
-  groupBrowseResult,
-  groupTorrent,
-  torrentBrowseResult,
-  browseJsonResponse,
+  type groupBrowseResult,
+  type groupTorrent,
+  type torrentBrowseResult,
+  type browseJsonResponse,
 } from "../schemas/GazelleJSONAPI";
 import BittorrentSite from "../schemas/AbstractBittorrentSite";
 import { unset, set } from "es-toolkit/compat";

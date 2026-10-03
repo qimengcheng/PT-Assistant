@@ -2,7 +2,7 @@
  * @JackettDefinitions https://github.com/Jackett/Jackett/blob/master/src/Jackett.Common/Definitions/milkie.yml
  */
 import type { ISiteMetadata, ITorrent } from "../types";
-import { AxiosRequestConfig, AxiosResponse } from "axios";
+import { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import PrivateSite from "../schemas/AbstractPrivateSite";
 
 const categoryMap: Record<number, string> = {

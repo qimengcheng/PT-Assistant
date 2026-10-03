@@ -2,7 +2,7 @@
  * @JackettDefinitions https://github.com/Jackett/Jackett/blob/master/src/Jackett.Common/Definitions/ehentai.yml
  */
 import BittorrentSite from "../schemas/AbstractBittorrentSite";
-import { ITorrent, type ISiteMetadata } from "../types";
+import { type ITorrent, type ISiteMetadata } from "../types";
 
 export const siteMetadata: ISiteMetadata = {
   version: 1,

@@ -1,9 +1,9 @@
 import axios from "axios";
 import {
-  IFetchSocialSiteInformationConfig,
-  ISocialInformation,
-  TSupportSocialSite,
-  TSupportSocialSitePageParserMatches,
+  type IFetchSocialSiteInformationConfig,
+  type ISocialInformation,
+  type TSupportSocialSite,
+  type TSupportSocialSitePageParserMatches,
 } from "./types.ts";
 
 export * from "./types.ts";

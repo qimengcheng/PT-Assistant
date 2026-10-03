@@ -1,11 +1,11 @@
 import {
   AbstractEmbyCompatibleServer,
-  IEmbyQueryItem,
-  IEmbyQueryResult,
-  IMediaServerBaseConfig,
-  IMediaServerMetadata,
-  IMediaServerSearchOptions,
-  IMediaServerSearchResult,
+  type IEmbyQueryItem,
+  type IEmbyQueryResult,
+  type IMediaServerBaseConfig,
+  type IMediaServerMetadata,
+  type IMediaServerSearchOptions,
+  type IMediaServerSearchResult,
 } from "../types.ts";
 import { AxiosError, type AxiosRequestConfig } from "axios";
 import urlJoin from "url-join";

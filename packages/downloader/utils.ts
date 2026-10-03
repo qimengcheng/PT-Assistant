@@ -1,6 +1,6 @@
 import { Buffer } from "buffer";
 import type { AxiosRequestConfig } from "axios";
-import parseTorrent, { Instance as TorrentInstance, type ParsedFile } from "parse-torrent";
+import parseTorrent, { type Instance as TorrentInstance, type ParsedFile } from "parse-torrent";
 import isValidFilename from "valid-filename";
 import { decode } from "urlencode";
 

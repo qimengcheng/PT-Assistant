@@ -2,13 +2,13 @@
  * @JackettDefinitions https://github.com/Jackett/Jackett/blob/master/src/Jackett.Common/Indexers/Definitions/Redacted.cs
  * @PTPPDefinitions https://github.com/pt-plugins/PT-Plugin-Plus/blob/dev/resource/sites/redacted.ch/config.json
  */
-import { ITorrent, IUserInfo, type ISiteMetadata, type TUserInfoParseKey } from "../types";
+import { type ITorrent, type IUserInfo, type ISiteMetadata, type TUserInfoParseKey } from "../types";
 import GazelleJSONAPI, {
-  jsonResponse,
+  type jsonResponse,
   SchemaMetadata,
-  torrentBrowseResult,
-  groupBrowseResult,
-  groupTorrent,
+  type torrentBrowseResult,
+  type groupBrowseResult,
+  type groupTorrent,
 } from "../schemas/GazelleJSONAPI.ts";
 
 export const siteMetadata: ISiteMetadata = {

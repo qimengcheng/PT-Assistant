@@ -1,8 +1,8 @@
 /**
  * @JackettDefinitions https://github.com/Jackett/Jackett/blob/master/src/Jackett.Common/Indexers/Definitions/AvistaZ.cs
  */
-import { ISiteMetadata, ISearchInput, IAdvancedSearchRequestConfig, ITorrent, ITorrentTag } from "../types";
-import AvistazNetwork, { SchemaMetadata, avzNetDiscountMap, IAvzNetRawTorrent } from "../schemas/AvistazNetwork.ts";
+import { type ISiteMetadata, type ISearchInput, type IAdvancedSearchRequestConfig, type ITorrent, type ITorrentTag } from "../types";
+import AvistazNetwork, { SchemaMetadata, avzNetDiscountMap, type IAvzNetRawTorrent } from "../schemas/AvistazNetwork.ts";
 
 const categoryMap: Record<number, string> = {
   0: "All",

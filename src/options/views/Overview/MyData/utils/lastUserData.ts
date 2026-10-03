@@ -1,5 +1,5 @@
 import { ref, computed } from "vue";
-import { type ISiteUserConfig, type IUserInfo, TSiteID } from "@ptd/site";
+import { type ISiteUserConfig, type IUserInfo, type TSiteID } from "@ptd/site";
 import { sendMessage } from "@/messages.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 

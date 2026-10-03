@@ -1,4 +1,4 @@
-import { AbstractMediaServer, IMediaServerBaseConfig, IMediaServerMetadata } from "./types";
+import { AbstractMediaServer, type IMediaServerBaseConfig, type IMediaServerMetadata } from "./types";
 import { cloneDeep } from "es-toolkit";
 
 export * from "./types";

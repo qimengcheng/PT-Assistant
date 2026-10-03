@@ -81,6 +81,33 @@ git ls-remote origin refs/heads/master         # 必须：trust-but-verify
   同意后用 `--force-with-lease`（比 `--force` 安全，会先校验远端未被他人改动），并先拉备份分支。
 - 远端：`https://github.com/qimengcheng/PT-Assistant.git`（master 为默认分支）。
 
+### 1.6 未推送的小改动要合进上一条提交，不要新开版本号
+
+**同一前缀（同一个 agent 名）的连续提交**，如果同时满足下面三条，就应该
+`git reset --soft HEAD~1` + `git commit --amend` 合进上一条，而不是再开一条新版本号：
+
+1. **同一个前缀**（`[WorkBuddy]-` / `[Trae]-` …），不是别的 agent 的提交；
+2. **这个版本号还没推送到远端**（`git log origin/master..HEAD` 里能看到它）；
+3. **改动很小**：只碰 ≤ 3 个文件、约 30 行以内，且和上一条改的是同一片地方。
+
+```bash
+export PATH="/c/Program Files/Git/bin:$PATH"
+git log --oneline origin/master..HEAD          # 确认这些提交都还没推送
+git reset --soft HEAD~1                        # 撤销最新一条，内容回到暂存区
+# 改回上一条的版本号（package.json），再 amend
+git commit --amend -m '<合并后的完整消息>'
+```
+
+**为什么**：版本号是给外部看的锚点，一个版本号应对应一组完整、已定型的改动。
+还没推送时中间态没人看到，多开一条只会让历史变碎，并且重复触发「同一个版本号出现多条提交」
+这个已经被 CI `verify` job 拦下的问题。
+
+**什么时候不能这么做**：提交**已经推送**过就不要用这招（要改就得 force push，风险高），
+那种情况老老实实开新版本号。判断方法就是上面那条 `git log origin/master..HEAD`——
+输出为空说明都已推送，接下来的提交都不要再合并了。
+
+**另外**：合并后要检查那条提交的 `package.json` 版本号是否正确（reset 不会帮你改文件内容）。
+
 ---
 
 ## 2. 构建与验收

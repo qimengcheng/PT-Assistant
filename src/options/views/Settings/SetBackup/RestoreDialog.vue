@@ -417,6 +417,9 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
   /* 对应原先 v-dialog 的 scrollable：内容过长时对话框内部滚动 */
   max-height: 55vh;
   overflow-y: auto;
+  /* a-row 的 :gutter 会给行加左右各 -8px 负外边距，在滚动容器里表现为恒定 16px 的横向溢出，
+     即一条永远存在的横向滚动条（加宽弹窗也消不掉）。这里横向不需要滚动，直接裁掉。 */
+  overflow-x: hidden;
 }
 
 .duration-tags {

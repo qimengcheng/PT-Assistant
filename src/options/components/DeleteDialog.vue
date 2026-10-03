@@ -50,15 +50,14 @@ async function dialogEnter() {
   <!-- footer prop 传 null 会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...），底部按钮全消失，故不设 footer -->
   <a-modal
     v-model:open="showDialog"
+    :title="t('common.dialog.title.confirmAction')"
+    wrap-class-name="modal-title--danger"
     :width="340"
     :mask-closable="!isDeleting"
     :closable="!isDeleting"
     :keyboard="!isDeleting"
     @after-open-change="(open: boolean) => open && dialogEnter()"
   >
-    <template #title>
-      <span style="color: #cf1322">{{ t("common.dialog.title.confirmAction") }}</span>
-    </template>
 
     <div class="text-body-large">
       {{ t("common.dialog.deleteText", [toDeleteIds!.length]) }}

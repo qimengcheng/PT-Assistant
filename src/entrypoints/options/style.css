@@ -366,3 +366,10 @@ body {
   font-size: 12px;
   margin-bottom: 4px;
 }
+
+/* ===== 弹窗标题的语义色 =====
+   modal 经 teleport 挂在 body 上，组件的 scoped 样式选不到 .ant-modal-title，
+   所以带语义色的标题统一走 wrap-class-name + 这里的全局规则。 */
+.modal-title--danger .ant-modal-title {
+  color: #cf1322;
+}

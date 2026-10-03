@@ -129,16 +129,12 @@ const rowSelection = computed(() => ({
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('contentScript.AdvanceListModuleDialog.title', [torrentItems.length])"
     :width="1200"
     :footer="null"
     styles="{ body: { maxHeight: `${windowHeight - 256}px`, overflow: 'auto' } }"
     @after-open-change="(open: boolean) => open && enterDialog()"
   >
-    <template #title>
-      <span style="color: #455a64">
-        {{ t("contentScript.AdvanceListModuleDialog.title", [torrentItems.length]) }}
-      </span>
-    </template>
 
     <div style="margin-bottom: 8px">
       <a-button type="primary" @click="handleSelectSeeders"><template #icon><InboxOutlined /></template><span class="ml-1">{{ t('contentScript.AdvanceListModuleDialog.selectSeeders') }}</span></a-button>

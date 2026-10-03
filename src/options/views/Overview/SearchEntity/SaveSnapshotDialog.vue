@@ -31,10 +31,7 @@ function saveSearchSnapshotData() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="500">
-    <template #title>
-      {{ t("SearchEntity.index.action.saveSnapshot") }}
-    </template>
+  <a-modal v-model:open="showDialog" :title="t('SearchEntity.index.action.saveSnapshot')" :width="500">
 
     <a-input
       v-model:value="snapshotName"

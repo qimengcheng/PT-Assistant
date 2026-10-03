@@ -89,11 +89,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="600" :footer="null">
-    <template #title>
-      <span style="color: #455a64">{{ t("contentScript.SocialSiteParseResultsDialog.title") }}</span>
-    </template>
-
+  <a-modal v-model:open="showDialog" :title="t('contentScript.SocialSiteParseResultsDialog.title')" :width="600" :footer="null">
     <div class="result-list">
       <template v-for="(result, index) in parseResults" :key="getResultKey(result, index)">
         <!-- 站点条目 -->

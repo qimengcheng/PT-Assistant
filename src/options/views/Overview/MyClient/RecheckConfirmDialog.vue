@@ -38,15 +38,13 @@ function dialogEnter() {
   -->
   <a-modal
     v-model:open="showDialog"
+    :title="t('MyClient.recheckDialog.title')"
     :width="420"
     :mask-closable="!isRechecking"
     :closable="!isRechecking"
     :keyboard="!isRechecking"
     @after-open-change="(open: boolean) => open && dialogEnter()"
   >
-    <template #title>
-      <div class="recheck-title">{{ t("MyClient.recheckDialog.title") }}</div>
-    </template>
 
     <div class="text-body-large">{{ t("MyClient.recheckDialog.text", { count: torrentCount }) }}</div>
 
@@ -72,13 +70,6 @@ function dialogEnter() {
 
 <style scoped lang="scss">
 /* 原 v-card-title class="bg-cyan-lighten-2" */
-.recheck-title {
-  padding: 8px 12px;
-  margin: -8px -12px;
-  font-weight: 500;
-  background: #b2ebf2; /* Vuetify cyan-lighten-2 */
-}
-
 .dialog-footer {
   display: flex;
   align-items: center;

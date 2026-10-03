@@ -252,8 +252,7 @@ onUnmounted(() => {
     @all-delete="() => throttleLoadDownloadHistory()"
   />
 
-  <a-modal v-model:open="showDownloadDetailDialog" :width="800" :footer="null">
-    <template #title>{{ t("DownloadHistory.table.status") }}</template>
+  <a-modal v-model:open="showDownloadDetailDialog" :title="t('DownloadHistory.table.status')" :width="800" :footer="null">
     <a-alert
       v-if="downloadDetail.errorMessage"
       class="mb-3"

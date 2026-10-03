@@ -22,7 +22,6 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import type { TDownloaderKey } from "@/shared/types.ts";
 import { getDownloaderIcon } from "@ptd/downloader";
 
-import NavButton from "@/options/components/NavButton.vue";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
 
 import AddDialog from "./AddDialog.vue";
@@ -179,24 +178,13 @@ const columns = [
 
     <a-card>
       <div class="toolbar">
-        <NavButton :text="t('common.btn.add')" :icon="PlusOutlined" type="primary" @click="showAddDialog = true" />
+        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span class="ml-1">{{ t('common.btn.add') }}</span></a-button>
 
-        <NavButton
-          :disabled="tableSelected.length === 0"
-          :text="t('common.remove')"
-          :icon="MinusOutlined"
-          danger
-          @click="deleteDownloader(tableSelected)"
-        />
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
 
         <a-divider type="vertical" />
 
-        <NavButton
-          :disabled="metadataStore.getDownloaders.length === 0"
-          :text="t('SetDownloader.index.editDefaultDownloaderBtn')"
-          :icon="DownloadOutlined"
-          @click="showDefaultDownloaderEditDialog = true"
-        />
+        <a-button type="primary" :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
 
         <div class="toolbar-right">
           <a-input

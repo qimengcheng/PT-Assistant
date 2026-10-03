@@ -27,7 +27,6 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate } from "@/options/utils.ts";
 import type { ISearchSolutionMetadata, TSolutionKey } from "@/shared/types.ts";
 
-import NavButton from "@/options/components/NavButton.vue";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
 
 import EditDialog from "./EditDialog.vue";
@@ -236,15 +235,9 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
 
     <a-card>
       <div class="toolbar">
-        <NavButton :text="t('common.btn.add')" :icon="PlusOutlined" type="primary" @click="addSearchSolution" />
+        <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span class="ml-1">{{ t('common.btn.add') }}</span></a-button>
 
-        <NavButton
-          :disabled="tableSelected.length === 0"
-          :text="t('common.remove')"
-          :icon="MinusOutlined"
-          danger
-          @click="deleteSearchSolutions(tableSelected)"
-        />
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
 
         <a-divider type="vertical" />
 
@@ -256,17 +249,12 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
           style="display: none"
           @change="importSearchSolution"
         />
-        <NavButton :text="t('common.import')" :icon="ImportOutlined" @click="triggerImportFile" />
-        <NavButton
-          :disabled="tableSelected.length === 0"
-          :text="t('common.export')"
-          :icon="ExportOutlined"
-          @click="() => exportSearchSolutions(tableSelected)"
-        />
+        <a-button type="primary" @click="triggerImportFile"><template #icon><ImportOutlined /></template><span class="ml-1">{{ t('common.import') }}</span></a-button>
+        <a-button type="primary" :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.export') }}</span></a-button>
 
         <a-divider type="vertical" />
 
-        <NavButton :text="t('common.howToUse')" :icon="QuestionCircleOutlined" disabled />
+        <a-button type="primary" disabled><template #icon><QuestionCircleOutlined /></template><span class="ml-1">{{ t('common.howToUse') }}</span></a-button>
 
         <div class="toolbar-right">
           <a-input v-model:value="tableFilter" allow-clear :placeholder="t('common.search')" style="width: 240px">

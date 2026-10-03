@@ -20,7 +20,6 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 
 import type { IRemoteDownloadDialogData } from "../types.ts";
 
-import NavButton from "@/options/components/NavButton.vue";
 import TorrentTitleTd from "@/options/components/TorrentTitleTd.vue";
 
 const { t } = useI18n();
@@ -135,16 +134,8 @@ const rowSelection = computed(() => ({
     </template>
 
     <div style="margin-bottom: 8px">
-      <NavButton
-        :icon="InboxOutlined"
-        :text="t('contentScript.AdvanceListModuleDialog.selectSeeders')"
-        @click="handleSelectSeeders"
-      />
-      <NavButton
-        :icon="MinusCircleOutlined"
-        :text="t('contentScript.AdvanceListModuleDialog.selectNotSeeding')"
-        @click="handleSelectNotSeeding"
-      />
+      <a-button type="primary" @click="handleSelectSeeders"><template #icon><InboxOutlined /></template><span class="ml-1">{{ t('contentScript.AdvanceListModuleDialog.selectSeeders') }}</span></a-button>
+      <a-button type="primary" @click="handleSelectNotSeeding"><template #icon><MinusCircleOutlined /></template><span class="ml-1">{{ t('contentScript.AdvanceListModuleDialog.selectNotSeeding') }}</span></a-button>
     </div>
 
     <a-table
@@ -188,36 +179,13 @@ const rowSelection = computed(() => ({
 
         <div style="flex: 1"></div>
 
-        <NavButton
-          :disabled="!hasSelectedTorrent"
-          :loading="localDownloadMultiStatus"
-          :icon="SaveOutlined"
-          :text="t('downloaderLabel.localDownload')"
-          @click="handleLocalDownloadMulti"
-        />
+        <a-button type="primary" :disabled="!hasSelectedTorrent" :loading="localDownloadMultiStatus" @click="handleLocalDownloadMulti"><template #icon><SaveOutlined /></template><span class="ml-1">{{ t('downloaderLabel.localDownload') }}</span></a-button>
 
-        <NavButton
-          :disabled="!hasSelectedTorrent"
-          :loading="linkCopyMultiStatus"
-          :icon="CopyOutlined"
-          :text="t('contentScript.copyLink')"
-          @click="handleLinkCopyMulti"
-        />
+        <a-button type="primary" :disabled="!hasSelectedTorrent" :loading="linkCopyMultiStatus" @click="handleLinkCopyMulti"><template #icon><CopyOutlined /></template><span class="ml-1">{{ t('contentScript.copyLink') }}</span></a-button>
 
-        <NavButton
-          :disabled="!hasSelectedTorrent"
-          :icon="CloudDownloadOutlined"
-          :text="t('contentScript.pushTo')"
-          @click="() => handleRemoteDownloadMulti()"
-        />
+        <a-button type="primary" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti()"><template #icon><CloudDownloadOutlined /></template><span class="ml-1">{{ t('contentScript.pushTo') }}</span></a-button>
 
-        <NavButton
-          v-if="metadataStore.defaultDownloader?.id"
-          :disabled="!hasSelectedTorrent"
-          :icon="DownloadOutlined"
-          :text="t('contentScript.pushToDefault')"
-          @click="() => handleRemoteDownloadMulti(true)"
-        />
+        <a-button type="primary" v-if="metadataStore.defaultDownloader?.id" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti(true)"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('contentScript.pushToDefault') }}</span></a-button>
       </div>
     </template>
   </a-modal>

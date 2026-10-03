@@ -13,6 +13,9 @@ dist-latest_prev*/
 dist-*/
 .tmp-build/
 
+# 待删除文件缓冲（AGENTS.md §3.6：先移入这里，全部做完再统一删除）
+tobedeleted/
+
 # IDE
 .idea/
 .vscode/

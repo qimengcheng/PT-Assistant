@@ -15,12 +15,26 @@ import type { ITorrent } from "@ptd/site";
 import { sendMessage } from "@/messages.ts";
 import type { ITorrentInfoForVerification } from "@/messages.ts";
 import type { IKeepUploadTask, IKeepUploadTaskItem, IKeepUploadTaskDownloadOptions } from "@/shared/types.ts";
+import {
+  buildFingerprintIndexLookup,
+  decideFingerprintAction,
+  diffFileLists,
+  matchLocalFingerprint,
+  type IFingerprintComparable,
+  type IFingerprintIndexLookup,
+  type IFingerprintMatchResult,
+  type IFingerprintPolicyDecision,
+  type ILocalFingerprintIndex,
+  type ILocalTorrentFingerprintEntry,
+} from "@/shared/fingerprint/index.ts";
 import { formatSize } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import SiteName from "@/options/components/SiteName.vue";
+import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 const showDialog = defineModel<boolean>();
 const { torrentItems } = defineProps<{
@@ -32,6 +46,9 @@ const configStore = useConfigStore();
 const metadataStore = useMetadataStore();
 const runtimeStore = useRuntimeStore();
 
+/** 判定依据（第 2/3 层指纹，或退回旧的文件逐条比对） */
+type TVerifiedBy = "infoHash" | "pieces" | "files" | "legacy";
+
 interface IVerifiedItem {
   id: string; // Map key
   data: ITorrent;
@@ -40,6 +57,14 @@ interface IVerifiedItem {
   verified: boolean;
   status: string;
   error: boolean;
+  /** 与基准种子的比对结论 */
+  baseMatch?: IFingerprintMatchResult;
+  /** 与基准种子比对时是靠哪一层判定通过的 */
+  verifiedBy?: TVerifiedBy;
+  /** 与下载器里已有种子的比对结论 */
+  localMatch?: IFingerprintMatchResult;
+  /** 保守决策：add / review / exclude */
+  localDecision?: IFingerprintPolicyDecision;
 }
 
 const verifiedItems = ref<Map<string, IVerifiedItem>>(new Map());
@@ -47,6 +72,14 @@ const verifiedItemsOrder = ref<string[]>([]); // 保持顺序
 const baseTorrent = ref<ITorrentInfoForVerification | null>(null);
 const verifiedCount = ref(0);
 const creating = ref(false);
+
+// ── 本地种子指纹索引 ──
+const localIndex = ref<ILocalFingerprintIndex | null>(null);
+const indexLoading = ref(false);
+const indexSupported = ref(true);
+/** 勾上后，把「本地已有 / 同站已挂」的条目排除出辅种列表（默认关，绝不静默替用户做决定） */
+const excludeLocalDuplicates = ref(false);
+const localLookup = computed<IFingerprintIndexLookup>(() => buildFingerprintIndexLookup(localIndex.value));
 
 // 下载选项
 const selectedDownloaderId = ref<string>("");
@@ -66,7 +99,7 @@ const labelOptions = computed(() => suggestedLabels.value.map((x) => ({ value: x
 
 // 是否可以创建任务
 const canCreateTask = computed(() => {
-  return verifiedCount.value > 1 && selectedDownloaderId.value;
+  return includedVerifiedCount.value > 1 && selectedDownloaderId.value;
 });
 
 // 状态文本
@@ -87,11 +120,129 @@ watch(showDialog, (val) => {
   }
 });
 
+// 切换下载器后本地索引就换了，跟着重建
+watch(selectedDownloaderId, () => {
+  if (showDialog.value) {
+    void loadLocalIndex();
+  }
+});
+
+/**
+ * 读取下载器里的本地种子指纹索引。
+ *
+ * 这一步会让 offscreen 逐个种子取文件清单（O(n) 次本地请求），所以：
+ * - 不阻塞辅种检测本身，失败只提示、不中断；
+ * - offscreen 侧有 30 分钟缓存，这里重复打开对话框基本是零成本。
+ */
+async function loadLocalIndex(refresh = false) {
+  if (!selectedDownloaderId.value) {
+    localIndex.value = null;
+    indexSupported.value = true;
+    return;
+  }
+
+  indexLoading.value = true;
+  try {
+    const index = await sendMessage("getLocalFingerprintIndex", {
+      downloaderId: selectedDownloaderId.value,
+      refresh,
+    });
+    localIndex.value = index;
+    indexSupported.value = true;
+    // 索引是异步到的，补算一遍本地比对结论
+    refreshLocalDecisions();
+  } catch (e) {
+    console.error("[PTD] load local fingerprint index failed", e);
+    localIndex.value = null;
+    indexSupported.value = false;
+  } finally {
+    indexLoading.value = false;
+  }
+}
+
+const localIndexText = computed(() => {
+  if (indexLoading.value) return t("SearchEntity.KeepUploadDialog.fingerprint.localIndex.loading");
+  if (!selectedDownloaderId.value) return t("SearchEntity.KeepUploadDialog.fingerprint.localIndex.needDownloader");
+  if (!indexSupported.value) return t("SearchEntity.KeepUploadDialog.fingerprint.localIndex.unavailable");
+
+  const index = localIndex.value;
+  if (!index) return t("SearchEntity.KeepUploadDialog.fingerprint.localIndex.unavailable");
+
+  return t("SearchEntity.KeepUploadDialog.fingerprint.localIndex.ready", [
+    index.totalTorrents,
+    localLookup.value.comparableCount,
+  ]);
+});
+
+/** 把「本地已有 / 同站已挂」的条目从待辅种列表里摘掉 */
+const excludedIds = computed(() => {
+  if (!excludeLocalDuplicates.value) return new Set<string>();
+  return new Set(
+    Array.from(verifiedItems.value.values())
+      .filter((item) => item.verified && item.localDecision?.action === "exclude")
+      .map((item) => item.id),
+  );
+});
+
+/** 参与辅种的条目（勾选排除时，被指纹判定为本地已有的条目会被剔掉） */
+const includedItems = computed(() =>
+  verifiedItemsOrder.value
+    .map((id) => verifiedItems.value.get(id))
+    .filter((item): item is IVerifiedItem => !!item && !excludedIds.value.has(item.id)),
+);
+
+const includedVerifiedCount = computed(() => includedItems.value.filter((item) => item.verified).length);
+
+/** 逐条重算「与本地已有种子的比对」，索引异步到达后补调用 */
+function refreshLocalDecisions() {
+  const lookup = localLookup.value;
+  if (lookup.entries.length === 0) return;
+
+  verifiedItems.value.forEach((item) => {
+    if (!item.torrent) return;
+    const match = matchLocalFingerprint(toComparable(item.torrent), lookup, { requireCompleted: true });
+    item.localMatch = match;
+    item.localDecision = decideFingerprintAction({ match, site: item.data.site });
+  });
+}
+
+/** 站点侧种子的三层指纹，归一到与本地条目可比的形状 */
+function toComparable(info: ITorrentInfoForVerification): IFingerprintComparable {
+  return {
+    titleKey: info.titleKey,
+    files: info.filesFingerprint ?? null,
+    pieces: info.piecesSample ?? null,
+    name: info.name,
+    size: info.length,
+  };
+}
+
+/** 把「已经知道内容的种子」（基准种子）包成本地条目，好让比对逻辑只有一条路径 */
+function toComparableEntry(info: ITorrentInfoForVerification): ILocalTorrentFingerprintEntry {
+  return {
+    hash: info.infoHash,
+    name: info.name,
+    size: info.length,
+    progress: 100,
+    isCompleted: true,
+    trackerHosts: [],
+    sites: [],
+    ratioLimit: -2,
+    seedingTimeLimit: -2,
+    titleKey: info.titleKey ?? "",
+    files: info.filesFingerprint ?? null,
+    pieces: info.piecesSample ?? null,
+  };
+}
+
 function startVerification() {
   verifiedItems.value = new Map();
   verifiedItemsOrder.value = [];
   baseTorrent.value = null;
   verifiedCount.value = 0;
+  localIndex.value = null;
+  indexSupported.value = true;
+  excludeLocalDuplicates.value = false;
 
   const remembered = configStore.download.saveLastDownloader ? metadataStore.lastKeepUpload : undefined;
   const rememberedDownloaderExists = remembered?.downloaderId && metadataStore.downloaders[remembered.downloaderId];
@@ -104,6 +255,9 @@ function startVerification() {
   torrentLabel.value = rememberedDownloaderExists
     ? remembered?.label || ""
     : metadataStore.defaultDownloader?.tags || "";
+
+  // 本地指纹索引与辅种检测并行，两者互不阻塞
+  void loadLocalIndex();
 
   torrentItems.forEach((item) => {
     const id = crypto.randomUUID();
@@ -167,6 +321,7 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
         item.verified = true;
         item.status = statusText.downloaded;
         verifiedCount.value++;
+        applyLocalDecision(item);
       } else {
         item.verified = false;
         item.status = statusText.failed;
@@ -194,35 +349,26 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
     }
 
     const baseTorrentInfo = baseTorrent.value!;
-    const torrentInfo = torrent;
 
-    // 首先检查 infoHash 是否相同
-    if (torrentInfo.infoHash && baseTorrentInfo.infoHash && torrentInfo.infoHash === baseTorrentInfo.infoHash) {
-      // infoHash 完全相同，说明是同一个种子
+    // ── 与基准种子的比对：三层指纹 ──
+    // 把基准种子当成「本地已知的一条数据」，比对逻辑就只剩一条代码路径，
+    // 而且基准种子和候选种子都带 piece 哈希，第 3 层在这里是真能用的。
+    const baseLookup = buildFingerprintIndexLookup([toComparableEntry(baseTorrentInfo)]);
+    const baseMatch = matchLocalFingerprint(toComparable(torrent), baseLookup);
+    result.baseMatch = baseMatch;
+
+    if (torrent.infoHash && baseTorrentInfo.infoHash && torrent.infoHash === baseTorrentInfo.infoHash) {
+      // infohash 完全相同 —— 是同一个种子，不用再往下比
       result.verified = true;
+      result.verifiedBy = "infoHash";
+    } else if (baseMatch.verdict === "identical") {
+      // 第 2 层（文件清单指纹）一致；抽样也对得上就是第 3 层确认过
+      result.verified = true;
+      result.verifiedBy = baseMatch.pieces === "match" ? "pieces" : "files";
     } else {
-      // infoHash 不同，检查名称和总大小是否相同
-      if (torrentInfo.name === baseTorrentInfo.name && torrentInfo.length === baseTorrentInfo.length) {
-        // 检查文件数量是否相同
-        if (torrentInfo.files?.length === baseTorrentInfo.files?.length) {
-          // 检查所有文件是否都能匹配（不要求顺序一致）
-          result.verified = torrentInfo.files.every((file) => {
-            return baseTorrentInfo.files.some(
-              (sourceFile) => file.path === sourceFile.path && file.length === sourceFile.length,
-            );
-          });
-        } else {
-          // 文件数量不同，检查是否缺少文件
-          const allFilesFound = torrentInfo.files.every((file) => {
-            return baseTorrentInfo.files.some(
-              (sourceFile) => file.path === sourceFile.path && file.length === sourceFile.length,
-            );
-          });
-          if (allFilesFound) {
-            result.status = statusText.missingFiles;
-          }
-        }
-      }
+      // 判不出来（比如两边都没算出指纹）时，才退回逐条比对文件清单
+      result.verified = legacyVerify(torrent, baseTorrentInfo);
+      result.verifiedBy = "legacy";
     }
 
     result.torrent = torrent;
@@ -231,20 +377,57 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
     }
 
     if (!result.status) {
-      result.status = result.verified ? statusText.success : statusText.failed;
+      result.status = result.verified
+        ? statusText.success
+        : // 没通过时顺手说明原因：是「基准种子更大、本地缺文件」还是压根不是同一份数据
+          hasAllFilesOf(torrent, baseTorrentInfo)
+          ? statusText.missingFiles
+          : statusText.failed;
     }
 
     Object.assign(item, result);
+    applyLocalDecision(item);
   }
 }
 
-function addToVerified(id: string) {
-  if (confirm(t("SearchEntity.KeepUploadDialog.addToKeepUploadConfirm"))) {
-    const item = verifiedItems.value.get(id);
-    if (item) {
-      item.verified = true;
-      verifiedCount.value++;
-    }
+/** 指纹算不出来时的兜底：逐条比对文件清单（要求总大小一致） */
+function legacyVerify(torrent: ITorrentInfoForVerification, base: ITorrentInfoForVerification): boolean {
+  if (torrent.length !== base.length) return false;
+  return hasAllFilesOf(torrent, base);
+}
+
+/** 候选种子的每个文件是否都能在基准种子里找到（不要求顺序一致） */
+function hasAllFilesOf(torrent: ITorrentInfoForVerification, base: ITorrentInfoForVerification): boolean {
+  if (torrent.files.length === 0) return false;
+  const { missing } = diffFileLists({ rootName: torrent.name, files: torrent.files }, {
+    rootName: base.name,
+    files: base.files,
+  });
+  return missing.length === 0;
+}
+
+/** 算一遍「与本地已有种子」的结论，并套用保守决策 */
+function applyLocalDecision(item: IVerifiedItem) {
+  if (!item.torrent || localLookup.value.entries.length === 0) return;
+  const match = matchLocalFingerprint(toComparable(item.torrent), localLookup.value, { requireCompleted: true });
+  item.localMatch = match;
+  item.localDecision = decideFingerprintAction({ match, site: item.data.site });
+}
+
+// MV3 扩展页面禁用原生 confirm()（静默返回 false）——原来这里恒为 false，
+// 「标记已校验」按钮点了永远不生效。改走 App 上下文的 modal。
+const { confirmDanger } = useConfirmDanger();
+
+async function addToVerified(id: string) {
+  if (!(await confirmDanger(t("SearchEntity.KeepUploadDialog.addToKeepUploadConfirm"), "primary"))) {
+    return;
+  }
+
+  const item = verifiedItems.value.get(id);
+  if (item) {
+    item.verified = true;
+    verifiedCount.value++;
+    applyLocalDecision(item);
   }
 }
 
@@ -287,11 +470,68 @@ function getFileCount(item: IVerifiedItem): number | string {
   return item.torrent?.files?.length ?? "N/A";
 }
 
+/** 与基准种子比对时是靠哪一层判定的（展示给用户，便于判断这条结论有多硬） */
+function verifiedByText(item: IVerifiedItem): string | null {
+  switch (item.verifiedBy) {
+    case "infoHash":
+      return t("SearchEntity.KeepUploadDialog.fingerprint.verifiedBy.infoHash");
+    case "pieces":
+      return t("SearchEntity.KeepUploadDialog.fingerprint.verifiedBy.pieces");
+    case "files":
+      return t("SearchEntity.KeepUploadDialog.fingerprint.verifiedBy.files");
+    case "legacy":
+      return t("SearchEntity.KeepUploadDialog.fingerprint.verifiedBy.legacy");
+    default:
+      return null;
+  }
+}
+
+/** 本地比对徽标：本地已有 / 同站已挂 / 仅标题疑似 */
+interface IFingerprintBadge {
+  key: string;
+  color: string;
+  text: string;
+  title?: string;
+}
+
+function localBadges(item: IVerifiedItem): IFingerprintBadge[] {
+  const decision = item.localDecision;
+  const match = item.localMatch;
+  if (!decision || !match) return [];
+
+  // 提示：第 2 层命中但没有 piece 证据，建议抽样验一下 piece
+  const suggestTitle = decision.suggestPieceVerify
+    ? t("SearchEntity.KeepUploadDialog.fingerprint.suggestPieceVerify")
+    : undefined;
+
+  const siteNames = (match.match?.sites ?? []).map(
+    (site) => metadataStore.siteNameMap?.[site] ?? metadataStore.getSiteName(site),
+  );
+
+  switch (decision.reason) {
+    case "local-identical":
+      return [{ key: "local-identical", color: "orange", text: t("SearchEntity.KeepUploadDialog.fingerprint.local.identical"), title: suggestTitle }];
+    case "same-site-already":
+      return [
+        {
+          key: "same-site",
+          color: "purple",
+          text: t("SearchEntity.KeepUploadDialog.fingerprint.local.sameSite"),
+          title: siteNames.join("、") || suggestTitle,
+        },
+      ];
+    case "title-only-candidate":
+      return [{ key: "candidate", color: "blue", text: t("SearchEntity.KeepUploadDialog.fingerprint.local.candidate"), title: suggestTitle }];
+    default:
+      return [];
+  }
+}
+
 // 创建辅种任务
 async function createKeepUploadTask() {
   if (!canCreateTask.value || !selectedDownloaderId.value) return;
 
-  const verifiedList = Array.from(verifiedItems.value.values()).filter((item) => item.verified);
+  const verifiedList = includedItems.value.filter((item) => item.verified);
   if (verifiedList.length === 0) {
     runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.noVerifiedItem"), { color: "error" });
     return;
@@ -366,72 +606,104 @@ async function createKeepUploadTask() {
       </div>
     </template>
 
+    <!-- 本地指纹索引：决定「哪些条目本地已经有了」，是辅种前的最后一道保守检查 -->
+    <div class="d-flex align-center ga-2 mb-2">
+      <span class="text-body-small text-grey">{{ localIndexText }}</span>
+      <a-tooltip :title="t('SearchEntity.KeepUploadDialog.fingerprint.localIndex.refresh')">
+        <a-button type="text" size="small" :loading="indexLoading" @click="loadLocalIndex(true)">
+          <template #icon><SyncOutlined /></template>
+        </a-button>
+      </a-tooltip>
+      <a-checkbox
+        v-if="localLookup.entries.length > 0"
+        v-model:checked="excludeLocalDuplicates"
+        class="text-body-small"
+      >
+        {{ t("SearchEntity.KeepUploadDialog.fingerprint.localIndex.excludeLocal", [excludedIds.size]) }}
+      </a-checkbox>
+    </div>
+
     <div class="keep-upload-list" style="max-height: 80vh">
-      <template v-for="(id, index) in verifiedItemsOrder" :key="id">
+      <template v-for="(item, index) in includedItems" :key="item.id">
         <div v-if="index === 0" class="text-body-small text-grey mb-1">
           {{ t("SearchEntity.KeepUploadDialog.baseTorrent") }}
         </div>
         <div v-if="index === 1" class="text-body-small text-grey mb-1">
           {{ t("SearchEntity.KeepUploadDialog.otherTorrent") }}
         </div>
-        <div v-if="verifiedItems.get(id)" class="d-flex align-center py-1">
-          <SiteFavicon :site-id="verifiedItems.get(id)!.data.site" :size="18" class="mr-2" />
+        <div class="d-flex align-center py-1">
+          <SiteFavicon :site-id="item.data.site" :size="18" class="mr-2" />
 
           <div class="flex-1-1-0 text-truncate">
             <div class="list-item text-body-medium">
-              <a :href="verifiedItems.get(id)!.data.link" target="_blank" rel="noopener noreferrer nofollow">
-                {{ verifiedItems.get(id)!.data.title }}
+              <a :href="item.data.link" target="_blank" rel="noopener noreferrer nofollow">
+                {{ item.data.title }}
               </a>
             </div>
             <div class="text-body-small">
-              {{ t("SearchEntity.KeepUploadDialog.size") }}{{ formatSize(verifiedItems.get(id)!.data.size ?? 0) }},
-              {{ t("SearchEntity.KeepUploadDialog.fileCount") }}{{ getFileCount(verifiedItems.get(id)!) }},
-              {{ t("SearchEntity.KeepUploadDialog.status.label") }}{{ verifiedItems.get(id)!.status }}
+              {{ t("SearchEntity.KeepUploadDialog.size") }}{{ formatSize(item.data.size ?? 0) }},
+              {{ t("SearchEntity.KeepUploadDialog.fileCount") }}{{ getFileCount(item) }},
+              {{ t("SearchEntity.KeepUploadDialog.status.label") }}{{ item.status }}
+              <span v-if="verifiedByText(item)" class="text-grey">
+                （{{ verifiedByText(item) }}）
+              </span>
+            </div>
+            <div v-if="localBadges(item).length" class="d-flex ga-1 mt-1 flex-wrap">
+              <a-tag v-for="badge in localBadges(item)" :key="badge.key" :color="badge.color" :bordered="false" :title="badge.title">
+                {{ badge.text }}
+              </a-tag>
+              <span
+                v-for="site in item.localMatch?.match?.sites ?? []"
+                :key="site"
+                class="text-body-small text-grey"
+              >
+                <SiteName :site-id="site" tag="span" />
+              </span>
             </div>
           </div>
 
           <div class="d-flex ga-1">
             <a-button
               v-if="
-                verifiedItems.get(verifiedItemsOrder[0])?.verified &&
-                !verifiedItems.get(id)!.loading &&
-                !verifiedItems.get(id)!.verified &&
+                includedItems[0]?.verified &&
+                !item.loading &&
+                !item.verified &&
                 index > 0
               "
               type="text"
               :title="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
-              @click.stop="addToVerified(id)"
+              @click.stop="addToVerified(item.id)"
             >
               <template #icon><PlusOutlined /></template>
             </a-button>
 
             <a-button
               v-if="
-                verifiedItems.get(verifiedItemsOrder[0])?.verified &&
-                !verifiedItems.get(id)!.loading &&
-                !verifiedItems.get(id)!.torrent &&
+                includedItems[0]?.verified &&
+                !item.loading &&
+                !item.torrent &&
                 index > 0
               "
               type="text"
               :title="t('SearchEntity.KeepUploadDialog.redownload')"
-              @click.stop="reDownload(id)"
+              @click.stop="reDownload(item.id)"
             >
               <template #icon><SyncOutlined /></template>
             </a-button>
 
             <a-button
               type="text"
-              :loading="verifiedItems.get(id)!.loading"
-              :title="verifiedItems.get(id)!.status"
+              :loading="item.loading"
+              :title="item.status"
             >
-              <template v-if="verifiedItems.get(id)!.verified" #icon>
+              <template v-if="item.verified" #icon>
                 <CheckOutlined style="color: #52c41a" />
               </template>
               <template v-else #icon>
                 <CloseOutlined
                   style="color: #ff4d4f"
                   :title="t('SearchEntity.KeepUploadDialog.removeFromKeepUpload')"
-                  @click.stop="removeVerifiedItem(id)"
+                  @click.stop="removeVerifiedItem(item.id)"
                 />
               </template>
             </a-button>
@@ -443,7 +715,7 @@ async function createKeepUploadTask() {
 
     <template #footer>
       <div class="d-flex align-center">
-        <template v-if="verifiedCount > 1">
+        <template v-if="includedVerifiedCount > 1">
           <a-select
             v-model:value="selectedDownloaderId"
             :options="downloaderOptions"

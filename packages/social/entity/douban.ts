@@ -1,11 +1,11 @@
 import axios from "axios";
 import Sizzle from "sizzle";
 import {
-  IFetchSocialSiteInformationConfig,
-  IPtgenApiResponse,
-  ISocialInformation,
-  ISocialSitePageInformation,
-  TSupportSocialSitePageParserMatches,
+  type IFetchSocialSiteInformationConfig,
+  type IPtgenApiResponse,
+  type ISocialInformation,
+  type ISocialSitePageInformation,
+  type TSupportSocialSitePageParserMatches,
 } from "../types";
 import { uniq } from "es-toolkit";
 import { parse as parseImdb } from "./imdb.ts";

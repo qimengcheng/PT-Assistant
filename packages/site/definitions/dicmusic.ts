@@ -7,9 +7,9 @@ import { buildCategoryOptionsFromList } from "../utils";
 import { type IUserInfo, type ITorrent, type ISiteMetadata, type TUserInfoParseKey } from "../types";
 import GazelleJSONAPI, {
   SchemaMetadata,
-  userJsonResponse,
-  groupBrowseResult,
-  groupTorrent,
+  type userJsonResponse,
+  type groupBrowseResult,
+  type groupTorrent,
 } from "../schemas/GazelleJSONAPI.ts";
 
 export const siteMetadata: ISiteMetadata = {

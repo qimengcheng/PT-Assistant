@@ -10,7 +10,7 @@ import {
   MinusCircleOutlined,
   SaveOutlined,
 } from "@antdv-next/icons";
-import { ETorrentStatus, ITorrent } from "@ptd/site";
+import { ETorrentStatus, type ITorrent } from "@ptd/site";
 import type { TableColumnsType } from "antdv-next";
 
 import { formatDate, formatSize } from "@/options/utils.ts";

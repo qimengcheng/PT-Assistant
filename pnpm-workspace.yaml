@@ -1,11 +1,29 @@
 nodeLinker: hoisted
 
 overrides:
-  # WXT 0.21 默认装 vite 8（rolldown 内核），rolldown 把 TS 模块间 missing export
-  # 从警告升级为硬错误，site 包大量 barrel 重导出的类型导入（无 type 修饰）会直接构建失败。
-  # 退回 rollup 内核（WXT peerDeps 允许 ^6.3.4 || ^7 || ^8）。
-  # 若要上 rolldown，需先对 site 包做 codemod 把类型导入改为 `import type`。
-  vite: ^7.0.0
+  # Vite 8 = rolldown + oxc 内核。WXT 0.21.4 的 peerDeps 允许 `^6.3.4 || ^7.0.0 || ^8.0.0-0`，
+  # 本行自 v0.5.15 起由 ^7.0.0（rollup 内核）翻到 ^8.0.0。回滚 = 把本行改回 ^7.0.0 并重装依赖。
+  #
+  # 【为什么曾经钉 v7】rolldown 会把「运行时 import 了一个只存在于类型层面的名字」判为
+  # missing export 硬错误。真实病因不是原先注释说的 barrel 重导出，而是**叶子文件自己的裸类型
+  # 导入**：在 v0.5.13 树上用 TypeScript 自身诊断量得 TS1484 共 335 处 / 85 文件
+  # （downloader/entity 100、site/definitions 96、src/options 31、social·mediaServer·
+  # backupServer 的 entity 67、site/schemas 14），而 TS1205（桶文件用值语法重导出纯类型）
+  # 实测 **0 处**。这 335 处已全部补 `import type`，根 tsconfig 的 `verbatimModuleSyntax`
+  # 也改回 true 固化防线（否则下次还会写回裸导入）。
+  #
+  # 【升级前的实测依据】对照构建用隔离副本做（同代码、只翻本行）：
+  #   vite 8.3.2 + rolldown 1.2.12 → 构建 0 error / 0 missing export；耗时 5.5s（v7 37s）；
+  #   产物 14.22MB / 1235 文件（v7 15.59MB / 1151）；SW 冒烟 PASS（module 形态、12 类事件注册）；
+  #   317 个站点定义仍是「每站一个懒加载 chunk」；content-app 的 ESM 拆分仍生效。
+  #   CJS interop 写法由 `r.AES.decrypt()` 变为 `a.default.AES.decrypt()`，已读 rolldown-runtime
+  #   的 interop 助手确认：目标非 __esModule 或无自身 default 时它总会显式定义 default 指向整个
+  #   命名空间，故结构自洽（crypto-js / sizzle / bencode / file-saver / jszip 走的都是同一助手）。
+  #
+  # 【遗留待人工回归】静态与构建覆盖不了的四条链路：站点解析 / 添加下载器 / CookieCloud 备份 /
+  # content 弹窗。另：Lightning CSS 会新增 3 条 `:deep` 伪类警告，那是 SetBase 非 scoped 样式块
+  # 里的死 CSS（v7 产物同样原样保留、浏览器同样不生效），不是本次升级引入的回归。
+  vite: ^8.0.0
 
 # pnpm 12 起不再自动执行依赖的构建脚本，未列入白名单会整体报
 # ERR_PNPM_IGNORED_BUILDS 并以退出码 1 失败 —— 本地和 CI 都会挂。

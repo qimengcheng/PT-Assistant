@@ -13,8 +13,8 @@ import {
   type ISiteMetadata,
   type ITorrent,
   type ITorrentTag,
-  IUserInfo,
-  TLevelId,
+  type IUserInfo,
+  type TLevelId,
 } from "../types";
 import { guessUserLevelId, store } from "../utils";
 import NexusPHP, {

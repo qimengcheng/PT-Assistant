@@ -1,4 +1,4 @@
-import { IBackupConfig, IBackupData, IBackupFileInfo, IBackupFileListOption } from "./type.ts";
+import { type IBackupConfig, type IBackupData, type IBackupFileInfo, type IBackupFileListOption } from "./type.ts";
 import { backupDataToJSZipBlob, decryptData, encryptData, jsZipBlobToBackupData } from "./utils.ts";
 
 export default abstract class AbstractBackupServer<T extends IBackupConfig> {

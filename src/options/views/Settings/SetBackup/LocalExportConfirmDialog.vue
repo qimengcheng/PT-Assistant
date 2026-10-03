@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { CloseCircleOutlined, ExportOutlined } from "@antdv-next/icons";
 
-import { BackupFields, TBackupFields } from "@/shared/types.ts";
+import { BackupFields, type TBackupFields } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
 
 const showDialog = defineModel<boolean>();

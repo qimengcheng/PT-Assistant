@@ -3,7 +3,7 @@
  */
 import { type AxiosRequestConfig, type AxiosResponse } from "axios";
 
-import { ISearchInput, type ISiteMetadata, type ITorrent } from "../types";
+import { type ISearchInput, type ISiteMetadata, type ITorrent } from "../types";
 import PrivateSite from "../schemas/AbstractPrivateSite.ts";
 import { xiaomloveDefaultUserLevelRequirements } from "../schemas/NexusPHP.ts";
 

@@ -5,7 +5,7 @@ import { FileSearchOutlined } from "@antdv-next/icons";
 import type { TableColumnsType } from "antdv-next";
 
 import { sendMessage } from "@/messages.ts";
-import { ILoggerItem } from "@/shared/types.ts";
+import { type ILoggerItem } from "@/shared/types.ts";
 import { formatDate } from "@/options/utils.ts";
 
 const { t } = useI18n();

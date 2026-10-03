@@ -3,7 +3,7 @@
  * @PTPPDefinitions https://github.com/pt-plugins/PT-Plugin-Plus/blob/dev/resource/sites/alpharatio.cc/config.json
  */
 import type { ISiteMetadata, ITorrent, IUserInfo, TSearchRequestConfigTransformer, TUserInfoParseKey } from "../types";
-import GazelleJSONAPI, { SchemaMetadata, torrentBrowseResult } from "../schemas/GazelleJSONAPI";
+import GazelleJSONAPI, { SchemaMetadata, type torrentBrowseResult } from "../schemas/GazelleJSONAPI";
 import { set, unset } from "es-toolkit/compat";
 import { toMerged } from "es-toolkit";
 

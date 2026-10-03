@@ -4,7 +4,7 @@
  * @PDSDefinitions https://github.com/mantou568/pre-dessert-sites/blob/main/site_config/sites/hhanclub.json
  * @PTMDefinitions https://github.com/JustLookAtNow/pt_mate/blob/master/assets/sites/hhanclub.json
  */
-import { ETorrentStatus, type ISiteMetadata, IUserInfo } from "../types";
+import { ETorrentStatus, type ISiteMetadata, type IUserInfo } from "../types";
 import NexusPHP, {
   CategoryInclbookmarked,
   CategoryIncldead,

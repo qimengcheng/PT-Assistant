@@ -1,7 +1,7 @@
 import { subDays, format as formatDate, eachDayOfInterval } from "date-fns";
-import { EResultParseStatus, TSiteID } from "@ptd/site";
+import { EResultParseStatus, type TSiteID } from "@ptd/site";
 
-import { type IStoredUserInfo, TUserInfoStorageSchema } from "@/shared/types.ts";
+import { type IStoredUserInfo, type TUserInfoStorageSchema } from "@/shared/types.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { extStore } from "@/storage.ts";
 

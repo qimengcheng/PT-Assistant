@@ -8,7 +8,7 @@ import PrivateSite from "./AbstractPrivateSite";
 import {
   EResultParseStatus,
   ETorrentStatus,
-  TSchemaMetadataListSelectors,
+  type TSchemaMetadataListSelectors,
   type ISiteMetadata,
   type IUserInfo,
   type ITorrent,

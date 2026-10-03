@@ -1,5 +1,5 @@
 import BittorrentSite from "../schemas/AbstractBittorrentSite";
-import { ISearchInput, ITorrent, type ISiteMetadata } from "../types";
+import { type ISearchInput, type ITorrent, type ISiteMetadata } from "../types";
 import Sizzle from "sizzle";
 // 只用 SHA256 一个算法：默认导入 `crypto-js` 根入口会把全部算法（AES/DES/RC/TripleDES/
 // SHA 家族/HMAC 家族/PBKDF/…）打进来，实测让这个站点的懒加载 chunk 到 174KB

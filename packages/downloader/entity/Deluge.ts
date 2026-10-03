@@ -2,23 +2,23 @@
  * @see https://deluge.readthedocs.io/en/latest/reference/webapi.html
  */
 import {
-  CAddTorrentOptions,
+  type CAddTorrentOptions,
   CustomPathDescription,
-  CTorrent,
-  DownloaderBaseConfig,
-  TorrentClientMetaData,
-  CTorrentFilterRules,
+  type CTorrent,
+  type DownloaderBaseConfig,
+  type TorrentClientMetaData,
+  type CTorrentFilterRules,
   CTorrentState,
-  TorrentClientStatus,
+  type TorrentClientStatus,
   AbstractBittorrentClient,
-  CAddTorrentResult,
-  TorrentSpeedLimit,
-  CTorrentFile,
-  CTorrentFileSelection,
-  CTorrentPeer,
-  CTorrentTracker,
+  type CAddTorrentResult,
+  type TorrentSpeedLimit,
+  type CTorrentFile,
+  type CTorrentFileSelection,
+  type CTorrentPeer,
+  type CTorrentTracker,
   CTrackerState,
-  TorrentFilePriority,
+  type TorrentFilePriority,
 } from "../types";
 import urlJoin from "url-join";
 

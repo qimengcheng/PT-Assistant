@@ -3,7 +3,7 @@
  */
 import type { Ref } from "vue";
 import { ref, unref } from "vue";
-import { MutationType, PiniaPluginContext } from "pinia";
+import { MutationType, type PiniaPluginContext } from "pinia";
 
 export async function persistent<T>(key: string, newValue: T, storage: chrome.storage.AreaName = "local") {
   await chrome.storage[storage].set({ [key]: JSON.parse(JSON.stringify(newValue)) });

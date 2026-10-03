@@ -158,14 +158,16 @@ jobs:
       - name: Generate release notes
         run: node scripts/gen-release-notes.mjs release-notes.md
 
-      # 版本号取自 package.json，skipIfReleaseExists 保证同版本不会重复发
+      # 注意参数名是 `bodyFile`，**没有** `bodyPath` 这个参数（v0.5.15 那次就因为写成
+      # bodyPath 被静默忽略，Release 页面只剩 GitHub 自动生成的那行 Full Changelog）。
+      # 相对路径以 workspace 为基准。
       - id: gh
         uses: ncipollo/release-action@v1
         with:
           name: v${{ needs.build.outputs.version }}
           tag: v${{ needs.build.outputs.version }}
           skipIfReleaseExists: true
-          bodyPath: release-notes.md
+          bodyFile: release-notes.md
           generateReleaseNotes: true
           artifacts: PT-Assistant-${{ needs.build.outputs.version }}-chrome.zip,PT-Assistant-${{ needs.build.outputs.version }}-firefox.zip,PT-Assistant-${{ needs.build.outputs.version }}-sources.zip
 

@@ -1,6 +1,6 @@
 {
   "name": "pt-assistant-wxt",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "description": "PT Assistant — PT-depiler 的 WXT + Vue 3 全新架构重写版（骨架）",
@@ -16,6 +16,7 @@
   "engines": {
     "node": ">=22"
   },
+  "packageManager": "pnpm@12.8.1",
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
     "@antdv-next/icons": "1.1.2",

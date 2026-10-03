@@ -134,6 +134,11 @@ export const routes: RouteRecordRaw[] = [
     name: "DebugSiteDefinitions",
     component: () => import("../views/SiteDefinitions.vue"),
   },
+  {
+    path: "/debugger",
+    name: "Debugger",
+    component: () => import("../views/Devtools/Debugger.vue"),
+  },
 
   {
     path: "/:pathMatch(.*)*",

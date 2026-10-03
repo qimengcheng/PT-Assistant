@@ -1,5 +1,4 @@
 import { createApp, markRaw } from "vue";
-import VueKonva from "vue-konva";
 
 import App from "./App.vue";
 
@@ -15,7 +14,7 @@ import "./vuetify-compat.css";
 // 后者不会执行 install、__VUE_I18N_SYMBOL__ 挂不上 app，所有 useI18n() 的组件
 // 会抛 ComposerErrorCodes.NOT_INSTALLED(27)，路由组件白屏（v0.4.0 备份页白屏的根因）。
 const app = createApp(App);
-app.use(piniaInstance).use(i18nInstance).use(routerInstance).use(antdInstance).use(VueKonva).mount("#app");
+app.use(piniaInstance).use(i18nInstance).use(routerInstance).use(antdInstance).mount("#app");
 
 // DEBUG-PROBE: 临时插桩供无头探针定位搜索表格空数据问题（验证后移除）
 (window as any).__pinia = piniaInstance;

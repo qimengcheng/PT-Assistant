@@ -46,13 +46,20 @@ async function updatePerSiteData(siteId: TSiteID, siteUserInfoData: IUserInfo) {
 export async function initTableData() {
   const configStore = useConfigStore();
 
+  const siteIds = Object.keys(metadataStore.sites);
+
   // 预加载所有已配置的站点基本属性，同时预加载的变量在全局统一，这样可以加快 Timeline 和 Statistic 的加载速度
-  const addedSiteMetaData = await loadAllAddedSiteMetadata(Object.keys(metadataStore.sites));
+  const addedSiteMetaData = await loadAllAddedSiteMetadata(siteIds);
 
   const tasks: Promise<void>[] = [];
 
   for (const [siteId, siteUserConfig] of Object.entries(metadataStore.sites)) {
     const siteMeta = addedSiteMetaData[siteId];
+
+    // siteMeta 缺失说明该站点没能在 loadAllAddedSiteMetadata 里建好条目（那里已 catch 并打日志）。
+    // 这里必须 continue 而不能继续访问 siteMeta.type —— 那会抛 TypeError 中断整个循环，
+    // 导致后面所有站点都不出现在表格里，且现象是「没有报错但表格空白」。
+    if (!siteMeta) continue;
 
     if (
       // 只显示私有站点的用户信息

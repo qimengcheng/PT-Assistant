@@ -1,5 +1,6 @@
 import { uniq } from "es-toolkit";
 import { isEmpty } from "es-toolkit/compat";
+import PQueue from "p-queue";
 import {
   getDefinedSiteMetadata,
   getFavicon,
@@ -85,16 +86,30 @@ export async function getSiteInstance<TYPE extends "private" | "public">(
   return await createSiteInstance<TYPE>(siteId, storedSiteUserConfig);
 }
 
+/**
+ * 站点图标抓取队列：getFavicon 最坏要串行发 4 次 HTTP（首页 → manifest → /favicon.ico → 本体），
+ * 且这些 axios 调用没有 timeout。若不加限制，一次性初始化几十个站点会同时打出几十个
+ * 全页请求，互相争抢带宽、拖慢整个页面。这里限制并发并加超时兜底。
+ */
+const faviconQueue = new PQueue({ concurrency: 6 });
+const FAVICON_TIMEOUT = 8000;
+
 export async function getSiteFavicon(site: TSiteID | getFaviconMetadata, flush: boolean = false): Promise<string> {
   const siteId = typeof site === "string" ? site : site.id;
   let siteFavicon = (await (await ptdIndexDb).get("favicon", siteId)) ?? false;
   if (flush || !siteFavicon) {
     const siteInstance = await getSiteInstance(siteId);
     if (siteInstance) {
-      siteFavicon = await getFavicon({
-        id: siteId,
-        urls: uniq([siteInstance.url, ...siteInstance.metadata.urls].filter(Boolean)),
-        favicon: siteInstance.metadata.favicon,
+      siteFavicon = await faviconQueue.add(async () => {
+        // 超时兜底：站点无响应时不能让调用方（表格首屏）一直等下去
+        return await Promise.race([
+          getFavicon({
+            id: siteId,
+            urls: uniq([siteInstance.url, ...siteInstance.metadata.urls].filter(Boolean)),
+            favicon: siteInstance.metadata.favicon,
+          }),
+          new Promise<string>((resolve) => setTimeout(() => resolve(NO_IMAGE), FAVICON_TIMEOUT)),
+        ]);
       });
 
       await (await ptdIndexDb).put("favicon", siteFavicon, siteId);

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { ETorrentStatus } from "@ptd/site";
+import { ArrowDownOutlined, ArrowUpOutlined, CheckOutlined, DisconnectOutlined } from "@antdv-next/icons";
 
 import { ISearchResultTorrent } from "@/shared/types.ts";
 
@@ -8,54 +9,60 @@ const { torrent } = defineProps<{
   torrent: ISearchResultTorrent;
 }>();
 
+/**
+ * antd 的图标是组件而不是 mdi 字符串，所以这里返回组件本身，
+ * 交给 <component :is> 渲染。
+ */
 const icon = computed(() => {
   switch (torrent.status) {
     case ETorrentStatus.downloading:
-      return "mdi-arrow-down";
+      return ArrowDownOutlined;
 
     case ETorrentStatus.completed:
-      return "mdi-check";
+      return CheckOutlined;
 
     case ETorrentStatus.inactive:
-      return "mdi-wifi-strength-off";
+      return DisconnectOutlined;
 
     case ETorrentStatus.seeding:
     default:
-      return "mdi-arrow-up";
+      return ArrowUpOutlined;
   }
 });
 
+/**
+ * 原来返回的是 Vuetify 的语义色名（info / grey / success），
+ * antd 的 stroke-color 与图标颜色都要真实色值，故在此映射。
+ */
 const color = computed(() => {
   switch (torrent.status) {
     case ETorrentStatus.downloading:
-      return "info";
+      return "#1677ff"; // info
 
     case ETorrentStatus.completed:
     case ETorrentStatus.inactive:
-      return "grey";
+      return "#8c8c8c"; // grey
 
     case ETorrentStatus.seeding:
     default:
-      return "success";
+      return "#52c41a"; // success
   }
 });
 </script>
 
 <template>
   <!--
-    Vuetify 4 的 v-row 改用 flex gap（默认 24px）、v-col 不再带 padding：
-    - gap="0" 让 cols="2" 的图标列恢复宽度、图标与进度条保持紧凑；
-    - align-center 让 4px 高的进度条与图标垂直居中（v3 是靠 v-col 的 12px padding 达到同样效果），
-      否则进度条会贴在行首、完成对勾看起来偏低（#1554）。
+    v-row/v-col 换成 a-row/a-col：a-row 用 :gutter="0" 取消列间距（对应原来的 gap="0"），
+    align="middle" 让很矮的进度条与图标垂直居中（#1554）。
   -->
-  <v-row gap="0" class="align-center pt-1">
-    <v-col class="pa-0" cols="2">
-      <v-icon :color="color" :icon="icon" size="x-small"></v-icon>
-    </v-col>
-    <v-col class="pl-1">
-      <v-progress-linear v-model="torrent.progress!" :color="color" :title="`${torrent.progress}%`"></v-progress-linear>
-    </v-col>
-  </v-row>
+  <a-row :gutter="0" align="middle" class="pt-1">
+    <a-col class="pa-0" :span="2">
+      <component :is="icon" :style="{ color }" />
+    </a-col>
+    <a-col class="pl-1" :span="22">
+      <a-progress :percent="torrent.progress!" :show-info="false" :stroke-color="color" size="small" />
+    </a-col>
+  </a-row>
 </template>
 
 <style scoped lang="scss"></style>

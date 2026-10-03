@@ -1,0 +1,117 @@
+/* ============================================================================
+   Vuetify 工具类兼容层（迁移期过渡用，可整体删除）
+   ---------------------------------------------------------------------------
+   UI 框架已从 Vuetify 换成 antdv-next，但已平移的 29 个视图里大量使用了
+   Vuetify 的原子类。这里按原值复刻一份，避免为了换框架去逐个重写这些
+   纯样式的 class 名 —— 它们只是排版，不涉及组件行为。
+   等所有视图的模板都改写成 antd 组件后，本文件即可删除。
+   ========================================================================== */
+
+/* ---- spacing（Vuetify 间距刻度：1=4px 2=8px 3=12px 4=16px 5=20px 6=24px）---- */
+.ma-0 { margin: 0; }
+.ma-1 { margin: 4px; }
+.ma-2 { margin: 8px; }
+.ma-3 { margin: 12px; }
+.ma-4 { margin: 16px; }
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mt-4 { margin-top: 16px; }
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.ml-0 { margin-left: 0; }
+.ml-1 { margin-left: 4px; }
+.ml-2 { margin-left: 8px; }
+.ml-3 { margin-left: 12px; }
+.mr-0 { margin-right: 0; }
+.mr-1 { margin-right: 4px; }
+.mr-2 { margin-right: 8px; }
+.mr-3 { margin-right: 12px; }
+.mx-0 { margin-left: 0; margin-right: 0; }
+.mx-1 { margin-left: 4px; margin-right: 4px; }
+.mx-2 { margin-left: 8px; margin-right: 8px; }
+.mx-3 { margin-left: 12px; margin-right: 12px; }
+.my-0 { margin-top: 0; margin-bottom: 0; }
+.my-1 { margin-top: 4px; margin-bottom: 4px; }
+.my-2 { margin-top: 8px; margin-bottom: 8px; }
+.my-3 { margin-top: 12px; margin-bottom: 12px; }
+.my-4 { margin-top: 16px; margin-bottom: 16px; }
+
+.pa-0 { padding: 0; }
+.pa-1 { padding: 4px; }
+.pa-2 { padding: 8px; }
+.pa-3 { padding: 12px; }
+.pa-4 { padding: 16px; }
+.pt-0 { padding-top: 0; }
+.pt-1 { padding-top: 4px; }
+.pt-2 { padding-top: 8px; }
+.pb-0 { padding-bottom: 0; }
+.pb-1 { padding-bottom: 4px; }
+.pb-2 { padding-bottom: 8px; }
+.pl-0 { padding-left: 0; }
+.pl-2 { padding-left: 8px; }
+.pl-4 { padding-left: 16px; }
+.pr-0 { padding-right: 0; }
+.pr-2 { padding-right: 8px; }
+.px-0 { padding-left: 0; padding-right: 0; }
+.px-1 { padding-left: 4px; padding-right: 4px; }
+.px-2 { padding-left: 8px; padding-right: 8px; }
+.px-6 { padding-left: 24px; padding-right: 24px; }
+.py-0 { padding-top: 0; padding-bottom: 0; }
+.py-1 { padding-top: 4px; padding-bottom: 4px; }
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+
+/* ---- flex ---- */
+.d-flex { display: flex; }
+.d-inline-flex { display: inline-flex; }
+.d-block { display: block; }
+.flex-column { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-nowrap { flex-wrap: nowrap; }
+.flex-1-1-0 { flex: 1 1 0; min-width: 0; }
+.flex-0-0 { flex: 0 0 auto; }
+.align-start { align-items: flex-start; }
+.align-center { align-items: center; }
+.align-end { align-items: flex-end; }
+.justify-start { justify-content: flex-start; }
+.justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
+.justify-space-between { justify-content: space-between; }
+
+/* ---- typography ---- */
+.text-body-small { font-size: 12px; }
+.text-body-medium { font-size: 14px; }
+.text-body-large { font-size: 16px; }
+.text-label-large { font-size: 14px; font-weight: 500; }
+.text-medium-emphasis { color: #6b7280; }
+.text-no-wrap { white-space: nowrap; }
+.text-wrap { white-space: normal; overflow-wrap: anywhere; }
+.text-truncate,
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.text-decoration-none { text-decoration: none; }
+.text-start { text-align: start; }
+.text-end { text-align: end; }
+.text-center { text-align: center; }
+.font-weight-bold { font-weight: 700; }
+.font-weight-medium { font-weight: 500; }
+.text-red { color: #d4380d; }
+.text-green { color: #389e0d; }
+.text-indigo { color: #531dab; }
+.text-yellow-darken-2 { color: #d4b106; }
+.text-blue-grey { color: #607d8b; }
+.text-grey { color: #6b7280; }
+.text-white { color: #fff; }
+
+/* ---- 表格相关（原先挂在 v-data-table 的 class 上）---- */
+.table-stripe tbody tr:nth-of-type(odd) { background: #fafafa; }
+.table-header-no-wrap th { white-space: nowrap; }
+.table-action { display: inline-flex; }

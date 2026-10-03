@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import {
+  CheckOutlined,
+  CloseOutlined,
+  PlusOutlined,
+  QuestionCircleOutlined,
+  SaveOutlined,
+  SyncOutlined,
+} from "@antdv-next/icons";
 
 import type { ITorrent } from "@ptd/site";
 
@@ -46,6 +54,15 @@ const savePath = ref("");
 const torrentLabel = ref("");
 const suggestedSavePaths = computed(() => metadataStore.downloaders[selectedDownloaderId.value]?.suggestFolders ?? []);
 const suggestedLabels = computed(() => metadataStore.downloaders[selectedDownloaderId.value]?.suggestTags ?? []);
+
+/** a-select 的 options 形如 { value, label }（原 Vuetify 的 item-value / item-title） */
+const downloaderOptions = computed(() =>
+  metadataStore.getSortedEnabledDownloaders.map((d) => ({ value: d.id, label: d.name })),
+);
+
+/** a-auto-complete 的 options 走的是 SelectProps.options，形如 { value, label } */
+const savePathOptions = computed(() => suggestedSavePaths.value.map((x) => ({ value: x, label: x })));
+const labelOptions = computed(() => suggestedLabels.value.map((x) => ({ value: x, label: x })));
 
 // 是否可以创建任务
 const canCreateTask = computed(() => {
@@ -332,156 +349,147 @@ async function createKeepUploadTask() {
 </script>
 
 <template>
-  <v-dialog v-model="showDialog" persistent scrollable max-width="1024">
-    <v-card>
-      <v-toolbar dark color="blue-grey-darken-2">
-        <v-toolbar-title>{{ t("SearchEntity.KeepUploadDialog.title") }}</v-toolbar-title>
-        <v-spacer />
-        <v-btn
-          icon
-          variant="text"
-          color="success"
+  <a-modal v-model:open="showDialog" :width="1024" :mask-closable="false">
+    <template #title>
+      <div class="d-flex align-center">
+        <span>{{ t("SearchEntity.KeepUploadDialog.title") }}</span>
+        <div class="flex-1-1-0" />
+        <a-button
+          type="text"
           href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/keep-upload-task"
           target="_blank"
           rel="noopener noreferrer nofollow"
           :title="t('common.howToUse')"
         >
-          <v-icon>mdi-help</v-icon>
-        </v-btn>
-      </v-toolbar>
-      <v-card-text style="max-height: 80vh">
-        <v-list lines="two" density="compact">
-          <template v-for="(id, index) in verifiedItemsOrder" :key="id">
-            <v-list-subheader v-if="index === 0">
-              {{ t("SearchEntity.KeepUploadDialog.baseTorrent") }}
-            </v-list-subheader>
-            <v-list-subheader v-if="index === 1">
-              {{ t("SearchEntity.KeepUploadDialog.otherTorrent") }}
-            </v-list-subheader>
-            <v-list-item v-if="verifiedItems.get(id)">
-              <template #prepend>
-                <v-avatar size="18">
-                  <SiteFavicon :site-id="verifiedItems.get(id)!.data.site" :size="18" />
-                </v-avatar>
+          <template #icon><QuestionCircleOutlined /></template>
+        </a-button>
+      </div>
+    </template>
+
+    <div class="keep-upload-list" style="max-height: 80vh">
+      <template v-for="(id, index) in verifiedItemsOrder" :key="id">
+        <div v-if="index === 0" class="text-body-small text-grey mb-1">
+          {{ t("SearchEntity.KeepUploadDialog.baseTorrent") }}
+        </div>
+        <div v-if="index === 1" class="text-body-small text-grey mb-1">
+          {{ t("SearchEntity.KeepUploadDialog.otherTorrent") }}
+        </div>
+        <div v-if="verifiedItems.get(id)" class="d-flex align-center py-1">
+          <SiteFavicon :site-id="verifiedItems.get(id)!.data.site" :size="18" class="mr-2" />
+
+          <div class="flex-1-1-0 text-truncate">
+            <div class="list-item text-body-medium">
+              <a :href="verifiedItems.get(id)!.data.link" target="_blank" rel="noopener noreferrer nofollow">
+                {{ verifiedItems.get(id)!.data.title }}
+              </a>
+            </div>
+            <div class="text-body-small">
+              {{ t("SearchEntity.KeepUploadDialog.size") }}{{ formatSize(verifiedItems.get(id)!.data.size ?? 0) }},
+              {{ t("SearchEntity.KeepUploadDialog.fileCount") }}{{ getFileCount(verifiedItems.get(id)!) }},
+              {{ t("SearchEntity.KeepUploadDialog.status.label") }}{{ verifiedItems.get(id)!.status }}
+            </div>
+          </div>
+
+          <div class="d-flex ga-1">
+            <a-button
+              v-if="
+                verifiedItems.get(verifiedItemsOrder[0])?.verified &&
+                !verifiedItems.get(id)!.loading &&
+                !verifiedItems.get(id)!.verified &&
+                index > 0
+              "
+              type="text"
+              :title="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
+              @click.stop="addToVerified(id)"
+            >
+              <template #icon><PlusOutlined /></template>
+            </a-button>
+
+            <a-button
+              v-if="
+                verifiedItems.get(verifiedItemsOrder[0])?.verified &&
+                !verifiedItems.get(id)!.loading &&
+                !verifiedItems.get(id)!.torrent &&
+                index > 0
+              "
+              type="text"
+              :title="t('SearchEntity.KeepUploadDialog.redownload')"
+              @click.stop="reDownload(id)"
+            >
+              <template #icon><SyncOutlined /></template>
+            </a-button>
+
+            <a-button
+              type="text"
+              :loading="verifiedItems.get(id)!.loading"
+              :title="verifiedItems.get(id)!.status"
+            >
+              <template v-if="verifiedItems.get(id)!.verified" #icon>
+                <CheckOutlined style="color: #52c41a" />
               </template>
-
-              <v-list-item-title class="list-item">
-                <a :href="verifiedItems.get(id)!.data.link" target="_blank" rel="noopener noreferrer nofollow">
-                  {{ verifiedItems.get(id)!.data.title }}
-                </a>
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                {{ t("SearchEntity.KeepUploadDialog.size") }}{{ formatSize(verifiedItems.get(id)!.data.size ?? 0) }},
-                {{ t("SearchEntity.KeepUploadDialog.fileCount") }}{{ getFileCount(verifiedItems.get(id)!) }},
-                {{ t("SearchEntity.KeepUploadDialog.status.label") }}{{ verifiedItems.get(id)!.status }}
-              </v-list-item-subtitle>
-
-              <template #append>
-                <div class="d-flex ga-1">
-                  <v-btn
-                    v-if="
-                      verifiedItems.get(verifiedItemsOrder[0])?.verified &&
-                      !verifiedItems.get(id)!.loading &&
-                      !verifiedItems.get(id)!.verified &&
-                      index > 0
-                    "
-                    icon
-                    variant="text"
-                    :title="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
-                    @click.stop="addToVerified(id)"
-                  >
-                    <v-icon color="info">mdi-plus</v-icon>
-                  </v-btn>
-
-                  <v-btn
-                    v-if="
-                      verifiedItems.get(verifiedItemsOrder[0])?.verified &&
-                      !verifiedItems.get(id)!.loading &&
-                      !verifiedItems.get(id)!.torrent &&
-                      index > 0
-                    "
-                    icon
-                    variant="text"
-                    :title="t('SearchEntity.KeepUploadDialog.redownload')"
-                    @click.stop="reDownload(id)"
-                  >
-                    <v-icon color="green">mdi-sync</v-icon>
-                  </v-btn>
-
-                  <v-btn
-                    icon
-                    variant="text"
-                    :loading="verifiedItems.get(id)!.loading"
-                    :title="verifiedItems.get(id)!.status"
-                  >
-                    <v-icon v-if="verifiedItems.get(id)!.verified" color="success">mdi-check-all</v-icon>
-                    <v-icon
-                      v-else
-                      color="error"
-                      :title="t('SearchEntity.KeepUploadDialog.removeFromKeepUpload')"
-                      @click.stop="removeVerifiedItem(id)"
-                    >
-                      mdi-close
-                    </v-icon>
-                  </v-btn>
-                </div>
+              <template v-else #icon>
+                <CloseOutlined
+                  style="color: #ff4d4f"
+                  :title="t('SearchEntity.KeepUploadDialog.removeFromKeepUpload')"
+                  @click.stop="removeVerifiedItem(id)"
+                />
               </template>
-            </v-list-item>
-            <v-divider v-if="index > 0" inset />
-          </template>
-        </v-list>
-      </v-card-text>
-      <v-divider />
-      <v-card-actions>
+            </a-button>
+          </div>
+        </div>
+        <a-divider v-if="index > 0" class="ml-4" />
+      </template>
+    </div>
+
+    <template #footer>
+      <div class="d-flex align-center">
         <template v-if="verifiedCount > 1">
-          <v-select
-            v-model="selectedDownloaderId"
-            :items="metadataStore.getSortedEnabledDownloaders"
-            item-title="name"
-            item-value="id"
-            density="compact"
-            hide-details
-            :label="t('SearchEntity.KeepUploadDialog.setSavePath')"
+          <a-select
+            v-model:value="selectedDownloaderId"
+            :options="downloaderOptions"
+            size="small"
+            :placeholder="t('SearchEntity.KeepUploadDialog.setSavePath')"
             style="max-width: 200px"
-            @update:model-value="resetDownloadOptions"
+            @change="resetDownloadOptions"
           />
-          <v-combobox
-            v-model="savePath"
-            :items="suggestedSavePaths"
-            density="compact"
-            hide-details
-            :label="t('KeepUploadTask.savePath')"
+          <a-auto-complete
+            v-model:value="savePath"
+            :options="savePathOptions"
+            size="small"
+            :placeholder="t('KeepUploadTask.savePath')"
             style="max-width: 200px"
           />
-          <v-combobox
-            v-model="torrentLabel"
-            :items="suggestedLabels"
-            density="compact"
-            hide-details
-            :label="t('SentToDownloaderDialog.label')"
+          <a-auto-complete
+            v-model:value="torrentLabel"
+            :options="labelOptions"
+            size="small"
+            :placeholder="t('SentToDownloaderDialog.label')"
             style="max-width: 200px"
           />
-          <v-btn
-            variant="text"
-            color="info"
+          <a-button
+            type="text"
             :loading="creating"
             :disabled="!canCreateTask"
             @click="createKeepUploadTask"
           >
-            <v-icon class="mr-1">mdi-content-save</v-icon>
+            <template #icon><SaveOutlined /></template>
             {{ t("SearchEntity.KeepUploadDialog.create") }}
-          </v-btn>
+          </a-button>
         </template>
-        <v-spacer />
-        <v-btn color="error" variant="text" @click="closeDialog">
+        <div class="flex-1-1-0" />
+        <a-button danger type="text" @click="closeDialog">
           {{ t("common.dialog.close") }}
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+        </a-button>
+      </div>
+    </template>
+  </a-modal>
 </template>
 
 <style scoped lang="scss">
+.keep-upload-list {
+  overflow-y: auto;
+}
+
 .list-item {
   a {
     color: #000;

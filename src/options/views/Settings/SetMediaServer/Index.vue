@@ -15,6 +15,7 @@ import {
 import { computedAsync } from "@vueuse/core";
 import {
   entityList,
+  getMediaServer,
   getMediaServerDefaultConfig,
   getMediaServerMetaData,
   type IMediaServerMetadata as PkgMediaServerMetadata,
@@ -24,6 +25,7 @@ import { nanoid } from "nanoid";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import type { IMediaServerMetadata, TMediaServerKey } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
+import ConnectCheckButton from "@/options/components/ConnectCheckButton.vue";
 
 const metadataStore = useMetadataStore();
 
@@ -52,6 +54,25 @@ const currentWarnings = computed(() => typeMetaMap.value[editingConfig.value.typ
 
 function normalizeAuthField(field: string | { name: string; required?: boolean; message?: string }) {
   return typeof field === "string" ? { name: field, required: true } : { required: true, ...field };
+}
+
+/**
+ * 连通性测试（上游 Editor.vue 的 ConnectCheckButton）。
+ * 只在「必填项都填了」时才真的发请求，否则直接判失败，避免拿半截配置去 ping。
+ */
+async function checkConnect(): Promise<boolean> {
+  const config = editingConfig.value;
+  if (!config.type || !config.name?.trim() || !config.address?.trim()) return false;
+  for (const rawField of currentAuthFields.value) {
+    const field = normalizeAuthField(rawField);
+    if (field.required && !config.auth?.[field.name]?.trim()) return false;
+  }
+  try {
+    const client = await getMediaServer(config);
+    return await client.ping();
+  } catch {
+    return false;
+  }
 }
 
 function openAddDialog() {
@@ -260,6 +281,13 @@ const columns = [
 
         <a-form-item label="启用">
           <a-switch v-model:checked="editingConfig.enabled" />
+        </a-form-item>
+
+        <!-- 连通性测试：上游 Editor.vue 里由 ConnectCheckButton 承担，这里补回同一能力 -->
+        <ConnectCheckButton :check-fn="checkConnect" :reset-timeout="3000" />
+
+        <a-form-item v-if="isEditMode && editingConfig.id" label="配置 ID">
+          <span class="text-body-small">{{ editingConfig.id }}</span>
         </a-form-item>
       </a-form>
     </a-modal>

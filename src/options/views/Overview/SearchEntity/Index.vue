@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useBreakpoint } from "antdv-next";
+import { useWindowSize } from "@vueuse/core";
 import {
   AlertOutlined,
   CameraOutlined,
@@ -214,6 +215,25 @@ const tableSelectedRaw = shallowRef<ISearchResultTorrent[]>([]);
 // 以下为 v-data-table → a-table 迁移所需的表格「胶水」，不涉及任何业务逻辑：
 // 过滤结果、当前页码、排序回写、行选择回写。
 // ============================================================================
+
+const tableWrapperRef = useTemplateRef<HTMLDivElement>("tableWrapper");
+const { width: windowWidth, height: windowHeight } = useWindowSize();
+const tableScrollY = ref(400);
+
+/**
+ * 表体可视高度 = 视口高度 − 表格顶部位置 − 表头 − 分页 − 底部留白，
+ * 让表格始终铺满视口右下区域（scroll.y 固定后横向滚动条也常驻可见）。
+ */
+function recalcTableScrollY() {
+  const el = tableWrapperRef.value;
+  if (!el) return;
+  const top = el.getBoundingClientRect().top;
+  tableScrollY.value = Math.max(windowHeight.value - top - 55 - 64 - 16, 200);
+}
+
+onMounted(recalcTableScrollY);
+// 窗口尺寸变化（工具栏换行会改变 top）、结果集变化（提示条出现/消失同理）后重测
+watch([windowWidth, windowHeight, tableItems], () => nextTick(recalcTableScrollY));
 
 /** a-table 的分页是受控的，v-data-table 原本把这块状态收在组件内部 */
 const tablePage = ref(1);
@@ -587,7 +607,7 @@ const hiddenTagNamesText = computed({
       <!-- 站点筛选器、已选种子等提示信息 -->
       <QuickFilterNotice :selected-torrents="tableSelectedRaw" />
 
-      <div id="ptd-search-entity-table" class="search-entity-table table-stripe table-header-no-wrap">
+      <div id="ptd-search-entity-table" ref="tableWrapper" class="search-entity-table table-stripe table-header-no-wrap">
         <a-table
           :columns="tableHeader"
           :data-source="tableItems"
@@ -598,6 +618,7 @@ const hiddenTagNamesText = computed({
             onChange: onRowSelectionChange,
           }"
           size="small"
+          :scroll="{ x: tableItems.length > 0 ? 'max-content' : undefined, y: `${tableScrollY}px` }"
           @change="onTableChange"
         >
           <template #bodyCell="{ column, record }">
@@ -692,6 +713,16 @@ const hiddenTagNamesText = computed({
 }
 
 #ptd-search-entity-table {
+  /* 滚动条平时透明不可见，鼠标悬停到表格区域（含拖拽滚动条时）才现形 */
+  :deep(.ant-table-body) {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  &:hover :deep(.ant-table-body) {
+    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  }
+
   :deep(td) {
     padding: 0 8px;
   }

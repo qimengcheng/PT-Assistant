@@ -5,6 +5,7 @@ import { isEmpty } from "es-toolkit/compat";
 import { jsZipBlobToBackupData } from "@ptd/backupServer/utils.ts";
 import type { IBackupData } from "@ptd/backupServer";
 import { useRouter } from "vue-router";
+import { CloseCircleOutlined, ImportOutlined, LeftOutlined, RightOutlined, SyncOutlined, UploadOutlined } from "@antdv-next/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
@@ -207,159 +208,233 @@ function goToPtppImport() {
   router.push({ name: "SetBaseBackup" });
   showDialog.value = false;
 }
+
+/** 快捷时长按钮：ISO-8601 时长 → 分钟 */
+const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P1Y"];
 </script>
 
 <template>
-  <v-dialog v-model="showDialog" :persistent="isDoingRestore" max-width="800" scrollable @after-enter="resetDialog">
-    <v-card>
-      <v-card-title class="pa-0">
-        <v-toolbar color="blue-grey-darken-2">
-          <v-toolbar-title>{{ t("SetBackup.RestoreDialog.title") }}</v-toolbar-title>
-        </v-toolbar>
-      </v-card-title>
-      <v-divider />
-      <v-card-text>
-        <v-alert class="mb-3" type="info" variant="tonal">
-          <span>{{ t("SetBackup.RestoreDialog.ptppPrompt") }}</span>
-          <template #append>
-            <v-btn color="primary" size="small" variant="outlined" prepend-icon="mdi-import" @click="goToPtppImport">
-              {{ t("SetBackup.RestoreDialog.ptppImport") }}
-            </v-btn>
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('SetBackup.RestoreDialog.title')"
+    :width="800"
+    :mask-closable="!isDoingRestore"
+    :keyboard="!isDoingRestore"
+    :closable="!isDoingRestore"
+    destroy-on-hidden
+    @after-open-change="(open: boolean) => open && resetDialog()"
+  >
+    <a-alert class="mb-3" type="info">
+      <!-- a-alert 不渲染默认插槽，正文要放 #message / #title -->
+      <template #message>
+        {{ t("SetBackup.RestoreDialog.ptppPrompt") }}
+      </template>
+      <!-- v-alert 的 #append → a-alert 的 #action -->
+      <template #action>
+        <a-button color="primary" variant="outlined" size="small" @click="goToPtppImport">
+          <template #icon>
+            <ImportOutlined />
           </template>
-        </v-alert>
-        <v-window v-model="currentStep">
-          <v-window-item value="file" eager>
-            <v-file-input
-              v-model="backupFile"
-              accept="application/zip"
-              :label="t('SetBackup.RestoreDialog.selectFile')"
-              :placeholder="t('SetBackup.RestoreDialog.selectFile')"
-              show-size
-              @update:model-value="loadLocalBackupFile"
-            />
-            <v-text-field
-              v-model="decryptKey"
-              :append-icon="showDecryptKey ? 'mdi-eye' : 'mdi-eye-off'"
-              :type="showDecryptKey ? 'text' : 'password'"
-              :label="t('SetBackup.RestoreDialog.decryptKey')"
-              @click:append="showDecryptKey = !showDecryptKey"
-            />
-            <v-btn
-              v-if="!isDecryptKeyValid"
-              :disabled="!backupFile"
-              prepend-icon="mdi-cached"
-              block
-              color="warning"
-              :text="t('SetBackup.RestoreDialog.retry')"
-              @click="loadLocalBackupFile"
-            />
-          </v-window-item>
-          <v-window-item value="remote" eager>
-            <v-text-field
-              v-model="decryptKey"
-              :append-icon="showDecryptKey ? 'mdi-eye' : 'mdi-eye-off'"
-              :type="showDecryptKey ? 'text' : 'password'"
-              :label="t('SetBackup.RestoreDialog.decryptKey')"
-              @click:append="showDecryptKey = !showDecryptKey"
-            />
-            <v-btn
-              v-if="!isDecryptKeyValid"
-              :loading="isLoadingRemoteBackupFile"
-              prepend-icon="mdi-cached"
-              block
-              color="warning"
-              :text="t('SetBackup.RestoreDialog.retry')"
-              @click="loadRemoteBackupFile"
-            />
-          </v-window-item>
-          <v-window-item value="restore">
-            <v-label>{{ t("SetBackup.RestoreDialog.restoreOptions") }}</v-label>
-            <v-row no-gutters>
-              <v-col v-for="backupField in BackupFields" :key="backupField" cols="12" md="4">
-                <v-switch
-                  v-model="restoreOptions.fields"
-                  :label="t(`SetBackup.fields.${backupField}`)"
-                  :value="backupField"
-                  color="success"
-                  :disabled="!restoreData?.manifest?.files?.[backupField]"
-                  hide-details
-                />
-              </v-col>
-            </v-row>
+          {{ t("SetBackup.RestoreDialog.ptppImport") }}
+        </a-button>
+      </template>
+    </a-alert>
 
-            <v-number-input
-              v-model="restoreOptions.expandCookieMinutes"
-              :label="t('SetBackup.RestoreDialog.expandCookieMinutes')"
-              :disabled="!restoreOptions.fields?.includes('cookies')"
-              persistent-hint
-              :min="0"
-              :step="1"
-            >
-              <template #details>
-                <v-chip
-                  v-for="minutes in ['PT30M', 'PT1H', 'PT12H', 'P1D', 'P1W', 'P1M', 'P6M', 'P1Y']"
-                  :key="minutes"
-                  class="mr-1"
-                  size="small"
-                  @click="() => (restoreOptions.expandCookieMinutes = convertIsoDurationToMinutes(minutes))"
-                >
-                  {{ minutes }}
-                </v-chip>
-              </template>
-            </v-number-input>
+    <!--
+      原来是 <v-window> 步骤流：没有标签页标题，currentStep 直接决定显示哪一块。
+      a-tabs 需要字符串 key 且依赖导航栏切换，这里用 v-show 保持
+      「currentStep 单一数据源 + 面板常驻挂载」的原有语义。
+    -->
+    <div v-show="currentStep === 'file'" class="step-panel">
+      <div class="section-label">{{ t("SetBackup.RestoreDialog.selectFile") }}</div>
+      <a-upload
+        accept="application/zip"
+        :max-count="1"
+        :show-upload-list="true"
+        :before-upload="
+          (file: File) => {
+            backupFile = file;
+            loadLocalBackupFile();
+            return false;
+          }
+        "
+      >
+        <a-button>
+          <template #icon>
+            <UploadOutlined />
+          </template>
+          {{ t("SetBackup.RestoreDialog.selectFile") }}
+        </a-button>
+      </a-upload>
 
-            <v-switch
-              v-model="restoreOptions.keepExistUserInfo"
-              color="success"
-              :label="t('SetBackup.RestoreDialog.keepExistUserInfo')"
-            />
-          </v-window-item>
-        </v-window>
-      </v-card-text>
-      <v-divider />
-      <v-card-actions>
-        <v-spacer />
-        <v-btn
-          :disabled="isDoingRestore"
-          color="error"
-          prepend-icon="mdi-close-circle"
-          variant="text"
-          @click="showDialog = false"
+      <div class="section-label mt-3">{{ t("SetBackup.RestoreDialog.decryptKey") }}</div>
+      <!-- v-text-field 的 append-icon 点击切换 → a-input-password 内置的可见性切换 -->
+      <a-input-password v-model:value="decryptKey" v-model:icon-visible="showDecryptKey" />
+
+      <a-button
+        v-if="!isDecryptKeyValid"
+        :disabled="!backupFile"
+        block
+        color="gold"
+        variant="solid"
+        style="margin-top: 12px"
+        @click="loadLocalBackupFile"
+      >
+        <template #icon>
+          <SyncOutlined />
+        </template>
+        {{ t("SetBackup.RestoreDialog.retry") }}
+      </a-button>
+    </div>
+
+    <div v-show="currentStep === 'remote'" class="step-panel">
+      <div class="section-label">{{ t("SetBackup.RestoreDialog.decryptKey") }}</div>
+      <a-input-password v-model:value="decryptKey" v-model:icon-visible="showDecryptKey" />
+
+      <a-button
+        v-if="!isDecryptKeyValid"
+        :loading="isLoadingRemoteBackupFile"
+        block
+        color="gold"
+        variant="solid"
+        style="margin-top: 12px"
+        @click="loadRemoteBackupFile"
+      >
+        <template #icon>
+          <SyncOutlined />
+        </template>
+        {{ t("SetBackup.RestoreDialog.retry") }}
+      </a-button>
+    </div>
+
+    <div v-show="currentStep === 'restore'" class="step-panel">
+      <div class="section-label">{{ t("SetBackup.RestoreDialog.restoreOptions") }}</div>
+
+      <!-- v-switch + 数组 v-model + :value 是复选语义，对应 a-checkbox-group -->
+      <a-checkbox-group v-model:value="restoreOptions.fields">
+        <a-row :gutter="[16, 8]">
+          <a-col v-for="backupField in BackupFields" :key="backupField" :span="12" :md="8">
+            <!-- 备份里不存在的字段不能勾选 -->
+            <a-checkbox :value="backupField" :disabled="!restoreData?.manifest?.files?.[backupField]">
+              {{ t(`SetBackup.fields.${backupField}`) }}
+            </a-checkbox>
+          </a-col>
+        </a-row>
+      </a-checkbox-group>
+
+      <div class="section-label mt-3">{{ t("SetBackup.RestoreDialog.expandCookieMinutes") }}</div>
+      <a-input-number
+        :value="restoreOptions.expandCookieMinutes"
+        :disabled="!restoreOptions.fields?.includes('cookies')"
+        :min="0"
+        :step="1"
+        style="width: 160px"
+        @update:value="(v: any) => (restoreOptions.expandCookieMinutes = v ?? undefined)"
+      />
+
+      <!-- v-number-input 的 #details 快捷时长 chip -->
+      <div class="duration-tags">
+        <a-tag
+          v-for="minutes in quickDurations"
+          :key="minutes"
+          class="duration-tag"
+          @click="() => (restoreOptions.expandCookieMinutes = convertIsoDurationToMinutes(minutes))"
         >
+          {{ minutes }}
+        </a-tag>
+      </div>
+
+      <div class="mt-3">
+        <a-switch
+          :checked="restoreOptions.keepExistUserInfo"
+          @change="(v: any) => (restoreOptions.keepExistUserInfo = !!v)"
+        />
+        <span class="switch-label">{{ t("SetBackup.RestoreDialog.keepExistUserInfo") }}</span>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <div style="flex: 1" />
+
+        <a-button :disabled="isDoingRestore" color="danger" variant="text" @click="showDialog = false">
+          <template #icon>
+            <CloseCircleOutlined />
+          </template>
           {{ t("common.dialog.cancel") }}
-        </v-btn>
-        <v-btn
+        </a-button>
+        <a-button
           v-if="currentStep == 'restore'"
-          color="blue-darken-1"
-          prepend-icon="mdi-chevron-left"
+          color="blue"
           variant="text"
+          icon-placement="start"
           @click="currentStep = restoreMetadata.type"
         >
+          <template #icon>
+            <LeftOutlined />
+          </template>
           {{ t("common.dialog.prev") }}
-        </v-btn>
-        <v-btn
+        </a-button>
+        <a-button
           v-if="currentStep != 'restore'"
           :disabled="isEmpty(restoreData)"
-          append-icon="mdi-chevron-right"
-          color="blue-darken-1"
+          color="blue"
           variant="text"
+          icon-placement="end"
           @click="currentStep = 'restore'"
         >
+          <template #icon>
+            <RightOutlined />
+          </template>
           {{ t("common.dialog.next") }}
-        </v-btn>
-        <v-btn
+        </a-button>
+        <a-button
           v-if="currentStep == 'restore'"
           :loading="isDoingRestore"
-          color="success"
-          prepend-icon="mdi-import"
+          color="green"
           variant="text"
           @click="doRestore"
         >
+          <template #icon>
+            <ImportOutlined />
+          </template>
           {{ t("common.dialog.ok") }}
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+        </a-button>
+      </div>
+    </template>
+  </a-modal>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.section-label {
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.step-panel {
+  /* 对应原先 v-dialog 的 scrollable：内容过长时对话框内部滚动 */
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.duration-tags {
+  margin-top: 8px;
+}
+
+.duration-tag {
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.switch-label {
+  margin-left: 8px;
+}
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+</style>

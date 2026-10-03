@@ -2,7 +2,6 @@
 import { useI18n } from "vue-i18n";
 import { BorderOutlined, CheckSquareOutlined, MinusSquareOutlined } from "@antdv-next/icons";
 
-import NavButton from "./NavButton.vue";
 
 const { t } = useI18n();
 
@@ -17,27 +16,9 @@ function updateSelected(value: T[]) {
 </script>
 
 <template>
-  <NavButton
-    :text="t('common.checkbox.all')"
-    :icon="CheckSquareOutlined"
-    size="small"
-    v-bind="$attrs"
-    @click="() => updateSelected(all)"
-  />
-  <NavButton
-    :text="t('common.checkbox.none')"
-    :icon="BorderOutlined"
-    size="small"
-    v-bind="$attrs"
-    @click="() => updateSelected([])"
-  />
-  <NavButton
-    :text="t('common.checkbox.invert')"
-    :icon="MinusSquareOutlined"
-    size="small"
-    v-bind="$attrs"
-    @click="() => updateSelected(all.filter((item) => !selected.includes(item)))"
-  />
+  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected(all)"><template #icon><CheckSquareOutlined /></template><span class="ml-1">{{ t('common.checkbox.all') }}</span></a-button>
+  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected([])"><template #icon><BorderOutlined /></template><span class="ml-1">{{ t('common.checkbox.none') }}</span></a-button>
+  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected(all.filter((item) => !selected.includes(item)))"><template #icon><MinusSquareOutlined /></template><span class="ml-1">{{ t('common.checkbox.invert') }}</span></a-button>
 </template>
 
 <style scoped lang="scss"></style>

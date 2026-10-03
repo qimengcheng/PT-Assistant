@@ -39,7 +39,6 @@ import { useConfigStore } from "@/options/stores/config.ts";
 
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
-import NavButton from "@/options/components/NavButton.vue";
 import CheckSwitchButton from "@/options/components/CheckSwitchButton.vue";
 
 import { type IUserDataStatistic, loadFullData, setSubDate } from "./utils.ts";
@@ -560,10 +559,10 @@ provide(THEME_KEY, echartsTheme);
 
       <div class="user-statistic-control">
         <div class="d-flex align-center mb-2">
-          <NavButton :text="t('common.back')" :icon="ArrowLeftOutlined" @click="() => router.back()" />
+          <a-button type="primary" @click="() => router.back()"><template #icon><ArrowLeftOutlined /></template><span class="ml-1">{{ t('common.back') }}</span></a-button>
           <div class="flex-1-1-0" />
-          <NavButton :text="t('common.exportImage')" :icon="ExportOutlined" @click="exportStatisticImg" />
-          <NavButton :text="t('common.saveSettings')" :icon="SaveOutlined" class="ml-2" @click="saveControl" />
+          <a-button type="primary" @click="exportStatisticImg"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.exportImage') }}</span></a-button>
+          <a-button type="primary" class="ml-2" @click="saveControl"><template #icon><SaveOutlined /></template><span class="ml-1">{{ t('common.saveSettings') }}</span></a-button>
         </div>
 
         <a-alert type="info" :message="t('UserDataStatistic.chart.chartStyleSettings')" class="mb-2" />

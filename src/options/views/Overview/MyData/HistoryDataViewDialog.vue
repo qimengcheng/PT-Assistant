@@ -19,7 +19,6 @@ import { formatRatio } from "./utils/format.ts";
 import { loadSiteHistoryData } from "./utils/lastUserData.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
-import NavButton from "@/options/components/NavButton.vue";
 
 const showDialog = defineModel<boolean>();
 const { siteId } = defineProps<{
@@ -259,13 +258,8 @@ function afterEnter() {
 
       <template #footer>
         <div class="d-flex align-center">
-          <NavButton
-            :disabled="tableSelected.length <= 0"
-            :icon="DeleteOutlined"
-            :text="t('common.remove')"
-            @click="deleteSiteUserInfo(tableSelected)"
-          />
-          <NavButton :icon="ExportOutlined" :text="t('common.export')" @click="exportSiteHistoryData" />
+          <a-button type="primary" :disabled="tableSelected.length <= 0" @click="deleteSiteUserInfo(tableSelected)"><template #icon><DeleteOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
+          <a-button type="primary" @click="exportSiteHistoryData"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.export') }}</span></a-button>
           <div class="flex-1-1-0" />
         </div>
       </template>

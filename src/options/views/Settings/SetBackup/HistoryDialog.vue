@@ -11,7 +11,6 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
-import NavButton from "@/options/components/NavButton.vue";
 import RestoreDialog from "./RestoreDialog.vue";
 
 const showDialog = defineModel<boolean>();
@@ -113,13 +112,7 @@ async function dialogLeave() {
       }}
     </template>
 
-    <NavButton
-      :disabled="tableSelected.length === 0"
-      :text="t('common.remove')"
-      color="danger"
-      :icon="DeleteOutlined"
-      @click="deleteBackupHistory(tableSelected)"
-    />
+    <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupHistory(tableSelected)"><template #icon><DeleteOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
 
     <a-table
       :columns="tableHeaders"

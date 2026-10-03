@@ -1,10 +1,16 @@
 /**
  * @PDSDefinitions https://github.com/mantou568/pre-dessert-sites/blob/main/site_config/sites/yhpp.json
  */
-import type { ISiteMetadata } from "../types";
+import type { ISiteMetadata, TUserInfoProcessStep } from "../types";
 import { SchemaMetadata } from "../schemas/NexusPHP";
 
-export const userInfoWithInvitesInUserDetailsPage = {
+/**
+ * 昆仑系站点共用的 userInfo 配置：在 NexusPHP 默认配置基础上，
+ * 于用户详情页额外解析 invites 字段。
+ * 必须显式标注为 ISiteMetadata["userInfo"]——仅靠展开推断会把内部类型放大，
+ * 导致各站点 siteMetadata 赋值时整体不兼容。
+ */
+export const userInfoWithInvitesInUserDetailsPage: ISiteMetadata["userInfo"] = {
   ...SchemaMetadata.userInfo!,
   selectors: {
     ...SchemaMetadata.userInfo!.selectors!,
@@ -37,7 +43,7 @@ export const userInfoWithInvitesInUserDetailsPage = {
     },
   },
   process: [
-    ...SchemaMetadata.userInfo!.process!.map((item) => {
+    ...SchemaMetadata.userInfo!.process!.map((item): TUserInfoProcessStep => {
       // 在用户详情页面添加 invites 字段
       if (item.requestConfig.url === "/userdetails.php") {
         return {

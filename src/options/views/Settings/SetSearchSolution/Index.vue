@@ -22,6 +22,7 @@ import {
 } from "@antdv-next/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
+import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate } from "@/options/utils.ts";
@@ -161,7 +162,13 @@ async function copySearchSolution(id: TSolutionKey) {
     }
   }
 
-  const newSearchSolutionName = prompt(
+  /**
+ * MV3 扩展页面禁用原生对话框：prompt() 会**静默返回 null**，
+ * 于是「复制搜索方案」点下去什么都没发生。改走 antdv App 上下文的 modal。
+ */
+const { promptInDialog } = usePromptInDialog();
+
+const newSearchSolutionName = await promptInDialog(
     t("SetSearchSolution.newSolutionNamePrompt"),
     `Copy of ${copied.name ?? copied.id}`,
   );

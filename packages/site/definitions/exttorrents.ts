@@ -1,7 +1,10 @@
 import BittorrentSite from "../schemas/AbstractBittorrentSite";
 import { ISearchInput, ITorrent, type ISiteMetadata } from "../types";
 import Sizzle from "sizzle";
-import CryptoJS from "crypto-js";
+// 只用 SHA256 一个算法：默认导入 `crypto-js` 根入口会把全部算法（AES/DES/RC/TripleDES/
+// SHA 家族/HMAC 家族/PBKDF/…）打进来，实测让这个站点的懒加载 chunk 到 174KB
+// （源码本身只有 11.9KB）。改按子路径引入单个算法。
+import SHA256 from "crypto-js/sha256";
 import { set } from "es-toolkit/compat";
 import { parseTimeToLiveToDate, parseValidTimeString } from "../utils";
 
@@ -284,6 +287,6 @@ export default class ExtTorrents extends BittorrentSite {
 
   private computeHMAC(torrentId: number, timestamp: number, token: string) {
     const data = `${torrentId}|${timestamp}|${token}`;
-    return CryptoJS.SHA256(data).toString();
+    return SHA256(data).toString();
   }
 }

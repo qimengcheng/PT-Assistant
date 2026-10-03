@@ -105,13 +105,23 @@ export function setupRetryWhenCloudflareBlock(axios: AxiosInstance): AxiosRetryW
       if (isCFBlocked && (config as any)?.isCfBlockedRetry !== true) {
         // 尝试获取到 cf_clearance
         const fullRequestUrl = axiosRetryWhenCloudflareBlockInstance.getUri(config);
-        const parsedUrl = new URL(fullRequestUrl);
-        const partitionSiteKey = `${parsedUrl.protocol}//${parsedUrl.hostname}`;
+
+        // ⚠️ 这段代码在「错误拦截器」里，抛出的异常会替换掉原始的 axios 错误向上传播。
+        // config 没有 baseURL 且 url 是相对路径时 new URL 会抛 TypeError，
+        // 调用方看到的是 "Invalid URL" 而不是「被 Cloudflare 拦截」这个可诊断信息。
+        // 解析不了就退回不带 partitionKey 的路径，不要因此丢掉原始错误。
+        let partitionKey: chrome.cookies.CookiePartitionKey | undefined;
+        try {
+          const parsedUrl = new URL(fullRequestUrl);
+          partitionKey = { topLevelSite: `${parsedUrl.protocol}//${parsedUrl.hostname}` };
+        } catch {
+          partitionKey = undefined;
+        }
 
         const cfCookie = await sendMessage("getAllCookies", {
           url: fullRequestUrl,
           name: "cf_clearance",
-          partitionKey: { topLevelSite: partitionSiteKey },
+          ...(partitionKey ? { partitionKey } : {}),
         });
 
         if (cfCookie && cfCookie.length > 0) {
@@ -127,7 +137,10 @@ export function setupRetryWhenCloudflareBlock(axios: AxiosInstance): AxiosRetryW
             "value",
           ]) as chrome.cookies.SetDetails;
 
-          await sendMessage("setCookie", newCfCookie);
+          // 必须 force：cf_clearance 往往已经存在且未过期，
+          // 而 setCookie 默认会跳过「已存在且未过期」的 cookie，于是重试请求仍然不带 clearance，
+          // Cloudflare 再次拦截 —— 整个重试机制静默失效。
+          await sendMessage("setCookie", { ...newCfCookie, force: true });
 
           (config as any).isCfBlockedRetry = true; // 标记为已重试过，防止反复重试
           (config as any).cfCookie = newCfCookie; // 保存当前的 cf_clearance cookie 信息，以便于在成功获取信息时删除我们设置的 cf_clearance

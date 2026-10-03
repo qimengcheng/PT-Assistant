@@ -2,7 +2,7 @@ import { uniqBy } from "es-toolkit";
 import { getMediaServer } from "@ptd/mediaServer";
 import { normalizedTorrentTagMap, sortTorrentTags, type TPatterns } from "@ptd/site";
 
-import { onMessage, sendMessage } from "@/messages.ts";
+import { onMessage } from "@/messages.ts";
 import type {
   IConfigPiniaStorageSchema,
   IMetadataPiniaStorageSchema,
@@ -11,9 +11,10 @@ import type {
 
 import { logger } from "./logger.ts";
 import { getSiteInstance } from "./site.ts";
+import { extStore } from "@/storage.ts";
 
 onMessage("getSiteSearchResult", async ({ data: { siteId, keyword = "", searchEntry = {} } }) => {
-  const configStorage = (await sendMessage("getExtStorage", "config")) as IConfigPiniaStorageSchema;
+  const configStorage = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
 
   logger({
     msg: `getSiteSearchResult For site: ${siteId} with keyword: ${keyword}`,
@@ -64,14 +65,14 @@ onMessage("getMediaServerSearchResult", async ({ data: { mediaServerId, keywords
     msg: `getMediaServerSearchResult For mediaServer: ${mediaServerId} with: ${keywords}`,
     data: { mediaServerId, keywords, options },
   });
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const mediaServerConfig = metadataStore.mediaServers[mediaServerId];
   const mediaServer = await getMediaServer(mediaServerConfig);
   return await mediaServer.getSearchResult(keywords ?? "", options);
 });
 
 async function getSnapshotData() {
-  return ((await sendMessage("getExtStorage", "searchResultSnapshot")) ?? {}) as TSearchResultSnapshotStorageSchema;
+  return ((await extStore.getItem("searchResultSnapshot")) ?? {}) as TSearchResultSnapshotStorageSchema;
 }
 
 onMessage("getSearchResultSnapshotData", async ({ data: snapshotId }) => {
@@ -83,12 +84,12 @@ onMessage("saveSearchResultSnapshotData", async ({ data: { snapshotId, data } })
   const snapshotData = await getSnapshotData();
   snapshotData[snapshotId] = data;
   logger({ msg: `A new SearchResult Snapshot will be add at: ${snapshotId}`, data });
-  await sendMessage("setExtStorage", { key: "searchResultSnapshot", value: snapshotData });
+  await extStore.setItem("searchResultSnapshot", snapshotData);
 });
 
 onMessage("removeSearchResultSnapshotData", async ({ data: snapshotId }) => {
   const snapshotData = await getSnapshotData();
   delete snapshotData[snapshotId];
-  await sendMessage("setExtStorage", { key: "searchResultSnapshot", value: snapshotData });
+  await extStore.setItem("searchResultSnapshot", snapshotData);
   logger({ msg: `SearchResult Snapshot ${snapshotId} is removed.` });
 });

@@ -15,8 +15,8 @@ import {
   CAddTorrentResult,
 } from "../types";
 import urlJoin from "url-join";
-import axios, { AxiosRequestConfig } from "axios";
-import { getRemoteTorrentFile } from "../utils";
+import { AxiosRequestConfig } from "axios";
+import { axios, getRemoteTorrentFile } from "../utils";
 
 export const clientConfig: TorrentClientConfig = {
   type: "synologyDownloadStation",
@@ -549,7 +549,10 @@ export default class SynologyDownloadStation extends AbstractBittorrentClient<To
      *    如果外部不传入 savePath ，我们须设置一个空值出来，否则 DSM 会报 error_code 120
      *    此时 DSM 会将文件放置在 默认目的地文件夹
      */
-    params.destination = `"${options.savePath || ""}"`;
+    // DSM 要求这些字段是「JSON 字符串」而非裸字符串（不包一层会报 error_code 120「对应项缺失」）。
+    // 必须用 JSON.stringify 而不是手写引号包裹：路径里含 " 或 \ 时手写的引号会截断/错解参数，
+    // JSON.stringify 顺带把内部的 " 转义成 \"。
+    params.destination = JSON.stringify(options.savePath ?? "");
 
     let postData;
     if (url.startsWith("magnet:") || !options.localDownload) {

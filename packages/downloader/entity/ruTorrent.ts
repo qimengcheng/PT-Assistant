@@ -20,8 +20,8 @@ import {
   CTrackerState,
   TorrentFilePriority,
 } from "../types";
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
-import { getRemoteTorrentFile } from "../utils";
+import { AxiosRequestConfig, AxiosResponse } from "axios";
+import { axios, getRemoteTorrentFile } from "../utils";
 
 export const clientConfig: TorrentClientConfig = {
   type: "ruTorrent",
@@ -133,15 +133,33 @@ function iv(val: string | null): number {
   return isNaN(v) ? 0 : v;
 }
 
+/**
+ * XML 文本转义。ruTorrent 的参数里有大量用户输入（标签名、保存路径、tracker URL 等），
+ * 直接插值进 XML 会被 `&` / `<` / `>` 破坏文档结构（标签名含 `&` 即 XML 注入）。
+ */
+function escapeXml(value: unknown): string {
+  return String(value).replace(
+    /[<>&'"]/g,
+    (c) =>
+      ({
+        "<": "&lt;",
+        ">": "&gt;",
+        "&": "&amp;",
+        "'": "&apos;",
+        '"': "&quot;",
+      })[c]!,
+  );
+}
+
 function buildRequestXML(calls: Array<[string, string[]?]>): string {
   let retXML = '<?xml version="1.0" encoding="UTF-8"?>';
   retXML += "<methodCall><methodName>system.multicall</methodName><params><param><value><array><data>";
   for (const [method, params = []] of calls) {
     retXML += "<value><struct>";
-    retXML += `<member><name>methodName</name><value><string>${method}</string></value></member>`;
+    retXML += `<member><name>methodName</name><value><string>${escapeXml(method)}</string></value></member>`;
     retXML +=
       "<member><name>params</name><value><array><data>" +
-      params.map((param) => `<value><string>${String(param)}</string></value>`).join("") +
+      params.map((param) => `<value><string>${escapeXml(param)}</string></value>`).join("") +
       "</data></array></value></member>";
     retXML += "</struct></value>";
   }
@@ -207,21 +225,10 @@ function parseXmlRpcResponse(xml: string): XmlRpcValue {
 }
 
 // 生成 system.multicall 请求（参数为 struct 数组），用于一次请求多个 rTorrent 调用
+// 与 buildRequestXML 输出完全等价，只是入参形态不同（对象 vs 元组），直接转调即可，
+// 免去维护两份一模一样的 XML 拼接逻辑（也免得只有其中一份记得做 XML 转义）。
 function buildSystemMulticallXML(calls: Array<{ methodName: string; params?: string[] }>): string {
-  let retXML = '<?xml version="1.0" encoding="UTF-8"?>';
-  retXML += "<methodCall><methodName>system.multicall</methodName><params><param><value><array><data>";
-  for (const call of calls) {
-    retXML += "<value><struct>";
-    retXML += `<member><name>methodName</name><value><string>${call.methodName}</string></value></member>`;
-    retXML += "<member><name>params</name><value><array><data>";
-    for (const param of call.params ?? []) {
-      retXML += `<value><string>${param}</string></value>`;
-    }
-    retXML += "</data></array></value></member>";
-    retXML += "</struct></value>";
-  }
-  retXML += "</data></array></value></param></params></methodCall>";
-  return retXML;
+  return buildRequestXML(calls.map(({ methodName, params }) => [methodName, params] as [string, string[]?]));
 }
 
 // noinspection JSUnusedGlobalSymbols
@@ -490,13 +497,6 @@ export default class RuTorrent extends AbstractBittorrentClient<TorrentClientCon
   // ─────────────────────────────────────────────
   // 文件级 / peers / tracker（rTorrent XML-RPC，经 ruTorrent httprpc 通道）
   // ─────────────────────────────────────────────
-
-  private getTorrentHash(torrent: string | CTorrent): string {
-    if (typeof torrent === "string") {
-      return torrent;
-    }
-    return (torrent.infoHash ?? torrent.id) as string;
-  }
 
   // 文件列表: f.multicall
   override async getTorrentFiles(torrent: string | CTorrent): Promise<CTorrentFile[]> {

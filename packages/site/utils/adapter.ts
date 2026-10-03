@@ -21,6 +21,7 @@ export { sleep } from "~/helper.ts";
 import type { ISiteUserConfig } from "../types";
 import type { IExtensionStorageSchema } from "@/storage.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types/storages/metadata.ts";
+import { extStore } from "@/storage.ts";
 
 // 默认允许 pkg/site 中的 axios 请求替换 unsafeHeader
 export const axios = setupRetryWhenCloudflareBlock(setupReplaceUnsafeHeader(axiosRaw));
@@ -35,9 +36,9 @@ export async function store(
   value: any,
   field: keyof ISiteUserConfig = "runtimeSettings",
 ): Promise<void> {
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
-  set(metadataStore, `sites.${siteId}.${field}.${key}`, value);
-  await sendMessage("setExtStorage", { key: "metadata", value: metadataStore });
+  // 走按路径增量写入，而不是「读全量 metadata → 改 → 写回全量」：
+  // 后者每次都要传输/序列化整个 300+ 站点的 metadata blob，且两个并发调用会互相覆盖。
+  await extStore.patchItem("metadata", `sites.${siteId}.${field}.${key}`, undefined);
 }
 
 export async function retrieve<T extends any>(
@@ -45,12 +46,12 @@ export async function retrieve<T extends any>(
   key: string,
   field: keyof ISiteUserConfig = "runtimeSettings",
 ): Promise<T | null> {
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   return get(metadataStore, `sites.${siteId}.${field}.${key}`, null) as T | null;
 }
 
 export async function retrieveStore(store: keyof IExtensionStorageSchema, keyPath: string): Promise<any> {
-  const metadataStore = (await sendMessage("getExtStorage", store)) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem(store)) as IMetadataPiniaStorageSchema;
   return get(metadataStore, keyPath, null);
 }
 

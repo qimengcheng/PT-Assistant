@@ -18,6 +18,7 @@
 import CryptoJS from "crypto-js";
 import axios, { AxiosRequestConfig } from "axios";
 import AbstractBackupServer from "../AbstractBackupServer.ts";
+import { localSort } from "../utils.ts";
 import type {
   IBackupConfig,
   IBackupData,
@@ -207,6 +208,8 @@ export default class CookieCloud extends AbstractBackupServer<CookieCloudConfig>
       });
     }
 
-    return list;
+    // 必须走 localSort：CookieCloud 只存单份备份，原先直接返回 list，
+    // 导致备份列表的排序选项（按时间/名称/大小）对它完全无效（其余 8 个实体都调用了）。
+    return localSort(list, options);
   }
 }

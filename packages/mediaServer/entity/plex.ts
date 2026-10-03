@@ -214,7 +214,12 @@ export default class Plex extends AbstractMediaServer<IPlexConfig> {
     } catch (e) {
       if (e instanceof AxiosError && e.response?.status === 401) {
         result.status = EResultParseStatus.needLogin;
+      } else {
+        result.status = EResultParseStatus.parseError;
       }
+      // 与 emby / jellyfin 保持一致：非 401 的失败也要填 errorMessage，
+      // 否则用户只看到一个没有原因的 parseError（见 #1396）。
+      result.errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
     }
 
     return result;

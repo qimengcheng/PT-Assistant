@@ -32,11 +32,20 @@ export const tableCustomFilter = useTableCustomFilter({
 const watchingMap = reactive<Record<TTorrentDownloadKey, number>>({});
 function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
   watchingMap[downloadHistoryId] = setTimeout(async () => {
-    const history = await sendMessage("getDownloadHistoryById", downloadHistoryId);
-    downloadHistory.value[downloadHistoryId] = history;
-    if (history.downloadStatus == "downloading" || history.downloadStatus == "pending") {
-      watchDownloadHistory(downloadHistoryId);
-    } else {
+    try {
+      const history = await sendMessage("getDownloadHistoryById", downloadHistoryId);
+      // 必须整体替换：downloadHistory 是 shallowRef，写 `value[id] = x` 不改变引用、
+      // 不触发任何响应式更新，下载状态会永远停在「下载中」。
+      // 整体替换既触发更新又保持条目不被深度代理（当初选 shallowRef 就是为了这个）。
+      downloadHistory.value = { ...downloadHistory.value, [downloadHistoryId]: history };
+      if (history.downloadStatus == "downloading" || history.downloadStatus == "pending") {
+        watchDownloadHistory(downloadHistoryId);
+      } else {
+        delete watchingMap[downloadHistoryId];
+      }
+    } catch (e) {
+      // 抛错时必须清理定时器并放弃轮询，否则会变成每 1s 一次的死循环 unhandledRejection
+      console.error(`[PTD] watch download history failed: ${downloadHistoryId}`, e);
       delete watchingMap[downloadHistoryId];
     }
   }, 1e3) as unknown as number;

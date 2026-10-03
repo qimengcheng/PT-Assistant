@@ -1,13 +1,12 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="Id extends string | number">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-
-type TDeleteId = any;
+import { message } from "antdv-next";
 
 const showDialog = defineModel<boolean>();
 const { toDeleteIds, confirmDelete: confirmDeleteFn } = defineProps<{
-  toDeleteIds: TDeleteId[];
-  confirmDelete: (toDeleteId: TDeleteId) => Promise<void> | void;
+  toDeleteIds: Id[];
+  confirmDelete: (toDeleteId: Id) => Promise<void> | void;
 }>();
 const emits = defineEmits<{
   (e: "allDelete"): void;
@@ -19,10 +18,27 @@ const isDeleting = ref(false);
 
 async function confirmDelete() {
   isDeleting.value = true;
-  await Promise.allSettled(toDeleteIds.map((toDeleteId) => confirmDeleteFn(toDeleteId)));
-  isDeleting.value = false;
-  showDialog.value = false;
-  emits("allDelete");
+  try {
+    const results = await Promise.allSettled(toDeleteIds.map((toDeleteId) => confirmDeleteFn(toDeleteId)));
+
+    // ⚠️ allSettled 会把失败吞掉：原来无论成败都关窗 + emits("allDelete")，
+    // 父组件收到通知后刷新列表，用户看到「删除成功」但实际可能一个都没删掉。
+    // 这里统计失败项并明确告知，弹窗保持打开让用户决定是否重试。
+    const failed = results.filter((r) => r.status === "rejected");
+    if (failed.length > 0) {
+      console.error(
+        "[PTD] delete partially failed",
+        failed.map((r) => (r as PromiseRejectedResult).reason),
+      );
+      message.error(t("common.dialog.deleteFailed", [failed.length]));
+      return;
+    }
+
+    showDialog.value = false;
+    emits("allDelete");
+  } finally {
+    isDeleting.value = false;
+  }
 }
 
 async function dialogEnter() {

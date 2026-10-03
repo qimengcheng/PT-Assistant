@@ -88,11 +88,15 @@ git ls-remote origin refs/heads/master         # 必须：trust-but-verify
 ### 2.1 命令
 
 ```bash
-pnpm build          # 产物 → .output/chrome-mv3
+PTD_SESSION=<会话标识> pnpm build   # 产物 → dist-<会话标识>/chrome-mv3（多会话并行时必须带，见 §2.2）
+pnpm build                        # 不带变量时落在默认 .output/chrome-mv3（CI 走的就是这条）
 ```
 
 - **本地只构建 Chrome**。**不要在本地跑 `pnpm build:firefox` / `dev:firefox`** ——
   纯浪费时间（Firefox 产物由 CI 统一构建，见 §2.4）。
+- 构建报 `remove C:\...\Temp\esbuild-*: Access is denied` 时（README 踩坑 §13，杀软句柄导致，
+  时好时坏），**别重启机器**，把临时目录指到仓库内已 gitignore 的 `.tmp-build/` 即可：
+  `PTD_SESSION=<标识> TEMP="$PWD/.tmp-build" TMP="$PWD/.tmp-build" TMPDIR="$PWD/.tmp-build" pnpm build`。
 - **不要再绕着调 `./node_modules/.bin/wxt build`**：`pnpm-workspace.yaml` 里已配
   `allowBuilds` 白名单（esbuild / @parcel/watcher），`pnpm build` 现在能正常跑通。
 - 类型检查：`pnpm compile`（= `vue-tsc --noEmit`），CI 前后端分别独立跑。
@@ -109,22 +113,27 @@ pnpm build          # 产物 → .output/chrome-mv3
 
 **每次让用户验收，必须同时给出：**
 
-1. **产物加载绝对路径**：`E:\DeepSeek Harness\ptassistant\PT-assistant-wxt\dist-latest`
+1. **产物加载绝对路径**：`E:\DeepSeek Harness\ptassistant\PT-assistant-wxt\dist-<会话标识>\chrome-mv3`
+   （`<会话标识>` 用本 agent 名的短横线小写形式，例如 `dist-qwenwork`、`dist-workbuddy`）
 2. **版本号**
 
-只说「改好了」而不给路径 = 未完成。产物改动后需把 `.output/chrome-mv3` 同步到 `dist-latest`。
+只说「改好了」而不给路径 = 未完成。**不再有「同步到 dist-latest」这一步**，直接加载自己会话的目录。
 
-### 2.3 同步产物的坑
+**多 agent 共用一棵工作树，产物必须各走各的目录：**
 
-`.output/chrome-mv3` / `dist-latest` 各有 ~750+ 文件，**wxt 每次构建会先清空输出目录**，
-触发本环境的批量删除守卫（`SAFE_DELETE_BULK_CONFIRM_REQUIRED`，阈值 50）导致构建中断。
-
-✅ 正确做法：**先改名挪开，不要删**：
-
-```js
-fs.renameSync(".output/chrome-mv3", ".output/chrome-mv3_prev");  // 挪开
-// 构建完再 fs.cpSync(".output/chrome-mv3", "dist-latest", { recursive: true });
+```bash
+PTD_SESSION=qwenwork pnpm build     # → dist-qwenwork/chrome-mv3
 ```
+
+为什么：`wxt` 每次构建都会**先清空 outDir**。实测发生过两起互擦事故 ——
+① 本会话把 `.output/chrome-mv3` 拷成 `dist-latest` 时，另一会话的构建正好把它清空，
+交付目录一度是 0 文件；② 另一会话一次失败的构建把共享的 `.output` 整个留空。
+
+WXT 0.21.4 的 `wxt build` **没有 `--output` 参数**（可用项只有 root/config/mode/browser/
+filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里的
+`outDir: sessionTag ? 'dist-' + tag : '.output'` 实现，值取自环境变量 `PTD_SESSION`。
+**不设该变量时仍是默认 `.output`** —— CI（build.yml / release.yml）依赖这个默认值取
+`.output/*.zip`，别让 CI 带上 PTD_SESSION。
 
 ### 2.4 Firefox 产物由 CI 构建
 

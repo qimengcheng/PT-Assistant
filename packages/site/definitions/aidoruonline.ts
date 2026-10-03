@@ -8,6 +8,7 @@ import {
   type ISiteMetadata,
   type IUserInfo,
   type ITorrent,
+  type TUserInfoParseKey,
   NeedLoginError,
 } from "../types";
 import PrivateSite from "../schemas/AbstractPrivateSite";
@@ -383,7 +384,7 @@ export default class AidoruOnline extends PrivateSite {
     return this.getFieldsData(
       userDetailDocument,
       this.metadata.userInfo?.selectors!,
-      Object.keys(omit(this.metadata.userInfo?.selectors!, ["id", "seedingSize"])),
+      Object.keys(omit(this.metadata.userInfo?.selectors!, ["id", "seedingSize"])) as TUserInfoParseKey[],
     ) as Partial<IUserInfo>;
   }
 

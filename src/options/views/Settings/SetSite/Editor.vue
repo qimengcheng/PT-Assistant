@@ -8,10 +8,12 @@ import type { SelectProps } from "antdv-next";
 
 import type { ISiteMetadata, ISiteUserConfig, timezoneOffset, TSiteID, TSiteUrl } from "@ptd/site";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
+import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate, formValidateRules } from "@/options/utils.ts";
 
 const { t } = useI18n();
 const metadataStore = useMetadataStore();
+const runtimeStore = useRuntimeStore();
 
 const siteId = defineModel<TSiteID>({ default: "" });
 const emit = defineEmits<{
@@ -36,25 +38,46 @@ const siteTimezoneOffset = computed({
 });
 const customSiteUrl = ref<string>("");
 
-async function initSiteData(id: TSiteID, flush = false) {
-  siteMetaData.value = await metadataStore.getSiteMetadata(id);
-  siteUserConfig.value = toMerged(
-    { inputSetting: {}, url: siteMetaData.value.urls[0] },
-    await metadataStore.getSiteUserConfig(id, flush),
-  );
+/** 竞态令牌：快速切换站点时，先发后到的旧请求结果必须丢弃 */
+let initToken = 0;
 
-  // fix: customSiteUrl not show in Editor (#726)
-  if (!siteMetaData.value.urls.includes(siteUserConfig.value.url as TSiteUrl)) {
-    customSiteUrl.value = siteUserConfig.value.url as string;
+async function initSiteData(id: TSiteID, flush = false) {
+  const token = ++initToken;
+
+  try {
+    const [meta, userConfig] = await Promise.all([
+      metadataStore.getSiteMetadata(id),
+      metadataStore.getSiteUserConfig(id, flush),
+    ]);
+
+    // 期间用户已经切到别的站点了 → 丢弃这次结果，否则旧数据会覆盖新站点的表单
+    if (token !== initToken) {
+      return;
+    }
+
+    siteMetaData.value = meta;
+    const merged = toMerged({ inputSetting: {}, url: meta.urls[0] }, userConfig);
+    siteUserConfig.value = merged;
+
+    // fix: customSiteUrl not show in Editor (#726)
+    // 用户配的 url 不在站点定义的候选列表里 → 视为自定义 url，需要展示出来让用户编辑
+    customSiteUrl.value = meta.urls.includes(merged.url as TSiteUrl) ? "" : (merged.url as string);
+  } catch (e) {
+    if (token !== initToken) {
+      return;
+    }
+    // 原来完全没有 catch：加载失败时表单永远空白且没有任何提示，用户无从判断是加载失败还是站点没数据
+    console.error("[SetSite] load site definition failed", id, e);
+    runtimeStore.showSnakebar(`加载站点 [${id}] 定义失败`, { color: "error" });
   }
 }
 
 onMounted(() => {
-  initSiteData(siteId.value);
+  void initSiteData(siteId.value);
 });
 
 watch(siteId, (newValue) => {
-  initSiteData(newValue);
+  void initSiteData(newValue);
 });
 
 // ===== 校验：替代旧实现的 Vuetify v-form + :rules，改为显式派生，保持 OK 按钮门控语义 =====

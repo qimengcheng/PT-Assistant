@@ -22,6 +22,8 @@ import { EResultParseStatus, ETorrentStatus } from "@ptd/site";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
+import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
+import { buildSortOrderMap, toTableColumns } from "@/options/components/tableSorters.ts";
 import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
 import type { ISearchResultTorrent } from "@/shared/types.ts";
 
@@ -116,56 +118,35 @@ const fullTableHeader = computed(
 );
 
 /**
- * a-table 的排序状态（'ascend' / 'descend'）与 configStore 里 Vuetify 格式的
- * [{ key, order: 'asc' | 'desc' }] 互转。Vuetify 默认所有带 key 的列都可排序，
- * 只有 action 显式 sortable: false，所以这里默认开启 sorter。
+ * 排序/分页行为统一收敛到 useTableBehavior：
+ * - multiSort：搜索结果页允许多列排序
+ * - clearOnEmpty：点第三下取消排序时写 [] 清掉持久化（本页旧实现就是这个语义）
+ * 本地保留别名 tablePageSize/onTableChange，下方调用点无需改名。
  */
-function toAntdSortOrder(key: string): "ascend" | "descend" | null {
-  const found = (configStore.tableBehavior.SearchEntity.sortBy ?? []).find((x: any) => x.key === key);
-  return found?.order === "asc" ? "ascend" : found?.order === "desc" ? "descend" : null;
-}
-
-/**
- * 通用比较器：数值优先（size/seeders/time 等都是数字），回退字符串比较；
- * category 这类对象列取 name。
- * ⚠️ antd 的受控排序要求 column.sorter 提供真正的 compare 函数——
- * `sorter: true` / `{ multiple: n }`（无 compare）时 antd 内部 getSortFunction 返回 false，
- * 排序器被静默跳过，表现为「箭头会动、数据不排」（v0.7.0 排序失效的根因）。
- */
-function makeSorter(key: string) {
-  return (a: any, b: any): number => {
-    const pick = (row: any) => {
-      const v = row?.[key];
-      return v && typeof v === "object" ? (v.name ?? "") : v;
-    };
-    const ra = pick(a);
-    const rb = pick(b);
-    const na = typeof ra === "number" ? ra : Number.parseFloat(ra);
-    const nb = typeof rb === "number" ? rb : Number.parseFloat(rb);
-    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-    return String(ra ?? "").localeCompare(String(rb ?? ""), "zh-CN");
-  };
-}
+const {
+  itemsPerPage: tablePageSize,
+  sortBy,
+  handleTableChange: onTableChange,
+} = useTableBehavior("SearchEntity", {
+  defaultPageSize: 50,
+  multiSort: true,
+  clearOnEmpty: true,
+});
 
 const tableHeader = computed<Record<string, any>[]>(() => {
   // 旧 storage 里 columns 可能缺失/非数组（Vuetify 时期格式），守卫回退为全部列
   const savedColumns = configStore.tableBehavior?.SearchEntity?.columns;
   const visibleColumns: string[] = Array.isArray(savedColumns) ? savedColumns : [];
-  return fullTableHeader.value
-    .filter((item) => item?.props?.disabled || visibleColumns.length === 0 || visibleColumns.includes(item.key!))
-    .map(({ props, sortable, ...rest }, colIdx) => ({
-      ...rest,
-      // 不可排序的列直接不带 sorter 键，a-table 就不会渲染排序箭头、点击也不会触发 change；
-      // 多列排序时 antd 用 { compare, multiple: 优先级 }，单列排序直接给 compare 函数。
-      ...(sortable === false
-        ? {}
-        : {
-            sorter: configStore.enableTableMultiSort
-              ? { compare: makeSorter(rest.key), multiple: colIdx + 1 }
-              : makeSorter(rest.key),
-            sortOrder: toAntdSortOrder(rest.key),
-          }),
-    }));
+  const visibleHeader = fullTableHeader.value.filter(
+    (item) => item?.props?.disabled || visibleColumns.length === 0 || visibleColumns.includes(item.key),
+  );
+
+  // 列生成走公共 toTableColumns：enableTableMultiSort 时 sorter 包成 { compare, multiple }
+  return toTableColumns(
+    visibleHeader as Record<string, any>[],
+    buildSortOrderMap(sortBy.value),
+    { multiSort: configStore.enableTableMultiSort },
+  );
 });
 
 /** a-select(mode="multiple") 的 options 形如 { value, label } */
@@ -238,11 +219,7 @@ watch([windowWidth, windowHeight, tableItems], () => nextTick(recalcTableScrollY
 
 /** a-table 的分页是受控的，v-data-table 原本把这块状态收在组件内部 */
 const tablePage = ref(1);
-const tablePageSize = computed(() => {
-  // 旧版本/迁移期 storage 里可能存有非法值（0/NaN/字符串），统一守卫回退默认
-  const v = configStore.tableBehavior?.SearchEntity?.itemsPerPage as unknown;
-  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 50;
-});
+// tablePageSize（非法值守卫）已由 useTableBehavior 提供
 
 /** 过滤条件变化后如果还停在旧页码上，antd 会显示空表，这里跟随 Vuetify 的行为回到第一页 */
 watch([tableFilterRef, tablePageSize], () => {
@@ -257,15 +234,6 @@ const tablePagination = computed(() => ({
   onShowSizeChange: (_page: number, size: number) =>
     configStore.updateTableBehavior("SearchEntity", "itemsPerPage", size),
 }));
-
-/** antd 的 sorter 结果 → configStore 的 [{ key, order }] */
-function onTableChange(_pagination: any, _filters: any, sorter: any, _extra: any) {
-  const list = Array.isArray(sorter) ? sorter : [sorter];
-  const next = list
-    .filter((x) => x?.order && x?.columnKey)
-    .map((x) => ({ key: String(x.columnKey), order: x.order === "ascend" ? "asc" : "desc" }));
-  configStore.updateTableBehavior("SearchEntity", "sortBy", next);
-}
 
 /** a-table 没有 v-model，行选择通过 rowSelection.selectedRowKeys + onChange 双向同步 */
 const tableSelectedRowKeys = computed(() => tableSelectedRaw.value.map((x) => x.uniqueId));

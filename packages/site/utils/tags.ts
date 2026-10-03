@@ -1,4 +1,5 @@
-import type { ITorrentTag } from "@ptd/site";
+// 包内使用相对路径，避免 @ptd/site 自引用产生重复类型身份
+import type { ITorrentTag } from "../types/torrent";
 
 interface IPreDefinedTorrentTag extends ITorrentTag {
   aka?: Array<string | RegExp>;

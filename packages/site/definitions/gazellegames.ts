@@ -9,6 +9,7 @@ import type {
   IUserInfo,
   ISearchEntryRequestConfig,
   ISearchResult,
+  TUserInfoParseKey,
 } from "../types.ts";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import {
@@ -370,6 +371,6 @@ export default class GazelleGames extends GazelleJSONAPI {
       "seedingSize",
       "seedingBonus",
       "lastAccessAt",
-    ] as (keyof Partial<IUserInfo>)[]) as Partial<IUserInfo>;
+    ] as TUserInfoParseKey[]) as Partial<IUserInfo>;
   }
 }

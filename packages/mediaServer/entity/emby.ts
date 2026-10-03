@@ -1,12 +1,13 @@
 import {
-  AbstractMediaServer,
+  AbstractEmbyCompatibleServer,
+  IEmbyQueryItem,
+  IEmbyQueryResult,
   IMediaServerBaseConfig,
-  IMediaServerItem,
   IMediaServerMetadata,
   IMediaServerSearchOptions,
   IMediaServerSearchResult,
 } from "../types.ts";
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import { AxiosError, type AxiosRequestConfig } from "axios";
 import urlJoin from "url-join";
 import { toMerged } from "es-toolkit";
 import { EResultParseStatus } from "@ptd/site";
@@ -39,60 +40,7 @@ export const mediaServerConfig: IEmbyConfig = {
   timeout: 5000,
 };
 
-export interface IEmbySystemInfo {
-  ServerName: string;
-  Version: string;
-  Id: string;
-}
-
-export interface IEmbyQueryItem {
-  Name: string;
-  ServerId: string;
-  Id: string;
-  Overview: string;
-  Container: string;
-  MediaSources: Array<{
-    Path: string;
-    Container: string;
-    Size: number;
-    Name: string;
-    MediaStreams: Array<
-      {
-        Codec: string;
-        Title: string;
-        DisplayTitle: string;
-        IsDefault?: boolean;
-      } & ({ Type: "Video" } | { Type: "Audio" } | { Type: "Subtitle" })
-    >;
-  }>;
-  Path: string;
-  CommunityRating?: number;
-  RunTimeTicks: number;
-  Size: number;
-  ImageTags: {
-    Primary?: string;
-    Logo?: string;
-    Thumb?: string;
-  };
-  GenreItems: Array<{
-    Name: string;
-    Id: number;
-  }>;
-  MediaType: string;
-  UserData: {
-    IsFavorite: boolean;
-    PlayCount: number;
-    PlaybackPositionTicks: number;
-    Played: boolean;
-  };
-}
-
-export interface IEmbyQueryResult<T extends any> {
-  Items: T[];
-  TotalRecordCount: number;
-}
-
-export default class Emby extends AbstractMediaServer<IEmbyConfig> {
+export default class Emby extends AbstractEmbyCompatibleServer<IEmbyConfig> {
   /**
    * 修正baseUrl，如果用户传入的地址为 https://127.0.0.1:8096/web/index.html 或者 https://127.0.0.1:8096/
    * 则将其修正为 JSON API 入口 https://127.0.0.1:8096/emby/
@@ -113,35 +61,12 @@ export default class Emby extends AbstractMediaServer<IEmbyConfig> {
     return urlJoin(serverAddress, "/web/index.html");
   }
 
-  protected async request<T = any, D = any>(
-    url: string,
-    config: AxiosRequestConfig<D> = {},
-  ): Promise<AxiosResponse<T, D>> {
-    config.baseURL = this.apiBaseUrl;
-    config.timeout ??= this.config.timeout; // 未额外传入 timeout 时，使用默认的 timeout
-
-    // 处理认证方式
+  protected applyAuth(config: AxiosRequestConfig): void {
+    // Emby 使用 X-Emby-Token 头携带 API Key
     config.headers = {
       ...(config.headers ?? {}),
       "X-Emby-Token": this.config.auth.apikey,
     };
-
-    // 处理请求url
-    config.url = url;
-
-    return axios.request<T>(config);
-  }
-
-  public override async ping(): Promise<boolean> {
-    try {
-      const response = await this.request<IEmbySystemInfo>("/System/Info", { responseType: "json" });
-      if (response.status === 200 && response.data?.Id) {
-        return true;
-      }
-    } catch (e) {
-      return false;
-    }
-    return false;
   }
 
   public override async getSearchResult(
@@ -193,34 +118,14 @@ export default class Emby extends AbstractMediaServer<IEmbyConfig> {
         } = response;
         for (const item of Items) {
           // 处理搜索结果
-
-          const mediaItem: IMediaServerItem<IEmbyQueryItem> = {
-            server: this.config.id!,
-            name: item.Name,
-            url: this.webBaseUrl + `#!/item?id=${item.Id}&serverId=${item.ServerId}`,
-            type: item.MediaType,
-            description: item.Overview ?? "",
-            format: item.Container,
-            size: item.Size,
-            duration: item.RunTimeTicks / 10000000, // 10000 ticks = 1 ms, 10000 ms = 1 s
-            poster: urlJoin(this.apiBaseUrl, `/Items/${item.Id}/Images/Primary`),
-            tags: item.GenreItems?.map((tag) => ({
-              name: tag.Name,
-              url: this.webBaseUrl + `#!/list/list.html?genreId=${tag.Id}&serverId=${item.ServerId}`,
-            })),
-            rating: item.CommunityRating ?? "-",
-            streams: item.MediaSources?.[0]?.MediaStreams?.map((stream) => ({
-              title: stream.Title ?? stream.DisplayTitle,
-              type: stream.Type,
-              format: stream.Codec,
-            })),
-            user: {
-              IsFavorite: item.UserData?.IsFavorite ?? false,
-              IsPlayed: item.UserData?.Played ?? false,
-            },
-            raw: item,
-          };
-          result.items.push(mediaItem);
+          result.items.push(
+            this.mapQueryItemToMediaItem(item, {
+              url: this.webBaseUrl + `#!/item?id=${item.Id}&serverId=${item.ServerId}`,
+              size: item.Size,
+              tagUrl: (tag) =>
+                this.webBaseUrl + `#!/list/list.html?genreId=${tag.Id}&serverId=${item.ServerId}`,
+            }),
+          );
         }
         result.options = config;
         result.status = EResultParseStatus.success;

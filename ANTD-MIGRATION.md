@@ -3,6 +3,9 @@
 UI 框架已从 Vuetify 4 换成 **antdv-next**（`antdv-next` 的 `App` 是全局安装插件，
 已在 `src/options/plugins/antd.ts` 注册，模板里直接写 `a-xxx` 即可，无需 import）。
 
+> ⚠️ 「无需 import」只对**设置页**成立：content script 侧已改按需注册，
+> 新标签要先加进 `src/content-script/antd-lite.ts` 的清单，详见下文同名小节。
+
 样式走 antdv-next 的 CSS-in-JS，**运行时注入 `<style>`**，不再有「构建期拆 CSS chunk +
 动态 `<link>` 注入」那条链路 —— 那条链路在扩展页里加载不可靠（表现为页面完全没有表格样式）。
 
@@ -85,3 +88,41 @@ Vuetify 是 `headers` + `items` + `#item.<key>` 插槽模型；antd 是 `columns
 1. **不许编造**：拿不准的 API 去 `node_modules/antdv-next/dist/**/*.d.ts` 查真实签名，不要照记忆写
 2. 改完必须 `pnpm compile`（vue-tsc）通过
 3. 不要改动 `<script setup>` 里的业务逻辑，只做模板层的组件替换
+
+## 例外：content script 侧不按全局注册
+
+开头那句「模板里直接写 `a-xxx` 即可，无需 import」**只对设置页成立**。content script 是独立入口，
+共用全量 `install` 会把整个组件库打进去：全量 install 注册 139 个组件名，浮窗只用得到 22 个，
+结果 `content-app` 单个 chunk 4.3MB（占全部产物 JS 的 65%），每个 PT 站点都要背一份；
+巨型单 chunk 还直接触发 README 踩坑 §13 的 esbuild >512KB 写 Temp 被杀软句柄卡住。
+
+- 按需清单：`src/content-script/antd-lite.ts`（18 个父组件 + `StyleProvider`，实际注册 41 个名字）
+- 接线：`src/content-script/app/init.ts` 用 `antdLiteInstance`，不再 import `@/options/plugins/antd.ts`
+- 实测：`content-app` 4,324,531 B → 2,760,974 B（-36%），gzip 1,064,854 → 742,902（-30%）
+- 往 content 的模板里加新的 `a-*` 标签：**先补清单，再跑校验**，否则线上是静默空白
+
+## 组件名坑位：antdv-next 没有 `a-list` / `a-step`
+
+上面 139 个注册名里**没有** `AList`/`AListItem`/`AListItemMeta`/`AStep`
+（List 只有虚拟滚动的 `AListy`；Steps 走 `:items` 属性）。Vuetify 的 `v-list` 系列照搬成 `a-list`
+不会报错，只会被当成原生未知元素渲染 —— 而带命名插槽（`#extra`/`#avatar`）时 children 是对象、
+原生元素分支只吃数组，**整块内容直接丢掉**，页面表现为一片空白却还留着点击区域。
+
+已修掉四处：
+
+| 位置 | 原来 | 现在 |
+|---|---|---|
+| `SentToDownloaderDialog/Index.vue` 快速推送列表 | `a-list` / `a-list-item` / `a-list-item-meta*` | 普通 div + scoped 样式（色值对齐 antd token） |
+| 同文件 `a-select` 的 `#option` 插槽 | `a-list-item-meta` | flex div |
+| `views/HomeView.vue` 功能模块列表 | `a-list` / `a-list-item` | `<ul class="modules">`：`style.css` 里 `.modules`/`.dot`/`.pending`/`.pending-tag` 早就写好了，迁移时换了结构却没接上类名 |
+| `SetDownloader/AddDialog.vue` 步骤条 | `<a-steps><a-step /></a-steps>` | `<a-steps :items="stepItems" />` |
+
+## 两条 CI 防线（本地也要跑）
+
+```bash
+node scripts/check-antd-tags.mjs          # 全仓扫「写了 antdv-next 里不存在的 a-* 标签」
+node scripts/check-content-antd-lite.mjs  # content 按需清单是否覆盖其依赖闭包用到的每个标签
+```
+
+两者的注册名表都是在 Node 里**实跑** antdv-next 的 `install()` 得到的（不是抄文档），
+FAIL 时非零退出；已挂进 `.github/workflows/build.yml`，排在 `pnpm compile` 之后、构建之前。

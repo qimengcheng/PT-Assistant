@@ -13,6 +13,10 @@ import { loadAllAddedSiteMetadata } from "./siteMetadata.ts";
 export interface IUserInfoItem extends IUserInfo {
   siteUserConfig: ISiteUserConfig;
   siteName: string;
+  /** 对 isDead 或者 isOffline 的站点不允许选择（ https://github.com/pt-plugins/PT-depiler/pull/140 ） */
+  selectable: boolean;
+  /** 多少天未访问站点，预先计算防止 template 中反复计算 */
+  lastAccessDuration: number;
 }
 
 const metadataStore = useMetadataStore();

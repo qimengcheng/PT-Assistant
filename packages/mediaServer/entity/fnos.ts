@@ -1,12 +1,12 @@
 import {
-  AbstractMediaServer,
+  AbstractEmbyCompatibleServer,
   IMediaServerBaseConfig,
   IMediaServerItem,
   IMediaServerMetadata,
   IMediaServerSearchOptions,
   IMediaServerSearchResult,
 } from "@ptd/mediaServer";
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import { EResultParseStatus } from "@ptd/site";
 import { toMerged } from "es-toolkit";
 import urlJoin from "url-join";
@@ -50,13 +50,6 @@ export const mediaServerConfig: IFnOSConfig = {
   },
   timeout: 5000,
 };
-
-interface IFnOSSystemInfo {
-  ServerName: string;
-  Version: string;
-  ProductName: string;
-  Id: string;
-}
 
 interface IFnOSLoginResponse {
   User: {
@@ -152,7 +145,7 @@ const FNOS_SEARCH_FIELDS = [
   "Size",
 ].join(",");
 
-export default class FnOS extends AbstractMediaServer<IFnOSConfig> {
+export default class FnOS extends AbstractEmbyCompatibleServer<IFnOSConfig> {
   private static sessionCache = new Map<string, IFnOSSession>();
   private static posterUrlCache = new Map<string, string>();
 
@@ -244,46 +237,20 @@ export default class FnOS extends AbstractMediaServer<IFnOSConfig> {
     return session;
   }
 
-  protected async request<T = any, D = any>(
-    url: string,
-    config: AxiosRequestConfig<D> = {},
-    retried = false,
-  ): Promise<AxiosResponse<T, D>> {
+  protected async applyAuth(config: AxiosRequestConfig): Promise<void> {
     const session = await this.login();
 
-    config.baseURL = this.apiBaseUrl;
-    config.url = url;
-    config.timeout ??= this.config.timeout;
-    config.responseType ??= "json";
     config.headers = {
       ...(config.headers ?? {}),
       "X-Emby-Token": session.apikey,
       "X-Emby-Authorization": this.getAuthorizationHeader(session.userId),
     };
-
-    try {
-      return await axios.request<T>(config);
-    } catch (e) {
-      if (!retried && e instanceof AxiosError && e.response?.status === 401) {
-        await this.login(true);
-        return await this.request(url, config, true);
-      }
-
-      throw e;
-    }
   }
 
-  public override async ping(): Promise<boolean> {
-    try {
-      const response = await this.request<IFnOSSystemInfo>("/System/Info");
-      if (response.status === 200 && response.data?.Id) {
-        return true;
-      }
-    } catch (e) {
-      return false;
-    }
-
-    return false;
+  // 401 时强制重新登录，随后基类会用同一请求配置原样重试一次
+  protected override async refreshAuth(): Promise<boolean> {
+    await this.login(true);
+    return true;
   }
 
   private async getViewIds(): Promise<string[]> {
@@ -450,6 +417,9 @@ export default class FnOS extends AbstractMediaServer<IFnOSConfig> {
       } else {
         result.status = EResultParseStatus.parseError;
       }
+      // 与 emby / jellyfin / plex 保持一致：非登录类失败也要填 errorMessage，
+      // 否则用户只看到一个没有原因的 parseError（见 #1396）。
+      result.errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
     }
 
     return result;

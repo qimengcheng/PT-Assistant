@@ -1,7 +1,7 @@
 /**
  * 所有和 ui 相关的选项均在本 store 管理
  */
-import { defineStore } from "pinia";
+import { MutationType, defineStore } from "pinia";
 import { has, unset } from "es-toolkit/compat";
 import { usePreferredDark } from "@vueuse/core";
 
@@ -18,6 +18,16 @@ export const defaultTimelineBackgroundColor = "#455A64";
 
 export const useConfigStore = defineStore("config", {
   persistWebExt: {
+    /**
+     * 打开变更自动落盘。缺这一项时插件不会注册 $subscribe，
+     * 基础设置页（SetBase 下7 个子窗口全部裸 v-model 绑定 configStore 字段、
+     * 自己不调 $save）就会「改了刷新就丢」—— 页面上的「变更即时保存」提示是假的。
+     *
+     * 三个类型都要覆盖：v-model 绑基本类型字段是 direct，
+     * 整体替换子对象（position 等）是 patchObject，$patch(fn) 是 patchFunction。
+     * 必须用 MutationType 枚举：裸字符串数组会被推断成 string[]，赋给 MutationType[] 直接编译失败。
+     */
+    autoSaveType: [MutationType.direct, MutationType.patchObject, MutationType.patchFunction],
     afterRestore: (context) => {
       // 清理已废弃的配置项
       const state = context.store.$state as any;

@@ -3,6 +3,7 @@
  * 站点下载所需的 unsafe header（如 M-Team 校验 Origin）通过 session 规则动态注入。
  */
 import { onMessage, sendMessage } from "@/messages.ts";
+import { DNR_ID_BASE } from "@/extends/axios/replaceUnsafeHeader.ts";
 
 onMessage("updateDNRSessionRules", async ({ data: { rule, extOnly = true } }) => {
   // 将规则正向圈定到本扩展发起的请求，避免误改普通网页的请求头（见 #1465）。
@@ -38,3 +39,25 @@ onMessage("removeDNRSessionRuleById", async ({ data: ruleId }) => {
     removeRuleIds: [ruleId],
   });
 });
+
+/**
+ * 启动时清理上一会话遗留的动态 session 规则。
+ *
+ * unsafe header 的规则是「一个请求一条、用完即删」的临时规则（见 replaceUnsafeHeader.ts）。
+ * 一旦页面在请求完成前被关闭、或 SW 被回收，removeDNRSessionRuleById 就永远不会执行，
+ * 规则会一直驻留在 declarativeNetRequest 里。累积到配额上限后
+ * updateSessionRules 直接抛错 —— 该扩展之后**所有**需要 unsafe header 的请求全部失败。
+ * 这里按 ID 号段前缀（DNR_ID_BASE，1e9）精确捞出这些僵尸规则清掉。
+ */
+export async function cleanupStaleDNRSessionRules(): Promise<void> {
+  try {
+    const rules = await chrome.declarativeNetRequest.getSessionRules();
+    const stale = rules.map((rule) => rule.id).filter((id) => id >= DNR_ID_BASE);
+    if (stale.length > 0) {
+      await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: stale });
+      void sendMessage("logger", { msg: `Cleaned ${stale.length} stale DNR session rules` });
+    }
+  } catch (e) {
+    console.warn("[PTD] cleanup stale DNR session rules failed", e);
+  }
+}

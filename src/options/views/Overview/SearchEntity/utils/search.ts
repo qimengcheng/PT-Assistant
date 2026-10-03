@@ -241,29 +241,37 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
   runtimeStore.search.searchKey = searchKey;
   runtimeStore.search.searchPlanKey = searchPlanKey;
 
-  // Expand search plan
-  const searchSolution = await metadataStore.getSearchSolution(runtimeStore.search.searchPlanKey);
+  try {
+    // Expand search plan
+    const searchSolution = await metadataStore.getSearchSolution(runtimeStore.search.searchPlanKey);
 
-  if (!searchSolution) {
-    runtimeStore.showSnakebar(`搜索方案 [${searchPlanKey}] 不存在`, { color: "error" });
-    return;
-  }
-
-  runtimeStore.search.searchPlanKey = searchSolution.id; // 重写 searchPlanKey 为实际的 id
-  console.log(`Expanded Search Plan for ${searchPlanKey}: `, searchSolution);
-
-  if (searchSolution.solutions.length === 0) {
-    runtimeStore.showSnakebar("请至少添加一个站点进行搜索", { color: "error" });
-    return;
-  }
-
-  runtimeStore.search.startAt = Date.now();
-  runtimeStore.search.isSearching = true;
-
-  for (const { siteId, searchEntries } of searchSolution.solutions) {
-    for (const [searchEntryName, searchEntry] of Object.entries(searchEntries)) {
-      await doSearchEntity(siteId, searchEntryName, searchEntry);
+    if (!searchSolution) {
+      runtimeStore.showSnakebar(`搜索方案 [${searchPlanKey}] 不存在`, { color: "error" });
+      return;
     }
+
+    runtimeStore.search.searchPlanKey = searchSolution.id; // 重写 searchPlanKey 为实际的 id
+    console.log(`Expanded Search Plan for ${searchPlanKey}: `, searchSolution);
+
+    if (searchSolution.solutions.length === 0) {
+      runtimeStore.showSnakebar("请至少添加一个站点进行搜索", { color: "error" });
+      return;
+    }
+
+    runtimeStore.search.startAt = Date.now();
+    runtimeStore.search.isSearching = true;
+
+    for (const { siteId, searchEntries } of searchSolution.solutions) {
+      for (const [searchEntryName, searchEntry] of Object.entries(searchEntries)) {
+        await doSearchEntity(siteId, searchEntryName, searchEntry);
+      }
+    }
+  } catch (e) {
+    // getSearchSolution / 队列投递抛错时原先一路冒泡到路由 watcher，变成 unhandled rejection：
+    // isSearching 可能卡在 true（表格一直转圈），用户也看不到任何提示。
+    console.error("[SearchEntity] doSearch failed", e);
+    runtimeStore.search.isSearching = false;
+    runtimeStore.showSnakebar("搜索启动失败，请重试", { color: "error" });
   }
 }
 

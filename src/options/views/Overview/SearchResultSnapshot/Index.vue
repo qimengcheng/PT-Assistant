@@ -136,7 +136,7 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
       }"
       row-key="id"
       size="small"
-      :scroll="{ y: 'calc(100vh - 280px)' }"
+      :scroll="{ y: 'calc(100vh - 300px)' }"
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">

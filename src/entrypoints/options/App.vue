@@ -19,16 +19,30 @@ import {
   SearchOutlined,
   SettingOutlined,
   TeamOutlined,
+  ToolOutlined,
 } from "@antdv-next/icons";
 
 import { sendMessage } from "@/messages.ts";
 import { antdLocaleMap } from "@/options/plugins/antd.ts";
 import { i18nInstance } from "@/options/plugins/i18n.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
+import { useConfigStore } from "@/options/stores/config.ts";
+import ReleaseNoteDialog from "@/options/views/Layout/ReleaseNoteDialog.vue";
 
 const version = browser.runtime.getManifest().version;
 const route = useRoute();
 const runtimeStore = useRuntimeStore();
+const configStore = useConfigStore();
+
+// 版本更新弹窗：必须等 configStore hydrate 完成（$onReady）再比对版本，
+// 否则首帧读到的是初始值会误判「每次都弹」。开启开关且记录版本 ≠ 当前版本时弹一次；
+// 已读版本号的回写由 ReleaseNoteDialog 关闭时自行完成。
+const showReleaseNoteDialog = ref<boolean>(false);
+void configStore.$onReady(() => {
+  if (configStore.showReleaseNoteOnVersionChange && configStore.version !== __EXT_VERSION__) {
+    showReleaseNoteDialog.value = true;
+  }
+});
 
 const backgroundOk = ref<boolean | null>(null);
 
@@ -67,6 +81,7 @@ const navItems = [
   { path: "/special-thank", label: "特别感谢", icon: TeamOutlined },
   { path: "/logger", label: "运行日志", icon: FileSearchOutlined },
   { path: "/debug/site-definitions", label: "站点定义", icon: FileTextOutlined, dev: true },
+  { path: "/debugger", label: "调试信息", icon: ToolOutlined, dev: true },
 ];
 
 /**
@@ -147,6 +162,8 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
           </router-view>
         </main>
       </div>
+
+      <ReleaseNoteDialog v-model="showReleaseNoteDialog" />
     </a-app>
   </a-config-provider>
 </template>

@@ -1,4 +1,14 @@
 nodeLinker: hoisted
 
 overrides:
+  # WXT 0.21 默认装 vite 8（rolldown 内核），rolldown 把 TS 模块间 missing export
+  # 从警告升级为硬错误，site 包大量 barrel 重导出的类型导入（无 type 修饰）会直接构建失败。
+  # 退回 rollup 内核（WXT peerDeps 允许 ^6.3.4 || ^7 || ^8）。
+  # 若要上 rolldown，需先对 site 包做 codemod 把类型导入改为 `import type`。
   vite: ^7.0.0
+
+# pnpm 10+ 不再自动执行依赖的构建脚本，未列入白名单的会整体报
+# ERR_PNPM_IGNORED_BUILDS 并以退出码 1 失败 —— 本地和 CI 都会挂。
+onlyBuiltDependencies:
+  - esbuild
+  - "@parcel/watcher"

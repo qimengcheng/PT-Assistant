@@ -20,6 +20,11 @@ import {
 import type { ITorrent } from "@ptd/site";
 
 import { onMessage, sendMessage } from "@/messages.ts";
+import {
+  buildTitleSizeKey,
+  computeFilesFingerprint,
+  samplePieces,
+} from "@/shared/fingerprint/index.ts";
 import type {
   IConfigPiniaStorageSchema,
   ITorrentDownloadMetadata,
@@ -35,6 +40,7 @@ import type {
 import { logger } from "./logger.ts";
 import { getSiteInstance } from "./site.ts";
 import { ptdIndexDb } from "../adapter/indexdb.ts";
+import { extStore } from "@/storage.ts";
 
 type TLocalDownloadOption = AugmentedRequired<IDownloadTorrentOption, "downloadId" | "localDownloadMethod">;
 type TRemoteDownloadOption = AugmentedRequired<
@@ -43,7 +49,7 @@ type TRemoteDownloadOption = AugmentedRequired<
 >;
 
 export async function getDownloaderConfig(downloaderId: string) {
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   return metadataStore?.downloaders?.[downloaderId] ?? ({} as IDownloaderMetadata);
 }
 
@@ -74,7 +80,7 @@ export async function getDownloaderInstance(downloaderId: string): Promise<Downl
 onMessage("getDownloaderConfig", async ({ data: downloaderId }) => await getDownloaderConfig(downloaderId));
 
 onMessage("getDownloaderList", async () => {
-  const metadata = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadata = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const downloaders = metadata?.downloaders ?? {};
   return Object.entries(downloaders).map(([id, config]) => ({
     id,
@@ -123,16 +129,45 @@ export async function getTorrentInfoForVerification(torrent: ITorrent) {
   downloadRequestConfig.responseType = "arraybuffer";
 
   const parsedTorrent = await getRemoteTorrentFile(downloadRequestConfig);
+  const info = parsedTorrent.info;
+
+  /**
+   * 第 2 层：文件清单指纹。
+   *
+   * 单文件种（没有 info.files，只有 info.length）与多文件种必须走两条不同的
+   * 指纹格式，否则「一个 40G 的单文件」会和「一堆文件加起来 40G 的多文件种」
+   * 撞出同一个指纹。
+   *
+   * rootName 传种子名：parse-torrent 的 files[].path 是「根目录名 + 相对路径」
+   * 且用平台分隔符（Windows 上是 `\`），上层按根目录名精确剥离一层，两侧才对得上。
+   */
+  const isMultiFile = Array.isArray(info.files) && info.files.length > 0;
+  const filesFingerprint = await computeFilesFingerprint(
+    isMultiFile
+      ? {
+          rootName: parsedTorrent.name,
+          length: 0,
+          files: (parsedTorrent.files ?? []).map((f) => ({ path: f.path, length: f.length })),
+        }
+      : { rootName: parsedTorrent.name, length: info.length ?? parsedTorrent.length, files: [] },
+  );
+
+  // 第 3 层：piece 哈希抽样（权威但贵，所以只带抽样结果）
+  const piecesSample = samplePieces(parsedTorrent.pieces, { pieceLength: parsedTorrent.pieceLength });
 
   // 返回可序列化的种子信息
   return {
-    infoHash: (parsedTorrent as unknown as { infoHash: string }).infoHash ?? "",
-    name: parsedTorrent.info.name ?? "unknown",
-    length: parsedTorrent.info.length ?? 0,
-    files: (parsedTorrent.info.files || []).map((f) => ({
+    infoHash: parsedTorrent.infoHash ?? "",
+    name: info.name ?? "unknown",
+    length: info.length ?? 0,
+    files: (parsedTorrent.files ?? []).map((f) => ({
       path: f.path,
       length: f.length,
     })),
+    // 第 1 层用站点标题（各站标题写法差异很大，归一化后跨站可比）
+    titleKey: buildTitleSizeKey(torrent.title || parsedTorrent.name, torrent.size ?? parsedTorrent.length),
+    filesFingerprint,
+    piecesSample,
   };
 }
 
@@ -313,12 +348,12 @@ function buildDownloadHistory(downloadOption: IDownloadTorrentOption): ITorrentD
 const lastSiteDownloadAt = new Map<string, number>();
 
 async function isAllowedSaveDownloadHistory(): Promise<boolean> {
-  const configStoreRaw = (await sendMessage("getExtStorage", "config")) as IConfigPiniaStorageSchema;
+  const configStoreRaw = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
   return configStoreRaw?.download?.saveDownloadHistory ?? true;
 }
 
 async function downloadTorrent(downloadOption: IDownloadTorrentOption) {
-  const configStoreRaw = (await sendMessage("getExtStorage", "config")) as IConfigPiniaStorageSchema;
+  const configStoreRaw = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
 
   // 0. 解析传来的下载参数
   const { torrent, downloaderId = "local", addTorrentOptions = {} as CAddTorrentOptions } = downloadOption;

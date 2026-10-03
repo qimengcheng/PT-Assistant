@@ -387,6 +387,28 @@
       "create": "创建任务",
       "createError": "辅种任务创建失败",
       "createSuccess": "辅种任务创建成功",
+      "fingerprint": {
+        "local": {
+          "candidate": "疑似：仅标题+大小匹配",
+          "identical": "本地已有",
+          "sameSite": "同站已挂"
+        },
+        "localIndex": {
+          "excludeLocal": "排除本地已有的（{0}）",
+          "loading": "正在读取本地种子指纹索引…",
+          "needDownloader": "选择下载器后即可与本地种子比对指纹",
+          "ready": "本地索引：{0} 个种子，其中 {1} 个可按文件清单比对",
+          "refresh": "重建本地指纹索引",
+          "unavailable": "该下载器不支持导出文件清单，只能按标题+大小粗筛"
+        },
+        "suggestPieceVerify": "建议抽样验证 piece 哈希后再下结论",
+        "verifiedBy": {
+          "files": "文件清单指纹一致",
+          "infoHash": "同一 infohash",
+          "legacy": "文件逐条比对",
+          "pieces": "piece 抽样一致"
+        }
+      },
       "fileCount": "文件数：",
       "keepUpload": "辅种检测",
       "noVerifiedItem": "没有验证通过的种子",
@@ -1109,6 +1131,7 @@
       "close": "关闭",
       "confirm": "确认",
       "deleteText": "确认删除这 {0} 条记录吗？",
+      "deleteFailed": "有 {0} 条记录删除失败，请重试。",
       "next": "下一步",
       "ok": "完成",
       "prev": "上一步",

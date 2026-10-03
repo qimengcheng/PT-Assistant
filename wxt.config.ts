@@ -46,7 +46,11 @@ export default defineConfig({
     optional_permissions: ["nativeMessaging"],
     icons: {
       "16": "/icon/16.png",
+      "32": "/icon/32.png",
+      "48": "/icon/48.png",
+      "64": "/icon/64.png",
       "128": "/icon/128.png",
+      "256": "/icon/256.png",
     },
     // 必须显式声明 action（哪怕为空对象）：没有 action 键时工具栏不会出现可点击按钮，
     // background 里的 action.onClicked 永远不会触发。声明后点击 → 打开 options 标签页。

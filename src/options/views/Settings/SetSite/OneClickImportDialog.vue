@@ -150,10 +150,22 @@ async function doAutoImport() {
   // 所有导入完成，重构 site{Host, Name}Map
   await metadataStore.buildSiteMapCache(true);
 
-  runtimeStore.showSnakebar(
-    t("SetSite.oneClickImportDialog.importComplete", { count: importStatus.value.success.length }),
-    { color: "success" },
-  );
+  // 有失败站点时不能再弹 success：旧逻辑无视 failed 一律报「导入完成」，全失败也显示成功
+  if (importStatus.value.failed.length > 0) {
+    runtimeStore.showSnakebar(
+      t("SetSite.oneClickImportDialog.stats", {
+        count: importStatus.value.success.length + importStatus.value.failed.length,
+        success: importStatus.value.success.length,
+        failed: importStatus.value.failed.length,
+      }),
+      { color: "warning", timeout: 8000 },
+    );
+  } else {
+    runtimeStore.showSnakebar(
+      t("SetSite.oneClickImportDialog.importComplete", { count: importStatus.value.success.length }),
+      { color: "success" },
+    );
+  }
 }
 
 async function dialogEnter() {

@@ -340,7 +340,7 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
           class="duration-tag"
           @click="() => (restoreOptions.expandCookieMinutes = convertIsoDurationToMinutes(minutes))"
         >
-          {{ minutes }}
+          {{ t(`SetBackup.RestoreDialog.quickDuration.${minutes}`) }}
         </a-tag>
       </div>
 

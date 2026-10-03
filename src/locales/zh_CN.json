@@ -128,6 +128,7 @@
     "detail": "详情",
     "loadMore": "加载更多",
     "noItems": "暂无内容，请使用搜索框或点击加载更多按钮",
+    "noItemsBeforeSearch": "输入关键词开始搜索",
     "searchPlaceholder": "搜索词"
   },
   "MyClient": {
@@ -285,6 +286,7 @@
         "viewRaw": "查看原始数据"
       },
       "deleteConfirm": "确认删除这条历史数据吗？",
+      "deleteError": "删除历史数据失败",
       "title": "用户历史数据"
     },
     "UserLevelRequirementsTd": {
@@ -595,6 +597,16 @@
       "missingVersion": "备份数据缺少版本信息，无法恢复",
       "ptppImport": "PT-Plugin-Plus 备份导入",
       "ptppPrompt": "需要导入 PT-Plugin-Plus 备份？",
+      "quickDuration": {
+        "P1D": "1天",
+        "P1M": "1个月",
+        "P1W": "1周",
+        "P1Y": "1年",
+        "P6M": "6个月",
+        "PT12H": "12小时",
+        "PT1H": "1小时",
+        "PT30M": "30分钟"
+      },
       "restoreOptions": "恢复选项",
       "retry": "重试",
       "selectFile": "选择备份文件",

@@ -102,7 +102,8 @@ const { itemsPerPage, handleTableChange: onTableChange } = useTableBehavior("Set
 });
 
 const pagination = computed(() => ({
-  current: 1,
+  // ⚠️ 不要写 current:1 —— antd 的 current 是受控值，写死后翻到第 2 页也会被立刻弹回第 1 页。
+  // 页码交给 a-table 内部非受控管理，这里只持久化 pageSize。
   pageSize: itemsPerPage.value,
   showSizeChanger: true,
   showTotal: (total: number) => `共 ${total} 项`,
@@ -199,7 +200,7 @@ const columns = [
             <a-button style="margin-left: 8px">
               <template #icon><FilterOutlined /></template>
             </a-button>
-            <template #overlay>
+            <template #popupRender>
               <a-menu style="min-width: 200px">
                 <a-menu-item key="enabled">
                   <a-checkbox

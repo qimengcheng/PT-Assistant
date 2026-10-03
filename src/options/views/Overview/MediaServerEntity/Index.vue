@@ -55,28 +55,52 @@ function openItem(item: IMediaServerItem) {
   window.open(item.url, "_blank", "noopener,noreferrer,nofollow");
 }
 
-function onScroll() {
-  // 当滚动到页面底部时加载更多
-  if (
-    configStore.mediaServerEntity.autoSearchMoreWhenScroll &&
-    window.innerHeight + window.scrollY >= document.body.offsetHeight - 50 &&
-    !runtimeStore.mediaServerSearch.isSearching &&
-    hasMore.value
-  ) {
-    void doSearch({ searchKey: search.value, loadMore: true });
-  }
+/**
+ * 「滚动到底自动加载更多」锚点。
+ *
+ * ⚠️ 不能监听 window scroll：选项页外壳是 .shell{height:100vh} + .content{overflow-y:auto}
+ * （entrypoints/options/style.css），window/document.body 本身从不滚动，旧实现里
+ * window.scrollY 恒为 0、scroll 事件永不触发，autoSearchMoreWhenScroll 设置形同虚设。
+ * IntersectionObserver 以浏览器视口为准、同时受滚动容器裁切影响，锚点进入
+ * .content 视口底边即触发，无需关心具体哪个祖先在滚动。
+ */
+const loadMoreSentinel = ref<HTMLElement | null>(null);
+let loadMoreObserver: IntersectionObserver | null = null;
+
+/** 是否发起过至少一次搜索：用于区分「未搜索 / 搜索无结果」两种空态 */
+const hasSearchedOnce = ref<boolean>(false);
+
+function runSearch(options: { searchKey: string; loadMore?: boolean }) {
+  hasSearchedOnce.value = true;
+  return doSearch(options);
 }
 
 onMounted(() => {
-  window.addEventListener("scroll", onScroll, { passive: true });
+  loadMoreObserver = new IntersectionObserver(
+    (entries) => {
+      if (
+        entries[0]?.isIntersecting &&
+        configStore.mediaServerEntity.autoSearchMoreWhenScroll &&
+        !runtimeStore.mediaServerSearch.isSearching &&
+        hasMore.value
+      ) {
+        void runSearch({ searchKey: search.value, loadMore: true });
+      }
+    },
+    { rootMargin: "160px" },
+  );
+  if (loadMoreSentinel.value) {
+    loadMoreObserver.observe(loadMoreSentinel.value);
+  }
 
   if (configStore.mediaServerEntity.autoSearchWhenMount && runtimeStore.mediaServerSearch.searchResult.length === 0) {
-    void doSearch({ searchKey: search.value });
+    void runSearch({ searchKey: search.value });
   }
 });
 
 onUnmounted(() => {
-  window.removeEventListener("scroll", onScroll);
+  loadMoreObserver?.disconnect();
+  loadMoreObserver = null;
 });
 
 // ===== 服务器范围多选 =====
@@ -98,11 +122,11 @@ function toggleAllServers(checked: boolean) {
 }
 
 function triggerSearch() {
-  void doSearch({ searchKey: search.value });
+  void runSearch({ searchKey: search.value });
 }
 
 function triggerLoadMore() {
-  void doSearch({ searchKey: search.value, loadMore: true });
+  void runSearch({ searchKey: search.value, loadMore: true });
 }
 
 function firstVideoTitle(item: IMediaServerItem): string | undefined {
@@ -156,8 +180,10 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
         </a-input>
       </div>
 
-      <!-- 瀑布流形式展示媒体服务器搜索结果 -->
-      <div v-if="runtimeStore.mediaServerSearch.searchResult.length > 0" class="masonry-grid">
+      <!-- 搜索中：结果区给加载反馈；未搜索 / 空结果给不同空态文案 -->
+      <a-spin :spinning="runtimeStore.mediaServerSearch.isSearching">
+        <!-- 瀑布流形式展示媒体服务器搜索结果 -->
+        <div v-if="runtimeStore.mediaServerSearch.searchResult.length > 0" class="masonry-grid">
         <div v-for="item in runtimeStore.mediaServerSearch.searchResult" :key="item.url" class="masonry-item">
           <div v-if="item.poster" class="poster-wrap">
             <img :src="item.poster" :title="item.name" :alt="item.name" class="poster-img" />
@@ -209,7 +235,15 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
         </div>
       </div>
 
-      <a-empty v-else :description="t('MediaServerEntity.noItems')" class="empty-state" />
+        <a-empty
+          v-else
+          :description="hasSearchedOnce ? t('MediaServerEntity.noItems') : t('MediaServerEntity.noItemsBeforeSearch')"
+          class="empty-state"
+        />
+      </a-spin>
+
+      <!-- 滚动自动加载的观察锚点 -->
+      <div ref="loadMoreSentinel" class="load-more-sentinel" aria-hidden="true" />
 
       <div class="load-more-row">
         <a-button
@@ -228,7 +262,10 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
 
 <style scoped>
 .media-server-entity {
-  padding: 16px;
+  /* 不再加 padding：外壳 .content 已有 16px padding（style.css），叠加会比其他页多一圈空白 */
+}
+.load-more-sentinel {
+  height: 1px;
 }
 .search-row {
   display: flex;

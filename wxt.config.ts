@@ -108,12 +108,20 @@ export default defineConfig({
       __RESOURCE_SITE_ICONS__: JSON.stringify(siteIconFiles),
     },
     resolve: {
-      alias: {
+      alias: [
+        // Node 内建 `path` → 浏览器最小实现。打包器默认把它替换成 `exports = {}` 的空 stub，
+        // 导致 parse-torrent 的 path.join 是 undefined（解析任何种子都抛），且 rolldown 会把
+        // 该 stub 产出到扩展根目录、文件名以 `_` 开头 —— Chrome 直接拒载整个扩展。
+        // 本文件自身 import 的是 `node:path`，不受此别名影响。
+        { find: /^path$/, replacement: path.resolve(rootDir, "src/extends/browserPath.ts") },
+        // 同理顶掉 `crypto` 的 browser-external stub（crypto-js 里那条 require 在浏览器是死分支，
+        // 但打包器仍会静态产出 stub 文件），见 src/extends/browserNodeCrypto.ts。
+        { find: /^crypto$/, replacement: path.resolve(rootDir, "src/extends/browserNodeCrypto.ts") },
         // 与 PT-depiler 保持一致的别名约定，site/social 包可以零修改平移
-        "@ptd": path.resolve(rootDir, "packages"),
-        "@": path.resolve(rootDir, "src"),
-        "~": path.resolve(rootDir, "src"),
-      },
+        { find: "@ptd", replacement: path.resolve(rootDir, "packages") },
+        { find: "@", replacement: path.resolve(rootDir, "src") },
+        { find: "~", replacement: path.resolve(rootDir, "src") },
+      ],
     },
     /**
      * content script 的「轻量引导 + 按需加载 app」拆分。

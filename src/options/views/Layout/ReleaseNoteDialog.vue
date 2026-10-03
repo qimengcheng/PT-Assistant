@@ -9,44 +9,17 @@ const showDialog = defineModel<boolean>();
 const configStore = useConfigStore();
 const { t } = useI18n();
 
-interface ParsedVersion {
-  versionNumbers: number[]; // 版本号数字部分
-  buildHash: string; // 构建哈希值
-  fullVersion: string; // 完整版本字符串
-}
-
-function parseVersion(versionString: string): ParsedVersion {
-  const versionPart = versionString.slice(1); // 移除前缀 v 后的部分
-  const [mainVersion, buildHash = ""] = versionPart.split("+"); // 分割版本号和构建哈希
-
-  // 解析版本号数字部分
-  const versionNumbers = mainVersion
-    .split(".")
-    .map((numStr) => parseInt(numStr, 10))
-    .filter((num) => !isNaN(num));
-
-  return {
-    versionNumbers,
-    buildHash,
-    fullVersion: versionString,
-  };
-}
-
-const storeVersion = parseVersion(configStore.version);
-const currentVersion = parseVersion(__EXT_VERSION__);
-const failbackVersion = parseVersion("v0.0.5.1147+23f758f7"); // 这个版本号为引入更新窗口时间点前的发布送审版本号
-const storeBuildHash = computed<string>(() => storeVersion.buildHash || failbackVersion.buildHash);
+const currentVersion = __EXT_VERSION__;
 
 /**
- * 本项目 `__EXT_VERSION__` 只注入到 `v<package.json 版本>`（见 wxt.config.ts），
- * 没有旧项目那种 `v...+<commit>` 的构建哈希后缀，两端哈希拿不全时拼出来的
- * `/compare/23f758f7...` 是打不开的死链，所以哈希齐了才走精确 compare，
- * 缺任何一端就退到仓库 compare 首页。
+ * 更新日志以 GitHub Release 页为准（CI ci.yml 按 package.json 版本发 tag `vX.Y.Z`）。
+ * 正式版直接落到当前版本对应的 tag 页；dev 等非标准版本号没有对应 tag，退回 Releases 列表。
  */
 const changelogUrl = computed<string>(() => {
-  const from = storeBuildHash.value;
-  const to = currentVersion.buildHash;
-  return from && to ? `${REPO_URL}/compare/${from}...${to}` : `${REPO_URL}/compare`;
+  const mainVersion = __EXT_VERSION__.slice(1).split("+")[0];
+  return /^\d+\.\d+\.\d+(?:\.\d+)?$/.test(mainVersion)
+    ? `${REPO_URL}/releases/tag/v${mainVersion}`
+    : `${REPO_URL}/releases`;
 });
 
 function dialogLeave() {
@@ -82,7 +55,7 @@ function onAfterOpenChange(open: boolean) {
       <div class="brand">
         <img src="/icon/128.png" width="128" alt="PT Assistant" />
         <div class="current-version">
-          {{ currentVersion.fullVersion }}{{ t("layout.releaseNote.currentVersion") }}
+          {{ currentVersion }}{{ t("layout.releaseNote.currentVersion") }}
         </div>
       </div>
 

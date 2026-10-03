@@ -10,8 +10,7 @@ import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-rou
  * 1. `alias` 保留上游的原始 path。content script 的 `doKeywordSearch`、
  *    SetDownloader 等处仍按上游路径跳转，加 alias 后新旧路径都能进。
  * 2. **只注册组件真实存在的路由**。上游有 30+ 条，这里按当前已平移的视图增量添加，
- *    组件还没做出来的（如 UserDataTimeline / SetSite / MyClient）先不注册，
- *    否则 `import()` 会在运行时抛模块找不到。
+ *    组件没做出来的先不注册，否则 `import()` 会在运行时抛模块找不到。
  */
 export const routes: RouteRecordRaw[] = [
   {

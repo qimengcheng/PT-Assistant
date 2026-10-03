@@ -1,7 +1,7 @@
 # AGENTS.md — PT Assistant (WXT) 开发约定
 
 > 本文件是**跨会话 / 跨 agent 共享**的硬约定。每个接手本仓库的 AI（含并行会话）动手前必读。
-> 与 `README.md`（项目说明）、`ANTD-MIGRATION.md`（UI 迁移进度）配套使用。
+> 与 `README.md`（项目说明）配套使用。
 
 ## 0. 项目一句话
 
@@ -201,6 +201,28 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 | `a-auto-complete` 选中后 | 输入框显示的是 **value**（如下载器随机 id），`option-label-prop` 不生效 | 固定列表选择一律用 `a-select`（单选固定显示 label）+ `show-search` + `option-filter-prop="label"` |
 | `a-table` 的 `sorter: true` | 排序箭头动、**数据不排** | antd `getSortFunction` 静默跳过无 compare 的 sorter，必须给真正 compare 函数 |
 | `a-list` 传 `:data-source="[]"` | 渲染内置「暂无数据」占位 | 不用 data-source，直接渲染子项 |
+| `<a-step>` 等注册表里不存在的 `a-*` 标签 | 被当原生未知元素，**内容静默丢失**（带对象插槽时整块空白） | antdv-next 全量 install 实测只有 139 个注册名，**没有** `AStep`/`AList`；Steps 只有 `:items` 数组写法。CI 的 check-antd-tags 会拦（v0.18.2 踩过） |
+| 图标 `import * as Icons from "@antdv-next/icons"` | 1760 个图标模块**全进包** | 只具名导入用到的：`import { DeleteOutlined } from "@antdv-next/icons"` |
+
+原子类兼容层：`src/entrypoints/options/vuetify-compat.css` 复刻的 Vuetify 原子类
+（`pa-0` `d-flex` `text-no-wrap` 等）**继续用、不用重写**，只换组件标签。
+
+#### content script 侧是按需注册，不是全局 install
+
+设置页模板直接写 `a-xxx` 即可（全局 install）；content script 是独立入口，全量 install 会把
+139 个组件打进每个站点都要加载的 content chunk（曾达 4.3MB，占全部产物 JS 的 65%）。
+按需清单在 `src/content-script/antd-lite.ts`（18 个父组件，实际注册 41 个名字），
+接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
+否则线上是静默空白。
+
+两条 CI 静态防线（本地改完也要跑，FAIL 非零退出，挂在 ci.yml 的 `pnpm compile` 之后、构建之前）：
+
+```bash
+node scripts/check-antd-tags.mjs          # 全仓扫「antdv-next 里不存在的 a-* 标签」
+node scripts/check-content-antd-lite.mjs  # content 按需清单是否覆盖其依赖闭包用到的每个标签
+```
+
+注册表是脚本在 Node 里**实跑** `install()` 得到的，不抄文档。
 
 ### 3.5 面向用户的一切显示用名称
 
@@ -209,7 +231,12 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 
 ### 3.6 删除文件
 
-先移入 `tobedeleted/<批次日期>/`，**全部做完再统一删除**。不要直接 `rm`。
+- **删除不需要人工确认的 agent**：直接删（`git rm` / 平台删除工具），不要移入 `tobedeleted/`
+  再等人点确认 —— 中间目录会卡住后续流程。
+- **删除必须人工确认的 agent**：先移入 `tobedeleted/<批次日期>/` 缓冲，用户确认后再统一删除。
+  该目录已在 .gitignore，不入库。
+- 不管哪种 agent，删错文件都要能找回：已被 git 跟踪的文件靠 git 历史恢复；
+  未跟踪的新文件本来就不该用删除处理。
 
 ---
 

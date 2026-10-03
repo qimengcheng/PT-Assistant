@@ -1,9 +1,9 @@
 import { subDays, format as formatDate, eachDayOfInterval } from "date-fns";
 import { EResultParseStatus, TSiteID } from "@ptd/site";
 
-import { sendMessage } from "@/messages.ts";
 import { type IStoredUserInfo, TUserInfoStorageSchema } from "@/shared/types.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
+import { extStore } from "@/storage.ts";
 
 export interface IUserDataStatistic {
   siteDateRange: Record<TSiteID, [string, string]>;
@@ -52,7 +52,7 @@ function calculateDailyIncremental(
 }
 
 export async function loadFullData(): Promise<IUserDataStatistic> {
-  const rawData = (await sendMessage("getExtStorage", "userInfo")) as TUserInfoStorageSchema;
+  const rawData = (await extStore.getItem("userInfo")) as TUserInfoStorageSchema;
   const metadataStore = useMetadataStore();
   const addedSiteIds = metadataStore.getAddedSiteIds;
 

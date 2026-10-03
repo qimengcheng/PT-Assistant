@@ -19,8 +19,8 @@ import {
   TorrentFilePriority,
 } from "../types";
 import urlJoin from "url-join";
-import axios from "axios";
-import { extractMagnetHash, getRemoteTorrentFile } from "../utils";
+
+import { axios, extractMagnetHash, getRemoteTorrentFile } from "../utils";
 
 export const clientConfig: TorrentClientConfig = {
   type: "uTorrent",
@@ -334,7 +334,10 @@ export default class UTorrent extends AbstractBittorrentClient<TorrentClientConf
 
     return req.torrents.map((torrent: TorrentData) => {
       const torrentState: number = torrent[1];
-      const progress: number = torrent[4] / 100;
+      // PROGRESS 是千分比（0-1000，对应 0-100%），要换算成百分比需除以 10。
+      // 原来写成 /100，导致 progress 恒在 0-10 之间，下面的 >= 100 永远不成立，
+      // done / isCompleted恒为 false，任务状态永远停在「下载中」。
+      const progress: number = torrent[4] / 10;
       const done = progress >= 100;
       const isCompleted = progress >= 100;
 
@@ -449,13 +452,6 @@ export default class UTorrent extends AbstractBittorrentClient<TorrentClientConf
   // ─────────────────────────────────────────────
   // 文件级 / tracker（uTorrent WebUI API；无完整 peer 列表接口）
   // ─────────────────────────────────────────────
-
-  private getTorrentHash(torrent: string | CTorrent): string {
-    if (typeof torrent === "string") {
-      return torrent;
-    }
-    return (torrent.infoHash ?? torrent.id) as string;
-  }
 
   // 文件列表: action=getfiles → files: [HASH, [[name,size,downloaded,priority],...]]
   override async getTorrentFiles(torrent: string | CTorrent): Promise<CTorrentFile[]> {

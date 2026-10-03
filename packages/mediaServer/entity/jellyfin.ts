@@ -1,17 +1,13 @@
 import {
-  AbstractMediaServer,
+  AbstractEmbyCompatibleServer,
+  IEmbyQueryItem,
+  IEmbyQueryResult,
   IMediaServerBaseConfig,
-  IMediaServerItem,
   IMediaServerMetadata,
   IMediaServerSearchOptions,
   IMediaServerSearchResult,
 } from "@ptd/mediaServer";
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-import {
-  IEmbyQueryItem,
-  IEmbyQueryResult,
-  IEmbySystemInfo as IJellyfinSystemInfo,
-} from "@ptd/mediaServer/entity/emby.ts";
+import { AxiosError, type AxiosRequestConfig } from "axios";
 import { EResultParseStatus } from "@ptd/site";
 import { toMerged } from "es-toolkit";
 import urlJoin from "url-join";
@@ -49,25 +45,21 @@ interface IJellyfinQueryItem extends Omit<IEmbyQueryItem, "Size"> {}
 /**
  * Jellyfin 的多数 API 和 Emby 相同
  */
-export default class Jellyfin extends AbstractMediaServer<IJellyfinConfig> {
+export default class Jellyfin extends AbstractEmbyCompatibleServer<IJellyfinConfig> {
   /**
    * 修正baseUrl，如果用户传入的地址为 http://127.0.0.1:8096/web/#/home.html 或者 https://127.0.0.1:8096/
    * 则将其修正为入口 https://127.0.0.1:8096/
+   *
+   * Jellyfin 的 JSON API 入口即服务根路径（不像 Emby 需要追加 /emby/）
    */
-  get baseUrl() {
+  get apiBaseUrl() {
     let serverAddress = this.config.address;
     serverAddress = serverAddress.replace(/web\/(#\/home.html.+)?/, "");
 
     return serverAddress;
   }
 
-  protected async request<T = any, D = any>(
-    url: string,
-    config: AxiosRequestConfig<D> = {},
-  ): Promise<AxiosResponse<T, D>> {
-    config.baseURL = this.baseUrl;
-    config.timeout ??= this.config.timeout; // 未额外传入 timeout 时，使用默认的 timeout
-
+  protected applyAuth(config: AxiosRequestConfig): void {
     config.headers = {
       ...(config.headers ?? {}),
       /**
@@ -76,23 +68,6 @@ export default class Jellyfin extends AbstractMediaServer<IJellyfinConfig> {
        */
       Authorization: `MediaBrowser Token="${this.config.auth.apikey}"`,
     };
-
-    // 处理请求url
-    config.url = url;
-
-    return axios.request<T>(config);
-  }
-
-  public async ping(): Promise<boolean> {
-    try {
-      const response = await this.request<IJellyfinSystemInfo>("/System/Info", { responseType: "json" });
-      if (response.status === 200 && response.data?.Id) {
-        return true;
-      }
-    } catch (e) {
-      return false;
-    }
-    return false;
   }
 
   public async getSearchResult(
@@ -100,7 +75,7 @@ export default class Jellyfin extends AbstractMediaServer<IJellyfinConfig> {
     config: IMediaServerSearchOptions = {},
   ): Promise<IMediaServerSearchResult> {
     // 预定义搜索结果
-    const result: IMediaServerSearchResult<{}> = {
+    const result: IMediaServerSearchResult<IJellyfinQueryItem> = {
       status: EResultParseStatus.unknownError,
       items: [],
     };
@@ -139,34 +114,14 @@ export default class Jellyfin extends AbstractMediaServer<IJellyfinConfig> {
         } = response;
         for (const item of Items) {
           // 处理搜索结果
-
-          const mediaItem: IMediaServerItem<IJellyfinQueryItem> = {
-            server: this.config.id!,
-            name: item.Name,
-            url: urlJoin(this.baseUrl, `/web/#/details?id=${item.Id}&serverId=${item.ServerId}`),
-            type: item.MediaType,
-            description: item.Overview ?? "",
-            format: item.Container,
-            size: item.MediaSources?.[0]?.Size,
-            duration: item.RunTimeTicks / 10000000, // 10000 ticks = 1 ms, 10000 ms = 1 s
-            poster: urlJoin(this.baseUrl, `/Items/${item.Id}/Images/Primary`),
-            tags: item.GenreItems?.map((tag) => ({
-              name: tag.Name,
-              url: urlJoin(this.baseUrl, `/web/#/list.html?genreId=${tag.Id}&serverId=${item.ServerId}`),
-            })),
-            rating: item.CommunityRating ?? "-",
-            streams: item.MediaSources?.[0]?.MediaStreams?.map((stream) => ({
-              title: stream.Title ?? stream.DisplayTitle,
-              type: stream.Type,
-              format: stream.Codec,
-            })),
-            user: {
-              IsFavorite: item.UserData?.IsFavorite ?? false,
-              IsPlayed: item.UserData?.Played ?? false,
-            },
-            raw: item,
-          };
-          result.items.push(mediaItem);
+          result.items.push(
+            this.mapQueryItemToMediaItem(item, {
+              url: urlJoin(this.apiBaseUrl, `/web/#/details?id=${item.Id}&serverId=${item.ServerId}`),
+              size: item.MediaSources?.[0]?.Size,
+              tagUrl: (tag) =>
+                urlJoin(this.apiBaseUrl, `/web/#/list.html?genreId=${tag.Id}&serverId=${item.ServerId}`),
+            }),
+          );
         }
         result.options = config;
         result.status = EResultParseStatus.success;

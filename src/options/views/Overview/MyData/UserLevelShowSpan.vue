@@ -113,10 +113,12 @@ function formatIntervalDate(duration: number | isoDuration): string {
 }
 
 function formatBonus(bonusKey: "bonus" | "seedingBonus") {
+  // 等级需求配置里 bonus 只会是 number；协议类型放宽出的 string 形态（"N/A"）归一成 0
+  const bonusValue = Number(levelRequirement[bonusKey]) || 0;
   return (
     (configStore.myDataTableControl.simplifyBonusNumbers
-      ? simplifyNumber(levelRequirement[bonusKey]!)
-      : formatNumber(levelRequirement[bonusKey]!)) +
+      ? simplifyNumber(bonusValue)
+      : formatNumber(bonusValue)) +
     (configStore.myDataTableControl.showBonusNeededInterval && levelRequirement[`${bonusKey}NeededInterval`]
       ? ` (~${levelRequirement[`${bonusKey}NeededInterval`]})`
       : "")
@@ -191,7 +193,7 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
   <template v-if="levelRequirement.bonus">
     <DollarOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.bonus')" />
     <span
-      :title="formatNumber(levelRequirement.bonus)"
+      :title="formatNumber(Number(levelRequirement.bonus) || 0)"
       @dblclick="toggleNumberSimplification"
       style="cursor: pointer; user-select: none"
     >
@@ -212,7 +214,7 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
 
   <template v-if="levelRequirement.bonusPerHour">
     <TagsOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.bonusPerHour')" />
-    {{ formatNumber(levelRequirement.bonusPerHour) }};
+    {{ formatNumber(Number(levelRequirement.bonusPerHour) || 0) }};
   </template>
 
   <template v-if="levelRequirement.uploads">

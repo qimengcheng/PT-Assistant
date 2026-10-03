@@ -15,7 +15,8 @@ import Gazelle, {
 
 type boxName = "stats" | "community" | "personal";
 
-const userInfoMap: Record<"en" | "ja", Record<boxName | keyof IUserInfo, string>> = {
+// 各语种只映射实际用到的少量字段，故用 Partial；genUserInfoSelector 对缺失键回落英文表
+const userInfoMap: Record<"en" | "ja", Partial<Record<boxName | keyof IUserInfo, string>>> = {
   en: {
     stats: "Stats",
     community: "Community",
@@ -43,7 +44,7 @@ const userInfoMap: Record<"en" | "ja", Record<boxName | keyof IUserInfo, string>
 function genUserInfoSelector(boxName: boxName, field: keyof IUserInfo): string[] {
   const failBack = userInfoMap.en[field]; // 默认使用英文，这样就可以减小重复字段了
   return Object.values(userInfoMap).map(
-    (value) => `div:contains('${value[boxName]}') + ul.stats > li:contains('${value[field] || failBack}')`,
+    (value) => `div:contains('${value[boxName]}') + ul.stats > li:contains('${value[field] || failBack || ""}')`,
   );
 }
 

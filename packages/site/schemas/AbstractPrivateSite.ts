@@ -16,6 +16,7 @@ import {
   type IUserInfo,
   type TLevelId,
   type TPatterns,
+  type TUserInfoParseKey,
 } from "../types";
 
 export const SchemaMetadata: Partial<ISiteMetadata> = {
@@ -134,7 +135,7 @@ export default class PrivateSite extends BittorrentSite {
         const processFields = uniq([
           ...(thisUserInfoProcess.fields ?? []),
           ...Object.keys(thisUserInfoProcess.selectors ?? {}),
-        ]) as string[];
+        ]) as TUserInfoParseKey[];
         // 检查相关元素是否均已有
         const existField = intersection(processFields, Object.keys(flushUserInfo));
         if (existField.length === processFields.length) {
@@ -147,12 +148,14 @@ export default class PrivateSite extends BittorrentSite {
           thisUserInfoProcess.requestConfig,
         );
         if (thisUserInfoProcess.assertion) {
-          for (const [requiredField, pathKey] of Object.entries(thisUserInfoProcess.assertion)) {
+          for (const [requiredFieldRaw, pathKey] of Object.entries(thisUserInfoProcess.assertion)) {
+            // assertion 的键受 ISiteMetadata 类型约束为 TUserInfoParseKey，Object.entries 退化为 string，这里收窄回来
+            const requiredField = requiredFieldRaw as TUserInfoParseKey;
             if (flushUserInfo[requiredField]) {
               if (has(requestConfig, pathKey as string)) {
                 let oldData = get(requestConfig, pathKey as string);
                 if (oldData && typeof oldData === "string") {
-                  oldData = oldData.replace(`$${requiredField}$`, flushUserInfo[requiredField]);
+                  oldData = oldData.replace(`$${requiredField}$`, String(flushUserInfo[requiredField]));
                   set(requestConfig, pathKey as string, oldData);
                 }
               } else {

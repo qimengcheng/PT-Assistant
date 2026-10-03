@@ -23,6 +23,7 @@ import { sendMessage } from "@/messages.ts";
 
 import { setupReplaceUnsafeHeader } from "~/extends/axios/replaceUnsafeHeader.ts";
 import { setupRetryWhenCloudflareBlock } from "~/extends/axios/retryWhenCloudflareBlock.ts";
+import { extStore } from "@/storage.ts";
 
 setupRetryWhenCloudflareBlock(setupReplaceUnsafeHeader(axios));
 
@@ -142,14 +143,14 @@ const resetItems = computed<resetItem[]>(() => [
       if (clearSiteTarget.value === "all") {
         // 清空所有站点数据
         metadataStore.lastUserInfo = {};
-        await sendMessage("setExtStorage", { key: "userInfo", value: {} });
+        await extStore.setItem("userInfo", {});
       } else {
         // 清空指定站点数据
         if (metadataStore.lastUserInfo[clearSiteTarget.value]) delete metadataStore.lastUserInfo[clearSiteTarget.value];
-        const userInfo = (await sendMessage("getExtStorage", "userInfo")) as Record<string, any>;
+        const userInfo = (await extStore.getItem("userInfo")) as Record<string, any>;
         if (userInfo && userInfo[clearSiteTarget.value]) {
           delete userInfo[clearSiteTarget.value];
-          await sendMessage("setExtStorage", { key: "userInfo", value: userInfo });
+          await extStore.setItem("userInfo", userInfo);
         }
       }
       await metadataStore.$save();
@@ -180,7 +181,7 @@ const resetItems = computed<resetItem[]>(() => [
       const metadataStore = useMetadataStore();
       metadataStore.snapshots = {};
       await metadataStore.$save();
-      await sendMessage("setExtStorage", { key: "searchResultSnapshot", value: {} });
+      await extStore.setItem("searchResultSnapshot", {});
     },
   },
 ]);

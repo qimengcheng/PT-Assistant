@@ -297,7 +297,9 @@ export const siteMetadata: ISiteMetadata = {
 export default class KaraGarga extends PrivateSite {
   public override async getUserInfoResult(lastUserInfo: Partial<IUserInfo> = {}): Promise<IUserInfo> {
     const userInfo = await super.getUserInfoResult(lastUserInfo);
-    const userInfoRecord = userInfo as Record<string, unknown>;
+    // 运行期动态写入 "N/A" 占位值，IUserInfo 上 bonus 允许 string，
+    // 但这里统一转成字符串记录形态以便循环赋值，先经 unknown 收窄
+    const userInfoRecord = userInfo as unknown as Record<string, unknown>;
 
     userInfoRecord.bonus = "N/A";
     userInfoRecord.bonusPerHour = "N/A";

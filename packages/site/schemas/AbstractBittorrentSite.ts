@@ -16,6 +16,7 @@ import {
   CFBlockedError,
   NoTorrentsError,
   NoUserInputError,
+  NetworkError,
   IAdvanceKeywordSearchConfig,
   ISearchInput,
   ITorrentTag,
@@ -68,7 +69,13 @@ export default class BittorrentSite {
 
   constructor(metadata: ISiteMetadata, userConfig: ISiteUserConfig = {}) {
     this.metadata = toMerged(metadata, userConfig.merge ?? {});
-    this.userConfig = userConfig;
+    // inputSetting 在站点需要用户填写 passkey/token 时才由用户配置写入，未配置时是 undefined。
+    // 各 definition 里存在 `this.userConfig.inputSetting!.token ?? ""` 这类写法
+    // （fsm / gazellegames / generationfree / hdbits / milkie / mteam / rousipro / yemapt 共 13 处）：
+    // 非空断言在inputSetting 为 undefined 时会先抛 TypeError，后面的 ?? "" 永远走不到，
+    // 整个站点实例直接崩。这里在构造期补一个空对象兜底，那些写法就都安全了，
+    // 同时不必为每个站点单独改一遍。
+    this.userConfig = { inputSetting: {}, ...userConfig };
     console?.log(`[Site] ${this.name} Initialized with Metadata: `, this.metadata, "UserConfig: ", this.userConfig);
   }
 
@@ -126,7 +133,7 @@ export default class BittorrentSite {
     // 如果站点有请求延迟，则等待一段时间
     await this.sleepAction(this.metadata.requestDelay ?? 0);
 
-    let req: AxiosResponse;
+    let req: AxiosResponse | undefined;
     try {
       req = await axios.request<T>(axiosConfig);
 
@@ -146,14 +153,26 @@ export default class BittorrentSite {
         req.data = doc;
       }
     } catch (e) {
-      // 从 AxiosError 中获取 response
-      req = (e as AxiosError).response!;
+      // 从 AxiosError 中获取 response。
+      // ⚠️ 超时 / DNS 失败 / 被扩展拦截 / 用户取消这类错误**没有** response，
+      // 原来直接 `response!` 断言成 AxiosResponse，后续 req.status 会抛
+      // "Cannot read properties of undefined (reading 'status')" —— 原始的
+      // 超时/网络不可达信息被彻底替换成无意义的 TypeError，调用方
+      // （getSearchResult 的 catch）也无法映射任何状态码，statusMsg 永远为空。
+      const error = e as AxiosError<T>;
+      req = error.response;
+      if (!req) {
+        throw new NetworkError(
+          `${axiosConfig.method ?? "GET"} ${axiosConfig.url ?? "/"} 请求失败：${error.code ?? ""} ${error.message ?? ""}`.trim(),
+        );
+      }
     }
 
     if (isCloudflareBlocked(req)) {
       throw new CFBlockedError();
     }
 
+    // 到这里 req 必然有值：catch 分支里无 response 时已抛 NetworkError
     // 随后检查是否需要登录
     if (checkLogin && !this.loggedCheck(req!)) {
       throw new NeedLoginError();
@@ -311,6 +330,10 @@ export default class BittorrentSite {
       } else if (e instanceof NoTorrentsError) {
         result.status = EResultParseStatus.noResults;
       }
+
+      // 始终带上错误文案：result.statusMsg 原本从未被赋值，
+      // 前端「搜索状态」那栏拿不到任何可诊断信息（超时？DNS？被拦截？），只看到一个 parseError。
+      result.statusMsg = e instanceof Error ? e.message : String(e);
     }
     return result;
   }
@@ -398,7 +421,9 @@ export default class BittorrentSite {
               query = another.getAttribute(elementQuery.attr) ?? query;
             } else {
               // 优先使用 innerText，如果没有，则使用 textContent
-              query = (another.innerText ?? another.textContent).replace(/\n/gi, " ") || query;
+              // 三者皆空（SVG/隐藏节点等）时必须兜底成 ""：
+              // 原写法 (innerText ?? textContent).replace 在两者都为 null 时会抛 TypeError。
+              query = ((another as HTMLElement).innerText ?? another.textContent ?? "").replace(/\n/gi, " ") || query;
             }
           }
         } else {
@@ -486,6 +511,15 @@ export default class BittorrentSite {
         } else {
           foundElements = get(context, selector);
         }
+
+        // ⚠️ JSON 站点的 rows 未必是数组：写成 { [id]: {...} } 这种以 id 为键的映射是很常见的写法。
+        // 原实现直接把这个对象当数组返回，下游 transformSearchPage 的
+        // `trs.length === 0` 判断失效（非空对象 length 是 undefined），
+        // 随后 `for (const tr of trs)` 会抛 "trs is not iterable"。这里统一归一成数组。
+        if (foundElements && !Array.isArray(foundElements)) {
+          foundElements = typeof foundElements === "object" ? Object.values(foundElements) : [foundElements];
+        }
+        foundElements ??= [];
       } else {
         // Document 处理
         foundElements = Sizzle(selector as string, context);
@@ -529,7 +563,12 @@ export default class BittorrentSite {
           chunk(trs, rowMergeDeep).forEach((chunkTr) => {
             const wrapperDiv = doc.createElement("div");
             chunkTr.forEach((tr) => {
-              wrapperDiv.appendChild(tr as Element);
+              // 必须 cloneNode 而非直接 appendChild：appendChild 是「移动」语义，
+              // 会把行从原table 里摘走。本方法同时服务于 content-script 的
+              // transformListPage（传入的是站点真实页面的 document），
+              // 一旦站点配了 merge > 1，用户页面上的表格行就会被搬进游离 div —— 页面直接少内容且不可逆。
+              // 下游只从 trs 读，不再需要原节点，故克隆是安全的。
+              wrapperDiv.appendChild((tr as Element).cloneNode(true));
             });
             newTrs.push(wrapperDiv);
           });

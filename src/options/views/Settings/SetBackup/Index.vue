@@ -75,6 +75,21 @@ const doBackupStatus = ref<Record<TBackupServerKey | symbol, boolean>>({});
 async function doBackup(backupServerId: TBackupServerKey | symbol) {
   doBackupStatus.value[backupServerId] = true;
 
+  // ⚠️ 必须 try/catch/finally：
+  // exportBackupData 抛错（网络不可达 / 备份服务器鉴权失败 / S3 配置错误）时，
+  // 原来没有任何 catch，异常直接逃出去，结尾的复位语句永远不会执行 ——
+  // 那个备份服务器的按钮会永远转圈，用户只能刷新页面。
+  try {
+    await runBackup(backupServerId);
+  } catch (e) {
+    console.error("[SetBackup] doBackup failed", backupServerId, e);
+    runtimeStore.showSnakebar(t("SetBackup.snackbar.failure"), { color: "error" });
+  } finally {
+    doBackupStatus.value[backupServerId] = false;
+  }
+}
+
+async function runBackup(backupServerId: TBackupServerKey | symbol) {
   if (typeof backupServerId == "string") {
     const serverConfig = metadataStore.backupServers[backupServerId];
     const backupFields = serverConfig.backupFields ?? [...BackupFields];
@@ -96,8 +111,6 @@ async function doBackup(backupServerId: TBackupServerKey | symbol) {
   } else {
     console.log('"doBackup" without valid backupServerId');
   }
-
-  doBackupStatus.value[backupServerId] = false;
 }
 
 const toEditBackupServerId = ref<TBackupServerKey | null>(null);

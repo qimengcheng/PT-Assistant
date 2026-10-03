@@ -45,14 +45,20 @@ const modules = [
     </a-row>
 
     <h3>功能模块</h3>
-    <a-list size="small" bordered>
-      <a-list-item v-for="m in modules" :key="m.name">
+    <!--
+      原来写的是 <a-list>/<a-list-item>：antdv-next 1.5.6 没有这两个组件（根入口只有虚拟滚动的
+      `Listy`），未注册的标签会被当成原生未知元素，而带命名插槽（#extra）时 children 是对象、
+      原生元素分支只吃数组 —— 整栏渲染成空白。
+      另一方面 style.css 里 `.modules` / `.dot` / `.pending` / `.pending-tag` 一套样式早就写好了
+      （带边框卡片 + li 分隔线），却没有任何组件在用：迁移时把 <ul class="modules"> 换成了 a-list，
+      样式与结构就此错位。这里按样式的原始约定改回 ul/li。
+    -->
+    <ul class="modules">
+      <li v-for="m in modules" :key="m.name">
         <span class="dot" :class="m.status">{{ m.status === "ok" ? "✓" : "…" }}</span>
         <span :class="{ pending: m.status === 'todo' }">{{ m.name }}</span>
-        <template #extra>
-          <a-tag v-if="m.status === 'todo'" color="default">建设中</a-tag>
-        </template>
-      </a-list-item>
-    </a-list>
+        <span v-if="m.status === 'todo'" class="pending-tag">建设中</span>
+      </li>
+    </ul>
   </div>
 </template>

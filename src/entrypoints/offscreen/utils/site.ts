@@ -12,14 +12,15 @@ import {
   checkSiteMetadataAllow,
 } from "@ptd/site";
 
-import { onMessage, sendMessage } from "@/messages.ts";
+import { onMessage } from "@/messages.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types.ts";
 
 import { logger } from "./logger.ts";
 import { ptdIndexDb } from "../adapter/indexdb.ts";
+import { extStore } from "@/storage.ts";
 
 export async function getSiteUserConfig(siteId: TSiteID, flush = false) {
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const storedSiteUserConfig = metadataStore?.sites?.[siteId] ?? {};
 
   const siteMetaData = await getDefinedSiteMetadata(siteId);
@@ -55,7 +56,7 @@ export async function getSiteUserConfig(siteId: TSiteID, flush = false) {
 onMessage("getSiteUserConfig", async ({ data: { siteId, flush } }) => await getSiteUserConfig(siteId, flush));
 
 onMessage("getSiteList", async () => {
-  const metadata = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadata = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const sites = metadata?.sites ?? {};
   const nameMap = metadata?.siteNameMap ?? {};
   return Promise.all(

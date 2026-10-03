@@ -22,7 +22,10 @@ const enabledDownloadersBySite = computed(() => {
 });
 
 async function parseDetailPage() {
-  const parsedResult = await siteInstance.value?.transformDetailPage(document);
+  // 必须传克隆文档：站点的 transformDetailPage 常带 DOM 查询/属性改写副作用，
+  // 直接传宿主 document 会把副作用作用在站点真实页面上。
+  // 同目录的 SiteListPage 与 SocialSitePage 也都是传克隆，保持一致。
+  const parsedResult = await siteInstance.value?.transformDetailPage(document.cloneNode(true) as Document);
 
   if (typeof parsedResult?.link === "undefined") {
     runtimeStore.showSnakebar(t("contentScript.cannotParseDetailLink"), { color: "error" });
@@ -38,29 +41,43 @@ async function parseDetailPage() {
 
 const remoteDownloadDialogData = inject<IRemoteDownloadDialogData>("remoteDownloadDialogData")!;
 
+/**
+ * parseDetailPage 在解析失败时会 throw，调用点必须兜底：
+ * 原来三个调用点都是裸 .then()，解析失败只会在控制台留下 unhandled rejection，
+ * 用户看到的是一个点了没反应（还可能一直转圈）的按钮。
+ */
+function runWithDetailPage(doWork: (torrent: NonNullable<Awaited<ReturnType<typeof parseDetailPage>>>) => Promise<void> | void) {
+  return () => {
+    parseDetailPage().then(doWork).catch((e) => {
+      console.error("[PTD] detail page action failed", e);
+      runtimeStore.showSnakebar(t("contentScript.cannotParseDetailLink"), { color: "error" });
+    });
+  };
+}
+
 function handleLinkCopy() {
-  parseDetailPage().then(async (torrent) => {
+  return runWithDetailPage(async (torrent) => {
     const downloadUrl = await sendMessage("getTorrentDownloadLink", torrent);
 
     const copied = await copyTextToClipboard(downloadUrl);
     runtimeStore.showSnakebar(copied ? t("contentScript.copyLinkSuccess") : t("contentScript.copyLinkFailed"), {
       color: copied ? "success" : "error",
     });
-  });
+  })();
 }
 
 function handleRemoteDownload(isDefaultSend = false) {
-  parseDetailPage().then((torrent) => {
+  return runWithDetailPage((torrent) => {
     remoteDownloadDialogData.torrents = [torrent];
     remoteDownloadDialogData.isDefaultSend = isDefaultSend;
     remoteDownloadDialogData.show = true;
-  });
+  })();
 }
 
 function handleSearch() {
-  parseDetailPage().then((torrent) => {
+  return runWithDetailPage((torrent) => {
     doKeywordSearch(torrent.title || "");
-  });
+  })();
 }
 </script>
 

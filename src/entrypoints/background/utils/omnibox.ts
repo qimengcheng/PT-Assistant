@@ -23,11 +23,22 @@ const allSolution: ISearchSolution = {
   value: "all",
 };
 
-async function getSearchSolution(getAll = false) {
+/**
+ * 搜索方案列表缓存。
+ *
+ * onInputChanged 是按键级触发的（中文输入法拼到一半也会触发），
+ * 每敲一个字符都 extStore.getItem("metadata") 一次 —— 而 metadata 里装着
+ * 300+ 站点的 userConfig，几十到几百 KB 起步，纯属浪费。
+ * 缓存后在 metadata 变更时主动失效（见文件末尾的 storage.onChanged）。
+ */
+const SOLUTION_CACHE_TTL = 30_000;
+let cachedSolutions: { at: number; all: ISearchSolution[]; top5: ISearchSolution[] } | null = null;
+
+async function loadSearchSolutions() {
   const { defaultSolutionId = "default", solutions = {} } =
     ((await extStore.getItem("metadata")) ?? {}) as Partial<IMetadataPiniaStorageSchema>;
 
-  let solutionsList: ISearchSolution[] = Object.values(solutions)
+  const enabled = Object.values(solutions)
     .filter((x) => !!x.enabled) // 过滤掉未启用的搜索方案
     .sort((a, b) => b.sort - a.sort) // 按照 sort 降序排序
     .map((x) => ({
@@ -35,16 +46,26 @@ async function getSearchSolution(getAll = false) {
       value: x.id,
     }));
 
-  if (getAll || defaultSolutionId !== "default") {
-    solutionsList = [allSolution, ...solutionsList];
-  }
-
-  if (!getAll) {
-    solutionsList = solutionsList.slice(0, 5); // 只显示前 5 个搜索方案
-  }
-
-  return solutionsList;
+  const all = defaultSolutionId !== "default" ? [allSolution, ...enabled] : enabled;
+  return { all, top5: all.slice(0, 5) };
 }
+
+async function getSearchSolution(getAll = false) {
+  const now = Date.now();
+  if (!cachedSolutions || now - cachedSolutions.at > SOLUTION_CACHE_TTL) {
+    const loaded = await loadSearchSolutions();
+    cachedSolutions = { at: now, all: loaded.all, top5: loaded.top5 };
+  }
+
+  return getAll ? cachedSolutions.all : cachedSolutions.top5;
+}
+
+// 方案被改动后立即失效缓存，不必等 TTL 自然过期
+chrome.storage?.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && Object.hasOwn(changes, "metadata")) {
+    cachedSolutions = null;
+  }
+});
 
 chrome.omnibox?.onInputChanged.addListener(async (text, suggest) => {
   if (!text) return;

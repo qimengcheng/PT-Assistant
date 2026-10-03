@@ -11,7 +11,12 @@
  * 本项目的解法：把 content-app 这一个 unlisted script 通过 vite 插件改成 ES 输出
  * （见 wxt.config.ts 的 ptd-content-app-esm 插件），引导命中站点后再
  * `import(chrome.runtime.getURL("content-app.js"))` 按需加载。
- * 这样引导里只剩 messages / host 匹配判断，几十行。
+ * 这样引导里只剩 messages / host 匹配判断 / 两次存储读，几十行。
+ *
+ * 存储读**直连 extStore**，不再走 sendMessage("getExtStorage")：RPC 版本在每个
+ * http/https 页面上都要先把 MV3 service worker 冷起来才能拿到 config，
+ * 直连就是两次 chrome.storage 读。代价是引导从 7,969 B 涨到 20,309 B
+ * （wxt/storage 的 StorageItem 机制），仍远小于命中站点才加载的 content-app。
  *
  * social 站点匹配仍走消息交给 offscreen 代查，避免把 @ptd/social 打进引导
  * （refs: PT-depiler issue #1467）。
@@ -21,6 +26,7 @@ import { getHostFromUrl } from "@ptd/site/utils/html.ts";
 import { sendMessage } from "@/messages.ts";
 import type { IConfigPiniaStorageSchema } from "@/shared/types/storages/config.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types/storages/metadata.ts";
+import { extStore } from "@/storage.ts";
 
 export default defineContentScript({
   matches: ["*://*/*"],
@@ -33,7 +39,7 @@ export default defineContentScript({
     // 无法直接传参；用 Symbol 之外的唯一键名避免与站点脚本冲突。
     (globalThis as any).__PTD_CONTENT_PROPS__ = null;
 
-    const configStore = (await sendMessage("getExtStorage", "config")) as IConfigPiniaStorageSchema;
+    const configStore = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
 
     if (!(configStore?.contentScript?.enabled ?? true)) return;
 
@@ -48,7 +54,7 @@ export default defineContentScript({
     }
 
     // ② PT 站点
-    const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+    const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
     const host = getHostFromUrl(window.location.href);
     const siteId = metadataStore?.siteHostMap?.[host];
 

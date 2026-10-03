@@ -209,23 +209,56 @@ export default class Aria2 extends AbstractBittorrentClient {
 
       const msgId = String(this.msgId);
 
-      this._wsClient.addEventListener("message", (event) => {
+      // 每次调用都 addEventListener("message") 且从不 removeEventListener：
+      // 长会话下监听器无限累积，每个新请求都要过一遍所有历史 handler。
+      // 改成「按 msgId 精确匹配 + 立即摘除自己」的一次性监听。
+      const onMessage = (event: MessageEvent) => {
         const data: jsonRPCResponse<T> = JSON.parse(event.data);
-        if (data.id === msgId) {
-          // 保证消息一致性
-          resolve(data);
-        } else if (data.error) {
-          reject(new Error(data.error?.message || "WS ERROR"));
-        }
-      });
 
-      this._wsClient.send(
-        JSON.stringify({
-          method: methodName,
-          id: msgId,
-          params: postParams,
-        }),
-      );
+        if (data.error && !data.id) {
+          cleanup();
+          reject(new Error(data.error?.message || "WS ERROR"));
+          return;
+        }
+
+        if (data.id !== msgId) {
+          return; // 不是本次请求的响应，交给别的 handler
+        }
+
+        cleanup();
+        if (data.error) {
+          reject(new Error(data.error.message || "WS ERROR"));
+        } else {
+          resolve(data);
+        }
+      };
+
+      // 兜底超时：服务端断开时既不触发 message 也不触发 error，
+      // 原来的 Promise 永远不 settle，调用方（含 UI 的 loading 态）会一直卡住。
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Aria2 ${methodName} timeout (id=${msgId})`));
+      }, this.config.timeout ?? 30e3);
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        this._wsClient.removeEventListener("message", onMessage as EventListener);
+      };
+
+      this._wsClient.addEventListener("message", onMessage as EventListener);
+
+      try {
+        this._wsClient.send(
+          JSON.stringify({
+            method: methodName,
+            id: msgId,
+            params: postParams,
+          }),
+        );
+      } catch (e) {
+        cleanup();
+        reject(e);
+      }
     });
   }
 
@@ -390,7 +423,11 @@ export default class Aria2 extends AbstractBittorrentClient {
   }
 
   private parseRawTorrent(rawTask: rawTask): CTorrent<rawTask> {
-    const progress = rawTask.completedLength / rawTask.totalLength || 0;
+    // CTorrent.progress 的契约是 0-100 的百分数（见 types.ts）。
+    // 这里原本直接用 completedLength/totalLength（0-1 的比值），
+    // 却拿去和 >= 100 比较 —— isCompleted 与「做种」状态恒为 false，
+    // UI 上 Aria2 任务永远显示 0-1% 且永不转为已完成。
+    const progress = rawTask.totalLength > 0 ? (rawTask.completedLength / rawTask.totalLength) * 100 : 0;
     let state = CTorrentState.unknown;
     switch (rawTask.status) {
       case "active":

@@ -4,7 +4,7 @@
  * @PDSDefinitions https://github.com/mantou568/pre-dessert-sites/blob/main/site_config/sites/putao.json
  */
 import { mergeWith } from "es-toolkit";
-import { ETorrentStatus, type ISiteMetadata, type IUserInfo } from "../types";
+import { ETorrentStatus, type ISiteMetadata, type IUserInfo, type TUserInfoProcessStep } from "../types";
 import { parseSizeString, createDocument } from "../utils";
 import NexusPHP, {
   CategoryInclbookmarked,
@@ -13,8 +13,8 @@ import NexusPHP, {
   SchemaMetadata,
 } from "../schemas/NexusPHP.ts";
 
-// 邀请采集配置
-const userInfoWithInvitesInUserDetailsPage = {
+// 邀请采集配置（与 kunlun.ts 的同名导出保持同构；显式标注，勿依赖展开推断）
+const userInfoWithInvitesInUserDetailsPage: ISiteMetadata["userInfo"] = {
   ...SchemaMetadata.userInfo!,
   selectors: {
     ...SchemaMetadata.userInfo!.selectors!,
@@ -47,7 +47,7 @@ const userInfoWithInvitesInUserDetailsPage = {
     },
   },
   process: [
-    ...SchemaMetadata.userInfo!.process!.map((item) => {
+    ...SchemaMetadata.userInfo!.process!.map((item): TUserInfoProcessStep => {
       // 在用户详情页面添加 invites 字段
       if (item.requestConfig.url === "/userdetails.php") {
         return {
@@ -397,7 +397,7 @@ export default class sjtu extends NexusPHP {
       const textBetween = match[0]; // 提取出 </a> 和 <div id="ka"> 之间的文本内容
       const numberMatch = textBetween.match(/(\d+)/);
       if (numberMatch) {
-        flushUserInfo.uploads = numberMatch[0];
+        flushUserInfo.uploads = Number(numberMatch[0]);
       }
     }
 

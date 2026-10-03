@@ -1,4 +1,7 @@
-import type { TAdvanceSearchKeyword } from "@ptd/site";
+// 注意：包内一律使用相对路径导入自身类型。
+// 曾经这里写 @ptd/site 自引用，会解析成第二份类型身份，导致 hdf 等站点
+// 出现 "Two different types with this name exist, but they are unrelated"。
+import type { TAdvanceSearchKeyword } from "./search";
 import type { TSiteID } from "./base";
 
 // 种子当前状态 - 使用字符串字面量枚举支持 i18n

@@ -14,7 +14,9 @@ import {
   type ITorrent,
   type ITorrentTag,
   type ISearchInput,
+  type TUserInfoParseKey,
   CFBlockedError,
+  NetworkError,
   NoTorrentsError,
 } from "../types";
 import { parseSizeString } from "../utils";
@@ -561,7 +563,7 @@ export default class AvistazNetwork extends PrivateSite {
       );
     }
 
-    const hasProfileInfo = [
+    const hasProfileInfo = ([
       "levelName",
       "uploaded",
       "downloaded",
@@ -574,7 +576,9 @@ export default class AvistazNetwork extends PrivateSite {
       "seeding",
       "leeching",
       "hnrUnsatisfied",
-    ].some((key) => typeof flushUserInfo[key] !== "undefined" && flushUserInfo[key] !== "");
+    ] as TUserInfoParseKey[]).some(
+      (key) => typeof flushUserInfo[key] !== "undefined" && flushUserInfo[key] !== "",
+    );
 
     if (hasProfileInfo) {
       flushUserInfo = await mergeUserInfo(flushUserInfo, () =>
@@ -719,7 +723,12 @@ export default class AvistazNetwork extends PrivateSite {
       } catch (error) {
         const response = (error as AxiosError<T>).response;
         if (!response) {
-          throw error;
+          // 没有 response = 超时/DNS/被拦截/用户取消。补上可诊断的上下文，
+          // 否则上层只能看到一个裸的 AxiosError，statusMsg 里没有站点与请求信息。
+          const err = error as AxiosError<T>;
+          throw new NetworkError(
+            `${axiosConfig.method ?? "GET"} ${axiosConfig.url ?? "/"} 请求失败：${err.code ?? ""} ${err.message ?? ""}`.trim(),
+          );
         }
 
         return response;

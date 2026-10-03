@@ -153,7 +153,7 @@ export const siteMetadata: ISiteMetadata = {
   userInfo: {
     ...userInfoWithInvitesInUserDetailsPage,
     selectors: {
-      ...userInfoWithInvitesInUserDetailsPage.selectors,
+      ...userInfoWithInvitesInUserDetailsPage!.selectors!,
       levelId: {
         selector: ["td.rowhead:contains('等级') + td > img"],
         attr: "src",

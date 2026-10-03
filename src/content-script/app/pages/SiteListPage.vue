@@ -56,8 +56,16 @@ function handleLocalDownloadMulti() {
   parseListPage()
     .then(({ torrents }) => {
       for (const torrent of torrents) {
-        sendMessage("downloadTorrent", { torrent, downloaderId: "local" });
+        // 单个种子失败不应中断整批，也不该留下 unhandledRejection
+        sendMessage("downloadTorrent", { torrent, downloaderId: "local" }).catch((e) =>
+          console.error("[PTD] download torrent failed", torrent.title, e),
+        );
       }
+    })
+    .catch((e) => {
+      // parseListPage 失败时必须有兜底，否则只剩 .finally 复位、错误被彻底吞掉
+      console.error("[PTD] parse list page failed", e);
+      runtimeStore.showSnakebar(t("contentScript.noTorrentParsed"), { color: "error" });
     })
     .finally(() => {
       localDownloadMultiStatus.value = false;
@@ -85,6 +93,10 @@ function handleLinkCopyMulti() {
         runtimeStore.showSnakebar(t("contentScript.copyLinkFailed"), { color: "error" });
       }
     })
+    .catch((e) => {
+      console.error("[PTD] parse list page failed", e);
+      runtimeStore.showSnakebar(t("contentScript.copyLinkFailed"), { color: "error" });
+    })
     .finally(() => {
       linkCopyMultiStatus.value = false;
     });
@@ -93,13 +105,18 @@ function handleLinkCopyMulti() {
 const remoteDownloadDialogData = inject<IRemoteDownloadDialogData>("remoteDownloadDialogData")!;
 
 function handleRemoteDownloadMulti(isDefaultSend = false) {
-  parseListPage().then(({ torrents }) => {
-    if (torrents.length > 0) {
-      remoteDownloadDialogData.torrents = torrents;
-      remoteDownloadDialogData.isDefaultSend = isDefaultSend;
-      remoteDownloadDialogData.show = true;
-    }
-  });
+  parseListPage()
+    .then(({ torrents }) => {
+      if (torrents.length > 0) {
+        remoteDownloadDialogData.torrents = torrents;
+        remoteDownloadDialogData.isDefaultSend = isDefaultSend;
+        remoteDownloadDialogData.show = true;
+      }
+    })
+    .catch((e) => {
+      console.error("[PTD] parse list page failed", e);
+      runtimeStore.showSnakebar(t("contentScript.noTorrentParsed"), { color: "error" });
+    });
 }
 
 const parsedTorrents = shallowRef<ITorrent[]>([]);

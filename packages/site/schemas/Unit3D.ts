@@ -13,6 +13,7 @@ import {
   type ISearchInput,
   type ITorrentTag,
   type ISearchCategories,
+  type TUserInfoParseKey,
 } from "../types";
 import { parseTimeToLiveToDate, parseValidTimeString } from "../utils";
 
@@ -635,7 +636,7 @@ export default class Unit3D extends PrivateSite {
     return this.getFieldsData(
       userDetailDocument,
       this.metadata.userInfo?.selectors!,
-      Object.keys(omit(this.metadata.userInfo?.selectors!, ["name"])),
+      Object.keys(omit(this.metadata.userInfo?.selectors!, ["name"])) as TUserInfoParseKey[],
     ) as Partial<IUserInfo>;
   }
 

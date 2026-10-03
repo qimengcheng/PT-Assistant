@@ -57,7 +57,7 @@ PT-assistant-wxt/
 │   ├── messages.ts        # 消息协议（@webext-core/messaging）
 │   ├── storage.ts         # 扩展存储（wxt/storage defineItem 适配层）
 │   └── helper.ts          # 全局助手（原样平移）
-├── dist-latest/           # 交付快照（.output/chrome-mv3 的拷贝，供加载验收）
+├── dist-<会话>/         # 各会话独立的产物目录（PTD_SESSION 驱动，见「命令」）
 └── wxt.config.ts
 ```
 
@@ -71,16 +71,17 @@ PT-assistant-wxt/
 
 ```bash
 pnpm install        # 安装 + wxt prepare（生成 .wxt 类型）
-pnpm dev            # 开发模式（自动开浏览器，HMR）
-pnpm build          # 生产构建 → .output/chrome-mv3
-pnpm build:firefox  # Firefox 构建
+PTD_SESSION=<会话标识> pnpm dev    # 开发模式（产物 → dist-<会话标识>/chrome-mv3）
+PTD_SESSION=<会话标识> pnpm build  # 生产构建（产物 → dist-<会话标识>/chrome-mv3）
+pnpm build          # 不带变量 → .output/chrome-mv3（CI 走这条，别改）
 pnpm compile        # vue-tsc 类型检查
-pnpm zip            # 商店发布包
 ```
 
-交付验收流程：`pnpm build` 通过后把 `.output/chrome-mv3` 拷贝为 `dist-latest/`，
-浏览器扩展以「加载已解压的扩展程序」指向其一，改完代码需重新 build + 在
-`chrome://extensions` 点重载。
+交付验收流程：本仓库常有**多个 agent 会话并行改同一棵工作树**，而 `wxt` 每次构建都会先清空
+输出目录 —— 共享目录会被互相擦掉（踩过：拷贝 `dist-latest` 时抓到另一会话构建中途的空目录）。
+所以构建时必须带 `PTD_SESSION=<会话标识>`，产物直接落在 `dist-<会话标识>/chrome-mv3`，
+浏览器「加载已解压的扩展程序」指**自己这个目录**，不再往共享目录拷贝。
+改完代码需重新 build + 在 `chrome://extensions` 点重载。
 
 ## 踩坑记录（2026-10-02，环境：pnpm 12.8.1 / Node 22）
 
@@ -103,6 +104,29 @@ pnpm zip            # 商店发布包
 11. **不要直接 `import dayjs`**：它只是 antdv-next 的传递依赖，未声明进 package.json，能跑全靠 hoisted 布局。日期区间用 range-picker `@change` 的第二参数 `dateStrings` + 原生 `Date` 即可。
 12. **宽表格溢出双修**：`.content`（flex 子项）必须 `min-width: 0`，否则整页被撑出视口；`a-table` 需 `:scroll="{ x, y }"`（y 固定后横向滚动条才常驻可见，antd 不会像 v-data-table 那样自带滚动）。
 13. **esbuild `transform` API 对 >~512KB 的输入会写系统 Temp 再自删**，本机杀软句柄会导致删除失败（`remove esbuild-*: Access is denied`），`wxt build`/`wxt dev` 全挂。缓解：重启机器或给项目目录 + `%TEMP%` 加杀软排除；长期：控制单 chunk 体积。构建失败会先清空 `.output`，注意别把半成品拷进 `dist-latest`。
+    **已验证的免重启绕法**：把临时目录指到仓库内已被 gitignore 的 `.tmp-build/`，构建即通过（2026-10-03 实测 45.7s，exit=0）：
+
+    ```bash
+    PTD_SESSION=<会话标识> TEMP="$PWD/.tmp-build" TMP="$PWD/.tmp-build" TMPDIR="$PWD/.tmp-build" pnpm build
+    ```
+
+14. **多 agent 并行构建会互相擦产物**（2026-10-03 实测两起）：`wxt` 每次构建先清空 outDir，
+    于是 ① 一个会话把 `.output/chrome-mv3` 拷成交付快照时，另一个会话正在清空它，交付目录直接变 0 文件；
+    ② 另一个会话一次失败的构建把共享的 `.output` 整个留空。
+    **解法**：产物目录按会话隔离 —— `PTD_SESSION=<标识> pnpm build` → `dist-<标识>/chrome-mv3`，
+    谁也不再往共享目录拷贝（实现见 `wxt.config.ts` 的 `outDir`；WXT 0.21.4 的 `wxt build` 没有 `--output` 参数）。
+    不设变量时仍是 `.output`，CI 依赖这个默认值取 `.output/*.zip`。
+
+15. **存储读写不再经 background 代理**（2026-10-03）：`getExtStorage` / `setExtStorage` /
+    `setExtStoragePath` 三条 RPC 与 background 侧的三个 handler 已删除，57 处调用点（offscreen 43、
+    options 9、content 引导 2、site 包 adapter 3）改为直连 `extStore`。
+    原 PT-depiler 的「extStore 不能在 offscreen 中使用」是继承来的旧约束：offscreen 文档是有
+    `storage` 权限的扩展页，content script 也有 storage 权限，两边都能直接读写。
+    直连后 `extStore` 提供 `getItem` / `setItem` / `patchItem(key, path, value)`，
+    并按 key 排队串行化写入 —— 这是补上原先 background 单写者顺带提供的读-改-写保护，
+    但**只在各上下文内部互斥**，不跨上下文（改造前 options 的 pinia 持久化也同样绕过了 background）。
+    代价：content 引导把 wxt/storage 的 StorageItem 机制打了进去，7,969 B → 20,309 B；
+    收益：不再为了读一次 config 就在每个网页上冷启动 MV3 service worker。
 
 ## Roadmap
 

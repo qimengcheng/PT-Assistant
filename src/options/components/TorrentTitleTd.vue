@@ -22,9 +22,10 @@ const configStore = useConfigStore();
 
 interface ISocialInformationData extends ISocialInformation {
   loading?: boolean;
+  /** 请求失败标记：避免 loading 永不清除导致 popover 一直转圈 */
+  error?: boolean;
 }
 
-// @ts-ignore
 const socialInformation = reactive<Record<TSupportSocialSite | string, ISocialInformationData>>({});
 
 const tagsExpanded = ref(false);
@@ -62,9 +63,15 @@ function tempHideTag(name: string) {
 function loadSocialInformation(site: TSupportSocialSite) {
   if (item[`ext_${site}`] && !socialInformation[site]) {
     socialInformation[site] = { loading: true } as ISocialInformationData;
-    sendMessage("getSocialInformation", { site, sid: item[`ext_${site}`] as unknown as string }).then((info) => {
-      socialInformation[site] = info;
-    });
+    sendMessage("getSocialInformation", { site, sid: item[`ext_${site}`] as unknown as string })
+      .then((info) => {
+        socialInformation[site] = info;
+      })
+      .catch((e) => {
+        // 必须兜底：失败时 { loading: true } 永不清除，popover 里会一直显示 Loading....
+        console.error("[PTD] load social information failed", site, e);
+        socialInformation[site] = { error: true } as ISocialInformationData;
+      });
   }
 }
 

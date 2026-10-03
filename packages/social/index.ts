@@ -68,17 +68,30 @@ export async function getSocialSiteInformation(
   if (preferPtGen && PtGenApiSupportSite.includes(site)) {
     console?.log("Use PtGen API to fetch social site information ", { site, id });
 
-    for (const ptGenEndpointElement of new Set<string>([ptGenEndpoint, buildInPtGenApi.at(-1)!.url].filter(Boolean))) {
-      const ptGenUrl = ptGenEndpointElement.replace("<site>", site).replace("<sid>", id);
-      try {
+    const endpoints = [...new Set<string>([ptGenEndpoint, buildInPtGenApi.at(-1)!.url].filter(Boolean))];
+
+    // 并发探测各PtGen 端点而不是串行 await：原来串行时两个端点各 5s 超时，
+    // 最坏要等满 10s 才轮询到内置解析。
+    const results = await Promise.allSettled(
+      endpoints.map(async (endpoint) => {
+        const ptGenUrl = endpoint.replace("<site>", site).replace("<sid>", id);
         const req = await axios.get(ptGenUrl, { timeout, responseType: "json" });
-        if (req.status === 200) {
-          const data = req.data as any;
-          if (data.success !== false) {
-            return socialModule.transformPtGen!(data);
-          }
+        const data = req.data as any;
+        if (req.status !== 200 || data?.success === false) {
+          throw new Error(`PtGen ${endpoint} responded unusable`);
         }
-      } catch (error) {}
+        return socialModule.transformPtGen!(data);
+      }),
+    );
+
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value) {
+        return result.value;
+      }
+      // 端点不可用是常态（站点没上 PtGen、网络抖动），记 debug 即可不该刷 error
+      if (result.status === "rejected") {
+        console.debug("[social] PtGen endpoint failed", site, result.reason);
+      }
     }
   }
 

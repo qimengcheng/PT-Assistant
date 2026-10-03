@@ -16,11 +16,11 @@ import {
   type TSiteID,
 } from "@ptd/site";
 
-import { sendMessage } from "@/messages.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types.ts";
+import { extStore } from "@/storage.ts";
 
 export async function getSiteUserConfig(siteId: TSiteID, flush = false) {
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const storedSiteUserConfig = metadataStore?.sites?.[siteId] ?? {};
 
   const siteMetaData = await getDefinedSiteMetadata(siteId);

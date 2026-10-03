@@ -4,6 +4,20 @@
 import type { AxiosInstance } from "axios";
 import { sendMessage } from "@/messages.ts";
 
+/**
+ * 动态 session 规则的 ID 号段与自增计数器。
+ *
+ * 用固定前缀（而不是随机数）是为了和 background/utils/webRequest.ts 的业务规则号段隔离，
+ * 也让 background 能在启动时按号段前缀批量清理上次会话遗留的僵尸规则。
+ */
+export const DNR_ID_BASE = 1_000_000_000;
+let dnrRuleSeq = 0;
+
+function nextDnrRuleId(): number {
+  dnrRuleSeq = (dnrRuleSeq + 1) % 1_000_000;
+  return DNR_ID_BASE + dnrRuleSeq;
+}
+
 export const unsafeHeaders: { [key: string]: boolean } = {
   "user-agent": true,
   cookie: true,
@@ -73,8 +87,12 @@ export function setupReplaceUnsafeHeader(axios: AxiosInstance): AxiosAllowUnsafe
       }
 
       if (requestHeaders.length > 0) {
-        // 生成一个随机的请求 ID，与 chrome.declarativeNetRequest 匹配
-        const dummyHeaderRequestId = Math.floor(Math.random() * 1e7);
+        // 单调递增的请求 ID，与 chrome.declarativeNetRequest 匹配。
+        // 原来用 Math.random()*1e7：并发数百个请求时生日碰撞概率约 1%，
+        // 一旦撞上，updateSessionRules 的 removeRuleIds+addRules 会覆盖另一条在途请求的规则，
+        // 那条请求就会拿到错误的请求头（比如 M-Team 的 Origin 被换成别的站点的）。
+        // 统一加 DNR_ID_BASE 前缀，与 webRequest.ts 的业务规则号段隔离。
+        const dummyHeaderRequestId = nextDnrRuleId();
         (config as any).dummyHeaderRequestId = dummyHeaderRequestId;
 
         const requestUrl = axios.getUri({ baseURL: config.baseURL, url: config.url });
@@ -100,10 +118,17 @@ export function setupReplaceUnsafeHeader(axios: AxiosInstance): AxiosAllowUnsafe
     return config;
   });
 
-  function removeDummyHeaderRequestId(config: any) {
-    if (config?.config?.dummyHeaderRequestId) {
-      // noinspection JSIgnoredPromiseFromCall
-      sendMessage("removeDNRSessionRuleById", config.config.dummyHeaderRequestId);
+  async function removeDummyHeaderRequestId(config: any) {
+    const ruleId = config?.config?.dummyHeaderRequestId;
+    if (ruleId === undefined || ruleId === null) {
+      return;
+    }
+    try {
+      await sendMessage("removeDNRSessionRuleById", ruleId);
+    } catch (e) {
+      // 不能静默：规则删不掉会一直驻留在 declarativeNetRequest 里，
+      // 累积到上限后 updateSessionRules 直接抛错，该扩展之后所有需要 unsafe header 的请求全部失败。
+      console.warn("[DNR] failed to remove session rule", ruleId, e);
     }
   }
 

@@ -26,6 +26,7 @@ import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate } from "@/options/utils.ts";
+import { toPagination } from "@/options/components/tableSorters.ts";
 import type { ISearchSolutionMetadata, TSolutionKey } from "@/shared/types.ts";
 
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
@@ -218,12 +219,15 @@ const columns = [
   { title: t("common.action"), key: "action", width: 180, align: "center" as const },
 ];
 
-const pagination = computed(() => ({
-  current: 1,
-  pageSize: configStore.tableBehavior.SetSearchSolution.itemsPerPage,
-  showSizeChanger: true,
-  showTotal: (total: number) => `共 ${total} 项`,
-}));
+const pagination = computed(() =>
+  // 走 toPagination 拿 -1/0 兜底：旧版 Vuetify 用 -1 表示「不分页」，这个约定被搬进了
+  // config 默认值，而 antd Table 是前端分页，pageSize=-1 会让 slice(0,-1) 吃掉最后一行、
+  // 页数算成负数（SetSite 已经踩过同一个坑）。
+  // 另外不能写 current:1 —— 受控值写死会锁死在第 1 页，页码交给 a-table 内部管理。
+  toPagination(configStore.tableBehavior.SetSearchSolution.itemsPerPage, 10, {
+    showTotal: (total: number) => `共 ${total} 项`,
+  }),
+);
 
 function onTableChange(pag: any) {
   if (pag.pageSize) {

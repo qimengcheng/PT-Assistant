@@ -41,34 +41,20 @@ function openItem() {
   window.open(item.url, "_blank", "noopener,noreferrer,nofollow");
 }
 
-function secondsToISO8601(rawSeconds: number) {
-  let seconds = Math.abs(rawSeconds);
-
-  let hours = Math.floor(seconds / 3600);
+/**
+ * 秒 → 人类可读的钟面时长（H:MM:SS / M:SS）。
+ * 旧实现反向转成 ISO-8601 的 "PT1H30M" 机器码直接展示给用户，已修正。
+ */
+function formatDuration(rawSeconds: number) {
+  let seconds = Math.floor(Math.abs(rawSeconds));
+  const hours = Math.floor(seconds / 3600);
   seconds %= 3600;
+  const minutes = Math.floor(seconds / 60);
+  seconds = seconds % 60;
 
-  let minutes = Math.floor(seconds / 60);
-  seconds = Math.floor(seconds % 60); // 取整秒数
-
-  let duration = "P";
-
-  // 仅在有天数时添加
-  if (hours >= 24) {
-    const days = Math.floor(hours / 24);
-    duration += `${days}D`;
-    hours %= 24;
-  }
-
-  // 如果有小时、分钟或秒，添加T分隔符
-  if (hours > 0 || minutes > 0 || seconds > 0) {
-    duration += "T";
-
-    if (hours > 0) duration += `${hours}H`;
-    if (minutes > 0) duration += `${minutes}M`;
-    if (seconds > 0) duration += `${seconds}S`;
-  }
-
-  return duration;
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${minutes}:${ss}`;
 }
 </script>
 
@@ -103,7 +89,7 @@ function secondsToISO8601(rawSeconds: number) {
           <span class="info-label">{{ t("MediaServerEntity.ItemInformationDialog.duration") }}</span>
           <a-tag color="green">
             <ClockCircleOutlined />
-            {{ secondsToISO8601(item.duration ?? 0) }}
+            {{ formatDuration(item.duration ?? 0) }}
           </a-tag>
         </div>
 

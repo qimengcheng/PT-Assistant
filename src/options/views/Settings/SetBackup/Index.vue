@@ -53,6 +53,17 @@ const fullTableHeader: TableColumnsType<IBackupServerMetadata> = [
 ];
 
 const tableSelected = ref<TBackupServerKey[]>([]);
+
+/** 工具栏搜索：按名称 / 类型过滤备份服务器（原来输入框没绑任何东西，是死控件） */
+const searchKey = ref<string>("");
+const filteredBackupServers = computed<IBackupServerMetadata[]>(() => {
+  const kw = searchKey.value.trim().toLowerCase();
+  if (!kw) return metadataStore.getBackupServers;
+  return metadataStore.getBackupServers.filter(
+    (server) =>
+      (server.name ?? "").toLowerCase().includes(kw) || (server.type ?? "").toLowerCase().includes(kw),
+  );
+});
 /** a-table 没有 v-model:selectedRowKeys，行选择要显式给 row-selection */
 const rowSelection = computed<TableRowSelection<IBackupServerMetadata>>(() => ({
   selectedRowKeys: tableSelected.value,
@@ -153,12 +164,12 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 
       <div style="flex: 1" />
 
-      <a-input allow-clear placeholder="Search" size="small" style="width: 320px; max-width: 500px" />
+      <a-input v-model:value="searchKey" allow-clear :placeholder="t('common.search')" size="small" style="width: 320px; max-width: 500px" />
     </div>
 
     <a-table
       :columns="fullTableHeader"
-      :data-source="metadataStore.getBackupServers"
+      :data-source="filteredBackupServers"
       :row-key="(record: IBackupServerMetadata) => record.id"
       :row-selection="rowSelection"
       :pagination="false"
@@ -201,7 +212,7 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
         </template>
 
         <template v-else-if="column.key === 'lastBackupAt'">
-          {{ record.lastBackupAt ? formatDate(record.lastBackupAt) : "notBackup" }}
+          {{ record.lastBackupAt ? formatDate(record.lastBackupAt) : t("SetBackup.table.notBackup") }}
         </template>
 
         <template v-else-if="column.key === 'enabled'">

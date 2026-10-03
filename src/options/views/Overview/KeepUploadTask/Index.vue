@@ -396,8 +396,15 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
     type="warning"
     show-icon
     :message="t('KeepUploadTask.warning.title')"
-    :description="`1. ${t('KeepUploadTask.warning.item1')}\n2. ${t('KeepUploadTask.warning.item2')}\n3. ${t('KeepUploadTask.warning.item3')}`"
-  />
+  >
+    <!-- a-alert 的 description 渲染为普通 div，字符串里的 \n 不会换行，
+         旧写法三条注意事项会被压成一行；改用插槽逐条渲染 -->
+    <template #description>
+      <div>1. {{ t('KeepUploadTask.warning.item1') }}</div>
+      <div>2. {{ t('KeepUploadTask.warning.item2') }}</div>
+      <div>3. {{ t('KeepUploadTask.warning.item3') }}</div>
+    </template>
+  </a-alert>
 </template>
 
 <style scoped lang="scss">

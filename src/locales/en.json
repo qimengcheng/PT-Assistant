@@ -128,6 +128,7 @@
     "detail": "Details",
     "loadMore": "Load More",
     "noItems": "No Items, use Search Input or Load More Button to Load",
+    "noItemsBeforeSearch": "Enter a keyword to start searching",
     "searchPlaceholder": "Search term"
   },
   "MyClient": {
@@ -285,6 +286,7 @@
         "viewRaw": "View Raw Data"
       },
       "deleteConfirm": "Confirm to delete this history data?",
+      "deleteError": "Failed to delete history data",
       "title": "User History Data"
     },
     "UserLevelRequirementsTd": {
@@ -595,6 +597,16 @@
       "missingVersion": "Backup data is missing version info, cannot restore",
       "ptppImport": "PT-Plugin-Plus Backup Import",
       "ptppPrompt": "Need to import PT-Plugin-Plus backup?",
+      "quickDuration": {
+        "P1D": "1 day",
+        "P1M": "1 month",
+        "P1W": "1 week",
+        "P1Y": "1 year",
+        "P6M": "6 months",
+        "PT12H": "12 hours",
+        "PT1H": "1 hour",
+        "PT30M": "30 minutes"
+      },
       "restoreOptions": "Restore Options",
       "retry": "Retry",
       "selectFile": "Select Backup File",

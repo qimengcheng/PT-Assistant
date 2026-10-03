@@ -9,11 +9,11 @@ const configStore = useConfigStore();
 
 const langOptions = definedLangMetaData.map((meta) => ({ value: meta.value, label: meta.title }));
 
-const themeOptions = [
-  { value: "light", label: "浅色" },
-  { value: "dark", label: "深色" },
-  { value: "auto", label: "跟随系统" },
-];
+// 「显示模式（浅色/深色/跟随系统）」选项已移除：全局写死 color-scheme: only light
+// （entrypoints/options/style.css），App.vue 也未接 dark algorithm，切换没有任何效果。
+// 等真正实现深色主题后再加回（configStore.theme 字段保留，不动存量数据）。
+// 「小屏设备下自动折叠导航栏」同理：侧栏目前没有任何折叠实现，开关先移除
+// （configStore.autoToggleNavBarOnDisplayChange 字段保留）。
 
 const socialSiteSearchByOptions = [
   { value: "id", label: "使用 ID 搜索" },
@@ -43,11 +43,6 @@ const contentScriptToggles = [
             <a-select v-model:value="configStore.lang" :options="langOptions" />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
-          <a-form-item label="显示模式">
-            <a-select v-model:value="configStore.theme" :options="themeOptions" />
-          </a-form-item>
-        </a-col>
       </a-row>
 
       <div class="group">
@@ -64,10 +59,6 @@ const contentScriptToggles = [
           <div class="switch-item">
             <a-switch v-model:checked="configStore.showReleaseNoteOnVersionChange" size="small" />
             <span class="label">版本更新后显示更新说明</span>
-          </div>
-          <div class="switch-item">
-            <a-switch v-model:checked="configStore.autoToggleNavBarOnDisplayChange" size="small" />
-            <span class="label">小屏设备下自动折叠导航栏</span>
           </div>
         </div>
       </div>

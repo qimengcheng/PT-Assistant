@@ -1,5 +1,6 @@
 import { intersection, isEqual, toMerged } from "es-toolkit";
 import { formatDate } from "date-fns";
+import PQueue from "p-queue";
 import { getBackupServer, IBackupData, IBackupFileInfo } from "@ptd/backupServer";
 import { backupDataToJSZipBlob, hasBackupRetentionToApply, pruneBackupFiles } from "@ptd/backupServer/utils.ts";
 import AbstractBackupServer from "@ptd/backupServer/AbstractBackupServer.ts";
@@ -17,6 +18,7 @@ import type {
 
 import { logger } from "./logger.ts";
 import { ptdIndexDb } from "../adapter/indexdb.ts";
+import { extStore } from "@/storage.ts";
 
 export const storageKey = [
   "config",
@@ -27,7 +29,7 @@ export const storageKey = [
 ] as TExtensionStorageKey[];
 
 export async function createBackupData(backupFields: TBackupFields[] = []): Promise<IBackupData> {
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
 
   const backupData: IBackupData = {};
 
@@ -46,7 +48,7 @@ export async function createBackupData(backupFields: TBackupFields[] = []): Prom
   // 处理直接从 chrome.storage.local 读取的字段
   for (const field of storageKey) {
     if (backupFields.includes(field as TBackupFields)) {
-      backupData[field] = await sendMessage("getExtStorage", field);
+      backupData[field] = await extStore.getItem(field);
     }
   }
 
@@ -69,7 +71,7 @@ export async function createBackupData(backupFields: TBackupFields[] = []): Prom
 
 export async function getBackupServerInstance(backupServerId: TBackupServerKey): Promise<AbstractBackupServer<any>> {
   logger({ msg: `Get backup server instance for ID: ${backupServerId}` });
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const backupServerConfig = metadataStore.backupServers[backupServerId];
   return await getBackupServer(backupServerConfig);
 }
@@ -85,7 +87,7 @@ export async function applyBackupRetention(
   backupServerId: TBackupServerKey,
   keepFilename?: string,
 ): Promise<IBackupFileInfo[]> {
-  const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+  const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const retention = metadataStore.backupServers[backupServerId]?.retention;
 
   if (!hasBackupRetentionToApply(retention)) {
@@ -137,15 +139,21 @@ export async function exportBackupData(
   const backupData = await createBackupData(backupFields);
   const backupFilename = `PTD_backup_${formatDate(new Date(), "yyyyMMdd'T'HHmm")}.zip`;
 
-  const configStore = (await sendMessage("getExtStorage", "config")) as IConfigPiniaStorageSchema;
+  const configStore = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
   const encryptionKey = configStore?.backup?.encryptionKey ?? "";
 
   logger({ msg: `Exporting backup data to ${backupServerId}`, data: { backupFields, backupFilename } });
   if (backupServerId === "local") {
     const jsZipBlob = await backupDataToJSZipBlob(backupData, encryptionKey);
     const blobUrl = URL.createObjectURL(jsZipBlob);
-    await sendMessage("downloadFile", { url: blobUrl, filename: backupFilename, conflictAction: "uniquify" });
-    return true;
+    try {
+      await sendMessage("downloadFile", { url: blobUrl, filename: backupFilename, conflictAction: "uniquify" });
+      return true;
+    } finally {
+      // 必须回收：blob: URL 不会自动释放，offscreen 文档整个生命周期都活着，
+      // 每次本地导出都泄漏一份完整备份 zip 的字节。同文件的 download.ts 里有对应写法。
+      URL.revokeObjectURL(blobUrl);
+    }
   } else {
     const backupServerInstance = await getBackupServerInstance(backupServerId);
     backupServerInstance.setEncryptionKey(encryptionKey);
@@ -153,9 +161,9 @@ export async function exportBackupData(
 
     // 更新最后一次备份时间
     if (backupStatus) {
-      const metadataStore = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
+      const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
       metadataStore.backupServers[backupServerId].lastBackupAt = new Date().getTime();
-      await sendMessage("setExtStorage", { key: "metadata", value: metadataStore });
+      await extStore.setItem("metadata", metadataStore);
 
       // 备份成功后，按照保留策略清理历史备份
       await applyBackupRetention(backupServerId, backupFilename).catch((e) => {
@@ -197,7 +205,7 @@ export async function restoreBackupData(
       let fieldData = restoreData[field] as IExtensionStorageSchema[typeof field];
       if (fieldData) {
         if (field === "userInfo" && keepExistUserInfo) {
-          const userInfoStore = ((await sendMessage("getExtStorage", "userInfo")) ?? {}) as TUserInfoStorageSchema;
+          const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
           fieldData = toMerged(fieldData, userInfoStore);
         }
 
@@ -210,7 +218,7 @@ export async function restoreBackupData(
         if (field === "metadata") {
           const restoredMetadata = fieldData as IMetadataPiniaStorageSchema;
           if (restoredMetadata?.backupServers) {
-            const existingMetadata = ((await sendMessage("getExtStorage", "metadata")) ??
+            const existingMetadata = ((await extStore.getItem("metadata")) ??
               {}) as IMetadataPiniaStorageSchema;
             const existingServers = existingMetadata.backupServers ?? {};
             const mergedServers: IMetadataPiniaStorageSchema["backupServers"] = { ...restoredMetadata.backupServers };
@@ -233,7 +241,7 @@ export async function restoreBackupData(
           }
         }
 
-        await sendMessage("setExtStorage", { key: field, value: fieldData });
+        await extStore.setItem(field, fieldData);
       }
     }
   }
@@ -242,16 +250,26 @@ export async function restoreBackupData(
   if (restoreFields.includes("cookies")) {
     const now = new Date().getTime() / 1000;
 
-    for (const cookieData of Object.values(restoreData.cookies!)) {
-      for (const cookie of cookieData) {
-        // 延长 cookie 过期时间
-        if (expandCookieMinutes > 0) {
-          cookie.expirationDate = Math.max(cookie.expirationDate ?? 0, now) + expandCookieMinutes * 60;
-        }
+    // 并发 + 限流，而不是原来的纯串行 await：
+    // 一次恢复涉及几十个站点 × 每站几十个 cookie = 上千次跨上下文消息往返
+    // （每次还夹一次 chrome.cookies.get），串行要等几十秒到几分钟，
+    // 期间整个 offscreen 被占死。p-queue 限并发避免一次性打爆 background。
+    const cookieQueue = new PQueue({ concurrency: 16 });
 
-        await sendMessage("setCookie", cookie as unknown as chrome.cookies.SetDetails);
-      }
-    }
+    await Promise.all(
+      Object.values(restoreData.cookies!).flatMap((cookieData) =>
+        cookieData.map((cookie) =>
+          cookieQueue.add(async () => {
+            // 延长 cookie 过期时间
+            if (expandCookieMinutes > 0) {
+              cookie.expirationDate = Math.max(cookie.expirationDate ?? 0, now) + expandCookieMinutes * 60;
+            }
+
+            await sendMessage("setCookie", cookie as unknown as chrome.cookies.SetDetails);
+          }),
+        ),
+      ),
+    );
   }
 
   return true;

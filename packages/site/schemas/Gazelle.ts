@@ -411,7 +411,7 @@ export class GazelleBase extends PrivateSite {
       const torrentAnothers = Sizzle("tr.torrent", TListDocument);
       torrentAnothers.forEach((element) => {
         const sizeAnother = Sizzle(`td:nth-child(${sizeIndex + 1})`, element);
-        if (sizeAnother && sizeAnother.length >= 0) {
+        if (sizeAnother && sizeAnother.length > 0) {
           userSeedingTorrent.seedingSize! += parseSizeString(
             (sizeAnother[0] as HTMLElement).innerText.trim().replace(/,/g, ""),
           );

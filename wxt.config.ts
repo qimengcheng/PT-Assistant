@@ -20,8 +20,24 @@ const siteIconFiles = (() => {
 // 改用 package.json 的 version（发布流程本来就三处同步 bump）。
 const pkgVersion = (await import("./package.json", { with: { type: "json" } })).default.version;
 
+/**
+ * 多 agent 共用同一个 git 工作树时的产物隔离：`wxt` 每次构建都会**先清空 outDir**，
+ * 两个会话并行构建就会互相擦（实测发生过：A 的 dist-latest 同步抓到 B 构建中途的空目录）。
+ *
+ * 注意 WXT 0.21.4 的 `wxt build` **没有 `--output` 参数**（只有 root/config/mode/browser/
+ * filter-entrypoint/mv3/analyze/debug/level），隔离只能走这里的 `outDir` 配置，用环境变量传：
+ *
+ *     PTD_SESSION=qwenwork pnpm build     → dist-qwenwork/chrome-mv3
+ *     PTD_SESSION=workbuddy pnpm dev      → dist-workbuddy/chrome-mv3
+ *
+ * 不设 PTD_SESSION 时仍是 WXT 默认的 `.output` —— CI（build.yml/release.yml）就没有并发会话，
+ * 它按 `.output/*.zip` 取包，绝不能被这条改动影响。
+ */
+const sessionTag = (process.env.PTD_SESSION ?? "").trim();
+
 export default defineConfig({
   srcDir: "src",
+  outDir: sessionTag ? `dist-${sessionTag}` : ".output",
   modules: ["@wxt-dev/module-vue"],
   manifest: {
     name: "PT Assistant",

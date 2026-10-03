@@ -21,7 +21,15 @@ export type SiteSchema =
   | "Unit3D"
   | string;
 
-type TUserInfoParseKey = keyof Omit<IUserInfo, "site" | "status" | "updateAt">;
+/**
+ * 可在 userInfo 选择器/process.fields/pickLast 中出现的字段键。
+ * 排除运行期元数据键（site/status/updateAt），它们不参与页面解析。
+ * 站点定义里做键数组断言时统一用本类型，不要用更宽的 keyof IUserInfo。
+ */
+export type TUserInfoParseKey = keyof Omit<IUserInfo, "site" | "status" | "updateAt">;
+
+/** userInfo.process 数组中单个步骤的类型，供站点定义 map/改写步骤时标注返回值 */
+export type TUserInfoProcessStep = NonNullable<NonNullable<ISiteMetadata["userInfo"]>["process"]>[number];
 
 export interface ISiteUserInputMeta {
   name: string; // 存储在 userConfig.inputSetting 中的名称

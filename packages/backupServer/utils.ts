@@ -220,7 +220,9 @@ export function localSort(files: IBackupFileInfo[], options: IBackupFileListOpti
     const orderMode: EListOrderMode = options.orderMode ?? EListOrderMode.desc;
     const orderBy: EListOrderBy = options.orderBy ?? EListOrderBy.time;
 
-    files.sort((a, b) => {
+    // 拷贝一份再排：原来直接 files.sort() 会就地改调用方传入的数组，
+    // 调用者若还持有该引用（比如刚从 list() 拿到的结果又复用到别处）顺序会被意外改掉。
+    return [...files].sort((a, b) => {
       let v1, v2;
       switch (orderBy) {
         case EListOrderBy.name:

@@ -3,6 +3,11 @@ export class CFBlockedError extends Error {}
 export class NeedLoginError extends Error {}
 export class NoTorrentsError extends Error {}
 export class NoUserInputError extends Error {} // 必填的用户输入设置（如 Token/key）未填写
+/**
+ * 请求根本没拿到 HTTP 响应：超时 / DNS 失败 / 被扩展或浏览器拦截 / 用户取消。
+ * 与「拿到了响应但状态码是 4xx/5xx」区分开，便于上层给出可诊断的错误文案。
+ */
+export class NetworkError extends Error {}
 
 export type TSiteID = string; // should match regexp /[0-9a-z]+/
 export type TSiteHost = string;

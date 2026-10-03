@@ -11,9 +11,10 @@ import {
   SyncOutlined,
 } from "@antdv-next/icons";
 import { useBreakpoint } from "antdv-next";
-import type { TableColumnsType, TablePaginationConfig, TableSorterResult } from "antdv-next";
+import type { TableColumnsType } from "antdv-next";
 
 import { sendMessage } from "@/messages.ts";
+import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { formatDate } from "@/options/utils.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import type {
@@ -47,11 +48,9 @@ const isNarrow = computed(() => screens.value?.xs === true || screens.value?.sm 
 
 const { tableFilterRef, tableWaitFilterRef, tableFilterFn } = tableCustomFilter;
 
-const persistedSort = computed(() => configStore.tableBehavior.DownloadHistory?.sortBy?.[0]);
-const antdSortOrder = computed<"ascend" | "descend" | null>(() => {
-  const s = persistedSort.value;
-  if (!s) return null;
-  return s.order === "asc" ? "ascend" : "descend";
+const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("DownloadHistory", {
+  defaultPageSize: 10,
+  size: "small",
 });
 
 const columns = computed<TableColumnsType<ITorrentDownloadMetadata>>(() => [
@@ -71,7 +70,7 @@ const columns = computed<TableColumnsType<ITorrentDownloadMetadata>>(() => [
     align: "center",
     width: 180,
     sorter: (a, b) => (a.downloadAt ?? 0) - (b.downloadAt ?? 0),
-    sortOrder: persistedSort.value?.key === "downloadAt" ? antdSortOrder.value : null,
+    sortOrder: sortOrderOf("downloadAt"),
   },
   { title: t("DownloadHistory.table.status"), key: "downloadStatus", align: "center", width: 120 },
   { title: t("common.action"), key: "action", align: "center", width: 110 },
@@ -117,28 +116,6 @@ async function deleteDownloadHistory(downloadHistoryIds: TTorrentDownloadKey[]) 
 async function confirmDeleteDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
   tableSelected.value = tableSelected.value.filter((id) => id !== downloadHistoryId);
   return await sendMessage("deleteDownloadHistoryById", downloadHistoryId);
-}
-
-const pagination = computed<TablePaginationConfig>(() => ({
-  pageSize: configStore.tableBehavior.DownloadHistory?.itemsPerPage ?? 10,
-  showSizeChanger: true,
-  size: "small",
-}));
-
-function handleTableChange(
-  page: TablePaginationConfig,
-  _filters: unknown,
-  sorter: TableSorterResult | TableSorterResult[],
-) {
-  if (page.pageSize) {
-    configStore.updateTableBehavior("DownloadHistory", "itemsPerPage", page.pageSize);
-  }
-  const single = Array.isArray(sorter) ? sorter[0] : sorter;
-  if (single?.order && single.columnKey) {
-    configStore.updateTableBehavior("DownloadHistory", "sortBy", [
-      { key: String(single.columnKey), order: single.order === "ascend" ? "asc" : "desc" },
-    ]);
-  }
 }
 
 const showDownloadDetailDialog = ref<boolean>(false);

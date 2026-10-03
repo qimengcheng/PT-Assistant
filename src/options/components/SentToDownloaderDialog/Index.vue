@@ -227,21 +227,34 @@ function dialogLeave() {
     <a-form v-else layout="vertical">
       <!-- 快速下载选项 -->
       <div v-if="quickSendToClient" style="padding: 0">
-        <!-- 不传 data-source：antdv List 传空数组会渲染内置「暂无数据」占位，这里直接渲染子项 -->
-        <a-list v-if="sortedEnabledDownloadersBySite.length > 0" size="small">
+        <!--
+          这里原来写的是 <a-list>/<a-list-item>/<a-list-item-meta>：antdv-next 1.5.6 根本没有这些
+          组件（根入口导出的是虚拟滚动的 `Listy`，全量 install 注册名里也只有 AListy），
+          未注册的标签会被 Vue 当原生未知元素渲染，而命名插槽（#avatar/#extra/#title）的内容
+          在原生元素上根本挂不上去 —— 结果这一栏是一片可以点击的空白。
+          与 MyClient/ClientStatusDialog.vue、TorrentDetailDialog.vue 同样的处理：改普通 div + scoped 样式。
+        -->
+        <div v-if="sortedEnabledDownloadersBySite.length > 0" class="quick-send-list">
           <template v-for="downloader in sortedEnabledDownloadersBySite" :key="downloader.id">
-            <a-list-item
+            <div
               v-for="path in ['', ...(downloader.suggestFolders ?? [])]"
-              :key="path"
+              :key="`${downloader.id}::${path}`"
+              class="quick-send-item"
               style="cursor: pointer"
               @click="() => quickSendToDownloader(downloader, path)"
             >
-              <template #extra>
-                <a-dropdown
-                  v-if="(downloader.suggestTags ?? []).length > 0"
-                  trigger="click"
-                  @click.stop
-                >
+              <div class="quick-send-item-main">
+                <img class="downloader-avatar" :src="getDownloaderIcon(downloader.type)" :alt="downloader.type" />
+                <div class="quick-send-item-body">
+                  <div class="quick-send-item-title" :title="downloaderTitle(downloader)">
+                    {{ downloaderTitle(downloader) }}
+                  </div>
+                  <div v-if="path" class="quick-send-item-subtitle" :title="path">{{ path }}</div>
+                </div>
+              </div>
+
+              <div v-if="(downloader.suggestTags ?? []).length > 0" class="quick-send-item-extra" @click.stop>
+                <a-dropdown trigger="click">
                   <a-button type="text" size="small">
                     <template #icon><EllipsisOutlined /></template>
                   </a-button>
@@ -257,19 +270,10 @@ function dialogLeave() {
                     </a-menu>
                   </template>
                 </a-dropdown>
-              </template>
-
-              <a-list-item-meta>
-                <template #avatar>
-                  <img class="downloader-avatar" :src="getDownloaderIcon(downloader.type)" :alt="downloader.type" />
-                </template>
-                <a-list-item-meta-title>
-                  <a-list-item-meta-title :title="downloaderTitle(downloader)" :subtitle="path" />
-                </a-list-item-meta-title>
-              </a-list-item-meta>
-            </a-list-item>
+              </div>
+            </div>
           </template>
-        </a-list>
+        </div>
         <a-alert v-else type="warning" show-icon>
           {{
             currentSiteIds.length > 0 && configStore.download.allowDownloaderFilterForSite
@@ -298,17 +302,12 @@ function dialogLeave() {
               @change="onDownloaderChange"
             >
               <template #option="opt">
-                <a-list-item-meta style="padding: 4px 0">
-                  <template #avatar>
-                    <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.type" />
-                  </template>
-                  <a-list-item-meta-content>
-                    <a-list-item-meta-title :title="opt.label" />
-                  </a-list-item-meta-content>
-                  <template #extra>
-                    <a-tag color="blue">{{ opt.raw.type }}</a-tag>
-                  </template>
-                </a-list-item-meta>
+                <!-- 同上的 a-list-item-meta，antdv-next 无此组件，改普通 flex 容器 -->
+                <div class="downloader-option">
+                  <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.type" />
+                  <span class="downloader-option-label" :title="opt.label">{{ opt.label }}</span>
+                  <a-tag color="blue">{{ opt.raw.type }}</a-tag>
+                </div>
               </template>
             </a-select>
           </a-col>
@@ -407,5 +406,60 @@ function dialogLeave() {
 .downloader-avatar {
   width: 24px;
   height: 24px;
+  flex: none;
+}
+
+// 原本由 a-list / a-list-item 承担的版式，色值对齐 antd 的 token（文字 0.88 / 次要 0.45 / 分隔线 0.06）
+.quick-send-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(5, 5, 5, 0.06);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.quick-send-item-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.quick-send-item-body {
+  min-width: 0;
+}
+
+.quick-send-item-title {
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.quick-send-item-subtitle {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.quick-send-item-title,
+.quick-send-item-subtitle,
+.downloader-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.downloader-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.downloader-option-label {
+  flex: 1;
+  min-width: 0;
 }
 </style>

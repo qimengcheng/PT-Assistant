@@ -114,7 +114,9 @@ export async function setCookie(cookie: chrome.cookies.SetDetails, force: boolea
 }
 
 onMessage("setCookie", async ({ data }) => {
-  return await setCookie(data);
+  // force 是我们自己的控制字段（见 messages.ts 的说明），不能透传给 chrome.cookies.set
+  const { force = false, ...details } = data;
+  return await setCookie(details as chrome.cookies.SetDetails, force);
 });
 
 onMessage("removeCookie", async ({ data }) => {

@@ -20,7 +20,6 @@ import {
 import { omit } from "es-toolkit";
 import { isEmpty } from "es-toolkit/compat";
 
-import { sendMessage } from "@/messages.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
@@ -28,6 +27,7 @@ import type { IPtppDumpUserInfo, IPtppUserInfo, TUserInfoStorageSchema } from "@
 
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import { extStore } from "@/storage.ts";
 
 const showDialog = defineModel<boolean>();
 const { ptppUserData } = defineProps<{
@@ -107,7 +107,9 @@ function statusInfo(host: string) {
 }
 
 function transferUserInfo(userInfo: IPtppUserInfo) {
-  const newUserInfo = {} as IUserInfo;
+  // 这是旧版 PTPP 数据的导入边界：键集合比 IUserInfo 宽且值类型不可信，
+  // 先用宽松记录承载，函数末尾再断言为 IUserInfo，避免在 IUserInfo 上做动态 string 索引
+  const newUserInfo: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(userInfo)) {
     if (userInfoTransferMap[key as keyof IPtppUserInfo]) {
       const transfer = userInfoTransferMap[key as keyof IPtppUserInfo];
@@ -119,13 +121,13 @@ function transferUserInfo(userInfo: IPtppUserInfo) {
         newUserInfo[transfer] = value;
       } else {
         const { key, format = undefined } = transfer as TUserInfoTransferFull;
-        newUserInfo[key as keyof IPtppUserInfo] = format ? format(value) : value;
+        newUserInfo[key as string] = format ? format(value) : value;
       }
     } else {
       newUserInfo[key] = value;
     }
   }
-  return newUserInfo;
+  return newUserInfo as unknown as IUserInfo;
 }
 
 async function doImport() {
@@ -156,7 +158,7 @@ async function doImportInternal() {
     }
 
     // 读出目前所有的 userInfo
-    const userInfoStorage = ((await sendMessage("getExtStorage", "userInfo")) as TUserInfoStorageSchema) ?? {};
+    const userInfoStorage = ((await extStore.getItem("userInfo")) as TUserInfoStorageSchema) ?? {};
 
     // 开始转换数据
     for (const [host, data] of Object.entries(ptppUserData)) {
@@ -183,7 +185,7 @@ async function doImportInternal() {
     }
 
     // 更新 userInfo
-    await sendMessage("setExtStorage", { key: "userInfo", value: userInfoStorage });
+    await extStore.setItem("userInfo", userInfoStorage);
     await metadataStore.$save();
 
     runtimeStore.showSnakebar("PT-Plugin-Plus 用户数据导入成功", { color: "success" });

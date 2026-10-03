@@ -8,6 +8,7 @@ import {
   type ITorrent,
   type ISiteMetadata,
   type ISearchInput,
+  type TUserInfoParseKey,
   NeedLoginError,
 } from "../types";
 
@@ -482,7 +483,7 @@ export default class GazelleJSONAPI extends GazelleBase {
       "bonus",
       "bonusPerHour",
       "seedingSize",
-    ] as (keyof IUserInfo)[]) as Partial<IUserInfo>;
+    ] as TUserInfoParseKey[]) as Partial<IUserInfo>;
   }
 
   protected async getUserExtendInfo(userId: number): Promise<Partial<IUserInfo>> {
@@ -500,7 +501,7 @@ export default class GazelleJSONAPI extends GazelleBase {
       "groups",
       "invited",
       "lastAccessAt",
-    ] as (keyof Partial<IUserInfo>)[]) as Partial<IUserInfo>;
+    ] as TUserInfoParseKey[]) as Partial<IUserInfo>;
   }
 
   protected cleanupUserInfo(flushUserInfo: IUserInfo): IUserInfo {

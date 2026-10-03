@@ -125,9 +125,9 @@ export async function doSearchEntity(
   console.log(`Add search ${solutionKey} to queue.`);
   runtimeStore.search.searchPlan[solutionKey].queueAt = Date.now();
 
-  // noinspection ES6MissingAwait
-  searchQueue.add(
-    async () => {
+  searchQueue
+    .add(
+      async () => {
       const startAt = (runtimeStore.search.searchPlan[solutionKey].startAt = Date.now());
       console.log(`search ${solutionKey} start at ${startAt}`);
       runtimeStore.search.searchPlan[solutionKey].status = EResultParseStatus.working;
@@ -181,25 +181,42 @@ export async function doSearchEntity(
         }
       }
 
-      // 批量添加新项目，减少响应式更新
-      if (newItems.length > 0) {
-        runtimeStore.search.searchResult.push(...newItems);
-      }
+      // 批量添加新项目，减少响应式更新。
+        // 用整体替换而不是 push(...newItems)：单批上万条时展开实参会爆调用栈
+        // （Maximum call stack size exceeded）。
+        if (newItems.length > 0) {
+          runtimeStore.search.searchResult = [...runtimeStore.search.searchResult, ...newItems];
+        }
 
-      // 更新计数状态
-      const endAt = Date.now();
-      runtimeStore.search.searchPlan[solutionKey].count = newItems.length;
-      runtimeStore.search.searchPlan[solutionKey].endAt = endAt;
-      runtimeStore.search.searchPlan[solutionKey].costTime = endAt - startAt;
+        // 更新计数状态
+        const endAt = Date.now();
+        runtimeStore.search.searchPlan[solutionKey].count = newItems.length;
+        runtimeStore.search.searchPlan[solutionKey].endAt = endAt;
+        runtimeStore.search.searchPlan[solutionKey].costTime = endAt - startAt;
 
-      // 直接向 advanceItemPropsRef.site 添加 siteId，而不是重新构造全部字典，以便于站点快速选择器更新
-      const sites = advanceItemPropsRef.value.site;
-      if (Array.isArray(sites) && !sites.includes(siteId)) {
-        sites.push(siteId);
+        // 直接向 advanceItemPropsRef.site 添加 siteId，而不是重新构造全部字典，以便于站点快速选择器更新
+        const sites = advanceItemPropsRef.value.site;
+        if (Array.isArray(sites) && !sites.includes(siteId)) {
+          sites.push(siteId);
+        }
+      },
+      { priority: queuePriority, id: solutionKey },
+    )
+    .catch((e) => {
+      // 队列任务必须兜底catch：
+      // 站点不可达 / 解析崩溃 / 扩展重载都会让 getSiteSearchResult 抛错，原先无人接手的
+      // rejection 会让该方案的 status 永远停在 working、endAt/costTime 不写、
+      // 排队计数不降（按钮一直显示「排队中」），甚至 idle 事件不触发导致 isSearching 卡在 true。
+      console.error(`[SearchEntity] search failed: ${solutionKey}`, e);
+      const plan = runtimeStore.search.searchPlan[solutionKey];
+      if (plan) {
+        const failedAt = Date.now();
+        plan.status = EResultParseStatus.unknownError;
+        plan.statusMsg = e instanceof Error ? e.message : String(e);
+        plan.endAt = failedAt;
+        plan.costTime = failedAt - (plan.startAt ?? failedAt);
       }
-    },
-    { priority: queuePriority, id: solutionKey },
-  );
+    });
 }
 
 export async function doSearch(search: string, plan?: string, flush: boolean = true) {

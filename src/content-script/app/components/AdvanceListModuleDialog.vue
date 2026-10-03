@@ -59,10 +59,17 @@ const selectedTorrentsSize = computed(() =>
 const localDownloadMultiStatus = ref<boolean>(false);
 async function handleLocalDownloadMulti() {
   localDownloadMultiStatus.value = true;
-  for (const torrent of selectedTorrents.value) {
-    await sendMessage("downloadTorrent", { torrent, downloaderId: "local" });
+  try {
+    for (const torrent of selectedTorrents.value) {
+      await sendMessage("downloadTorrent", { torrent, downloaderId: "local" });
+    }
+  } catch (e) {
+    // 必须 try/finally：中途抛错时 localDownloadMultiStatus 会永远停在 true，按钮永久转圈
+    console.error("[PTD] batch download failed", e);
+    runtimeStore.showSnakebar(t("contentScript.parsePageFailed"), { color: "error" });
+  } finally {
+    localDownloadMultiStatus.value = false;
   }
-  localDownloadMultiStatus.value = false;
 }
 
 const linkCopyMultiStatus = ref<boolean>(false);

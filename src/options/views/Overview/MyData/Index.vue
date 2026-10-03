@@ -5,7 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { isUndefined } from "es-toolkit/compat";
 // 注意：antdv-next 根入口把这几个类型做了别名再导出（ColumnType -> TableColumnType 等）
-import type { TableColumnsType, TableSortOrder, TableSorterResult, TablePaginationConfig } from "antdv-next";
+import type { TableColumnsType } from "antdv-next";
 import {
   AlertOutlined,
   ArrowDownOutlined,
@@ -30,6 +30,8 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
+import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
+import { buildSortOrderMap, toTableColumns } from "@/options/components/tableSorters.ts";
 import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
@@ -116,52 +118,15 @@ const selectedColumnKeys = computed({
   set: (value: string[]) => configStore.updateTableBehavior("MyData", "columns", value),
 });
 
-/** vuetify 的 order 是 asc/desc，antd 的 SortOrder 是 ascend/descend */
-function toAntdSortOrder(order: "asc" | "desc" | undefined): TableSortOrder {
-  if (order === "asc") return "ascend";
-  if (order === "desc") return "descend";
-  return null;
-}
-
-/** 嵌套 key 取值（"siteUserConfig.sortIndex" → item.siteUserConfig.sortIndex） */
-function getByPath(row: any, path: string): any {
-  return path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), row);
-}
-
-/**
- * 通用比较器：数值优先，回退中文字符串比较。
- * ⚠️ antd 受控排序必须提供真正的 compare 函数——`sorter: true` 无 compare 时
- * antd 内部 getSortFunction 返回 false，排序器被静默跳过（箭头动、数据不排）。
- */
-function makeSorter(path: string) {
-  return (a: IUserInfoItem, b: IUserInfoItem): number => {
-    const ra = getByPath(a, path);
-    const rb = getByPath(b, path);
-    const na = typeof ra === "number" ? ra : Number.parseFloat(ra);
-    const nb = typeof rb === "number" ? rb : Number.parseFloat(rb);
-    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-    return String(ra ?? "").localeCompare(String(rb ?? ""), "zh-CN");
-  };
-}
+/** 排序/分页行为统一收敛到 useTableBehavior（MyData 允许多列排序）；列生成走公共 toTableColumns */
+const { sortBy, pagination: tablePagination, handleTableChange } = useTableBehavior("MyData", {
+  defaultPageSize: 20,
+  multiSort: true,
+});
 
 const tableColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
-  tableHeader.value.map((header) => ({
-    key: header.key,
-    // 嵌套路径（如 siteUserConfig.sortIndex）用数组形式，antd 才会正确取值 / 排序
-    dataIndex: header.key.split("."),
-    align: header.align,
-    width: header.width,
-    // v-data-table 默认所有列都能排序，只有显式 sortable: false 的例外
-    sorter: header.sortable === false ? false : makeSorter(header.key),
-    sortOrder: toAntdSortOrder(configStore.tableBehavior.MyData.sortBy?.find((s) => s.key === header.key)?.order),
-  })),
+  toTableColumns<IUserInfoItem>(tableHeader.value, buildSortOrderMap(sortBy.value)),
 );
-
-/** 对应 v-data-table 的 items-per-page */
-const tablePagination = computed(() => ({
-  pageSize: configStore.tableBehavior.MyData.itemsPerPage,
-  showSizeChanger: true,
-}));
 
 const tableNonBooleanControlKey = [
   "joinTimeFormat",
@@ -196,7 +161,7 @@ const {
   advanceFilterDictRef,
   updateTableFilterValueFn,
   buildFilterDictFn,
-  toggleKeywordStateFn,
+  setKeywordRequiredFn,
 } = useTableCustomFilter<IUserInfoItem>({
   parseOptions: {
     keywords: ["site", "status", "siteUserConfig.groups"],
@@ -240,28 +205,6 @@ const filteredTableData = computed<IUserInfoItem[]>(() => {
   if (!query) return tableData.value;
   return tableData.value.filter((raw) => tableFilterFn(undefined, query, { raw }));
 });
-
-/** 对应 v-data-table 的 @update:sortBy + @update:itemsPerPage */
-function handleTableChange(
-  pagination: TablePaginationConfig,
-  _filters: unknown,
-  sorter: TableSorterResult<IUserInfoItem> | TableSorterResult<IUserInfoItem>[],
-) {
-  const sorters = (Array.isArray(sorter) ? sorter : [sorter]).filter((item) => item?.order && item?.columnKey);
-  if (sorters.length > 0) {
-    configStore.updateTableBehavior(
-      "MyData",
-      "sortBy",
-      sorters.map((item) => ({
-        key: String(item.columnKey),
-        order: item.order === "descend" ? ("desc" as const) : ("asc" as const),
-      })),
-    );
-  }
-  if (pagination.pageSize && pagination.pageSize !== configStore.tableBehavior.MyData.itemsPerPage) {
-    configStore.updateTableBehavior("MyData", "itemsPerPage", pagination.pageSize);
-  }
-}
 
 // 挂载时加载表格数据
 onMounted(() => initTableData());
@@ -473,7 +416,14 @@ const showExportDialog = ref(false);
                       advanceFilterDictRef[`siteUserConfig.groups`].required.length > 0 &&
                       !advanceFilterDictRef[`siteUserConfig.groups`].required.includes(index)
                     "
-                    @change="(v: any) => toggleKeywordStateFn(`siteUserConfig.groups`, index)"
+                    @change="
+                      (e: any) => {
+                        // 必须用 setKeywordRequiredFn：这里是受控 :checked 且没有 checkbox-group，
+                        // 而 toggleKeywordStateFn 只改 exclude、不碰 required，点了等于没反应。
+                        // 同时 antd Checkbox 的 change 传的是事件对象，取 e.target.checked。
+                        setKeywordRequiredFn(`siteUserConfig.groups`, index, e.target.checked);
+                      }
+                    "
                     @click.stop
                   />
                   <span class="ml-2">{{ index }} ({{ item.length }})</span>

@@ -4,7 +4,7 @@
  * @PTMDefinitions https://github.com/JustLookAtNow/pt_mate/blob/master/assets/sites/dicmusic.json
  */
 import { buildCategoryOptionsFromList } from "../utils";
-import { type IUserInfo, type ITorrent, type ISiteMetadata } from "../types";
+import { type IUserInfo, type ITorrent, type ISiteMetadata, type TUserInfoParseKey } from "../types";
 import GazelleJSONAPI, {
   SchemaMetadata,
   userJsonResponse,
@@ -378,7 +378,7 @@ export default class DICMusic extends GazelleJSONAPI {
       "seedingSize",
       "bonus",
       "bonusPerHour",
-    ] as (keyof Partial<IUserInfo>)[]) as Partial<IUserInfo>;
+    ] as TUserInfoParseKey[]) as Partial<IUserInfo>;
   }
 
   // 该站点提供禁转标签

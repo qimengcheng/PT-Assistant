@@ -1,7 +1,7 @@
 import Sizzle from "sizzle";
 import BittorrentSite from "../schemas/AbstractBittorrentSite.ts";
 import Gazelle, { SchemaMetadata } from "../schemas/Gazelle.ts";
-import { type ISearchInput, type ISiteMetadata, type ITorrent } from "../types";
+import { type ISearchInput, type ISiteMetadata, type ITorrent, type TUserInfoParseKey } from "../types";
 
 function isHdfTorrentRow(row: HTMLTableRowElement): boolean {
   if (!row.querySelector("a[href*='torrents.php?action=download']")) return false;
@@ -214,7 +214,7 @@ export const siteMetadata: ISiteMetadata = {
                 "hnrUnsatisfied",
                 "bonusPerHour",
                 "trueUploaded",
-              ],
+              ] as TUserInfoParseKey[],
             }
           : step,
       ),

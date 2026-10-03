@@ -44,22 +44,44 @@ async function getDefinitionModule(definition: string): Promise<definitionEntity
   return module;
 }
 
+/**
+ * 站点元数据缓存。
+ *
+ * 原来每次调用都对 definition 模块的 siteMetadata 做一次 cloneDeep —— 而它包含
+ * 全部 selector / URL 数组，体积很大。放大链路很可观：getSiteUserConfig 与 getSite
+ * 各调一次、getSiteList 还会对每个站点再调一次，一次全站搜索下来是几百次深拷贝。
+ * definition 模块本身是不可变的，这里缓存住是安全的（调用方不允许改动返回值：
+ * getSite 的构造器里会用 toMerged 再拷一份）。
+ */
+const definedSiteMetadataCache = new Map<string, Promise<ISiteMetadata>>();
+
 export async function getDefinedSiteMetadata(definition: string): Promise<ISiteMetadata> {
-  const { siteMetadata: definedSiteMetadata } = await getDefinitionModule(definition);
-
-  const siteMetadata = cloneDeep(definedSiteMetadata);
-
-  // 解密url加密过的站点
-  siteMetadata.urls = siteMetadata.urls!.map(restoreSecureLink);
-  if (siteMetadata.legacyUrls?.length) {
-    siteMetadata.legacyUrls = siteMetadata.legacyUrls.map(restoreSecureLink);
+  const cached = definedSiteMetadataCache.get(definition);
+  if (cached) {
+    return cached;
   }
 
-  // 补全一些可以缺失字段
-  siteMetadata.tags ??= [];
-  siteMetadata.timezoneOffset ??= siteMetadata.schema === "NexusPHP" ? "+0800" : "+0000";
+  const pending = (async () => {
+    const { siteMetadata: definedSiteMetadata } = await getDefinitionModule(definition);
 
-  return siteMetadata;
+    const siteMetadata = cloneDeep(definedSiteMetadata);
+
+    // 解密url加密过的站点
+    siteMetadata.urls = siteMetadata.urls!.map(restoreSecureLink);
+    if (siteMetadata.legacyUrls?.length) {
+      siteMetadata.legacyUrls = siteMetadata.legacyUrls.map(restoreSecureLink);
+    }
+
+    // 补全一些可以缺失字段
+    siteMetadata.tags ??= [];
+    siteMetadata.timezoneOffset ??= siteMetadata.schema === "NexusPHP" ? "+0800" : "+0000";
+
+    return siteMetadata;
+  })();
+
+  definedSiteMetadataCache.set(definition, pending);
+  // 缓存 promise 而非结果：并发 miss 时也能收敛成一次模块加载 + 一次 cloneDeep
+  return pending;
 }
 
 export function checkSiteMetadataAllow(siteMetadata: ISiteMetadata, key: keyof ISiteMetadata): boolean {

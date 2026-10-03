@@ -79,6 +79,19 @@ const queryReservedCharsRegex = /[\\ ,:]/g;
 // /pattern/[gimsuy]
 const regexLiteralPattern = /^\/((?:\\.|[^\\/])*)\/([gimsuy]*)$/;
 const regexCache = new Map<string, RegExp | null>();
+/**
+ * regexCache 上限。用户每敲一个字符就可能新增一条正则（多表实例共享同一个 Map），
+ * 不设上限的话长时间使用 + 逐字输入正则会把内存慢慢吃光。超限就整体清空 ——
+ * 缓存只是省掉重复 new RegExp 的开销，丢了一两次重新编译完全无害。
+ */
+const REGEX_CACHE_MAX = 200;
+
+function cacheRegex(key: string, regex: RegExp | null): void {
+  if (regexCache.size >= REGEX_CACHE_MAX) {
+    regexCache.clear();
+  }
+  regexCache.set(key, regex);
+}
 
 function escapeQueryValue(value: unknown): unknown {
   if (typeof value !== "string") return value;
@@ -109,17 +122,20 @@ function toRegexIfValid(value: unknown): RegExp | null {
 
   const matched = regexLiteralPattern.exec(normalizedValue);
   if (!matched) {
-    regexCache.set(normalizedValue, null);
+    cacheRegex(normalizedValue, null);
     return null;
   }
 
   const [, pattern, flags] = matched;
   try {
-    const regex = new RegExp(pattern, flags);
-    regexCache.set(normalizedValue, regex);
+    // ⚠️ 必须去掉 g / y 再缓存：
+    // 带 g 或 y 的正则有 lastIndex 状态，同一个实例被 tableFilterFn 跨行复用时
+    // 第二次 test 会从上次的位置继续找，导致「同一行在不同列上结果不一致」的诡异 bug。
+    const regex = new RegExp(pattern, flags.replace(/[gy]/g, ""));
+    cacheRegex(normalizedValue, regex);
     return regex;
   } catch {
-    regexCache.set(normalizedValue, null);
+    cacheRegex(normalizedValue, null);
     return null;
   }
 }
@@ -417,6 +433,16 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
     buildFilterDictFn(""); // 使用空字符串构建
   }
 
+  /**
+   * 三态循环：中性 -> required -> exclude -> required -> ...
+   *
+   * ⚠️ 只能用在「a-checkbox-group 的 v-model:value 绑到 required」的写法上：
+   * 本函数自身只改 exclude，required 是靠 checkbox-group 自己的 change 回调维护的。
+   * 两者的事件顺序恰好是 DOM click（本函数）先于 input change（group 更新 required），
+   * 所以本函数读到的是旧值，组合起来才构成完整循环。
+   * 单向 :checked + @click 的写法（没有 checkbox-group）用它会点不动 —— required 永远没人改。
+   * 那种场景请改用 setKeywordRequiredFn。
+   */
   function toggleKeywordStateFn(field: string, value: string) {
     const keywordState = advanceFilterDictRef.value[field] as ITextValue;
     const state = keywordState.required!.includes(value);
@@ -427,27 +453,57 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
     }
   }
 
+  /**
+   * 两态开关：显式把 value 加入或移出 required，并保证它不出现在 exclude 里。
+   *
+   * 给「单向 :checked + @change」的受控复选框用 —— 那类写法没有 checkbox-group 兜底，
+   * 必须由本函数自己维护 required，否则筛选项点不动、筛选条件永远为空。
+   */
+  function setKeywordRequiredFn(field: string, value: string, required: boolean) {
+    const keywordState = advanceFilterDictRef.value[field] as ITextValue;
+    const drop = (list: string[]) => list.filter((x) => !isEqual(x, value));
+    if (required) {
+      if (!keywordState.required!.some((x) => isEqual(x, value))) {
+        keywordState.required!.push(value);
+      }
+      keywordState.exclude = drop(keywordState.exclude ?? []);
+    } else {
+      keywordState.required = drop(keywordState.required ?? []);
+    }
+  }
+
   function tableFilterFn(value: any, query: string, item: any): boolean {
     const rawItem = item.raw as ItemType;
 
     const { text, exclude } = tableParsedFilterRef.value;
 
-    const itemTitle = flattenDeep(titleFields.map((key) => get(rawItem, key)))
-      .filter(Boolean)
-      .join("|$|")
-      .toString();
-    const itemTitleLowerCase = itemTitle.toLowerCase();
+    /**
+     * 惰性构造标题串：原来每行都无条件做一遍 titleFields.map(get) + flattenDeep + join + toLowerCase。
+     * 搜索结果上万行时，改一次过滤词就是几万次这样的开销；而像「size:>10GB」这种
+     * 只有区间条件的过滤压根用不到标题，却照样全算一遍。
+     */
+    let cachedTitle: string | undefined;
+    let cachedTitleLower: string | undefined;
+    const getTitle = () => {
+      if (cachedTitle === undefined) {
+        cachedTitle = flattenDeep(titleFields.map((key) => get(rawItem, key)))
+          .filter(Boolean)
+          .join("|$|")
+          .toString();
+        cachedTitleLower = cachedTitle.toLowerCase();
+      }
+      return cachedTitle;
+    };
+    const matchesText = (keyword: string): boolean => {
+      const normalizedKeyword = normalizeFilterValue(keyword);
+      if (typeof normalizedKeyword !== "string") return false;
+      const regex = toRegexIfValid(normalizedKeyword);
+      return regex ? regex.test(getTitle()) : (cachedTitleLower ??= getTitle().toLowerCase()).includes(normalizedKeyword.toLowerCase());
+    };
 
     if (text) {
       const includeText = Array.isArray(text) ? text : [text];
-      if (
-        !includeText.every((keyword: string) => {
-          const normalizedKeyword = normalizeFilterValue(keyword);
-          if (typeof normalizedKeyword !== "string") return false;
-          const regex = toRegexIfValid(normalizedKeyword);
-          return regex ? regex.test(itemTitle) : itemTitleLowerCase.includes(normalizedKeyword.toLowerCase());
-        })
-      ) {
+      if (!includeText.every(matchesText)) {
         return false;
       }
     }
@@ -469,14 +525,7 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
 
       if (exText) {
         const excludesText = Array.isArray(exText) ? exText : [exText];
-        if (
-          excludesText.some((keyword: string) => {
-            const normalizedKeyword = normalizeFilterValue(keyword);
-            if (typeof normalizedKeyword !== "string") return false;
-            const regex = toRegexIfValid(normalizedKeyword);
-            return regex ? regex.test(itemTitle) : itemTitleLowerCase.includes(normalizedKeyword.toLowerCase());
-          })
-        ) {
+        if (excludesText.some(matchesText)) {
           return false;
         }
       }
@@ -507,5 +556,6 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
     reBuildAdvanceFilter,
     updateTableFilterValueFn,
     toggleKeywordStateFn,
+    setKeywordRequiredFn,
   };
 }

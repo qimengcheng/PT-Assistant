@@ -12,7 +12,7 @@ import { extStore } from "@/storage.ts";
 import { onMessage, sendMessage } from "@/messages.ts";
 import type { IDownloadTorrentOption, IMetadataPiniaStorageSchema } from "@/shared/types.ts";
 
-import { setupOffscreenDocument } from "./offscreen.ts";
+import { whenOffscreenReady } from "./offscreen.ts";
 import { sleep } from "~/helper.ts";
 
 export enum EJobType {
@@ -25,7 +25,7 @@ const jobs = defineJobScheduler();
 
 function autoFlushUserInfo(retryIndex: number = 0) {
   return async () => {
-    await setupOffscreenDocument();
+    await whenOffscreenReady();
 
     const configStore = (await extStore.getItem("config"))!;
 
@@ -149,7 +149,7 @@ jobs.scheduleJob({
  */
 function autoBackup() {
   return async () => {
-    await setupOffscreenDocument();
+    await whenOffscreenReady();
 
     const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema | undefined;
     if (!metadataStore?.backupServers) {
@@ -206,7 +206,7 @@ jobs.scheduleJob({
 
 function doReDownloadTorrent(downloadOption: IDownloadTorrentOption) {
   return async () => {
-    await setupOffscreenDocument();
+    await whenOffscreenReady();
     // 按照相同的方式重新下载种子到下载器
     await sendMessage("downloadTorrent", downloadOption);
   };

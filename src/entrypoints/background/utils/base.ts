@@ -6,6 +6,7 @@
 import { stringify } from "urlencode";
 
 import { onMessage } from "@/messages.ts";
+import { extStore } from "@/storage.ts";
 
 export interface IOpenOptionsTarget {
   path: string;
@@ -28,4 +29,19 @@ export function openOptionsPage(url?: string | IOpenOptionsTarget) {
 
 onMessage("openOptionsPage", async ({ data: url }) => {
   openOptionsPage(url);
+});
+
+// ===== chrome.storage 代理：offscreen document 唯一可用的扩展 API 是 chrome.runtime，
+// 没有 chrome.storage，offscreen 侧的 extStore（@/storage.ts）自动改走这里。
+// 读写都经过 SW 这唯一一份 extStore，顺带获得 SW 内的按 key 写串行保证。
+onMessage("getExtStorage", async ({ data: key }) => {
+  return await extStore.getItem(key);
+});
+
+onMessage("setExtStorage", async ({ data: { key, value } }) => {
+  await extStore.setItem(key, value);
+});
+
+onMessage("patchExtStorage", async ({ data: { key, path, value } }) => {
+  await extStore.patchItem(key, path, value);
 });

@@ -3,6 +3,7 @@ import { useI18n } from "vue-i18n";
 import { ref } from "vue";
 import { computedAsync } from "@vueuse/core";
 import { nanoid } from "nanoid";
+import { CheckCircleOutlined, CloseCircleOutlined, LeftOutlined, QuestionCircleOutlined, RightOutlined } from "@antdv-next/icons";
 
 import { BackupFields, IBackupServerMetadata } from "@/shared/types.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -59,114 +60,156 @@ function resetDialog() {
 </script>
 
 <template>
-  <v-dialog v-model="showDialog" max-width="800" scrollable @after-leave="resetDialog">
-    <v-card>
-      <v-card-title class="pa-0">
-        <v-toolbar color="blue-grey-darken-2">
-          <v-toolbar-title>{{ t("SetBackup.AddDialog.title") }}</v-toolbar-title>
-          <v-spacer />
-          <v-btn
-            :title="t('layout.header.wiki')"
-            :href="`${REPO_URL}/wiki/config-backup-server`"
-            color="success"
-            icon="mdi-help-circle"
-            rel="noopener noreferrer nofollow"
-            target="_blank"
-          />
-        </v-toolbar>
-      </v-card-title>
-
-      <v-divider />
-      <v-card-text>
-        <v-window v-model="currentStep">
-          <!-- 选取可添加的备份服务器类型 -->
-          <v-window-item :value="0">
-            <v-autocomplete
-              v-model="selectedBackupServerType"
-              :items="Object.values(allBackupServerMetaData)"
-              item-value="type"
-              item-title="type"
-              :multiple="false"
-              persistent-hint
-              :hint="
-                allBackupServerMetaData[selectedBackupServerType!]?.description ??
-                t('SetDownloader.add.NoneSelectNotice')
-              "
-              @update:model-value="(e) => updateStoredDownloaderConfigByDefault(e)"
-            >
-              <template #selection="{ item: backupServer }">
-                <v-list-item :prepend-avatar="getBackupServerIcon(backupServer.type)" :title="backupServer.type" />
-              </template>
-              <template #item="{ props, item: backupServer }">
-                <v-list-item
-                  v-bind="props"
-                  :prepend-avatar="getBackupServerIcon(backupServer.type)"
-                  :title="backupServer.type"
-                >
-                </v-list-item>
-              </template>
-            </v-autocomplete>
-          </v-window-item>
-          <v-window-item :value="1">
-            <Editor
-              v-if="storedBackupServerConfig.type"
-              v-model="storedBackupServerConfig"
-              @update:config-valid="(v) => (isBackupServerConfigValid = v)"
-            />
-          </v-window-item>
-        </v-window>
-      </v-card-text>
-
-      <v-divider />
-
-      <v-card-actions>
-        <v-btn
-          v-show="currentStep === 0"
-          :href="`${REPO_URL}/tree/master/src/packages/backupServer`"
-          color="grey-darken-1"
-          flat
+  <a-modal v-model:open="showDialog" :width="800" @after-close="resetDialog">
+    <!-- 标题栏右侧的 wiki 链接（原来放在 v-toolbar 的 #append 上，antd 标题插槽需自行排版） -->
+    <template #title>
+      <div class="dialog-title">
+        <span>{{ t("SetBackup.AddDialog.title") }}</span>
+        <a-button
+          type="text"
+          color="green"
+          :title="t('layout.header.wiki')"
+          :href="`${REPO_URL}/wiki/config-backup-server`"
           rel="noopener noreferrer nofollow"
           target="_blank"
         >
-          <v-icon icon="mdi-help-circle" />
-          <span class="ml-1">{{ t("SetDownloader.add.newType") }}</span>
-        </v-btn>
-        <v-spacer />
-        <v-btn color="error" prepend-icon="mdi-close-circle" variant="text" @click="showDialog = false">
+          <template #icon>
+            <QuestionCircleOutlined />
+          </template>
+        </a-button>
+      </div>
+    </template>
+
+    <!--
+      原来是 <v-window> 步骤流：没有标签页标题，currentStep 直接决定显示哪一块。
+      a-tabs 需要字符串 key 且必须显示导航栏才能切换，这里用 v-show 保持
+      「currentStep 单一数据源 + 面板常驻挂载」的原有语义。
+    -->
+    <div v-show="currentStep === 0">
+      <a-select
+        v-model:value="selectedBackupServerType"
+        placeholder="请选择备份服务器类型"
+        @change="(v: IBackupServerMetadata['type']) => updateStoredDownloaderConfigByDefault(v)"
+      >
+        <a-select-option v-for="meta in Object.values(allBackupServerMetaData)" :key="meta.type" :value="meta.type">
+          <div class="backup-type-option">
+            <img class="backup-type-option__icon" :src="getBackupServerIcon(meta.type)" :alt="meta.type" />
+            <span>{{ meta.type }}</span>
+          </div>
+        </a-select-option>
+      </a-select>
+
+      <!-- v-autocomplete 的 persistent-hint -->
+      <div class="select-hint">
+        {{
+          allBackupServerMetaData[selectedBackupServerType!]?.description ?? t("SetDownloader.add.NoneSelectNotice")
+        }}
+      </div>
+    </div>
+
+    <div v-show="currentStep === 1">
+      <Editor
+        v-if="storedBackupServerConfig.type"
+        v-model="storedBackupServerConfig"
+        @update:config-valid="(v) => (isBackupServerConfigValid = v)"
+      />
+    </div>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <a-button
+          v-show="currentStep === 0"
+          :href="`${REPO_URL}/tree/master/src/packages/backupServer`"
+          color="default"
+          variant="solid"
+          rel="noopener noreferrer nofollow"
+          target="_blank"
+        >
+          <template #icon>
+            <QuestionCircleOutlined />
+          </template>
+          <span>{{ t("SetDownloader.add.newType") }}</span>
+        </a-button>
+
+        <div style="flex: 1" />
+
+        <a-button color="danger" variant="text" @click="showDialog = false">
+          <template #icon>
+            <CloseCircleOutlined />
+          </template>
           {{ t("common.dialog.cancel") }}
-        </v-btn>
-        <v-btn
+        </a-button>
+        <a-button
           v-if="currentStep === 1"
-          color="blue-darken-1"
-          prepend-icon="mdi-chevron-left"
+          color="blue"
           variant="text"
+          icon-placement="start"
           @click="currentStep--"
         >
+          <template #icon>
+            <LeftOutlined />
+          </template>
           {{ t("common.dialog.prev") }}
-        </v-btn>
-        <v-btn
+        </a-button>
+        <a-button
           v-if="currentStep === 0"
           :disabled="selectedBackupServerType == null"
-          append-icon="mdi-chevron-right"
-          color="blue-darken-1"
+          color="blue"
           variant="text"
+          icon-placement="end"
           @click="currentStep++"
         >
+          <template #icon>
+            <RightOutlined />
+          </template>
           {{ t("common.dialog.next") }}
-        </v-btn>
-        <v-btn
+        </a-button>
+        <a-button
           v-if="currentStep === 1"
           :disabled="!isBackupServerConfigValid"
-          color="success"
-          prepend-icon="mdi-check-circle-outline"
+          color="green"
           variant="text"
           @click="saveStoredBackupServerConfig"
         >
+          <template #icon>
+            <CheckCircleOutlined />
+          </template>
           {{ t("common.dialog.ok") }}
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+        </a-button>
+      </div>
+    </template>
+  </a-modal>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.dialog-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* 底部操作按钮：新增服务器链接靠左，取消/上一步/下一步/确定靠右 */
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.select-hint {
+  margin-top: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.backup-type-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backup-type-option__icon {
+  width: 20px;
+  height: 20px;
+}
+</style>

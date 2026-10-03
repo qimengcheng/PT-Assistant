@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { CloseCircleOutlined, ExportOutlined } from "@antdv-next/icons";
 
 import { BackupFields, TBackupFields } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
@@ -20,39 +21,47 @@ function dialogEnter() {
 </script>
 
 <template>
-  <v-dialog v-model="showDialog" max-width="600" @after-enter="dialogEnter">
-    <v-card>
-      <v-card-title class="pa-0">
-        <v-toolbar color="blue-grey-darken-2">
-          <v-toolbar-title>{{ t("SetBackup.LocalExportConfirmDialog.title") }}</v-toolbar-title>
-        </v-toolbar>
-      </v-card-title>
-      <v-divider />
-      <v-card-text>
-        <v-row no-gutters>
-          <v-col v-for="backupField in BackupFields" :key="backupField" cols="12" md="6">
-            <v-switch
-              v-model="backupFields"
-              :label="t(`SetBackup.fields.${backupField}`)"
-              :value="backupField"
-              color="success"
-              hide-details
-            />
-          </v-col>
-        </v-row>
-      </v-card-text>
-      <v-divider />
-      <v-card-actions>
-        <v-spacer />
-        <v-btn color="error" prepend-icon="mdi-close-circle" variant="text" @click="showDialog = false">
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('SetBackup.LocalExportConfirmDialog.title')"
+    :width="600"
+    @after-open-change="(open: boolean) => open && dialogEnter()"
+  >
+    <!-- v-switch + 数组 v-model + :value 是 Vuetify 的复选语义，antd 对应 a-checkbox-group -->
+    <a-checkbox-group v-model:value="backupFields">
+      <a-row :gutter="[0, 8]">
+        <a-col v-for="backupField in BackupFields" :key="backupField" :span="12" :md="6">
+          <a-checkbox :value="backupField">
+            {{ t(`SetBackup.fields.${backupField}`) }}
+          </a-checkbox>
+        </a-col>
+      </a-row>
+    </a-checkbox-group>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <a-button color="danger" variant="text" @click="showDialog = false">
+          <template #icon>
+            <CloseCircleOutlined />
+          </template>
           {{ t("common.dialog.cancel") }}
-        </v-btn>
-        <v-btn color="success" prepend-icon="mdi-export" variant="text" @click="() => doLocalExport()">{{
-          t("common.export")
-        }}</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+        </a-button>
+        <a-button color="green" variant="text" @click="() => doLocalExport()">
+          <template #icon>
+            <ExportOutlined />
+          </template>
+          {{ t("common.export") }}
+        </a-button>
+      </div>
+    </template>
+  </a-modal>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+/* 底部操作按钮统一右对齐 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+</style>

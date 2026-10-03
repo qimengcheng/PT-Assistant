@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import type { IBackupServerMetadata, TBackupServerKey } from "@/shared/types.ts";
@@ -29,33 +30,39 @@ function editClientConfig() {
 </script>
 
 <template>
-  <v-dialog v-model="showDialog" max-width="800" scrollable @after-enter="dialogEnter">
-    <v-card>
-      <v-card-title class="pa-0">
-        <v-toolbar color="blue-grey-darken-2">
-          <v-toolbar-title>{{ t("SetDownloader.edit.title") }}</v-toolbar-title>
-          <template #append>
-            <v-btn icon="mdi-close" :title="t('common.dialog.close')" @click="showDialog = false" />
-          </template>
-        </v-toolbar>
-      </v-card-title>
-      <v-divider />
-      <v-card-text>
-        <Editor v-if="clientConfig" v-model="clientConfig" />
-      </v-card-text>
-      <v-divider />
-      <v-card-actions>
-        <v-spacer />
-        <v-btn color="error" prepend-icon="mdi-close-circle" variant="text" @click="showDialog = false">
-          {{ t("common.dialog.cancel") }}
-        </v-btn>
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('SetDownloader.edit.title')"
+    :width="800"
+    @after-open-change="(open: boolean) => open && dialogEnter()"
+  >
+    <Editor v-if="clientConfig" v-model="clientConfig" />
 
-        <v-btn color="success" prepend-icon="mdi-check-circle-outline" variant="text" @click="editClientConfig">
+    <template #footer>
+      <div class="dialog-footer">
+        <a-button color="danger" variant="text" @click="showDialog = false">
+          <template #icon>
+            <CloseCircleOutlined />
+          </template>
+          {{ t("common.dialog.cancel") }}
+        </a-button>
+
+        <a-button color="green" variant="text" @click="editClientConfig">
+          <template #icon>
+            <CheckCircleOutlined />
+          </template>
           {{ t("common.dialog.ok") }}
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+        </a-button>
+      </div>
+    </template>
+  </a-modal>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+/* 底部操作按钮统一右对齐 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+</style>

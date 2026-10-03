@@ -42,7 +42,13 @@ const binds = {
 </script>
 
 <template>
-  <v-img :height="size" :src="siteFavicon" :width="size" aspect-ratio="1/1" v-on="binds" />
+  <img :height="size" :src="siteFavicon" :width="size" class="site-favicon" v-on="binds" alt="" />
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.site-favicon {
+  object-fit: cover;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+</style>

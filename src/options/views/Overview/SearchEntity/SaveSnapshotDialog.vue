@@ -31,33 +31,22 @@ function saveSearchSnapshotData() {
 </script>
 
 <template>
-  <v-dialog v-model="showDialog" width="500">
-    <v-card>
-      <v-card-title class="pa-0">
-        <v-toolbar color="cyan-darken-2">
-          <v-toolbar-title>{{ t("SearchEntity.index.action.saveSnapshot") }}</v-toolbar-title>
-          <template #append>
-            <v-btn icon="mdi-close" :title="t('common.dialog.close')" @click="showDialog = false" />
-          </template>
-        </v-toolbar>
-        <v-spacer />
-      </v-card-title>
-      <v-divider />
-      <v-card-text>
-        <v-text-field
-          v-model="snapshotName"
-          density="compact"
-          hide-details
-          variant="outlined"
-          :label="t('SearchEntity.SaveSnapshotDialog.snapshotName')"
-        ></v-text-field>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer />
-        <v-btn color="primary" @click="saveSearchSnapshotData">{{ t("common.save") }}</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+  <a-modal v-model:open="showDialog" :width="500">
+    <template #title>
+      {{ t("SearchEntity.index.action.saveSnapshot") }}
+    </template>
+
+    <a-input
+      v-model:value="snapshotName"
+      size="small"
+      :placeholder="t('SearchEntity.SaveSnapshotDialog.snapshotName')"
+    />
+
+    <template #footer>
+      <a-button @click="showDialog = false">{{ t("common.dialog.cancel") }}</a-button>
+      <a-button type="primary" @click="saveSearchSnapshotData">{{ t("common.save") }}</a-button>
+    </template>
+  </a-modal>
 </template>
 
 <style scoped lang="scss"></style>

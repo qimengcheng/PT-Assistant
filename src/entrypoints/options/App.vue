@@ -3,9 +3,11 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { message } from "antdv-next";
 import {
+  AppstoreOutlined,
   BarChartOutlined,
   CloudUploadOutlined,
   DownloadOutlined,
+  FileSearchOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
   GlobalOutlined,
@@ -13,8 +15,10 @@ import {
   HomeOutlined,
   InboxOutlined,
   PlayCircleOutlined,
+  PlaySquareOutlined,
   SearchOutlined,
   SettingOutlined,
+  TeamOutlined,
 } from "@antdv-next/icons";
 
 import { sendMessage } from "@/messages.ts";
@@ -54,10 +58,14 @@ const navItems = [
   { path: "/search-result-snapshot", label: "搜索快照", icon: FolderOpenOutlined },
   { path: "/download-history", label: "下载历史", icon: HistoryOutlined },
   { path: "/keep-upload-task", label: "辅种任务", icon: InboxOutlined },
+  { path: "/media-server-entity", label: "媒体库", icon: PlaySquareOutlined },
   { path: "/set-backup", label: "数据备份", icon: CloudUploadOutlined },
   { path: "/set-downloader", label: "下载器", icon: DownloadOutlined },
   { path: "/set-media-server", label: "媒体服务器", icon: PlayCircleOutlined },
   { path: "/set-base", label: "基础设置", icon: SettingOutlined },
+  { path: "/technology-stack", label: "技术栈", icon: AppstoreOutlined },
+  { path: "/special-thank", label: "特别感谢", icon: TeamOutlined },
+  { path: "/logger", label: "运行日志", icon: FileSearchOutlined },
   { path: "/debug/site-definitions", label: "站点定义", icon: FileTextOutlined, dev: true },
 ];
 

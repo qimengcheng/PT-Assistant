@@ -2,6 +2,7 @@
 import { reactive, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import { ExportOutlined, MoreOutlined, SearchOutlined } from "@antdv-next/icons";
 
 import { socialBuildUrlMap } from "@ptd/social";
 import type { ITorrent } from "@ptd/site";
@@ -27,6 +28,8 @@ interface ISocialInformationData extends ISocialInformation {
 const socialInformation = reactive<Record<TSupportSocialSite | string, ISocialInformationData>>({});
 
 const tagsExpanded = ref(false);
+/** 当前悬停的标签名：只有悬停的那个标签才显示关闭按钮（替代原先的 v-hover） */
+const hoveringTag = ref<string | null>(null);
 
 const visibleTags = computed(() => {
   const tags = item.tags;
@@ -81,14 +84,14 @@ function canAdvanceSearch(site: TSupportSocialSite) {
 </script>
 
 <template>
-  <v-container class="t_main pa-0">
-    <v-row gap="0" class="flex-nowrap">
+  <div class="t_main">
+    <div class="t_row">
       <!-- 种子主标题信息 -->
       <span class="text-truncate flex-1-1-0">
         <a
           :href="item.url"
           :title="item.title"
-          class="t_title text-decoration-none text-high-emphasis text-body-large text-truncate"
+          class="t_title text-decoration-none text-body-large text-truncate"
           rel="noopener noreferrer nofollow"
           target="_blank"
         >
@@ -100,118 +103,107 @@ function canAdvanceSearch(site: TSupportSocialSite) {
       <div class="ml-2 flex-0-0">
         <template v-if="showSocial && configStore.searchEntifyControl.showSocialInformation">
           <template v-for="(meta, key) in socialBuildUrlMap" :key="key">
-            <v-menu v-if="item[`ext_${key}`]" open-on-hover>
-              <template v-slot:activator="{ props }">
-                <v-avatar
-                  v-bind="props"
-                  :image="`/icons/social/${key}.png`"
-                  rounded="0"
-                  size="x-small"
-                  class="ml-1"
-                  @click="() => loadSocialInformation(key as TSupportSocialSite)"
-                  @mouseenter="() => loadSocialInformation(key as TSupportSocialSite)"
-                />
-              </template>
-              <v-card>
-                <v-card-text class="pa-0 py-1">
-                  <div class="text-center" style="max-width: 150px">
-                    <template v-if="socialInformation[key]?.loading === true">
-                      <h3 class="font-weight-bold my-2">Loading....</h3>
-                    </template>
-                    <template v-else-if="socialInformation[key]?.id">
-                      <v-img :src="socialInformation[key]?.poster" class="mb-1" width="150" aspect-ratio="2/3">
-                        <template #placeholder>
-                          <v-skeleton-loader type="image@2" height="225"></v-skeleton-loader>
-                        </template>
-                        <template #error>
-                          <v-img width="150" src="/icons/movie_placeholder.png" class="mb-1" />
-                        </template>
-                      </v-img>
-                      <h3
-                        v-if="socialInformation[key]?.title"
-                        class="text-decoration-none text-ellipsis text-truncate font-weight-bold"
-                        :title="socialInformation[key]?.title"
-                      >
-                        {{ socialInformation[key]?.title.split(" / ")[0] }}
-                      </h3>
-                      <p v-if="socialInformation[key]?.ratingScore" class="text-body-small">
-                        {{ socialInformation[key].ratingScore }}
-                        <span v-if="socialInformation[key]?.ratingCount">
-                          from {{ socialInformation[key].ratingCount }} votes
-                        </span>
-                      </p>
-                    </template>
-                    <template v-else>
-                      <h3 class="font-weight-bold my-2">No Information</h3>
-                    </template>
-
-                    <template v-if="canAdvanceSearch(key as TSupportSocialSite)">
-                      <v-divider class="my-1" />
-                      <v-btn
-                        variant="text"
-                        block
-                        append-icon="mdi-magnify"
-                        @click="doAdvanceSearch(key as TSupportSocialSite, item[`ext_${key}`] as string)"
-                      >
-                        {{ t("common.search") }}
-                      </v-btn>
-                    </template>
-
-                    <v-divider class="my-1" />
-                    <v-btn
-                      variant="text"
-                      :href="meta(item[`ext_${key}`]! as string)"
-                      target="_blank"
-                      block
-                      rel="noopener noreferrer nofollow"
-                      :title="`${key}: ${item[`ext_${key}`]}`"
-                      append-icon="mdi-arrow-top-right-bold-box-outline"
+            <a-popover
+              v-if="item[`ext_${key}`]"
+              placement="bottom"
+              trigger="hover"
+              :open="undefined"
+              @open-change="(open: boolean) => open && loadSocialInformation(key as TSupportSocialSite)"
+            >
+              <template #content>
+                <div class="social-card" style="max-width: 150px">
+                  <template v-if="socialInformation[key]?.loading === true">
+                    <h3 class="font-weight-bold my-2">Loading....</h3>
+                  </template>
+                  <template v-else-if="socialInformation[key]?.id">
+                    <a-image
+                      :src="socialInformation[key]?.poster"
+                      :width="150"
+                      :fallback="'/icons/movie_placeholder.png'"
+                      class="mb-1"
                     >
-                      {{ t("common.visit") }}
-                    </v-btn>
-                    <v-divider class="my-1" />
-                    <p class="text-body-small mt-1">( {{ key }}: {{ item[`ext_${key}`] }} )</p>
-                  </div>
-                </v-card-text>
-              </v-card>
-            </v-menu>
+                      <template #placeholder>
+                        <a-skeleton-button active style="width: 150px; height: 225px" />
+                      </template>
+                    </a-image>
+                    <h3
+                      v-if="socialInformation[key]?.title"
+                      class="text-ellipsis font-weight-bold"
+                      :title="socialInformation[key]?.title"
+                    >
+                      {{ socialInformation[key]?.title.split(" / ")[0] }}
+                    </h3>
+                    <p v-if="socialInformation[key]?.ratingScore" class="text-body-small">
+                      {{ socialInformation[key].ratingScore }}
+                      <span v-if="socialInformation[key]?.ratingCount">
+                        from {{ socialInformation[key].ratingCount }} votes
+                      </span>
+                    </p>
+                  </template>
+                  <template v-else>
+                    <h3 class="font-weight-bold my-2">No Information</h3>
+                  </template>
+
+                  <template v-if="canAdvanceSearch(key as TSupportSocialSite)">
+                    <a-divider class="my-1" />
+                    <a-button type="text" block @click="doAdvanceSearch(key as TSupportSocialSite, item[`ext_${key}`] as string)">
+                      <template #icon><SearchOutlined /></template>
+                      {{ t("common.search") }}
+                    </a-button>
+                  </template>
+
+                  <a-divider class="my-1" />
+                  <a-button
+                    type="text"
+                    block
+                    :href="meta(item[`ext_${key}`]! as string)"
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    :title="`${key}: ${item[`ext_${key}`]}`"
+                  >
+                    <template #icon><ExportOutlined /></template>
+                    {{ t("common.visit") }}
+                  </a-button>
+                  <a-divider class="my-1" />
+                  <p class="text-body-small mt-1">( {{ key }}: {{ item[`ext_${key}`] }} )</p>
+                </div>
+              </template>
+
+              <img
+                class="social-avatar"
+                :src="`/icons/social/${key}.png`"
+                :alt="key"
+                @click="loadSocialInformation(key as TSupportSocialSite)"
+                @mouseenter="loadSocialInformation(key as TSupportSocialSite)"
+              />
+            </a-popover>
           </template>
         </template>
       </div>
-    </v-row>
-    <v-row
-      gap="0"
-      class="flex-nowrap"
+    </div>
+    <div
+      class="t_row"
       v-if="configStore.searchEntifyControl.showTorrentTag || configStore.searchEntifyControl.showTorrentSubtitle"
     >
       <!-- 种子标签信息 -->
       <div class="flex-0-0">
         <template v-if="configStore.searchEntifyControl.showTorrentTag && item.tags && item.tags.length > 0">
-          <v-hover v-for="tag in displayedTags" :key="tag.name" v-slot:default="{ isHovering, props }">
-            <v-chip
-              v-bind="props"
-              :color="tag.color"
-              :closable="isHovering as unknown as boolean"
-              class="mr-1"
-              label
-              size="x-small"
-              @click:close="tempHideTag(tag.name)"
-            >
-              {{ tag.name }}
-            </v-chip>
-          </v-hover>
-          <v-chip
-            v-if="hasMoreTags"
+          <a-tag
+            v-for="tag in displayedTags"
+            :key="tag.name"
+            :color="tag.color"
+            :closable="hoveringTag === tag.name"
             class="mr-1"
-            label
-            size="x-small"
-            color="primary"
-            variant="tonal"
-            prepend-icon="mdi-arrow-expand-right"
-            @click="tagsExpanded = true"
+            @mouseenter="hoveringTag = tag.name"
+            @mouseleave="hoveringTag = null"
+            @close="tempHideTag(tag.name)"
           >
+            {{ tag.name }}
+          </a-tag>
+          <a-tag v-if="hasMoreTags" class="mr-1" color="blue" @click="tagsExpanded = true">
+            <template #icon><MoreOutlined /></template>
             {{ hiddenTagCount }}
-          </v-chip>
+          </a-tag>
         </template>
       </div>
 
@@ -223,13 +215,41 @@ function canAdvanceSearch(site: TSupportSocialSite) {
       >
         {{ item.subTitle }}
       </span>
-    </v-row>
-  </v-container>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">
+.t_main {
+  padding: 0;
+}
+
+.t_row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
 // flex item 默认 min-width: auto 会阻止 text-overflow: ellipsis 收缩截断,需显式归零
 .t_main .text-truncate.flex-1-1-0 {
   min-width: 0;
+}
+
+.t_title {
+  color: inherit;
+  font-weight: 500;
+}
+
+.social-avatar {
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.social-card {
+  text-align: center;
 }
 </style>

@@ -5,3 +5,8 @@ node_modules/
 .env.*
 *.log
 stats.html
+
+# 构建产物的备份副本（调试期间留下的 dist-latest 系列，累计约 77MB）
+dist-latest/
+dist-latest_prev*/
+.tmp-build/

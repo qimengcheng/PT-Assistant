@@ -248,10 +248,13 @@ body {
   font-size: 11px;
 }
 
-/* ===== 站点定义（开发调试视图） ===== */
+/* ===== 站点定义（开发调试视图） =====
+   高度用 100% 而不是 100vh：本页嵌在 .content（flex 撑满 100vh、自带 padding 与
+   overflow-y:auto）里，写 100vh 会比内容框高出一屏 → 外层一条、内层又一条双滚动条。 */
 .layout {
   display: flex;
-  height: 100vh;
+  height: 100%;
+  min-height: 480px;
 }
 
 .layout .defs {

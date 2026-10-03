@@ -18,7 +18,6 @@ import { REPO_NAME } from "~/helper.ts";
 
 const configStore = useConfigStore();
 
-const showEncryptionKey = ref<boolean>(false);
 const encryptionKey = shallowRef<string>(configStore.backup.encryptionKey);
 const { history, undo: undoEncryptionKey } = useThrottledRefHistory(encryptionKey, { throttle: 50 });
 watch(encryptionKey, (newValue) => {
@@ -70,13 +69,10 @@ async function loadPTPPBackupFile() {
           <a-space>
             <a-input-password
               v-model:value="encryptionKey"
-              :placeholder="showEncryptionKey ? '密钥明文' : '留空则不加密'"
+              placeholder="留空则不加密"
               style="width: 320px"
               autocomplete="new-password"
             />
-            <a-button @click="showEncryptionKey = !showEncryptionKey">
-              {{ showEncryptionKey ? "隐藏" : "显示" }}
-            </a-button>
             <a-tooltip title="随机生成一个密钥">
               <a-button @click="randomEncryptionKey">
                 <KeyOutlined /> 随机生成

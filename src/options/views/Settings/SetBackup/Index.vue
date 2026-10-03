@@ -292,6 +292,7 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 .table-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
 }

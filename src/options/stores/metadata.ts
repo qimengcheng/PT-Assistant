@@ -186,7 +186,13 @@ export const useMetadataStore = defineStore("metadata", {
           return;
         }
 
-        let searchEntries = siteMetadata.searchEntry ?? { default: {} };
+        /**
+         * ⚠️ 必须先浅拷贝容器再改写：getDefinedSiteMetadata 返回的是**共享缓存对象**
+         * （同一 siteId 多次调用返回同一引用）。直接 `searchEntries[key] = {...}` 会把
+         * 站点定义里真正的 searchEntry 配置（selectors / requestConfig）永久抹成
+         * {id, name, enabled}，该站点的搜索随即完全失效。
+         */
+        let searchEntries = { ...(siteMetadata.searchEntry ?? { default: {} }) };
         for (const [key, value] of Object.entries(siteUserConfig?.merge?.searchEntry ?? {})) {
           if (searchEntries[key] && typeof value.enabled === "boolean") {
             /**
@@ -244,22 +250,29 @@ export const useMetadataStore = defineStore("metadata", {
         }
 
         // 对于已经存在的搜索方案，其中如果有 id === "default" 的特殊情况，将其动态解开
-        let solution = state.solutions[solutionId] as ISearchSolutionMetadata;
-        let solutionItems = [];
+        const solution = state.solutions[solutionId] as ISearchSolutionMetadata;
+
+        /**
+         * ⚠️ 不要在 getter 里改state：
+         * 原来这里 `solutionItem.searchEntries = ...` 与 `solution.solutions = solutionItems`
+         * 是就地改写持久化数据 —— 「读」一个搜索方案会把解开的 default 条目永久写回 storage，
+         * 而且 pinia getter 是 computed，在其依赖上做 mutation 会触发级联失效/重渲染，
+         * 调用方 cloneDeep 拿到的还是被就地改过的对象。
+         * 改成构造新对象返回。
+         */
+        const solutionItems: ISearchSolution[] = [];
         for (const solutionItem of solution.solutions) {
           if (solutionItem.id === "default") {
             const searchEntries = await this.getSiteDefaultSearchSolution(solutionItem.siteId);
             if (searchEntries) {
-              solutionItem.searchEntries = searchEntries;
-              solutionItems.push(solutionItem);
+              solutionItems.push({ ...solutionItem, searchEntries });
             }
           } else {
             solutionItems.push(solutionItem);
           }
         }
 
-        solution.solutions = solutionItems;
-        return solution;
+        return { ...solution, solutions: solutionItems };
       };
     },
 

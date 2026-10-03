@@ -9,12 +9,13 @@ import type { IMetadataPiniaStorageSchema, IConfigPiniaStorageSchema, TUserInfoS
 
 import { logger } from "./logger.ts";
 import { getSiteInstance } from "./site.ts";
+import { extStore } from "@/storage.ts";
 
 const flushQueue = new PQueue({ concurrency: 1 }); // 默认设置为 1，避免并发搜索
 const setSiteLastUserInfoQueue = new PQueue({ concurrency: 1 }); // 专门用于 setSiteLastUserInfo 的队列
 
 flushQueue.on("active", async () => {
-  const configStoreRaw = (await sendMessage("getExtStorage", "config")) as IConfigPiniaStorageSchema;
+  const configStoreRaw = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
   const queueConcurrency = configStoreRaw?.userInfo?.queueConcurrency ?? 1;
 
   if (flushQueue.concurrency != queueConcurrency) {
@@ -45,8 +46,8 @@ export async function getSiteUserInfoResult(siteId: string) {
     }
 
     // 获取历史信息
-    const metadataStoreRaw = (await sendMessage("getExtStorage", "metadata")) as IMetadataPiniaStorageSchema;
-    const configStoreRaw = (await sendMessage("getExtStorage", "config")) as IConfigPiniaStorageSchema;
+    const metadataStoreRaw = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
+    const configStoreRaw = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
     let lastUserInfo = metadataStoreRaw?.lastUserInfo?.[siteId as string] ?? {};
     if (
       !(configStoreRaw.userInfo.alwaysPickLastUserInfo ?? true) ||
@@ -61,7 +62,7 @@ export async function getSiteUserInfoResult(siteId: string) {
       userInfo = await site.getUserInfoResult(userInfo);
     } else if (site.metadata.type === "private" && !site.isOnline && isEmpty(lastUserInfo)) {
       // 如果 private 站点不允许查询用户信息（），则尝试从 userInfo 中获取最近一次的用户信息（回退），以避免 metadata.lastUserInfo 为 undefined 的情况
-      const userInfoStore = ((await sendMessage("getExtStorage", "userInfo")) ?? {}) as TUserInfoStorageSchema;
+      const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
       const userInfoSite = userInfoStore?.[siteId] ?? {};
 
       let maxDate = null;
@@ -92,18 +93,18 @@ export async function setSiteLastUserInfo(userData: IUserInfo) {
     const site = userData.site;
 
     // 存储用户信息到 metadata 中（ pinia/webExtPersistence 会自动同步该部分信息 ）
-    const metadataStore = ((await sendMessage("getExtStorage", "metadata")) ?? {}) as IMetadataPiniaStorageSchema;
+    const metadataStore = ((await extStore.getItem("metadata")) ?? {}) as IMetadataPiniaStorageSchema;
     (metadataStore as IMetadataPiniaStorageSchema).lastUserInfo ??= {};
     (metadataStore as IMetadataPiniaStorageSchema).lastUserInfo[site] = userData;
-    await sendMessage("setExtStorage", { key: "metadata", value: metadataStore });
+    await extStore.setItem("metadata", metadataStore);
 
     // 存储用户信息到 userInfo 中（仅当获取成功时）
     if (userData.status === EResultParseStatus.success) {
-      const userInfoStore = ((await sendMessage("getExtStorage", "userInfo")) ?? {}) as TUserInfoStorageSchema;
+      const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
       userInfoStore[site] ??= {};
       const dateTime = format(userData.updateAt, "yyyy-MM-dd");
       userInfoStore[site][dateTime] = userData;
-      await sendMessage("setExtStorage", { key: "userInfo", value: userInfoStore });
+      await extStore.setItem("userInfo", userInfoStore);
     }
   });
 }
@@ -111,14 +112,14 @@ export async function setSiteLastUserInfo(userData: IUserInfo) {
 onMessage("setSiteLastUserInfo", async ({ data: userData }) => await setSiteLastUserInfo(userData));
 
 onMessage("getSiteUserInfo", async ({ data: siteId }) => {
-  const userInfoStore = ((await sendMessage("getExtStorage", "userInfo")) ?? {}) as TUserInfoStorageSchema;
+  const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
   return userInfoStore?.[siteId] ?? {};
 });
 
 onMessage("removeSiteUserInfo", async ({ data: { siteId, date } }) => {
-  const userInfoStore = ((await sendMessage("getExtStorage", "userInfo")) ?? {}) as TUserInfoStorageSchema;
+  const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
   for (const day of date) {
     unset(userInfoStore, `${siteId}.${day}`);
   }
-  await sendMessage("setExtStorage", { key: "userInfo", value: userInfoStore! });
+  await extStore.setItem("userInfo", userInfoStore!);
 });

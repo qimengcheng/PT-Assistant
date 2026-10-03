@@ -14,8 +14,35 @@
  * special thanks to: https://github.com/spro/get-website-favicon/tree/master/lib/origin
  */
 
-import axios from "axios";
+// 必须用 site 包自己的 axios 适配器而不是裸 axios：
+// 1) 走 replaceUnsafeHeader，部分站点的首页需要覆盖 UA/Cookie 才能返回真实内容；
+// 2) 走 Cloudflare 拦截重试；
+// 3) 每个请求都显式带 timeout —— 图标是纯附加信息，不该拖住调用方。
+// 原来全靠调用侧 Promise.race 兜底，那些 Promise 仍会一直挂着。
+import { axios } from "./adapter.ts";
 import type { ISiteMetadata } from "../types";
+
+/** 图标请求是可有可无的附加信息，超时给得比正文请求更短 */
+const FAVICON_TIMEOUT = 5e3;
+
+/**
+ * Blob → dataURL 的公共实现（消掉原先散落两处的副本与那条 FIXME）。
+ * @param label 报错信息里用来区分调用方的场景
+ */
+export function blobToDataUrl(blob: Blob, label = "blob"): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("loadend", () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error(`Error when parse ${label} Blob`));
+      }
+    });
+
+    reader.readAsDataURL(blob);
+  });
+}
 
 // from: https://stackoverflow.com/a/9967193/8824471
 // from: http://proger.i-forge.net/%D0%9A%D0%BE%D0%BC%D0%BF%D1%8C%D1%8E%D1%82%D0%B5%D1%80/[20121112]%20The%20smallest%20transparent%20pixel.html
@@ -86,26 +113,10 @@ const remoteBetterFaviconOrder = [
   },
 ].reverse();
 
-// FIXME 转成公共函数 BlobToBase64
-function transformBlob(blob: Blob): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("loadend", () => {
-      if (reader.result) {
-        resolve(reader.result);
-      } else {
-        reject(new Error("Error when parse favicon Blob"));
-      }
-    });
-
-    reader.readAsDataURL(blob);
-  });
-}
-
 async function getFaviconFromUrl(url: string): Promise<Blob> {
   const baseUrl = new URL(url);
 
-  const { data: doc } = await axios.get<Document>(url, { responseType: "document" });
+  const { data: doc } = await axios.get<Document>(url, { responseType: "document", timeout: FAVICON_TIMEOUT });
 
   const favicons: IParsedFavicon[] = [];
 
@@ -126,7 +137,7 @@ async function getFaviconFromUrl(url: string): Promise<Blob> {
   if (manifestElement) {
     const { data: manifest } = await axios.get<{
       icons: Record<"sizes" | "src" | "type", string>[];
-    }>(manifestElement.href, { responseType: "json" });
+    }>(manifestElement.href, { responseType: "json", timeout: FAVICON_TIMEOUT });
 
     manifest.icons.forEach(({ sizes, src }) => {
       favicons.push({
@@ -142,6 +153,7 @@ async function getFaviconFromUrl(url: string): Promise<Blob> {
     const faviconIco = await axios.get<Blob>("/favicon.ico", {
       baseURL: baseUrl.origin,
       responseType: "blob",
+      timeout: FAVICON_TIMEOUT,
     });
     if (faviconIco && faviconIco.data?.type === "image/x-icon") {
       favicons.push({
@@ -187,7 +199,7 @@ async function getFaviconFromUrl(url: string): Promise<Blob> {
             faviconUrl = `${baseUrl.origin}${faviconUrl}`;
           }
 
-          const { data } = await axios.get(faviconUrl, { responseType: "blob" });
+          const { data } = await axios.get(faviconUrl, { responseType: "blob", timeout: FAVICON_TIMEOUT });
           return data;
         } catch {}
       }
@@ -225,7 +237,7 @@ export async function getFavicon(site: getFaviconMetadata): Promise<string> {
   // 2.1 ISiteMetadata 中定义的 favicon 字段为一个链接
   if (siteFavicon && siteFavicon.startsWith("http")) {
     try {
-      const configReq = await axios.get(siteFavicon, { responseType: "blob" });
+      const configReq = await axios.get(siteFavicon, { responseType: "blob", timeout: FAVICON_TIMEOUT });
       faviconMeta = configReq.data;
     } catch {}
   }
@@ -243,7 +255,7 @@ export async function getFavicon(site: getFaviconMetadata): Promise<string> {
   // 将请求结果转为 base64
   let faviconBase64;
   if (typeof faviconMeta !== "undefined") {
-    faviconBase64 = await transformBlob(faviconMeta); // 将 faviconMeta 转成 base64，并缓存
+    faviconBase64 = await blobToDataUrl(faviconMeta, "favicon"); // 将 faviconMeta 转成 base64，并缓存
   }
 
   // 3. fallback 使用 NO_IMAGE 替代

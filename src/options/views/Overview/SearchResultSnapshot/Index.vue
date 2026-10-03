@@ -10,11 +10,11 @@ import {
   MinusOutlined,
   SearchOutlined,
 } from "@antdv-next/icons";
-import type { TableColumnsType, TablePaginationConfig, TableSorterResult } from "antdv-next";
+import type { TableColumnsType } from "antdv-next";
 
+import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { formatDate } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
-import { useConfigStore } from "@/options/stores/config.ts";
 import { type ISearchSnapshotMetadata, type TSearchSnapshotKey } from "@/shared/types.ts";
 
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
@@ -22,7 +22,6 @@ import EditNameDialog from "./EditNameDialog.vue";
 
 const { t } = useI18n();
 const router = useRouter();
-const configStore = useConfigStore();
 const metadataStore = useMetadataStore();
 
 const showEditNameDialog = ref<boolean>(false);
@@ -32,12 +31,10 @@ const tableSelected = ref<TSearchSnapshotKey[]>([]);
 const tableWaitFilter = ref("");
 const tableFilter = refDebounced(tableWaitFilter, 500); // 延迟搜索过滤词的生成
 
-/** 配置里存的是 Vuetify 时代的 `[{key, order:"asc"|"desc"}]`，这里翻译成 antd 的受控排序 */
-const persistedSort = computed(() => configStore.tableBehavior.SearchResultSnapshot?.sortBy?.[0]);
-const antdSortOrder = computed<"ascend" | "descend" | null>(() => {
-  const s = persistedSort.value;
-  if (!s) return null;
-  return s.order === "asc" ? "ascend" : "descend";
+const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("SearchResultSnapshot", {
+  defaultPageSize: 25,
+  size: "small",
+  showTotal: (total: number) => `${total}`,
 });
 
 const columns = computed<TableColumnsType<ISearchSnapshotMetadata>>(() => [
@@ -47,7 +44,7 @@ const columns = computed<TableColumnsType<ISearchSnapshotMetadata>>(() => [
     key: "name",
     align: "left",
     sorter: (a, b) => a.name.localeCompare(b.name),
-    sortOrder: persistedSort.value?.key === "name" ? antdSortOrder.value : null,
+    sortOrder: sortOrderOf("name"),
   },
   {
     title: t("SearchResultSnapshot.table.header.recordCount"),
@@ -56,7 +53,7 @@ const columns = computed<TableColumnsType<ISearchSnapshotMetadata>>(() => [
     align: "right",
     width: 100,
     sorter: (a, b) => a.recordCount - b.recordCount,
-    sortOrder: persistedSort.value?.key === "recordCount" ? antdSortOrder.value : null,
+    sortOrder: sortOrderOf("recordCount"),
   },
   {
     title: t("SearchResultSnapshot.table.header.createdAt"),
@@ -65,7 +62,7 @@ const columns = computed<TableColumnsType<ISearchSnapshotMetadata>>(() => [
     align: "center",
     width: 180,
     sorter: (a, b) => a.createdAt - b.createdAt,
-    sortOrder: persistedSort.value?.key === "createdAt" ? antdSortOrder.value : null,
+    sortOrder: sortOrderOf("createdAt"),
   },
   {
     title: t("common.action"),
@@ -81,29 +78,6 @@ const filteredItems = computed(() => {
   if (!keyword) return list;
   return list.filter((item) => item.name.toLowerCase().includes(keyword));
 });
-
-const pagination = computed<TablePaginationConfig>(() => ({
-  pageSize: configStore.tableBehavior.SearchResultSnapshot?.itemsPerPage ?? 25,
-  showSizeChanger: true,
-  showTotal: (total: number) => `${total}`,
-  size: "small",
-}));
-
-function handleTableChange(
-  page: TablePaginationConfig,
-  _filters: unknown,
-  sorter: TableSorterResult | TableSorterResult[],
-) {
-  if (page.pageSize) {
-    configStore.updateTableBehavior("SearchResultSnapshot", "itemsPerPage", page.pageSize);
-  }
-  const single = Array.isArray(sorter) ? sorter[0] : sorter;
-  if (single?.order && single.columnKey) {
-    configStore.updateTableBehavior("SearchResultSnapshot", "sortBy", [
-      { key: String(single.columnKey), order: single.order === "ascend" ? "asc" : "desc" },
-    ]);
-  }
-}
 
 function viewSnapshot(searchSnapshotId: TSearchSnapshotKey) {
   router.push({

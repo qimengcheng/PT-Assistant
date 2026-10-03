@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { App, type TableColumnsType } from "antdv-next";
+import { type TableColumnsType } from "antdv-next";
 import {
   ArrowUpOutlined,
   CopyOutlined,
@@ -20,10 +20,9 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 const { t } = useI18n();
-// MV3 扩展页里原生 confirm() 静默失效，统一走 App 上下文提供的 modal
-const { modal } = App.useApp();
 const runtimeStore = useRuntimeStore();
 const metadataStore = useMetadataStore();
 
@@ -77,19 +76,8 @@ onMounted(() => {
   loadTasks();
 });
 
-function confirmDanger(content: string) {
-  return new Promise<boolean>((resolve) => {
-    modal.confirm({
-      title: t("common.dialog.title.confirmAction"),
-      content,
-      okType: "danger",
-      okText: t("common.dialog.ok"),
-      cancelText: t("common.dialog.cancel"),
-      onOk: () => resolve(true),
-      onCancel: () => resolve(false),
-    });
-  });
-}
+// 统一走公共实现（原先这里是本仓库第一份手写副本，现已抽到 components/useConfirmDanger.ts）
+const { confirmDanger } = useConfirmDanger();
 
 async function deleteTask(task: IKeepUploadTask) {
   if (!(await confirmDanger(t("KeepUploadTask.deleteConfirm")))) return;

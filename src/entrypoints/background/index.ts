@@ -2,7 +2,6 @@
 import type { ISiteMetadata, TSite } from "@ptd/site"; // type-only：构建时擦除，不会把 @ptd/site 的 eager 链（utils → social → sizzle）带进 SW
 
 import { onMessage } from "@/messages.ts";
-import { extStore } from "@/storage.ts";
 import { setupOffscreenDocumentSafe } from "./utils/offscreen.ts";
 // cookies 相关 handler（含 setCookie 的字段白名单与 checkAndExtendCookies）统一在本模块注册
 import "./utils/cookies.ts";
@@ -11,7 +10,7 @@ import "./utils/contextMenus.ts";
 // openOptionsPage 消息：content-script 划词搜索等跳转选项页
 import "./utils/base.ts";
 // DNR session 规则（unsafe header 注入，正向圈定本扩展请求 #1465/#1486）
-import "./utils/webRequest.ts";
+import { cleanupStaleDNRSessionRules } from "./utils/webRequest.ts";
 // 地址栏 ptd + Tab 搜索
 import "./utils/omnibox.ts";
 // 定时任务：自动刷新站点数据 / 自动备份 / 冷却后重新推送种子
@@ -59,19 +58,12 @@ export default defineBackground({
       definitionCount,
     }));
 
-    // ===== chrome.storage（供 offscreen / site 包 adapter 的 store/retrieve 使用）=====
-    // ⚠️ 必须走 @/storage.ts 的 extStore，不能自己拼 storage.local 的 key：
-    // options 页的 pinia 持久化（persistWebExt，key = store.$id）写的是裸 key "metadata"，
-    // 若这里换成 `extStorage:${key}`，两套命名空间互不相通 —— 备份恢复写进去的数据
-    // options 页永远读不到（MyData 表格空白），offscreen 侧也永远读不到用户的站点配置。
-    onMessage("getExtStorage", async ({ data: key }) => {
-      // 不同 key 的值类型不同，这里无法收窄到具体键的类型
-      return (await extStore.getItem(key)) as any;
-    });
-
-    onMessage("setExtStorage", async ({ data: { key, value } }) => {
-      await extStore.setItem(key, value);
-    });
+    // ===== chrome.storage 不再由本 SW 代理 =====
+    // 原先这里注册着 getExtStorage / setExtStorage / setExtStoragePath 三个 handler，
+    // 供 offscreen / content script / site 包 adapter 远程读写。2026-10-03 起全部改为
+    // 各上下文直连 @/storage.ts 的 extStore（offscreen 是扩展页、content script 有
+    // storage 权限，都能直接用 chrome.storage），RPC 已删除：
+    // 少一层消息协议，也免得 content 引导在每个网页上都为读一次 config 唤醒 SW。
 
     // ===== chrome.downloads（供备份本地导出等使用）=====
     onMessage("downloadFile", async ({ data }) => {
@@ -89,5 +81,9 @@ export default defineBackground({
       console.debug("[PTD] Installed!");
       void fixAllStoredUserInfo();
     });
+
+    // SW 每次被唤醒都会跑 main()，在这里清理上一会话遗留的 DNR 动态 session 规则，
+    // 避免它们累积到配额上限后让所有 unsafe header 请求失败（见 utils/webRequest.ts）。
+    void cleanupStaleDNRSessionRules();
   },
 });

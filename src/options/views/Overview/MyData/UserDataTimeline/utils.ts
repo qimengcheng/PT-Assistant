@@ -2,7 +2,6 @@ import { ref, shallowRef, computed } from "vue";
 import { differenceInDays } from "date-fns";
 import { EResultParseStatus, type ISiteUserConfig, type IUserInfo, type TSiteID } from "@ptd/site";
 
-import { sendMessage } from "@/messages.ts";
 import { formatSize, simplifyNumber } from "@/options/utils.ts";
 import { useResetableRef } from "@/options/directives/useResetableRef.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -10,6 +9,7 @@ import type { IStoredUserInfo, TUserInfoStorageSchema } from "@/shared/types.ts"
 
 import { fixUserInfo, realFormatRatio } from "../utils/format.ts";
 import { allAddedSiteMetadata, TOptionSiteMetadatas } from "../utils/siteMetadata.ts";
+import { extStore } from "@/storage.ts";
 
 const metadataStore = useMetadataStore();
 
@@ -25,15 +25,17 @@ export const topSiteRenderAttr = [
   { iconFill: "#B4B4B4", siteKey: "subSite", valueKey: "subValue" },
 ] as const;
 
+// bonus/bonusPerHour 在协议上可能是 "N/A" 字符串，故 format 入参统一收宽为 number|string，
+// 各 format 内部用 Number() 归一（无法解析按 0 处理）
 export const CTimelineUserInfoField = [
-  { name: "uploads", format: (x: number) => x },
-  { name: "uploaded", format: (x: number) => formatSize(x) },
-  { name: "downloaded", format: (x: number) => formatSize(x) },
-  { name: "seeding", format: (x: number) => x },
-  { name: "seedingSize", format: (x: number) => formatSize(x) },
-  { name: "bonus", format: (x: number) => simplifyNumber(x, " ") },
-  { name: "bonusPerHour", format: (x: number) => simplifyNumber(x, " ") },
-  { name: "ratio", format: (x: number) => realFormatRatio(x) },
+  { name: "uploads", format: (x: number | string) => Number(x) || 0 },
+  { name: "uploaded", format: (x: number | string) => formatSize(Number(x) || 0) },
+  { name: "downloaded", format: (x: number | string) => formatSize(Number(x) || 0) },
+  { name: "seeding", format: (x: number | string) => Number(x) || 0 },
+  { name: "seedingSize", format: (x: number | string) => formatSize(Number(x) || 0) },
+  { name: "bonus", format: (x: number | string) => simplifyNumber(Number(x) || 0, " ") },
+  { name: "bonusPerHour", format: (x: number | string) => simplifyNumber(Number(x) || 0, " ") },
+  { name: "ratio", format: (x: number | string) => realFormatRatio(Number(x) || 0) },
 ] as const;
 
 export type ITimelineUserInfoField = (typeof CTimelineUserInfoField)[number];
@@ -78,7 +80,7 @@ export function canThisSiteShow(siteId: TSiteID) {
 
 export async function loadFullData(): Promise<Record<TSiteID, IStoredUserInfo>> {
   const lastUserInfo: Record<TSiteID, IStoredUserInfo> = {};
-  const rawData = (await sendMessage("getExtStorage", "userInfo")) as TUserInfoStorageSchema;
+  const rawData = (await extStore.getItem("userInfo")) as TUserInfoStorageSchema;
 
   for (const siteId in metadataStore.sites) {
     const siteUserInfo = metadataStore.lastUserInfo[siteId] as IStoredUserInfo;
@@ -189,11 +191,12 @@ export const timelineDataRef = useResetableRef<ITimelineData>(
         // 更新 uploads, uploaded, downloaded, seeding, seedingSize 信息
         for (const userInfoField of CTimelineUserInfoField) {
           const userInfoKey = userInfoField.name as ITimelineUserInfoField["name"];
-          if (userInfo[userInfoKey] && userInfo[userInfoKey] > 0) {
+          // bonus 类可能是 "N/A"，先转数再比较（NaN/0 都会被挡掉）
+          if (userInfo[userInfoKey] && Number(userInfo[userInfoKey]) > 0) {
             // refs: https://github.com/pt-plugins/PT-depiler/issues/48
             let value = 0;
             try {
-              value = parseFloat(userInfo[userInfoKey]);
+              value = parseFloat(String(userInfo[userInfoKey]));
             } catch (e) {}
 
             if (!isFinite(value)) continue; // 如果不是有限数字，则跳过

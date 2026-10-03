@@ -22,8 +22,8 @@ import {
   CTrackerState,
   TorrentFilePriority,
 } from "../types";
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-import { getRemoteTorrentFile } from "../utils";
+import { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import { axios, getRemoteTorrentFile } from "../utils";
 
 export const clientConfig: TorrentClientConfig = {
   type: "Flood",
@@ -354,13 +354,6 @@ export default class Flood extends AbstractBittorrentClient {
   // ─────────────────────────────────────────────
   // 文件级 / peers / tracker（jesec/flood API）
   // ─────────────────────────────────────────────
-
-  private getTorrentHash(torrent: string | CTorrent): string {
-    if (typeof torrent === "string") {
-      return torrent;
-    }
-    return (torrent.infoHash ?? torrent.id) as string;
-  }
 
   // 文件列表: GET /api/torrents/{hash}/contents
   override async getTorrentFiles(torrent: string | CTorrent): Promise<CTorrentFile[]> {

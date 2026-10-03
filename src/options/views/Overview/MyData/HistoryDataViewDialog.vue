@@ -19,12 +19,16 @@ import { formatRatio } from "./utils/format.ts";
 import { loadSiteHistoryData } from "./utils/lastUserData.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
+import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
+import { toTableColumns } from "@/options/components/tableSorters.ts";
+import { useRuntimeStore } from "@/options/stores/runtime.ts";
 
 const showDialog = defineModel<boolean>();
 const { siteId } = defineProps<{
   siteId: TSiteID | null;
 }>();
 const { t } = useI18n();
+const runtimeStore = useRuntimeStore();
 
 const currentDate = formatDate(+new Date(), "yyyy-MM-dd");
 const jsonData = ref<any>({});
@@ -40,11 +44,20 @@ interface ITableHeader {
   align?: "start" | "end" | "center";
   width?: number | string;
   sortable?: boolean;
+  /** 非受控初始排序（仅此弹窗的 date 列用） */
+  defaultSortOrder?: "ascend" | "descend";
 }
 
 const siteHistoryData = shallowRef<IShowUserInfo[]>([]);
 const tableHeader = [
-  { title: t("common.date"), key: "date", align: "center" },
+  {
+    title: t("common.date"),
+    key: "date",
+    align: "center",
+    // 原 :sort-by="[{ key: 'date', order: 'desc' }]" 是初始排序，
+    // 用 defaultSortOrder（非受控的 sortOrder）才能保持表头仍可点击切换
+    defaultSortOrder: "descend",
+  },
   { title: t("common.username"), key: "name", align: "center", sortable: false },
   { title: t("MyData.table.levelName"), key: "levelName", align: "start", sortable: false },
   { title: t("MyData.table.userData"), key: "uploaded", align: "end", sortable: false },
@@ -56,32 +69,9 @@ const tableHeader = [
 ] as ITableHeader[];
 const tableSelected = ref<string[]>([]);
 
-/** 嵌套 key 取值 + 通用比较器（antd 受控排序必须有 compare，`sorter: true` 会被静默跳过） */
-function getByPath(row: any, path: string): any {
-  return path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), row);
-}
-function makeSorter(path: string) {
-  return (a: IShowUserInfo, b: IShowUserInfo): number => {
-    const ra = getByPath(a, path);
-    const rb = getByPath(b, path);
-    const na = typeof ra === "number" ? ra : Number.parseFloat(ra);
-    const nb = typeof rb === "number" ? rb : Number.parseFloat(rb);
-    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-    return String(ra ?? "").localeCompare(String(rb ?? ""), "zh-CN");
-  };
-}
-
+/** 列生成走公共 toTableColumns（不传 sortOrderMap，保持 date 列的非受控初始排序） */
 const tableColumns = computed<TableColumnsType<IShowUserInfo>>(() =>
-  tableHeader.map((header) => ({
-    key: header.key,
-    dataIndex: header.key.split("."),
-    align: header.align,
-    width: header.width,
-    sorter: header.sortable === false ? false : makeSorter(header.key),
-    // 原 :sort-by="[{ key: 'date', order: 'desc' }]" 是初始排序，
-    // 用 defaultSortOrder（非受控的 sortOrder）才能保持表头仍可点击切换
-    defaultSortOrder: header.key === "date" ? ("descend" as const) : null,
-  })),
+  toTableColumns<IShowUserInfo>(tableHeader),
 );
 
 // 对应 v-data-table 的 show-select + item-value="date"
@@ -90,21 +80,29 @@ const tableRowSelection = computed(() => ({
   onChange: (keys: (string | number)[]) => {
     tableSelected.value = keys.map(String);
   },
-  // 对应 v-data-table 的 item-selectable="_selectable"
-  getCheckboxProps: (record: IShowUserInfo) => ({ disabled: !(record as any)._selectable }),
 }));
 
-function deleteSiteUserInfo(date: string[]) {
-  if (confirm(t("MyData.HistoryDataView.deleteConfirm"))) {
-    sendMessage("removeSiteUserInfo", {
+/**
+ * MV3 扩展页面禁用原生 confirm()（静默返回 false），
+ * 所以这里必须走 App 上下文的 modal，否则「删除」按钮点了没有任何反应也不会报错。
+ */
+const { confirmDanger } = useConfirmDanger();
+
+async function deleteSiteUserInfo(date: string[]) {
+  if (!(await confirmDanger(t("MyData.HistoryDataView.deleteConfirm")))) {
+    return;
+  }
+
+  try {
+    await sendMessage("removeSiteUserInfo", {
       siteId: siteId!,
       date: date.filter((d) => d != currentDate), // 不允许移除当天的数据
-    }).then(() => {
-      loadSiteHistoryData(siteId!).then((data) => {
-        siteHistoryData.value = data;
-        tableSelected.value = [];
-      });
     });
+    siteHistoryData.value = await loadSiteHistoryData(siteId!);
+    tableSelected.value = [];
+  } catch (e) {
+    console.error("[MyData] remove site user info failed", e);
+    runtimeStore.showSnakebar(t("MyData.HistoryDataView.deleteConfirm"), { color: "error" });
   }
 }
 

@@ -1,6 +1,6 @@
 /// <reference types="chrome" />
 import { onMessage, sendMessage } from "@/messages.ts";
-import { setupOffscreenDocument } from "./offscreen.ts";
+import { whenOffscreenReady } from "./offscreen.ts";
 import type { BridgeState, BridgeStatus } from "@/shared/types.ts";
 
 /**
@@ -227,7 +227,7 @@ function connect() {
     }
 
     try {
-      await setupOffscreenDocument();
+      await whenOffscreenReady();
       const result = await sendMessage(method as any, params);
       if (port === currentPort) {
         currentPort.postMessage({ type: "response", id, result });

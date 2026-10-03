@@ -9,6 +9,8 @@ stats.html
 # 构建产物的备份副本（调试期间留下的 dist-latest 系列，累计约 77MB）
 dist-latest/
 dist-latest_prev*/
+# 各 agent 会话独立的产物目录（PTD_SESSION=<标识> → dist-<标识>/）
+dist-*/
 .tmp-build/
 
 # IDE

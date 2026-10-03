@@ -21,8 +21,8 @@ import {
   TorrentFilePriority,
 } from "../types";
 import urlJoin from "url-join";
-import axios from "axios";
-import { getRemoteTorrentFile } from "../utils";
+
+import { axios, getRemoteTorrentFile } from "../utils";
 
 export const clientConfig: DownloaderBaseConfig = {
   type: "Deluge",
@@ -210,25 +210,6 @@ function mapTorrentFilePriorityToDeluge(priority: TorrentFilePriority): number {
     default:
       return 1;
   }
-}
-
-// Deluge tracker_status 为自由文本，按关键词归一化
-function mapDelugeTrackerState(status: string | undefined): { state: CTrackerState; message?: string } {
-  const text = status ?? "";
-  const lower = text.toLowerCase();
-  if (lower.includes("error")) {
-    return { state: CTrackerState.error, message: status };
-  }
-  if (lower.includes("updating")) {
-    return { state: CTrackerState.updating, message: status };
-  }
-  if (lower.includes("disabled")) {
-    return { state: CTrackerState.disabled, message: status };
-  }
-  if (text.length === 0) {
-    return { state: CTrackerState.unknown };
-  }
-  return { state: CTrackerState.working, message: status };
 }
 
 type DelugeTorrentField =
@@ -571,13 +552,6 @@ export default class Deluge extends AbstractBittorrentClient {
   // 文件级 / peers / tracker 管理（Deluge WebAPI）
   // ─────────────────────────────────────────────
 
-  private getTorrentHash(torrent: string | CTorrent): string {
-    if (typeof torrent === "string") {
-      return torrent;
-    }
-    return (torrent.infoHash || (torrent.id as string)) as string;
-  }
-
   // 文件列表: core.get_torrents_status fields files/file_progress/file_priorities
   override async getTorrentFiles(torrent: string | CTorrent): Promise<CTorrentFile[]> {
     const hash = this.getTorrentHash(torrent);
@@ -678,17 +652,17 @@ export default class Deluge extends AbstractBittorrentClient {
     const trackers: Array<{ url: string; tier: number }> = torrentData?.trackers ?? [];
     const trackerStatus: string | undefined = torrentData?.tracker_status;
 
-    return trackers.map((tracker) => {
-      const { state, message } = mapDelugeTrackerState(trackerStatus);
-      return {
-        url: tracker.url,
-        tier: tracker.tier ?? 0,
-        status: state,
-        statusMessage: message,
-        enabled: state !== CTrackerState.disabled,
-        raw: tracker,
-      };
-    });
+    // ⚠️ Deluge 的 tracker_status 是**种子级**的单个状态字符串（它不提供 per-tracker 状态）。
+    // 原来把这个值套到每一个 tracker 上，会让 UI 显示成「所有 tracker 都是同一个状态」，
+    // 在多 tracker 场景下是误导性的。这里统一标为 unknown，并在文案里注明来源层级。
+    return trackers.map((tracker) => ({
+      url: tracker.url,
+      tier: tracker.tier ?? 0,
+      status: CTrackerState.unknown,
+      statusMessage: trackerStatus ? `[torrent-level] ${trackerStatus}` : undefined,
+      enabled: tracker.tier !== -1,
+      raw: tracker,
+    }));
   }
 
   // 新增 tracker: core.set_torrent_trackers（全量替换，先读后加）
@@ -736,7 +710,7 @@ export default class Deluge extends AbstractBittorrentClient {
     }
 
     const {
-      data: { result },
+      data: { result, error },
     } = await axios.post<DelugeDefaultResponse<T>>(
       this.address,
       {
@@ -749,6 +723,13 @@ export default class Deluge extends AbstractBittorrentClient {
         timeout: this.config.timeout,
       },
     );
+
+    // Deluge 用 HTTP 200 + JSON-RPC error 字段报错，result 此时是 undefined。
+    // 直接 return result 会把 undefined 当成功返回（例如 addResult.success = result !== null 判成 true），
+    // 调用方拿到一个「成功但没有数据」的结果，错误信息彻底丢失。
+    if (error) {
+      throw new Error(`Deluge RPC ${method} failed: ${Array.isArray(error) ? error.join(", ") : String(error)}`);
+    }
     return result;
   }
 }

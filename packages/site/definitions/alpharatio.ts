@@ -2,7 +2,7 @@
  * @JackettDefinitions https://github.com/Jackett/Jackett/blob/master/src/Jackett.Common/Indexers/Definitions/AlphaRatio.cs
  * @PTPPDefinitions https://github.com/pt-plugins/PT-Plugin-Plus/blob/dev/resource/sites/alpharatio.cc/config.json
  */
-import type { ISiteMetadata, ITorrent, IUserInfo, TSearchRequestConfigTransformer } from "../types";
+import type { ISiteMetadata, ITorrent, IUserInfo, TSearchRequestConfigTransformer, TUserInfoParseKey } from "../types";
 import GazelleJSONAPI, { SchemaMetadata, torrentBrowseResult } from "../schemas/GazelleJSONAPI";
 import { set, unset } from "es-toolkit/compat";
 import { toMerged } from "es-toolkit";
@@ -251,7 +251,7 @@ export default class AlphaRatio extends GazelleJSONAPI {
       this.getFieldsData(userPage, this.metadata.userInfo!.selectors!, [
         "donation",
         "seedingBonus",
-      ] as (keyof Partial<IUserInfo>)[]) as Partial<IUserInfo>,
+      ] as TUserInfoParseKey[]) as Partial<IUserInfo>,
     );
   }
 }

@@ -19,6 +19,7 @@ import {
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
+import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import type { TDownloaderKey } from "@/shared/types.ts";
 import { getDownloaderIcon } from "@ptd/downloader";
 
@@ -96,18 +97,16 @@ const filteredDownloaders = computed(() => {
   });
 });
 
+const { itemsPerPage, handleTableChange: onTableChange } = useTableBehavior("SetDownloader", {
+  defaultPageSize: 10,
+});
+
 const pagination = computed(() => ({
   current: 1,
-  pageSize: configStore.tableBehavior.SetDownloader.itemsPerPage,
+  pageSize: itemsPerPage.value,
   showSizeChanger: true,
   showTotal: (total: number) => `共 ${total} 项`,
 }));
-
-function onTableChange(pag: any) {
-  if (pag.pageSize) {
-    configStore.updateTableBehavior("SetDownloader", "itemsPerPage", pag.pageSize);
-  }
-}
 
 const columns = [
   { title: "№", dataIndex: "sortIndex", width: 70, align: "right" as const },

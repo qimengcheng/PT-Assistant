@@ -19,8 +19,8 @@ import {
   TorrentFilePriority,
 } from "../types";
 import urlJoin from "url-join";
-import axios, { type AxiosResponse, isAxiosError } from "axios";
-import { getRemoteTorrentFile } from "../utils";
+import { type AxiosResponse, isAxiosError } from "axios";
+import { axios, getRemoteTorrentFile } from "../utils";
 
 export const clientConfig: TorrentClientConfig = {
   type: "Transmission",

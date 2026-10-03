@@ -226,13 +226,13 @@ function convertToJSON(items: IHistoryUserInfo[]): string {
                   <a-checkbox
                     :checked="selectedKeys.includes(field.key)"
                     :disabled="field.required"
-                    @change="
-                      (v: any) => {
-                        if (v) {
-                          selectedKeys.push(field.key);
-                        } else {
-                          selectedKeys = selectedKeys.filter((k) => k !== field.key);
-                        }
+                    @update:checked="
+                      (checked: boolean) => {
+                        // @update:checked 直接给布尔值。用 @change 会拿到 CheckboxChangeEvent 对象，
+                        // if (v) 恒为真 —— 非必选字段取消不掉，且每次点击都往数组里塞重复项。
+                        selectedKeys = checked
+                          ? [...new Set([...selectedKeys, field.key])]
+                          : selectedKeys.filter((k) => k !== field.key);
                       }
                     "
                   >

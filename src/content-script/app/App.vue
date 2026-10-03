@@ -107,13 +107,21 @@ function fixDraggingLink(link: string): string {
   return link;
 }
 
-document.addEventListener("dragstart", (e: DragEvent) => {
+/**
+ * 把站点页面上的 <a> 拖拽成本扩展的种子链接。
+ *
+ * 必须随组件生命周期成对挂载/卸载：这里是 document 级监听器，
+ * 而 init.ts 的 MutationObserver 在节点被挤掉后会 unmount 并重新 mountApp（见 init.ts），
+ * 写在 <script setup> 顶层（每次实例化都跑、且无人 removeEventListener）会随每次重挂
+ * 无限累积 —— 页面上所有拖拽事件都要过一遍这些僵尸 handler，且各自持有旧的 ptdData 快照。
+ */
+function onDragStart(e: DragEvent) {
   const target = e.target as HTMLElement;
   if (target.tagName == "A") {
     const a = target as HTMLAnchorElement;
     const link = fixDraggingLink(a.href);
     if (link) {
-      let list: ITorrent[] = [
+      const list: ITorrent[] = [
         {
           site: ptdData.siteId || "",
           link,
@@ -125,7 +133,10 @@ document.addEventListener("dragstart", (e: DragEvent) => {
     }
   }
   // fallback to default text/html behavior
-});
+}
+
+onMounted(() => document.addEventListener("dragstart", onDragStart));
+onBeforeUnmount(() => document.removeEventListener("dragstart", onDragStart));
 
 const SIMPLE_URL_REGEX = /https?:\/\/[^\s]+/g;
 

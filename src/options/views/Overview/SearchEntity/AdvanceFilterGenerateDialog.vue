@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
- * 因为 Vuetify 的限制，无法实现  indeterminate -> checked -> unchecked -> indeterminate 的循环切换，
- * 只能由 indeterminate -> checked <-> unchecked 之间切换，当 checked 是为 required，unchecked 时为 exclude，
- * 如果需要忽略，目前只能重置过滤词。
+ * 高级筛选对话框。Vuetify 时代无法实现 indeterminate -> checked -> unchecked -> indeterminate
+ * 的循环，只能 中性 -> checked(required) <-> unchecked(exclude)，要忽略只能重置过滤词。
  * refs: https://github.com/vuetifyjs/vuetify/blob/0ca7e93ad011b358591da646fdbd6ebe83625d25/packages/vuetify/src/components/VCheckbox/VCheckboxBtn.tsx#L49-L53
+ *
+ * 三态复选区、关键词输入、区间滑块、底栏与 DownloadHistory 版共用
+ * src/options/components/AdvanceFilter 下的零件。
  */
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -25,6 +27,10 @@ import { setDateRangeByDatePicker, getThisDateUnitRange } from "@/options/direct
 
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import FilterKeywordsSection from "@/options/components/AdvanceFilter/FilterKeywordsSection.vue";
+import FilterCheckboxSection from "@/options/components/AdvanceFilter/FilterCheckboxSection.vue";
+import FilterRangeSlider from "@/options/components/AdvanceFilter/FilterRangeSlider.vue";
+import AdvanceFilterFooter from "@/options/components/AdvanceFilter/AdvanceFilterFooter.vue";
 
 const showDialog = defineModel<boolean>();
 
@@ -98,11 +104,6 @@ function onAfterOpenChange(open: boolean) {
   if (open) enterDialog();
 }
 
-/** 站点/标签/状态三组勾选框的「排除」态 —— Vuetify 里是写死 indeterminate，这里按数据实际状态呈现 */
-function isExcluded(field: string, value: string): boolean {
-  return (advanceFilterDictRef.value[field]?.exclude ?? []).includes(value);
-}
-
 /** 自定义日期区间：a-range-picker 给的是 dayjs，setDateRangeByDatePicker 要的是 Date[] */
 function onCustomDateRangeChange(dates: unknown) {
   if (!dates || !Array.isArray(dates) || dates.length === 0) return;
@@ -115,13 +116,6 @@ function disabledDate(current: { valueOf: () => number }): boolean {
   const [min, max] = advanceItemPropsRef.value.time.range as [number, number];
   const ts = current.valueOf();
   return ts < startOfDay(new Date(min)).getTime() || ts > addDays(new Date(max), 1).getTime();
-}
-
-/** v-range-slider 的 ticks（原始数值数组）→ a-slider 的 marks（Record<number, any>） */
-function toMarks(ticks: number[]): Record<number, null> {
-  const marks: Record<number, null> = {};
-  for (const tick of ticks ?? []) marks[tick] = null;
-  return marks;
 }
 
 /** v-range-slider 的 #thumb-label → a-slider 的 tooltip.formatter */
@@ -144,51 +138,26 @@ function formatSizeTooltip(value?: number) {
       <a-row :gutter="0">
         <a-col :span="24" class="text-label-large">{{ t("common.AdvanceFilterGenerateDialog.keywords") }}</a-col>
       </a-row>
-      <a-row :gutter="0">
-        <a-col :xs="24" :md="12">
-          <a-select
-            v-model:value="advanceFilterDictRef.text.required"
-            mode="tags"
-            size="small"
-            :token-separators="[',']"
-            :placeholder="t('common.AdvanceFilterGenerateDialog.required')"
-          />
-        </a-col>
-        <a-col :xs="24" :md="12">
-          <a-select
-            v-model:value="advanceFilterDictRef.text.exclude"
-            mode="tags"
-            size="small"
-            :token-separators="[',']"
-            :placeholder="t('common.AdvanceFilterGenerateDialog.exclude')"
-          />
-        </a-col>
-      </a-row>
+      <FilterKeywordsSection v-model="advanceFilterDictRef.text" />
 
       <a-row :gutter="0">
         <a-col :span="24" class="text-label-large">{{ t("common.AdvanceFilterGenerateDialog.site") }}</a-col>
       </a-row>
-      <a-checkbox-group v-model:value="advanceFilterDictRef.site.required" class="advance-filter-checkbox-group">
-        <a-row :gutter="0">
-          <a-col
-            v-for="site in advanceItemPropsRef.site"
-            :key="`${reBuildFilterCountRef}_${site}`"
-            class="pa-0"
-            :xs="6"
-            :sm="8"
-            :md="4"
-          >
-            <a-checkbox
-              :value="site"
-              :indeterminate="isExcluded('site', site)"
-              @click.stop="() => toggleKeywordStateFn('site', site)"
-            >
-              <SiteFavicon :site-id="site" :size="16" class="mr-2" />
-              <SiteName :class="['text-decoration-none']" :site-id="site" tag="span" />
-            </a-checkbox>
-          </a-col>
-        </a-row>
-      </a-checkbox-group>
+      <FilterCheckboxSection
+        v-model:required="advanceFilterDictRef.site.required"
+        :items="(advanceItemPropsRef.site as string[])"
+        :excluded="advanceFilterDictRef.site.exclude ?? []"
+        :rebuild-key="reBuildFilterCountRef"
+        :xs="6"
+        :sm="8"
+        :md="4"
+        @toggle="(v) => toggleKeywordStateFn('site', String(v))"
+      >
+        <template #item="{ item }: { item: string }">
+          <SiteFavicon :site-id="item" :size="16" class="mr-2" />
+          <SiteName :class="['text-decoration-none']" :site-id="item" tag="span" />
+        </template>
+      </FilterCheckboxSection>
 
       <template v-if="configStore.searchEntifyControl.showTorrentTag">
         <div class="d-flex align-center">
@@ -207,31 +176,26 @@ function formatSizeTooltip(value?: number) {
             }}
           </a-button>
         </div>
-        <a-checkbox-group v-model:value="advanceFilterDictRef.tags.required" class="advance-filter-checkbox-group">
-          <a-row :gutter="0">
-            <a-col
-              v-for="tag in filteredTorrentTags"
-              :key="`${reBuildFilterCountRef}_${tag.name}`"
-              class="pa-0"
-              :xs="6"
-              :sm="4"
-              :md="3"
-            >
-              <a-checkbox
-                :value="tag.name"
-                :indeterminate="isExcluded('tags', tag.name)"
-                @click.stop="() => toggleKeywordStateFn('tags', tag.name)"
-              >
-                <a-tag :color="tag.color" :bordered="true" class="mr-1">
-                  <template v-if="preDefinedTorrentTagNameSet.includes(tag.name)" #icon>
-                    <PushpinOutlined class="pin-icon" />
-                  </template>
-                  {{ tag.name }}
-                </a-tag>
-              </a-checkbox>
-            </a-col>
-          </a-row>
-        </a-checkbox-group>
+        <FilterCheckboxSection
+          v-model:required="advanceFilterDictRef.tags.required"
+          :items="filteredTorrentTags"
+          :excluded="advanceFilterDictRef.tags.exclude ?? []"
+          :item-value="(tag: any) => tag.name"
+          :rebuild-key="reBuildFilterCountRef"
+          :xs="6"
+          :sm="4"
+          :md="3"
+          @toggle="(v) => toggleKeywordStateFn('tags', String(v))"
+        >
+          <template #item="{ item: tag }">
+            <a-tag :color="tag.color" :bordered="true" class="mr-1">
+              <template v-if="preDefinedTorrentTagNameSet.includes(tag.name)" #icon>
+                <PushpinOutlined class="pin-icon" />
+              </template>
+              {{ tag.name }}
+            </a-tag>
+          </template>
+        </FilterCheckboxSection>
       </template>
 
       <a-row :gutter="0">
@@ -239,27 +203,22 @@ function formatSizeTooltip(value?: number) {
           {{ t("SearchEntity.AdvanceFilterGenerateDialog.status") }}
         </a-col>
       </a-row>
-      <a-checkbox-group v-model:value="advanceFilterDictRef.status.required" class="advance-filter-checkbox-group">
-        <a-row :gutter="0">
-          <a-col
-            v-for="status in statusOptions"
-            :key="`${reBuildFilterCountRef}_${status.value}`"
-            class="pa-0"
-            :xs="12"
-            :sm="8"
-            :md="6"
-          >
-            <a-checkbox
-              :value="status.value"
-              :indeterminate="isExcluded('status', String(status.value))"
-              @click.stop="() => toggleKeywordStateFn('status', status.value)"
-            >
-              <component :is="status.icon" :style="{ color: status.color, marginRight: '8px' }" />
-              <span>{{ status.label }}</span>
-            </a-checkbox>
-          </a-col>
-        </a-row>
-      </a-checkbox-group>
+      <FilterCheckboxSection
+        v-model:required="advanceFilterDictRef.status.required"
+        :items="statusOptions"
+        :excluded="advanceFilterDictRef.status.exclude ?? []"
+        :item-value="(status: any) => status.value"
+        :rebuild-key="reBuildFilterCountRef"
+        :xs="12"
+        :sm="8"
+        :md="6"
+        @toggle="(v) => toggleKeywordStateFn('status', v as string)"
+      >
+        <template #item="{ item: status }">
+          <component :is="status.icon" :style="{ color: status.color, marginRight: '8px' }" />
+          <span>{{ status.label }}</span>
+        </template>
+      </FilterCheckboxSection>
 
       <a-row :gutter="0">
         <a-col :xs="24" :md="12">
@@ -285,14 +244,13 @@ function formatSizeTooltip(value?: number) {
           </div>
           <a-row :gutter="0">
             <a-col :span="24" class="px-6">
-              <a-slider
-                v-model:value="advanceFilterDictRef.time"
-                range
+              <FilterRangeSlider
+                v-model="advanceFilterDictRef.time"
                 :min="advanceItemPropsRef.time.range[0]"
                 :max="advanceItemPropsRef.time.range[1]"
                 :step="60 * 1000"
-                :marks="toMarks(advanceItemPropsRef.time.ticks)"
-                :tooltip="{ open: true, formatter: formatTimeTooltip }"
+                :ticks="advanceItemPropsRef.time.ticks"
+                :formatter="formatTimeTooltip"
               />
             </a-col>
           </a-row>
@@ -305,14 +263,13 @@ function formatSizeTooltip(value?: number) {
           </a-row>
           <a-row :gutter="0">
             <a-col :span="24" class="px-6">
-              <a-slider
-                v-model:value="advanceFilterDictRef.size"
-                range
+              <FilterRangeSlider
+                v-model="advanceFilterDictRef.size"
                 :min="advanceItemPropsRef.size.range[0]"
                 :max="advanceItemPropsRef.size.range[1]"
                 :step="1024 ** 3"
-                :marks="toMarks(advanceItemPropsRef.size.ticks)"
-                :tooltip="{ open: true, formatter: formatSizeTooltip }"
+                :ticks="advanceItemPropsRef.size.ticks"
+                :formatter="formatSizeTooltip"
               />
             </a-col>
           </a-row>
@@ -327,14 +284,13 @@ function formatSizeTooltip(value?: number) {
           </a-row>
           <a-row :gutter="0">
             <a-col :span="24" class="px-6">
-              <a-slider
-                v-model:value="advanceFilterDictRef.seeders"
-                range
+              <FilterRangeSlider
+                v-model="advanceFilterDictRef.seeders"
                 :min="advanceItemPropsRef.seeders.range[0]"
                 :max="advanceItemPropsRef.seeders.range[1]"
                 :step="1"
-                :marks="toMarks(advanceItemPropsRef.seeders.ticks)"
-                :tooltip="{ open: true, formatter: null }"
+                :ticks="advanceItemPropsRef.seeders.ticks"
+                :formatter="null"
               />
             </a-col>
           </a-row>
@@ -347,14 +303,13 @@ function formatSizeTooltip(value?: number) {
           </a-row>
           <a-row :gutter="0">
             <a-col :span="24" class="px-6">
-              <a-slider
-                v-model:value="advanceFilterDictRef.leechers"
-                range
+              <FilterRangeSlider
+                v-model="advanceFilterDictRef.leechers"
                 :min="advanceItemPropsRef.leechers.range[0]"
                 :max="advanceItemPropsRef.leechers.range[1]"
                 :step="1"
-                :marks="toMarks(advanceItemPropsRef.leechers.ticks)"
-                :tooltip="{ open: true, formatter: null }"
+                :ticks="advanceItemPropsRef.leechers.ticks"
+                :formatter="null"
               />
             </a-col>
           </a-row>
@@ -367,14 +322,13 @@ function formatSizeTooltip(value?: number) {
           </a-row>
           <a-row :gutter="0">
             <a-col :span="24" class="px-6">
-              <a-slider
-                v-model:value="advanceFilterDictRef.completed"
-                range
+              <FilterRangeSlider
+                v-model="advanceFilterDictRef.completed"
                 :min="advanceItemPropsRef.completed.range[0]"
                 :max="advanceItemPropsRef.completed.range[1]"
                 :step="1"
-                :marks="toMarks(advanceItemPropsRef.completed.ticks)"
-                :tooltip="{ open: true, formatter: null }"
+                :ticks="advanceItemPropsRef.completed.ticks"
+                :formatter="null"
               />
             </a-col>
           </a-row>
@@ -383,25 +337,16 @@ function formatSizeTooltip(value?: number) {
     </div>
 
     <template #footer>
-      <div class="d-flex align-center">
-        <a-button type="text" @click="() => reBuildAdvanceFilter(true)">
-          {{ t("common.AdvanceFilterGenerateDialog.reset") }}
-        </a-button>
-        <div class="flex-1-1-0" />
-        <a-button danger type="text" @click="showDialog = false">{{ t("common.dialog.cancel") }}</a-button>
-        <a-button type="text" @click="updateTableFilter">
-          {{ t("common.AdvanceFilterGenerateDialog.generate") }}
-        </a-button>
-      </div>
+      <AdvanceFilterFooter
+        @reset="reBuildAdvanceFilter(true)"
+        @cancel="showDialog = false"
+        @generate="updateTableFilter"
+      />
     </template>
   </a-modal>
 </template>
 
 <style scoped lang="scss">
-.advance-filter-checkbox-group {
-  width: 100%;
-}
-
 .pin-icon {
   transform: rotate(45deg);
 }

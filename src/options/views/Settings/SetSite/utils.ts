@@ -1,4 +1,5 @@
 import { computedAsync } from "@vueuse/core";
+import { ref } from "vue";
 import { definitionList, type ISiteMetadata, type ISiteUserConfig, type TSiteID } from "@ptd/site";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -24,7 +25,11 @@ export interface ISiteTableItem {
   userConfig: ISiteUserConfig;
 }
 
-/** 已添加站点的「定义 + 用户配置」合并视图，供管理表格整体消费 */
+/**
+ * 已添加站点的「定义 + 用户配置」合并视图，供管理表格整体消费。
+ * isLoadingAllAddedSites：computedAsync 第三参传 Ref<boolean>，会随求值过程自动翻转（evaluating）
+ */
+export const isLoadingAllAddedSites = ref(false);
 export const allAddedSiteInfo = computedAsync<ISiteTableItem[]>(async () => {
   const metadataStore = useMetadataStore();
   // 显式触碰 sites，令增删站点时该异步 computed 重新求值
@@ -40,4 +45,4 @@ export const allAddedSiteInfo = computedAsync<ISiteTableItem[]>(async () => {
   }
 
   return sitesReturn;
-}, []);
+}, [], isLoadingAllAddedSites);

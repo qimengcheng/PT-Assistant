@@ -591,6 +591,7 @@ const hiddenTagNamesText = computed({
         <a-table
           :columns="tableHeader"
           :data-source="tableItems"
+          :loading="runtimeStore.search.isSearching"
           row-key="uniqueId"
           :pagination="tablePagination"
           :row-selection="{

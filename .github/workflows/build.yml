@@ -1,0 +1,62 @@
+name: Build
+
+# 每次 push / PR 都构建并产出可安装的 zip；release.yml 通过 workflow_call 复用它。
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_call:
+    outputs:
+      version:
+        description: package.json 里的版本号，产物命名与 Release 都以此为准
+        value: ${{ jobs.build.outputs.version }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm/action-setup 优先读 package.json 的 packageManager 字段（已固定为 12.8.1）
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 唯一的版本真源：提交信息里的 vX.Y.Z 是给人看的，产物和 Release 都以这里为准
+      - id: meta
+        name: Read version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Type check (vue-tsc)
+        run: pnpm compile
+
+      # 用 WXT 自带的 `wxt zip` 而不是系统 zip：
+      # 1) 不依赖 runner 是否预装 zip；2) 同时产出 -sources.zip，
+      #    那是 Firefox Add-ons 强制要求的源码包；3) 本地已逐条验证过产物命名。
+      - name: Build and package
+        run: |
+          set -euo pipefail
+          pnpm exec wxt zip
+          pnpm exec wxt zip -b firefox
+          mkdir -p build
+          mv .output/pt-assistant-wxt-*-chrome.zip   build/extension-chrome.zip
+          mv .output/pt-assistant-wxt-*-firefox.zip  build/extension-firefox.zip
+          mv .output/pt-assistant-wxt-*-sources.zip  build/extension-sources.zip
+          ls -l build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-zip-${{ steps.meta.outputs.version }}
+          path: build/*.zip

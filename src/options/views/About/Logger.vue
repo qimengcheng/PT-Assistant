@@ -57,8 +57,6 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <a-alert class="mb-2" type="info" show-icon :message="t('route.About.Logger')" />
-
   <a-table
     :columns="columns"
     :data-source="logger"

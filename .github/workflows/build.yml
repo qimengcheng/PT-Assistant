@@ -45,15 +45,19 @@ jobs:
       # 用 WXT 自带的 `wxt zip` 而不是系统 zip：
       # 1) 不依赖 runner 是否预装 zip；2) 同时产出 -sources.zip，
       #    那是 Firefox Add-ons 强制要求的源码包；3) 本地已逐条验证过产物命名。
+      # 产物名带上版本号：Release 页面里多个版本的 zip 并排时能一眼分清，
+      # 下载到本地也不会和旧版本的包混淆。
       - name: Build and package
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
           pnpm exec wxt zip
           pnpm exec wxt zip -b firefox
           mkdir -p build
-          mv .output/pt-assistant-wxt-*-chrome.zip   build/extension-chrome.zip
-          mv .output/pt-assistant-wxt-*-firefox.zip  build/extension-firefox.zip
-          mv .output/pt-assistant-wxt-*-sources.zip  build/extension-sources.zip
+          mv .output/pt-assistant-wxt-*-chrome.zip   "build/PT-Assistant-${VERSION}-chrome.zip"
+          mv .output/pt-assistant-wxt-*-firefox.zip  "build/PT-Assistant-${VERSION}-firefox.zip"
+          mv .output/pt-assistant-wxt-*-sources.zip  "build/PT-Assistant-${VERSION}-sources.zip"
           ls -l build
 
       - uses: actions/upload-artifact@v4

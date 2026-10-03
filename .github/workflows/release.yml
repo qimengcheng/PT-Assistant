@@ -32,7 +32,7 @@ jobs:
           tag: v${{ needs.build.outputs.version }}
           skipIfReleaseExists: true
           generateReleaseNotes: true
-          artifacts: extension-chrome.zip,extension-firefox.zip,extension-sources.zip
+          artifacts: PT-Assistant-${{ needs.build.outputs.version }}-chrome.zip,PT-Assistant-${{ needs.build.outputs.version }}-firefox.zip,PT-Assistant-${{ needs.build.outputs.version }}-sources.zip
 
       # ── 以下为可选的商店发布：secret 未配置时整段跳过，不影响 GitHub Release ──
       #
@@ -98,7 +98,7 @@ jobs:
 
           # iorate/wepub：Chrome / Firefox / Edge 三家商店统一 CLI
           curl -fsSL https://unpkg.com/wepub@latest/install.sh | sh
-          wepub chrome extension-chrome.zip
+          wepub chrome PT-Assistant-*-chrome.zip
 
       - name: Publish to Firefox Add-ons
         if: ${{ steps.gh.outputs.id != '' }}
@@ -113,7 +113,7 @@ jobs:
             echo "::notice::未配置 Firefox Add-ons 凭证，跳过"
             exit 0
           fi
-          # AMO 强制要求同时提交源码包，用构建阶段产出的 extension-sources.zip
-          wepub firefox extension-firefox.zip \
-            --source extension-sources.zip \
+          # AMO 强制要求同时提交源码包，用构建阶段产出的 -sources.zip
+          wepub firefox PT-Assistant-*-firefox.zip \
+            --source PT-Assistant-*-sources.zip \
             --channel "${FIREFOX_CHANNEL:-listed}"

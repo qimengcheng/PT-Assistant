@@ -17,6 +17,7 @@ import {
   TorrentQueueDirection,
   TorrentSpeedLimit,
   CTorrentFile,
+  CTorrentFileList,
   CTorrentFileSelection,
   CTorrentPeer,
   CTorrentTracker,
@@ -744,16 +745,9 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
   // 文件级 / peers / tracker 管理（qBittorrent WebAPI v2）
   // ─────────────────────────────────────────────
 
-  private getTorrentHash(torrent: string | CTorrent): string {
-    if (typeof torrent === "string") {
-      return torrent;
-    }
-    return (torrent.infoHash || (torrent.id as string)) as string;
-  }
-
   // 文件列表: GET /torrents/files
-  override async getTorrentFiles(torrent: string | CTorrent): Promise<CTorrentFile[]> {
-    const { data: files } = await this.request<
+  private async fetchTorrentFilesRaw(hash: string) {
+    const { data } = await this.request<
       Array<{
         index: number;
         name: string;
@@ -762,7 +756,12 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
         priority: number; // 0/1/6/7
         is_seed: boolean;
       }>
-    >("/torrents/files", { params: { hash: this.getTorrentHash(torrent) } });
+    >("/torrents/files", { params: { hash } });
+    return data;
+  }
+
+  override async getTorrentFiles(torrent: string | CTorrent): Promise<CTorrentFile[]> {
+    const files = await this.fetchTorrentFilesRaw(this.getTorrentHash(torrent));
 
     return files.map((file) => {
       const priority = mapQBittorrentFilePriority(file.priority);
@@ -777,6 +776,29 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
         raw: file,
       };
     });
+  }
+
+  /**
+   * 导出指纹所需的文件清单（第 2 层指纹的原料）。
+   *
+   * 与 getTorrentFiles 共用同一次 `/torrents/files` 请求 —— 本地索引要对全部
+   * 种子各发一次请求（O(n)），能省一次是一次。
+   *
+   * 关于 piece：qBittorrent 的 WebAPI **不提供 piece 哈希**（`/torrents/properties`
+   * 只有 piece_size / pieces_num / pieces_have 这种进度位图），所以本地种子拿不到
+   * 第 3 层指纹。第 3 层仍然有用 —— 站点侧的 .torrent 之间可以互相校验 ——
+   * 但「本地 vs 站点」这一侧只能停在第 2 层。
+   */
+  override async getTorrentFileList(torrent: string | CTorrent): Promise<CTorrentFileList> {
+    const hash = this.getTorrentHash(torrent);
+    const files = await this.fetchTorrentFilesRaw(hash);
+
+    return {
+      name: typeof torrent === "string" ? undefined : torrent.name,
+      // qBittorrent 对多文件种返回的 name 含顶层目录名，上层按 name 剥离
+      files: files.map((file) => ({ path: file.name, size: file.size })),
+      length: typeof torrent === "string" ? undefined : torrent.totalSize,
+    };
   }
 
   // 文件优先级/选择: POST /torrents/filePrio，同一优先级合并为一次请求

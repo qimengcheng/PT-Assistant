@@ -1,20 +1,37 @@
 import { Buffer } from "buffer";
-import axios, { AxiosRequestConfig } from "axios";
-import parseTorrent, { Instance as TorrentInstance } from "parse-torrent";
+import type { AxiosRequestConfig } from "axios";
+import parseTorrent, { Instance as TorrentInstance, type ParsedFile } from "parse-torrent";
 import isValidFilename from "valid-filename";
 import { decode } from "urlencode";
 
+import { axios } from "./utils/adapter";
+
 export * from "./utils/adapter";
 
+/**
+ * `parseTorrent()` 的解析结果 + 本项目额外附加的原始字节与文件名。
+ *
+ * 这里逐个列出（而不是 `extends Instance`）是因为 Instance 继承自 magnet-uri 的
+ * `Instance`，那个接口带 `[key: string]: any` 索引签名，一旦继承/映射，未显式
+ * 声明的字段全都会被塌缩成 `any`。
+ */
 export interface ParsedTorrent {
   name: string;
+  infoHash: string;
+  /** 规范化后的文件清单（多文件种的 path 含顶层目录名，且用平台分隔符） */
+  files?: ParsedFile[];
+  /** 全局总长度（单文件种的字节数） */
+  length?: number;
+  pieceLength?: number;
+  /** 每个 piece 一个 SHA1，hex 数组 */
+  pieces?: string[];
+  info: TorrentInstance;
   metadata: {
     arraybuffer: ArrayBuffer;
     buffer: Buffer;
     blob: () => Blob;
     base64: () => string;
   };
-  info: TorrentInstance;
 }
 
 const utf8FilenameRegex = /filename\*=UTF-8''([\w%\-\.]+)(?:; ?|$)/i;

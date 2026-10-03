@@ -30,6 +30,9 @@ import type {
 } from "@ptd/downloader";
 import type { IBackupData, IBackupFileInfo } from "@ptd/backupServer";
 
+// type-only：编译期擦除，不会与 storage.ts → messages.ts 的运行时导入形成循环依赖
+import type { IExtensionStorageSchema, TExtensionStorageKey } from "@/storage.ts";
+
 import type { IFilesFingerprint, IPieceSample, ILocalFingerprintIndex } from "@/shared/fingerprint/index.ts";
 import type {
   IDownloaderMetadata,
@@ -69,10 +72,24 @@ export interface ProtocolMap {
   offscreenPing(): "pong";
 
   // ===== 1. chrome.storage =====
-  // 已删除 getExtStorage / setExtStorage / setExtStoragePath 三条代理消息：
-  // offscreen / content script / site 包 adapter 现在都直连 @/storage.ts 的 extStore。
-  // 加回代理消息前请先想清楚：那等于再造一层只有 background 会用的写串行点，
-  // 而 options 页的 pinia 持久化根本不经过它（历史现状，别误以为 RPC 提供了全局原子性）。
+  // 这三条代理消息**必须存在**：Chrome 对 offscreen document 只开放 chrome.runtime
+  // （且只是消息通信子集，连 runtime.getManifest 都没有），chrome.storage 在
+  // offscreen 里根本不存在 —— 官方文档原文：
+  //   "the chrome.runtime API is the only extension API supported by offscreen documents"
+  // offscreen 里直连 wxt/storage 会抛 "You must add the 'storage' permission to your
+  // manifest"（v0.19.4 备份恢复失败的根因，当时一度误删本 RPC）。
+  // @/storage.ts 的 extStore 在检测到无 chrome.storage 的上下文时会自动改走这三条消息，
+  // 调用方无感知。SW / options / content script 仍直连本地 chrome.storage。
+  getExtStorage<T extends TExtensionStorageKey>(data: T): IExtensionStorageSchema[T] | null;
+  setExtStorage<T extends TExtensionStorageKey>(data: {
+    key: T;
+    value: IExtensionStorageSchema[T];
+  }): void;
+  patchExtStorage<T extends TExtensionStorageKey>(data: {
+    key: T;
+    path: string;
+    value: unknown;
+  }): void;
 
   // ===== 1.1 chrome.declarativeNetRequest（供 unsafe header 替换使用）=====
   updateDNRSessionRules(data: { rule: chrome.declarativeNetRequest.Rule; extOnly?: boolean }): void;

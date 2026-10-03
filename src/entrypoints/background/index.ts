@@ -58,12 +58,11 @@ export default defineBackground({
       definitionCount,
     }));
 
-    // ===== chrome.storage 不再由本 SW 代理 =====
-    // 原先这里注册着 getExtStorage / setExtStorage / setExtStoragePath 三个 handler，
-    // 供 offscreen / content script / site 包 adapter 远程读写。2026-10-03 起全部改为
-    // 各上下文直连 @/storage.ts 的 extStore（offscreen 是扩展页、content script 有
-    // storage 权限，都能直接用 chrome.storage），RPC 已删除：
-    // 少一层消息协议，也免得 content 引导在每个网页上都为读一次 config 唤醒 SW。
+    // ===== chrome.storage 由本 SW 代理给 offscreen =====
+    // getExtStorage / setExtStorage / patchExtStorage 三个 handler 在 ./utils/base.ts 注册。
+    // 为什么必须代理：offscreen document 里只有 chrome.runtime，没有 chrome.storage
+    // （官方限制，不是权限声明问题），offscreen 侧 @/storage.ts 的 extStore 会自动改走消息。
+    // content script 不受此限（隔离世界有 chrome.storage），直连本地 extStore 即可。
 
     // ===== chrome.downloads（供备份本地导出等使用）=====
     onMessage("downloadFile", async ({ data }) => {

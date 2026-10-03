@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { CheckCircleOutlined, CloseCircleOutlined, CloseOutlined } from "@antdv-next/icons";
+import { CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
 
 import type { CTorrent } from "@ptd/downloader";
 import { sendMessage } from "@/messages.ts";
@@ -49,17 +49,12 @@ async function confirmSetLabel() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="480" @after-open-change="(open: boolean) => open && dialogEnter()">
-    <template #title>
-      <div class="dialog-title">
-        <span>{{ t("MyClient.label.title", { count: torrents.length }) }}</span>
-        <a-button type="text" size="small" :title="t('common.dialog.close')" @click="showDialog = false">
-          <template #icon>
-            <CloseOutlined />
-          </template>
-        </a-button>
-      </div>
-    </template>
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('MyClient.label.title', { count: torrents.length })"
+    :width="480"
+    @after-open-change="(open: boolean) => open && dialogEnter()"
+  >
 
     <a-divider class="ma-0" />
 
@@ -96,13 +91,6 @@ async function confirmSetLabel() {
 
 <style scoped lang="scss">
 /* 标题栏右侧的关闭按钮（原来放在 v-toolbar 的 #append 上，antd 标题插槽需自行排版） */
-.dialog-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .dialog-footer {
   display: flex;
   align-items: center;

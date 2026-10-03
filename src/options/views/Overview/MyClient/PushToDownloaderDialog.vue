@@ -5,7 +5,6 @@ import type { UploadFile } from "antdv-next";
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  CloseOutlined,
   CloudUploadOutlined,
   InboxOutlined,
   LinkOutlined,
@@ -113,17 +112,12 @@ async function submit() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="560" @after-open-change="(open: boolean) => open && cleanStatus()">
-    <template #title>
-      <div class="dialog-title">
-        <span>{{ t("MyClient.pushToDownloader.title") }}</span>
-        <a-button type="text" size="small" :title="t('common.dialog.close')" @click="showDialog = false">
-          <template #icon>
-            <CloseOutlined />
-          </template>
-        </a-button>
-      </div>
-    </template>
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('MyClient.pushToDownloader.title')"
+    :width="560"
+    @after-open-change="(open: boolean) => open && cleanStatus()"
+  >
 
     <a-segmented v-model:value="inputMode" :options="inputModeOptions" block class="mb-4" />
 
@@ -190,13 +184,6 @@ async function submit() {
 
 <style scoped lang="scss">
 /* 标题栏右侧的关闭按钮（原来放在 v-toolbar 的 #append 上，antd 标题插槽需自行排版） */
-.dialog-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .dialog-footer {
   display: flex;
   align-items: center;

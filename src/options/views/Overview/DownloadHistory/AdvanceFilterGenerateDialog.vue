@@ -46,10 +46,10 @@ function enterDialog() {
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('common.AdvanceFilterGenerateDialog.title')"
     :width="800"
     @after-open-change="(open: boolean) => open && enterDialog()"
   >
-    <template #title>{{ t("common.AdvanceFilterGenerateDialog.title") }}</template>
 
     <div class="filter-body">
       <div class="section-title">{{ t("common.AdvanceFilterGenerateDialog.keywords") }}</div>

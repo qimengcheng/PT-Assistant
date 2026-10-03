@@ -6,7 +6,6 @@ import {
   AppstoreOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  CloseOutlined,
   EllipsisOutlined,
 } from "@antdv-next/icons";
 
@@ -195,6 +194,7 @@ function dialogLeave() {
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('SentToDownloaderDialog.title', [torrentItems.length])"
     :width="800"
     :mask-closable="!isSending"
     :closable="!isSending"
@@ -202,18 +202,6 @@ function dialogLeave() {
     @after-open-change="(open: boolean) => open && dialogEnter()"
     @after-close="dialogLeave"
   >
-    <template #title>
-      <span style="color: #455a64">{{ t("SentToDownloaderDialog.title", [torrentItems.length]) }}</span>
-      <a-button
-        type="text"
-        size="small"
-        :title="t('common.dialog.close')"
-        style="float: right"
-        @click="showDialog = false"
-      >
-        <template #icon><CloseOutlined /></template>
-      </a-button>
-    </template>
 
     <a-alert v-if="isSending" type="info" show-icon>
       {{

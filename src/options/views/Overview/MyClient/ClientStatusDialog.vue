@@ -4,7 +4,6 @@ import { useI18n } from "vue-i18n";
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
-  CloseOutlined,
   ExportOutlined,
   ReloadOutlined,
   StopOutlined,
@@ -89,22 +88,21 @@ function onEnter() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="800" :footer="null" @after-open-change="(open: boolean) => open && onEnter()">
-    <template #title>
-      <div class="dialog-title">
-        <span>{{ t("MyClient.clientStatusDialog.title") }}</span>
-        <a-button type="text" size="small" :title="t('MyClient.refresh')" @click="fetchAll">
-          <template #icon>
-            <ReloadOutlined />
-          </template>
-        </a-button>
-        <a-button type="text" size="small" :title="t('common.dialog.close')" @click="showDialog = false">
-          <template #icon>
-            <CloseOutlined />
-          </template>
-        </a-button>
-      </div>
-    </template>
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('MyClient.clientStatusDialog.title')"
+    :width="800"
+    :footer="null"
+    @after-open-change="(open: boolean) => open && onEnter()"
+  >
+    <!-- 刷新按钮原先挂在 #title 插槽里，会和右上角关闭按钮重叠，移到内容区顶部 -->
+    <div class="d-flex justify-end">
+      <a-button type="text" size="small" :title="t('MyClient.refresh')" @click="fetchAll">
+        <template #icon>
+          <ReloadOutlined />
+        </template>
+      </a-button>
+    </div>
 
     <a-divider class="ma-0" />
 
@@ -210,12 +208,6 @@ function onEnter() {
 
 <style scoped lang="scss">
 /* 标题栏：标题 + 刷新 + 关闭（原来放在 v-toolbar 的 #append 上，antd 标题插槽需自行排版） */
-.dialog-title {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .client-list {
   max-height: 70vh;
   overflow-y: auto;

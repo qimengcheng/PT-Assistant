@@ -11,7 +11,7 @@ import type { TSiteID } from "@ptd/site";
 
 import type { ISearchSolution } from "@/shared/types/storages/metadata.ts";
 
-import SiteName from "@/options/components/SiteName.vue";
+import { useMetadataStore } from "@/options/stores/metadata.ts";
 
 import {
   generateSiteSearchSolution,
@@ -30,6 +30,35 @@ const { siteId, selectCategory, saveGeneratedSolution } = defineProps<{
 }>();
 
 const { t } = useI18n();
+const metadataStore = useMetadataStore();
+
+/**
+ * 站点名要拼进标题：原先用 <SiteName> 组件塞在 #title 插槽里，
+ * 而 antdv-next 的 modal header 无 padding、关闭按钮绝对定位在右上角，插槽内容会压到 X 上。
+ */
+const siteName = ref<string>("");
+watch(
+  () => siteId,
+  async (id) => {
+    if (!id) {
+      siteName.value = "";
+      return;
+    }
+    try {
+      siteName.value = await metadataStore.getSiteName(id);
+    } catch (e) {
+      console.error("[PTD] load site name failed", id, e);
+      siteName.value = "";
+    }
+  },
+  { immediate: true },
+);
+
+const dialogTitle = computed(() => {
+  const base = t("SetSearchSolution.CustomSolutionDialog.title");
+  return siteName.value ? `${base} [ ${siteName.value} ]` : base;
+});
+
 
 const formRef = ref();
 const formValid = ref<boolean>(false);
@@ -114,6 +143,7 @@ async function doSubmit() {
 <template>
   <a-modal
     :open="showDialog"
+    :title="dialogTitle"
     :width="800"
     :ok-text="t('common.dialog.ok')"
     :cancel-text="t('common.dialog.cancel')"
@@ -121,9 +151,6 @@ async function doSubmit() {
     @update:open="(v: boolean) => (showDialog = v)"
     @ok="doSubmit"
   >
-    <template #title>
-      <span>{{ t("SetSearchSolution.CustomSolutionDialog.title") }} [ <SiteName :site-id="siteId" tag="span" /> ]</span>
-    </template>
 
     <a-form
       ref="formRef"

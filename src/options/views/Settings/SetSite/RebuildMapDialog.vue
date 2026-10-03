@@ -36,10 +36,10 @@ const canReBuild = computed<boolean>(() => Object.values(reBuildControlRef.value
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('SetSite.ReBuildMapDialog.title')"
     :width="600"
     @after-open-change="(open: boolean) => open && resetReBuildControlRef()"
   >
-    <template #title>{{ t("SetSite.ReBuildMapDialog.title") }}</template>
 
     <label class="switch-row">
       <a-switch v-model:checked="reBuildControlRef.rebuildSiteHostMap" size="small" />

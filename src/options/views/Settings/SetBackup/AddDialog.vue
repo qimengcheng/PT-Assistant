@@ -60,25 +60,28 @@ function resetDialog() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="800" @after-close="resetDialog">
-    <!-- 标题栏右侧的 wiki 链接（原来放在 v-toolbar 的 #append 上，antd 标题插槽需自行排版） -->
-    <template #title>
-      <div class="dialog-title">
-        <span>{{ t("SetBackup.AddDialog.title") }}</span>
-        <a-button
-          type="text"
-          color="green"
-          :title="t('layout.header.wiki')"
-          :href="`${REPO_URL}/wiki/config-backup-server`"
-          rel="noopener noreferrer nofollow"
-          target="_blank"
-        >
-          <template #icon>
-            <QuestionCircleOutlined />
-          </template>
-        </a-button>
-      </div>
-    </template>
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('SetBackup.AddDialog.title')"
+    :width="800"
+    @after-close="resetDialog"
+  >
+    <!-- wiki 入口原先挂在 #title 插槽里（.dialog-title 的 space-between 把它推到最右，
+         正好压在 antd 绝对定位的关闭按钮上 —— 就是截图里问号与 X 重叠的成因），移到内容区顶部 -->
+    <div class="d-flex justify-end">
+      <a-button
+        type="text"
+        color="green"
+        :title="t('layout.header.wiki')"
+        :href="`${REPO_URL}/wiki/config-backup-server`"
+        rel="noopener noreferrer nofollow"
+        target="_blank"
+      >
+        <template #icon>
+          <QuestionCircleOutlined />
+        </template>
+      </a-button>
+    </div>
 
     <!--
       原来是 <v-window> 步骤流：没有标签页标题，currentStep 直接决定显示哪一块。
@@ -182,13 +185,6 @@ function resetDialog() {
 </template>
 
 <style scoped lang="scss">
-.dialog-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 /* 底部操作按钮：新增服务器链接靠左，取消/上一步/下一步/确定靠右 */
 .dialog-footer {
   display: flex;

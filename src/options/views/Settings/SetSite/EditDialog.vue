@@ -36,8 +36,13 @@ function dialogEnter() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="800" @after-open-change="(open: boolean) => open && dialogEnter()">
-    <template #title>{{ t("SetSite.edit.title") }}</template>
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('SetSite.edit.title')"
+    :width="800"
+    @after-open-change="(open: boolean) => open && dialogEnter()"
+  >
+
 
     <div class="editor-body">
       <Editor v-model="props.siteId" @update:form-valid="(v: boolean) => (isFormValid = v)" />

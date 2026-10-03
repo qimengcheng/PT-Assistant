@@ -6,7 +6,6 @@ import { isEmpty } from "es-toolkit/compat";
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  CloseOutlined,
   EditOutlined,
   ExclamationCircleOutlined,
   ImportOutlined,
@@ -167,30 +166,14 @@ async function dialogEnter() {
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('SetSite.oneClickImportDialog.title')"
     :width="1000"
-    :closable="false"
+    :closable="!importStatus.isWorking"
     :mask="{ closable: !importStatus.isWorking }"
     :keyboard="!importStatus.isWorking"
     :body-style="{ maxHeight: '72vh', overflowY: 'auto' }"
     @after-open-change="(open: boolean) => open && dialogEnter()"
   >
-    <template #title>
-      <div class="dialog-title">
-        <span>{{ t("SetSite.oneClickImportDialog.title") }}</span>
-        <div class="dialog-title-spacer" />
-        <a-button
-          size="small"
-          type="text"
-          :title="t('common.dialog.close')"
-          :disabled="importStatus.isWorking"
-          @click="showDialog = false"
-        >
-          <template #icon>
-            <CloseOutlined />
-          </template>
-        </a-button>
-      </div>
-    </template>
 
     <a-alert class="mb-2" type="warning" show-icon :message="t('SetSite.oneClickImportDialog.alert1')" />
 
@@ -271,16 +254,6 @@ async function dialogEnter() {
 </template>
 
 <style scoped lang="scss">
-.dialog-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.dialog-title-spacer {
-  flex: 1 1 0;
-}
-
 .site-skeleton {
   padding: 12px;
 }

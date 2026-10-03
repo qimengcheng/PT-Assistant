@@ -2,7 +2,7 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { saveAs } from "file-saver";
-import { CloseOutlined, CodeOutlined, ExportOutlined, FileTextOutlined } from "@antdv-next/icons";
+import { CodeOutlined, ExportOutlined, FileTextOutlined } from "@antdv-next/icons";
 
 import type { IUserInfo, TSiteID } from "@ptd/site";
 
@@ -183,22 +183,15 @@ function convertToJSON(items: IHistoryUserInfo[]): string {
 
 <template>
   <!-- footer prop 传 null 会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...），底部按钮全消失，故不设 footer -->
-  <a-modal v-model:open="showDialog" :width="700">
-    <template #title>
-      <div class="d-flex align-center">
-        <span class="flex-1-1-0">
-          <template v-if="isExportSelected">
-            {{ t("MyData.exportDialog.exportSelected", { count: querySiteIds.length }) }}
-          </template>
-          <template v-else>
-            {{ t("MyData.exportDialog.exportAll", { count: querySiteIds.length }) }}
-          </template>
-        </span>
-        <a-button type="text" size="small" :title="t('common.dialog.close')" @click="showDialog = false">
-          <CloseOutlined />
-        </a-button>
-      </div>
-    </template>
+  <a-modal
+    v-model:open="showDialog"
+    :title="
+      isExportSelected
+        ? t('MyData.exportDialog.exportSelected', { count: querySiteIds.length })
+        : t('MyData.exportDialog.exportAll', { count: querySiteIds.length })
+    "
+    :width="700"
+  >
 
     <a-divider class="ma-0" />
 

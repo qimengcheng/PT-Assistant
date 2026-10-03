@@ -32,7 +32,7 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
 
 // 数据来源
-import { allAddedSiteInfo, type ISiteTableItem } from "./utils.ts";
+import { allAddedSiteInfo, isLoadingAllAddedSites, type ISiteTableItem } from "./utils.ts";
 
 const { t } = useI18n();
 
@@ -185,6 +185,10 @@ async function confirmDeleteSite(siteId: TSiteID) {
 
 const isFaviconFlushing = ref(false);
 async function flushSiteFavicon(siteId: TSiteID | TSiteID[]) {
+  // 模板按钮虽有 :loading 禁用，这里再兜一层，防止程序化连点产生重复刷新
+  if (isFaviconFlushing.value) {
+    return;
+  }
   isFaviconFlushing.value = true;
   try {
     const siteIds = Array.isArray(siteId) ? siteId : [siteId];
@@ -192,6 +196,10 @@ async function flushSiteFavicon(siteId: TSiteID | TSiteID[]) {
       await sendMessage("getSiteFavicon", { site: id, flush: true });
     }
     runtimeStore.showSnakebar(t("SetSite.index.flushFaviconFinish"), { color: "success" });
+  } catch (e) {
+    // 旧实现只有 finally：刷新失败时用户只看到按钮停转，没有任何失败提示
+    console.error("[SetSite] flush site favicon failed", e);
+    runtimeStore.showSnakebar(t("SetSite.index.flushFaviconFailed"), { color: "error" });
   } finally {
     isFaviconFlushing.value = false;
   }
@@ -308,6 +316,7 @@ function keywordChecked(keyword: string) {
     <a-table
       :columns="columns"
       :data-source="filteredItems"
+      :loading="isLoadingAllAddedSites"
       :pagination="pagination"
       :row-selection="{
         selectedRowKeys: tableSelected,

@@ -43,7 +43,7 @@ import BonusFormatSpan from "./BonusFormatSpan.vue";
 import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
 
 import { formatRatio } from "./utils/format.ts";
-import { tableData, initTableData, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
+import { tableData, initTableData, isTableLoading, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
 
 // 本文件名为 Index.vue，与 SearchEntity/Index.vue 同名；<script setup> 推断出的
 // __name 会是 "Index"，导致 App.vue 的 KeepAlive :include 无法区分两者（会互相顶掉缓存）。
@@ -213,9 +213,9 @@ onMounted(() => initTableData());
 watchDebounced(
   () => metadataStore.lastUserInfo,
   () => {
-    // 此时前端并没有进行刷新，强制更新
+    // 此时前端并没有进行刷新，强制更新（silent：后台数据变化，不亮整表 loading）
     if (!Object.values(runtimeStore.userInfo.flushPlan).some((isFlushing) => isFlushing)) {
-      initTableData();
+      initTableData({ silent: true });
     }
   },
   { debounce: 5e3, deep: true },
@@ -441,6 +441,7 @@ const showExportDialog = ref(false);
     <a-table
       :columns="tableColumns"
       :data-source="filteredTableData"
+      :loading="isTableLoading"
       :row-key="(r: any) => r.site"
       :row-selection="tableRowSelection"
       :pagination="tablePagination"

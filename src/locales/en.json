@@ -53,6 +53,7 @@
       "errorMessage": "Error Message"
     },
     "filterPlaceholder": "Filter download history",
+    "loadError": "Failed to load download history",
     "reDownload": "Re-download",
     "refresh": "Refresh download history list",
     "searchTorrent": "Search this torrent across all sites",
@@ -983,6 +984,7 @@
     },
     "index": {
       "flushFaviconFinish": "The selected site favicon has been refreshed successfully!",
+      "flushFaviconFailed": "Failed to refresh site favicon",
       "oneClickImport": "One-Click Import Sites",
       "reBuildMap": "Rebuild Site Cache",
       "settingNote": [

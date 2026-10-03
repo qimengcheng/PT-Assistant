@@ -25,6 +25,16 @@ const { t } = useI18n();
 const metadataStore = useMetadataStore();
 
 const currentStep = ref<0 | 1>(0);
+
+/**
+ * antdv-next 的 Steps 只有 `items` 写法（1.5.6 注册名里根本没有 `a-step`，
+ * 全量 install 也只有 ASteps），照 Vuetify 的 v-stepper 那样写子组件会渲染成
+ * 未知元素、步骤条整条空白。
+ */
+const stepItems = computed(() => [
+  { title: t("SetDownloader.add.selectPlaceholder") },
+  { title: t("SetDownloader.common.name") },
+]);
 const selectedClientType = ref<string | null>(null);
 const storedDownloaderConfig = ref<IDownloaderMetadata>({} as IDownloaderMetadata);
 
@@ -82,10 +92,7 @@ const selectedDescription = computed(() => {
     :footer="null"
     @after-close="resetDialog"
   >
-    <a-steps :current="currentStep" size="small" style="margin-bottom: 24px">
-      <a-step :title="t('SetDownloader.add.selectPlaceholder')" />
-      <a-step :title="t('SetDownloader.common.name')" />
-    </a-steps>
+    <a-steps :current="currentStep" size="small" :items="stepItems" style="margin-bottom: 24px" />
 
     <div v-show="currentStep === 0">
       <a-select

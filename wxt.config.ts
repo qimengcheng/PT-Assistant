@@ -26,7 +26,7 @@ export default defineConfig({
   manifest: {
     name: "PT Assistant",
     description: "PT 站点辅助扩展（WXT + Vue 3 重构版）",
-    // 与 PT-depiler 权限清单对齐（offscreen 由 Chrome 端追加；nativeMessaging 仍为可选权限，后续轮次再定）
+    // 与 PT-depiler 权限清单对齐（offscreen 由 Chrome 端追加）
     permissions: [
       "activeTab",
       "alarms",
@@ -41,6 +41,9 @@ export default defineConfig({
       "offscreen",
     ],
     host_permissions: ["*://*/*"],
+    // nativeMessaging 为可选权限：用户在「基础设置 → 原生通信桥」里动态授权，
+    // 供本机 ptd CLI（com.ptd.native）与扩展通信（background/utils/nativeMessaging.ts）
+    optional_permissions: ["nativeMessaging"],
     icons: {
       "16": "/icon/16.png",
       "128": "/icon/128.png",
@@ -49,6 +52,10 @@ export default defineConfig({
     // background 里的 action.onClicked 永远不会触发。声明后点击 → 打开 options 标签页。
     action: {
       default_title: "PT Assistant",
+    },
+    // 地址栏输入 ptd + Tab 后可直接按搜索方案检索（background/utils/omnibox.ts）
+    omnibox: {
+      keyword: "ptd",
     },
   },
   // env.browser 是 WXT 从 CLI `-b/--browser` 解析出的目标浏览器。

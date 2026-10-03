@@ -35,12 +35,13 @@ import type {
   TTorrentDownloadStatus,
   IRestoreOptions,
   TBackupFields,
+  BridgeStatus,
 } from "@/shared/types.ts";
 import { isDebug } from "~/helper.ts";
 
 /**
  * 消息协议（对齐 PT-depiler messages.ts 的全量协议，按已平移模块裁剪：
- * 未平移的 backup / nativeMessaging / CLI 分组暂不声明，走索引签名宽松兜底）：
+ * 未平移的 backup / CLI 分组暂不声明，走索引签名宽松兜底）：
  * 1. background —— chrome cookies / DNR / storage
  * 2. offscreen —— 站点解析、搜索、下载器、用户信息、社交信息、辅种
  */
@@ -125,8 +126,19 @@ export interface ProtocolMap extends TMessageMap {
   deleteKeepUploadTask(taskId: TKeepUploadTaskKey): void;
   clearKeepUploadTasks(): void;
 
+  // ===== 1.2 background：打开扩展选项页（content-script 搜索跳转等使用）=====
+  openOptionsPage(data?: string | { path: string; query?: Record<string, unknown> }): void;
+
   // ===== 1.3 chrome.downloads（供备份本地导出等使用）=====
   downloadFile(downloadOptions: chrome.downloads.DownloadOptions): number;
+
+  // ===== 1.4 background：下载冷却结束后重新推送种子（offscreen download 发起，alarms 处理）=====
+  reDownloadTorrent(data: IDownloadTorrentOption): void;
+
+  // ===== 1.5 background：原生通信桥（nativeMessaging，可选权限；CLI ptd 本地调用）=====
+  nativeBridgeGetStatus(): BridgeStatus;
+  nativeBridgeSetEnabled(data: boolean): BridgeStatus;
+  nativeBridgeReconnect(): BridgeStatus;
 
   // ===== 2.6 日志 ( utils/logger ) =====
   logger(data: ILoggerItem): void;

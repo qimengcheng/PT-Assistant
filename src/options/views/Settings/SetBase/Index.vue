@@ -13,6 +13,7 @@ import SearchEntityWindow from "./SearchEntityWindow.vue";
 import DownloadWindow from "./DownloadWindow.vue";
 import BackupWindow from "./BackupWindow.vue";
 import SocialInformationWindow from "./SocialInformationWindow.vue";
+import NativeBridgeWindow from "./NativeBridgeWindow.vue";
 
 const tabs = [
   { key: "ui", label: "界面与内容脚本", component: UiWindow },
@@ -21,6 +22,7 @@ const tabs = [
   { key: "download", label: "下载", component: DownloadWindow },
   { key: "backup", label: "备份", component: BackupWindow },
   { key: "social-information", label: "社交信息", component: SocialInformationWindow },
+  { key: "native-bridge", label: "原生通信桥", component: NativeBridgeWindow },
 ] as const;
 
 const route = useRoute();

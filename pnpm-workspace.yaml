@@ -7,8 +7,10 @@ overrides:
   # 若要上 rolldown，需先对 site 包做 codemod 把类型导入改为 `import type`。
   vite: ^7.0.0
 
-# pnpm 10+ 不再自动执行依赖的构建脚本，未列入白名单的会整体报
+# pnpm 12 起不再自动执行依赖的构建脚本，未列入白名单会整体报
 # ERR_PNPM_IGNORED_BUILDS 并以退出码 1 失败 —— 本地和 CI 都会挂。
-onlyBuiltDependencies:
-  - esbuild
-  - "@parcel/watcher"
+# 键名注意：旧版是 onlyBuiltDependencies，pnpm 12 改为 allowBuilds；
+# `pnpm config get only-built-dependencies` 仍能读到旧键，但不会被采纳（静默失效）。
+allowBuilds:
+  esbuild: true
+  "@parcel/watcher": true

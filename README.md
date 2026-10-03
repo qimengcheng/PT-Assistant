@@ -17,8 +17,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | i18n | vue-i18n 双语言全量注册（~118KB） | vue-i18n 双语言全量注册 |
 | 测试 | 无 | 预留（WXT 自带 Vitest 集成，roadmap） |
 
-> **UI 框架已从 Vuetify 换成 antdv-next**（v0.13.1）。迁移规范见
-> [`ANTD-MIGRATION.md`](./ANTD-MIGRATION.md)，含完整标签映射表。
+> **UI 框架已从 Vuetify 换成 antdv-next**（v0.13.1）。
 >
 > 换框架的附带收益：antdv-next 走 CSS-in-JS **运行时注入样式**，
 > 不再有 Vuetify 那种「构建期拆 CSS chunk + 动态 `<link>` 注入」的链路 ——
@@ -133,7 +132,7 @@ pnpm compile        # vue-tsc 类型检查
 - [x] ~~mediaServer / backupServer 包平移~~（v0.2.0）
 - [x] ~~offscreen 入口（页面解析宿主）+ 搜索流程~~（v0.3.0，含 Vuetify/vue-router 接入）
 - [x] ~~数据备份/导入：本地导出(zip)+文件恢复 + WebDAV/S3/B2 远程备份（加密/保留策略/历史）~~（v0.4.0）
-- [x] ~~UI 框架迁移 Vuetify → antdv-next 全量收尾~~（v0.7.0，规范见 ANTD-MIGRATION.md）
+- [x] ~~UI 框架迁移 Vuetify → antdv-next 全量收尾~~（v0.7.0）
 - [x] ~~下载器配置页与种子推送流程 UI（SetDownloader + MyClient）~~（v0.13.1）
 - [x] ~~content script（引导 + 懒加载 app，站点浮窗/推送）~~（v0.13.1）
 - [x] ~~站点图标资源目录平移（public/icons/site，__RESOURCE_SITE_ICONS__）~~（v0.13.1）

@@ -30,12 +30,12 @@ function dialogEnter() {
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="t('SearchResultSnapshot.EditNameDialog.title')"
     :width="500"
     :footer="null"
     @after-open-change="(open: boolean) => open && props.editId && dialogEnter()"
     @after-close="() => (snapshotName = '')"
   >
-    <template #title>{{ t("SearchResultSnapshot.EditNameDialog.title") }}</template>
 
     <a-input
       v-model:value="snapshotName"

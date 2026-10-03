@@ -285,7 +285,7 @@
         "viewRaw": "View Raw Data"
       },
       "deleteConfirm": "Confirm to delete this history data?",
-      "title": "User History Data @ "
+      "title": "User History Data"
     },
     "UserLevelRequirementsTd": {
       "levelList": "User Level List"

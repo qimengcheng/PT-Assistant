@@ -129,10 +129,13 @@ function formatSizeTooltip(value?: number) {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="800" @after-open-change="onAfterOpenChange">
-    <template #title>
-      {{ t("common.AdvanceFilterGenerateDialog.title") }}
-    </template>
+  <a-modal
+    v-model:open="showDialog"
+    :title="t('common.AdvanceFilterGenerateDialog.title')"
+    :width="800"
+    @after-open-change="onAfterOpenChange"
+  >
+
 
     <div class="pa-0">
       <a-row :gutter="0">

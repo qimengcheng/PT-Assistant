@@ -589,22 +589,19 @@ async function createKeepUploadTask() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :width="1024" :mask-closable="false">
-    <template #title>
-      <div class="d-flex align-center">
-        <span>{{ t("SearchEntity.KeepUploadDialog.title") }}</span>
-        <div class="flex-1-1-0" />
-        <a-button
-          type="text"
-          href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/keep-upload-task"
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-          :title="t('common.howToUse')"
-        >
-          <template #icon><QuestionCircleOutlined /></template>
-        </a-button>
-      </div>
-    </template>
+  <a-modal v-model:open="showDialog" :title="t('SearchEntity.KeepUploadDialog.title')" :width="1024" :mask-closable="false">
+    <!-- 「怎么用」入口原先挂在 #title 插槽里，会和右上角相撞，移到内容区顶部 -->
+    <div class="d-flex justify-end">
+      <a-button
+        type="text"
+        href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/keep-upload-task"
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        :title="t('common.howToUse')"
+      >
+        <template #icon><QuestionCircleOutlined /></template>
+      </a-button>
+    </div>
 
     <!-- 本地指纹索引：决定「哪些条目本地已经有了」，是辅种前的最后一道保守检查 -->
     <div class="d-flex align-center ga-2 mb-2">

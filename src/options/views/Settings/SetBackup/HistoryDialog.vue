@@ -100,17 +100,15 @@ async function dialogLeave() {
 <template>
   <a-modal
     v-model:open="showDialog"
+    :title="
+      t('SetBackup.HistoryDialog.title', {
+        name: metadataStore.backupServers[backupServerId].name ?? backupServerId,
+      })
+    "
     :width="1000"
     @after-open-change="(open: boolean) => open && dialogEnter()"
     @after-close="dialogLeave"
   >
-    <template #title>
-      {{
-        t("SetBackup.HistoryDialog.title", {
-          name: metadataStore.backupServers[backupServerId].name ?? backupServerId,
-        })
-      }}
-    </template>
 
     <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupHistory(tableSelected)"><template #icon><DeleteOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
 

@@ -1,6 +1,7 @@
 import { storage } from "wxt/utils/storage";
 import { set } from "es-toolkit/compat";
 
+import { sendMessage } from "@/messages.ts";
 import type {
   IConfigPiniaStorageSchema,
   IMetadataPiniaStorageSchema,
@@ -26,12 +27,14 @@ export type TExtensionStorageKey = keyof IExtensionStorageSchema;
  * 扩展存储的唯一出口（wxt/storage）。键名与 @webext-core/storage 时代一致
  * （"local:config" → chrome.storage.local 的 "config"），老用户数据无需迁移。
  *
- * **所有上下文都直连这里**：background / offscreen / options / content script 都能用 ——
- * 它们要么是有 `chrome.storage` 权限的扩展页面，要么是有 storage 权限的 content script。
- * 旧版 PT-depiler 留下的「extStore 不能在 offscreen 中使用，必须走 sendMessage 问 SW」
- * 这条约束已经作废，原先的 `getExtStorage` / `setExtStorage` / `setExtStoragePath`
- * 三条 RPC 消息随之删除（RPC 版本还有个副作用：content 引导在**每个网页**上都要
- * 为读一次 config 而把 MV3 service worker 唤醒）。
+ * **按运行上下文自动二选一**：
+ * - SW / options 页 / content script —— 直连本地 chrome.storage（这些上下文里 API 存在）；
+ * - **offscreen document —— 不能直连**。Chrome 官方限制：offscreen 里唯一可用的扩展 API
+ *   是 chrome.runtime（仅消息子集，连 getManifest 都没有），chrome.storage 根本不存在。
+ *   直连 wxt/storage 会抛 "You must add the 'storage' permission to your manifest"
+ *   —— v0.5.18 备份恢复失败（前端表现为 The message port closed before a response
+ *   was received）的根因。此环境下 extStore 自动改走 SW 的 getExtStorage/setExtStorage/
+ *   patchExtStorage 三条代理消息（handler 在 background/utils/base.ts），调用方无感知。
  *
  * ⚠️ 键命名空间与 options 页的 pinia 持久化（persistWebExt，key = store.$id）**是同一套**，
  * 都落在 chrome.storage.local 的裸 key（"config" / "metadata" / …）上。
@@ -70,12 +73,24 @@ function serialize<K extends TExtensionStorageKey>(key: K, task: () => Promise<u
   return run;
 }
 
-export const extStore = {
+/**
+ * extStore 的对外形态。offscreen 里的远程实现与本地实现共用这一个接口，
+ * 调用方（offscreen/utils/*、packages/site/utils/adapter.ts 等）无需感知自己在哪个上下文。
+ */
+export interface IExtStore {
+  getItem<K extends TExtensionStorageKey>(key: K): Promise<IExtensionStorageSchema[K] | null>;
+  setItem<K extends TExtensionStorageKey>(key: K, value: IExtensionStorageSchema[K]): Promise<void>;
+  patchItem<K extends TExtensionStorageKey>(key: K, path: string, value: unknown): Promise<void>;
+}
+
+const localExtStore: IExtStore = {
   getItem<K extends TExtensionStorageKey>(key: K): Promise<IExtensionStorageSchema[K] | null> {
     return items[key].getValue() as Promise<IExtensionStorageSchema[K] | null>;
   },
 
-  /** 整键写入；与同键的 patchItem 排队互斥（本上下文内） */
+  /**
+   * 整键写入；与同键的 patchItem 排队互斥（本上下文内）
+   */
   setItem<K extends TExtensionStorageKey>(key: K, value: IExtensionStorageSchema[K]): Promise<void> {
     return serialize(key, () => items[key].setValue(value as never));
   },
@@ -99,3 +114,37 @@ export const extStore = {
     });
   },
 };
+
+/**
+ * offscreen 专用：所有读写转成消息发给 SW 的代理 handler（background/utils/base.ts）。
+ * 串行化由 SW 侧那唯一一份 localExtStore 的 writeQueues 兜底，这里不需要本地队列。
+ */
+function createRemoteExtStore(): IExtStore {
+  return {
+    getItem(key) {
+      // 泛型协议在「键本身就是泛型参数」时返回值会退化成全字段联合，这里按 K 收窄
+      return sendMessage("getExtStorage", key) as Promise<IExtensionStorageSchema[typeof key] | null>;
+    },
+    setItem(key, value) {
+      return sendMessage("setExtStorage", { key, value });
+    },
+    patchItem(key, path, value) {
+      return sendMessage("patchExtStorage", { key, path, value });
+    },
+  };
+}
+
+/**
+ * 当前上下文是否能直接访问 chrome.storage。
+ *
+ * Chrome 的 offscreen document 是唯一拿不到的扩展上下文（只有 chrome.runtime，
+ * 且 runtime.getManifest 都不存在）；SW / options / content script 都能直连。
+ * 不按 entrypoint 名判断，直接探 API —— Firefox 的 background 是普通页面，
+ * 未来其它受限上下文也能自动落到正确分支。
+ */
+function hasDirectStorageAccess(): boolean {
+  const g = globalThis as { chrome?: { storage?: unknown }; browser?: { storage?: unknown } };
+  return g.chrome?.storage != null || g.browser?.storage != null;
+}
+
+export const extStore: IExtStore = hasDirectStorageAccess() ? localExtStore : createRemoteExtStore();

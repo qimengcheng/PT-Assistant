@@ -24,8 +24,15 @@ const metadataStore = useMetadataStore();
 export const perSiteLastUserData = ref<Record<TSiteID, IUserInfoItem>>({});
 export const tableData = computed(() => Object.values(perSiteLastUserData.value));
 
-/** 表格初始/全量加载进行中标志（onMounted 与 watch 两处入口共用） */
-export const isTableLoading = ref<boolean>(false);
+/**
+ * 表格初始/全量加载进行中标志（$onReady 首屏与 watch 后台重建两处入口共用）。
+ *
+ * 初值必须是 true：首屏取数挂在 metadata 水合完成之后，从组件挂载到 $onReady 回调之间
+ * 有一段真实存在的空窗（storage.get + 大对象 $patch）。若初值为 false，这段空表里
+ * a-table 会先渲染成「暂无数据」，等水合完成再切回 loading 再出数据 —— 用户看到的是
+ * 一次假空态闪烁，比转圈更糟。
+ */
+export const isTableLoading = ref<boolean>(true);
 
 async function updatePerSiteData(siteId: TSiteID, siteUserInfoData: IUserInfo) {
   const currentDate = new Date();

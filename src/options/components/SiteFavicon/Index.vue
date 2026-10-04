@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted, shallowRef, watch } from "vue";
+import { computed, onMounted, watch } from "vue";
 import { NO_IMAGE, type TSiteID } from "@ptd/site";
 
-import { getSiteFavicon } from "./utils.ts";
+import { faviconCache, getSiteFavicon } from "./utils.ts";
 
 const {
   siteId,
@@ -18,36 +18,26 @@ const {
   flushOnClick?: boolean;
 }>();
 
-const siteFavicon = shallowRef<string>(NO_IMAGE);
-
-/** 用 siteId 作竞态令牌：并发加载时只有最后一次请求的结果会被采纳 */
-let loadToken = 0;
+/**
+ * 图标值一律从 utils 的共享缓存派生，组件自己不再持有一份 shallowRef。
+ * 这样 flushSiteFavicon() 改写/删除某个站点的缓存后，页面上所有已渲染的实例会跟着更新；
+ * 原实现把结果存在组件本地，外部刷新永远传不进来。
+ * 也正因为缓存是按 siteId 存的，不再需要「竞态令牌」防止结果串到别的站点上。
+ */
+const siteFavicon = computed<string>(() => faviconCache.value[siteId] ?? NO_IMAGE);
 
 async function load(flush: boolean) {
-  const token = ++loadToken;
-  try {
-    let favicon = await getSiteFavicon(siteId, flush);
-    if (favicon === NO_IMAGE && flushOnNoImage) {
-      favicon = await getSiteFavicon(siteId, true); // 强制刷新
-    }
-
-    // 期间 siteId 已经变了（或又发起了新的加载）→ 丢弃这次结果，否则图标会串到别的站点上
-    if (token === loadToken) {
-      siteFavicon.value = favicon;
-    }
-  } catch (e) {
-    console.error("[PTD] load site favicon failed", siteId, e);
-    if (token === loadToken) {
-      siteFavicon.value = NO_IMAGE;
-    }
+  const favicon = await getSiteFavicon(siteId, flush);
+  if (favicon === NO_IMAGE && flushOnNoImage) {
+    await getSiteFavicon(siteId, true); // 强制刷新
   }
 }
 
-onMounted(() => load(flushOnPre));
+onMounted(() => void load(flushOnPre));
 
 // ⚠️ 必须监听 siteId：表格排序/过滤后 rc-table 会复用行组件实例，
 // 只在 onMounted 读一次的话，siteId 变了而图标不变。
-watch(() => siteId, () => load(flushOnPre));
+watch(() => siteId, () => void load(flushOnPre));
 
 function doFlush() {
   if (!flushOnClick) return;

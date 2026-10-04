@@ -1160,6 +1160,7 @@
       ],
       "table": {
         "flushFavicon": "Refresh Site Favicon",
+        "flushFaviconBundled": "This site's icon ships with the extension and cannot be refreshed",
         "searchEntries": "Search Entries"
       }
     },

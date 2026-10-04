@@ -20,6 +20,7 @@ import { getBackupServer } from "@ptd/backupServer";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { sendMessage } from "@/messages.ts";
+import { clearFaviconCaches } from "@/options/components/SiteFavicon/utils.ts";
 
 import { setupReplaceUnsafeHeader } from "~/extends/axios/replaceUnsafeHeader.ts";
 import { setupRetryWhenCloudflareBlock } from "~/extends/axios/retryWhenCloudflareBlock.ts";
@@ -164,8 +165,11 @@ const resetItems = computed<resetItem[]>(() => [
   },
   {
     title: t("Debugger.resetItems.clearFaviconCache"),
+    // 必须走 store 侧的 clearFaviconCaches：它同时清 options 的内存缓存和 IndexedDB。
+    // 原来只发 sendMessage("clearSiteFaviconCache") 清库，本页面内存里那份还在，
+    // 清完图标照旧显示，得整页重载才见效。
     resetFn: async () => {
-      await sendMessage("clearSiteFaviconCache", undefined);
+      await clearFaviconCaches();
     },
   },
   {

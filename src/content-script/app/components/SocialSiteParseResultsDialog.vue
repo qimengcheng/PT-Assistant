@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { type ISocialSitePageInformation } from "@ptd/social";
 import { doKeywordSearch, type IPtdData } from "../utils.ts";
-import { computed, inject } from "vue";
+import { inject } from "vue";
 import { useI18n } from "vue-i18n";
-import { DownOutlined } from "@antdv-next/icons";
-import { useMetadataStore } from "@/options/stores/metadata.ts";
+import SearchPlanDropdown from "./SearchPlanDropdown.vue";
 
 const { t } = useI18n();
-const metadataStore = useMetadataStore();
 
 const showDialog = defineModel<boolean>();
 const { parseResults, searchPlan = "default" } = defineProps<{
@@ -17,34 +15,9 @@ const { parseResults, searchPlan = "default" } = defineProps<{
 
 const ptdData = inject<IPtdData>("ptd_data", {});
 
-const customSearchPlans = computed(() => {
-  if (!metadataStore.$ready) {
-    return [];
-  }
-
-  return metadataStore.getSearchSolutions
-    .filter((solution) => !!solution.enabled)
-    .sort((a, b) => b.sort - a.sort)
-    .map((solution) => ({
-      id: solution.id,
-      name: solution.name ?? solution.id,
-    }));
-});
-
-const searchPlans = computed(() => {
-  const plans = [{ id: "default", name: t("layout.header.searchPlan.default") }];
-
-  if (metadataStore.defaultSolutionId !== "default") {
-    plans.push({ id: "all", name: t("layout.header.searchPlan.all") });
-  }
-
-  plans.push(...customSearchPlans.value);
-
-  return plans;
-});
-
-const shouldShowSearchPlanMenu = computed(() => customSearchPlans.value.length > 0);
-
+// 搜索方案下拉（customSearchPlans / searchPlans / shouldShowSearchPlanMenu 的计算
+// 与菜单渲染）已整块搬进 SearchPlanDropdown.vue —— 这个弹窗里站点条目 / 外部 ID /
+// 系列名 / 折叠标题 / 标题列表五处都是同一段 dropdown，只有关键词不同。
 function buildSiteSearchKeyword(result: ISocialSitePageInformation) {
   return `${ptdData.socialSite!}|${result.id}`;
 }
@@ -90,26 +63,22 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
 
 <template>
   <a-modal v-model:open="showDialog" :title="t('contentScript.SocialSiteParseResultsDialog.title')" :width="600" :footer="null">
-    <div class="result-list">
+    <!-- 解析不到任何东西时原来是一个纯空白的内容区（弹窗照常打开，里面什么都没有），
+         给出明确空状态。Empty 已加进 content 侧的按需注册清单 antd-lite.ts。 -->
+    <a-empty
+      v-if="parseResults.length === 0"
+      :description="t('contentScript.SocialSiteParseResultsDialog.empty')"
+    />
+    <div v-else class="result-list">
       <template v-for="(result, index) in parseResults" :key="getResultKey(result, index)">
         <!-- 站点条目 -->
         <div v-if="shouldShowSiteId(result, index)" class="result-row" @click="() => doKeywordSearch(buildSiteSearchKeyword(result), searchPlan)">
           <span class="result-title">{{ `${ptdData.socialSite}: ${result.id}` }}</span>
           <a-tag color="blue">{{ t("contentScript.SocialSiteParseResultsDialog.searchId") }}</a-tag>
-          <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
-            <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-            <template #popupRender>
-              <a-menu>
-                <a-menu-item
-                  v-for="plan in searchPlans"
-                  :key="`${result.id}|id|${plan.id}`"
-                  @click.stop="doKeywordSearch(buildSiteSearchKeyword(result), plan.id)"
-                >
-                  {{ plan.name }}
-                </a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
+          <SearchPlanDropdown
+            :keyword="buildSiteSearchKeyword(result)"
+            :item-id="`${result.id}|id`"
+          />
         </div>
 
         <!-- 外部 ID -->
@@ -122,20 +91,10 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
           >
             <span class="result-title">{{ `${externalType}: ${externalId}` }}</span>
             <a-tag color="green">{{ t("contentScript.SocialSiteParseResultsDialog.searchExternalId") }}</a-tag>
-            <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
-              <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-              <template #popupRender>
-                <a-menu>
-                  <a-menu-item
-                    v-for="plan in searchPlans"
-                    :key="`${result.id}|${externalType}|${plan.id}`"
-                    @click.stop="doKeywordSearch(`${externalType}|${externalId}`, plan.id)"
-                  >
-                    {{ plan.name }}
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
+            <SearchPlanDropdown
+              :keyword="`${externalType}|${externalId}`"
+              :item-id="`${result.id}|${externalType}|${externalId}`"
+            />
           </div>
         </template>
 
@@ -147,20 +106,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
         >
           <span class="result-title">{{ result.seriesTitle }}</span>
           <a-tag color="default">{{ t("contentScript.SocialSiteParseResultsDialog.searchTitle") }}</a-tag>
-          <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
-            <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-            <template #popupRender>
-              <a-menu>
-                <a-menu-item
-                  v-for="plan in searchPlans"
-                  :key="`${result.id}|series|${plan.id}`"
-                  @click.stop="doKeywordSearch(result.seriesTitle!, plan.id)"
-                >
-                  {{ plan.name }}
-                </a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
+          <SearchPlanDropdown :keyword="result.seriesTitle!" :item-id="`${result.id}|series`" />
         </div>
 
         <!-- 标题列表（tmdb 季列表时折叠） -->
@@ -175,20 +121,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
               >
                 <span class="result-title">{{ title }}</span>
                 <a-tag color="default">{{ t("contentScript.SocialSiteParseResultsDialog.searchTitle") }}</a-tag>
-                <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
-                  <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-                  <template #popupRender>
-                    <a-menu>
-                      <a-menu-item
-                        v-for="plan in searchPlans"
-                        :key="`${result.id}|${title}|${plan.id}`"
-                        @click.stop="doKeywordSearch(title, plan.id)"
-                      >
-                        {{ plan.name }}
-                      </a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
+                <SearchPlanDropdown :keyword="title" :item-id="`${result.id}|${title}`" />
               </div>
             </div>
           </a-collapse-panel>
@@ -203,20 +136,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
           >
             <span class="result-title">{{ title }}</span>
             <a-tag color="default">{{ t("contentScript.SocialSiteParseResultsDialog.searchTitle") }}</a-tag>
-            <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
-              <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-              <template #popupRender>
-                <a-menu>
-                  <a-menu-item
-                    v-for="plan in searchPlans"
-                    :key="`${result.id}|${title}|${plan.id}`"
-                    @click.stop="doKeywordSearch(title, plan.id)"
-                  >
-                    {{ plan.name }}
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
+            <SearchPlanDropdown :keyword="title" :item-id="`${result.id}|${title}`" />
           </div>
         </template>
 

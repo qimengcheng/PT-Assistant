@@ -33,6 +33,7 @@ import {
   ConfigProvider,
   Dropdown,
   Divider,
+  Empty,
   Form,
   Image,
   Menu,
@@ -59,6 +60,9 @@ const usedComponents = [
   ConfigProvider, // a-config-provider（把浮层容器指进 shadowRoot，见 App.vue）
   Dropdown, // a-dropdown
   Divider, // a-divider
+  Empty, // a-empty —— SocialSiteParseResultsDialog 解析结果为空时的空状态
+        // 实测注册它 content-app.js 零增长（Δ0 KB）：Empty 的实现本来就在 chunk 里
+        // （被别的组件间接引用），之前只是没注册，模板里写 <a-empty> 会静默变原生标签。
   Form, // a-form / a-form-item
   Image, // a-image
   Menu, // a-menu / a-menu-item

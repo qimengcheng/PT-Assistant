@@ -157,15 +157,15 @@
     },
     "autoRefresh": {
       "btnTitle": "自动刷新",
-      "clientSuspended": "{name} 刷新失败 3 次，已暂停自动刷新。点击下载器标签可恢复。",
+      "clientSuspended": "{name} 加载失败，后续的刷新将跳过它。在「下载器状态」里点重试图标可恢复。",
       "downloaderFilter": "下载器筛选",
       "intervalLabel": "刷新间隔",
       "intervalUnit": "秒（0 表示关闭）",
-      "resumeDownloader": "恢复该下载器的自动刷新",
+      "resumeDownloader": "解除跳过并立即重新加载该下载器",
       "start": "开始自动刷新",
       "stop": "停止自动刷新",
       "stopDownloader": "停止该下载器的自动刷新",
-      "suspendedTip": "该下载器已因连续失败 3 次而被暂停。点击感叹号图标可恢复。"
+      "suspendedTip": "该下载器已因加载失败被跳过，不再参与刷新。点右侧重试图标可恢复。"
     },
     "clientStatusDialog": {
       "openBtn": "全部下载器状态",
@@ -247,7 +247,8 @@
       "title": "确认重新校验"
     },
     "refresh": "刷新",
-    "refreshFailed": "{name} 加载失败：{message}",
+    "refreshFailed": "{name} 加载失败：{message}，已跳过该下载器",
+    "allSuspended": "全部下载器都已因加载失败被跳过，在「下载器状态」里点重试图标可恢复。",
     "resumeSelected": "开始",
     "searchPlaceholder": "搜索种子名称、Hash、标签、路径",
     "speedLimit": {
@@ -1379,6 +1380,7 @@
     },
     "SocialSiteParseResultsDialog": {
       "defaultSeasonTitle": "单季",
+      "empty": "本页没有解析到可搜索的条目",
       "searchEntryTitle": "搜索{title}",
       "searchExternalId": "搜索外部ID",
       "searchId": "搜索ID",

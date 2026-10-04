@@ -400,7 +400,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
   </a-alert>
 
   <a-card size="small">
-    <div class="toolbar">
+    <a-flex align="center" :gap="4" style="padding: 8px 0">
       <a-tooltip :title="t('MyClient.pushToDownloader.navBtn')">
         <a-button type="text" @click="showPushToDownloaderDialog = true">
           <template #icon><CloudUploadOutlined /></template>
@@ -494,18 +494,18 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
         />
       </a-tooltip>
 
-      <div style="flex: 1"></div>
-
-      <a-input
-        v-model:value="searchText"
-        :placeholder="t('MyClient.searchPlaceholder')"
-        allow-clear
-        size="small"
-        style="max-width: 300px"
-      >
-        <template #prefix><SearchOutlined /></template>
-      </a-input>
-    </div>
+      <a-flex flex="auto" justify="flex-end" align="center">
+        <a-input
+          v-model:value="searchText"
+          :placeholder="t('MyClient.searchPlaceholder')"
+          allow-clear
+          size="small"
+          style="max-width: 300px"
+        >
+          <template #prefix><SearchOutlined /></template>
+        </a-input>
+      </a-flex>
+    </a-flex>
 
     <a-table
       :columns="tableHeader"
@@ -699,13 +699,6 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
 </template>
 
 <style scoped lang="scss">
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0;
-}
-
 .client-avatar {
   width: 22px;
   height: 22px;

@@ -41,15 +41,18 @@ const canReBuild = computed<boolean>(() => Object.values(reBuildControlRef.value
     :after-open-change="(open: boolean) => open && resetReBuildControlRef()"
   >
 
-    <label class="switch-row">
+    <!-- component="label"：a-flex 渲染成 <label> 而不是 <div>，
+         保留「点文字也能拨动开关」——label 内的 labelable 元素（a-switch 的 button）
+         会被浏览器转发点击。布局交给组件，只留内边距和光标两条手写样式。 -->
+    <a-flex component="label" align="center" gap="small" class="switch-row">
       <a-switch v-model:checked="reBuildControlRef.rebuildSiteHostMap" size="small" />
       <span>{{ t("SetSite.ReBuildMapDialog.rebuildSiteHostMap") }}</span>
-    </label>
+    </a-flex>
 
-    <label class="switch-row">
+    <a-flex component="label" align="center" gap="small" class="switch-row">
       <a-switch v-model:checked="reBuildControlRef.rebuildSiteNameMap" size="small" />
       <span>{{ t("SetSite.ReBuildMapDialog.rebuildSiteNameMap") }}</span>
-    </label>
+    </a-flex>
 
     <template #footer>
       <a-button size="small" type="text" danger @click="showDialog = false">
@@ -70,10 +73,8 @@ const canReBuild = computed<boolean>(() => Object.values(reBuildControlRef.value
 </template>
 
 <style scoped lang="scss">
+/* 布局已在 a-flex 上，只剩内边距与手型光标 */
 .switch-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 8px 0;
   cursor: pointer;
 }

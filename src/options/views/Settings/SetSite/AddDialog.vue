@@ -150,42 +150,47 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
     </div>
 
     <template #footer>
-      <div class="footer-bar">
-        <label v-if="currentStep === 0" class="switch-row">
+      <a-flex align="center" gap="small">
+        <!-- component="label" 保住「点文字也能拨动开关」，布局交给 a-flex -->
+        <a-flex v-if="currentStep === 0" component="label" align="center" gap="small" class="switch-row">
           <a-switch v-model:checked="showDeadSite" size="small" />
           <span>{{ t("SetSite.AddDialog.showDeadSite") }}</span>
-        </label>
-        <div class="footer-bar-spacer" />
-        <a-button size="small" type="text" danger @click="showDialog = false">
-          <template #icon>
-            <CloseCircleOutlined />
-          </template>
-          <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
-        </a-button>
-        <a-button v-if="currentStep === 1" size="small" type="text" color="blue" @click="currentStep = 0">
-          <template #icon>
-            <LeftOutlined />
-          </template>
-          <span class="ml-1">{{ t("common.dialog.prev") }}</span>
-        </a-button>
-        <a-button
-          v-if="currentStep === 0"
-          size="small"
-          type="text"
-          color="blue"
-          :disabled="selectedSiteId == null"
-          @click="currentStep = 1"
-        >
-          <span>{{ t("common.dialog.next") }}</span>
-          <RightOutlined class="ml-1" />
-        </a-button>
-        <a-button v-if="currentStep === 1" size="small" type="text" color="green" :disabled="!isFormValid" @click="saveSite">
-          <template #icon>
-            <CheckCircleOutlined />
-          </template>
-          <span class="ml-1">{{ t("common.dialog.ok") }}</span>
-        </a-button>
-      </div>
+        </a-flex>
+
+        <!-- 步骤 2 时左侧开关整体消失，所以右侧按钮组自己吃掉剩余宽度再右对齐，
+             不能靠外层 justify="space-between"（只剩一个子元素时会贴到左边跑位） -->
+        <a-flex flex="auto" justify="flex-end" align="center" gap="small">
+          <a-button size="small" type="text" danger @click="showDialog = false">
+            <template #icon>
+              <CloseCircleOutlined />
+            </template>
+            <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
+          </a-button>
+          <a-button v-if="currentStep === 1" size="small" type="text" color="blue" @click="currentStep = 0">
+            <template #icon>
+              <LeftOutlined />
+            </template>
+            <span class="ml-1">{{ t("common.dialog.prev") }}</span>
+          </a-button>
+          <a-button
+            v-if="currentStep === 0"
+            size="small"
+            type="text"
+            color="blue"
+            :disabled="selectedSiteId == null"
+            @click="currentStep = 1"
+          >
+            <span>{{ t("common.dialog.next") }}</span>
+            <RightOutlined class="ml-1" />
+          </a-button>
+          <a-button v-if="currentStep === 1" size="small" type="text" color="green" :disabled="!isFormValid" @click="saveSite">
+            <template #icon>
+              <CheckCircleOutlined />
+            </template>
+            <span class="ml-1">{{ t("common.dialog.ok") }}</span>
+          </a-button>
+        </a-flex>
+      </a-flex>
     </template>
   </a-modal>
 </template>
@@ -228,20 +233,7 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
   color: rgba(0, 0, 0, 0.45);
 }
 
-.footer-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.footer-bar-spacer {
-  flex: 1 1 0;
-}
-
 .switch-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   cursor: pointer;
 }
 </style>

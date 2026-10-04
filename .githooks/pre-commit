@@ -1,0 +1,11 @@
+#!/bin/sh
+# 提交瞬间拦住「版本号跳号 / 与 package.json 不一致」。
+#
+# 为什么要放本地 hook 而不是只挂 CI：CI 只在 push 时触发。
+# 本地连提 5 次它一次都不跑，等 push 时历史已经定型，只能事后告诉你
+# 「曾经跳过某个版本」，那时重写 5 条提交远比当场改麻烦。
+#
+# 启用方式（每个 clone 一次）：
+#   git config core.hooksPath .githooks
+# 见 AGENTS.md §1.2。
+exec node "$(git rev-parse --show-toplevel)/scripts/check-version.mjs" --staged

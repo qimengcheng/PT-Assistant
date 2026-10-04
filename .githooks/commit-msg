@@ -1,0 +1,8 @@
+#!/bin/sh
+# 提交瞬间拦住「commit message 里的版本号与 package.json 不一致」。
+#
+# pre-commit 阶段提交消息还没成形，所以 message 的校验只能放在这里
+# （commit-msg 能拿到 .git/COMMIT_EDITMSG 的内容）。
+#
+# 启用方式见 pre-commit 的注释：git config core.hooksPath .githooks
+exec node "$(git rev-parse --show-toplevel)/scripts/check-version.mjs" --message-file "$1"

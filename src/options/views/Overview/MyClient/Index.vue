@@ -448,7 +448,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
             <template #icon><ClockCircleOutlined /></template>
           </a-button>
         </a-tooltip>
-        <template #overlay>
+        <template #popupRender>
           <a-card size="small" style="min-width: 240px; padding: 12px">
             <div style="margin-bottom: 8px">{{ t("MyClient.autoRefresh.intervalLabel") }}</div>
             <a-input-number
@@ -627,7 +627,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
                   <template #icon><SwapOutlined /></template>
                 </a-button>
               </a-tooltip>
-              <template #overlay>
+              <template #popupRender>
                 <a-menu>
                   <a-menu-item @click="() => moveTorrentsInQueue([record], 'top')">
                     <template #icon><VerticalAlignTopOutlined /></template>

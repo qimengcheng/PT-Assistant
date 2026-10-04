@@ -246,7 +246,7 @@ function dialogLeave() {
                   <a-button type="text" size="small">
                     <template #icon><EllipsisOutlined /></template>
                   </a-button>
-                  <template #overlay>
+                  <template #popupRender>
                     <a-menu>
                       <a-menu-item
                         v-for="tag in downloader.suggestTags"

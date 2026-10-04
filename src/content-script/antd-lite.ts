@@ -29,6 +29,7 @@ import {
   Button,
   Col,
   Collapse,
+  ConfigProvider,
   Dropdown,
   Divider,
   Form,
@@ -53,6 +54,7 @@ const usedComponents = [
   Button, // a-button
   Col, // a-col
   Collapse, // a-collapse / a-collapse-panel
+  ConfigProvider, // a-config-provider（把浮层容器指进 shadowRoot，见 App.vue）
   Dropdown, // a-dropdown
   Divider, // a-divider
   Form, // a-form / a-form-item

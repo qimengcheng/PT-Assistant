@@ -51,6 +51,7 @@ import RecheckConfirmDialog from "./RecheckConfirmDialog.vue";
 import {
   torrents,
   selectedDownloaderIds,
+  suspendedDownloaders,
   autoRefreshRunning,
   globalRefreshInterval,
   useClientRefresh,
@@ -68,7 +69,6 @@ const {
   loadSingleDownloader,
   scheduleDownloaderRefresh,
   stopAllTimers,
-  resetRefreshState,
   toggleAutoRefresh,
 } = useClientRefresh();
 
@@ -200,13 +200,20 @@ const selectedColumnKeys = computed<string[]>({
 const columnOptions = computed(() => fullTableHeader.value.map((item) => ({ value: item.key, label: item.title })));
 
 // ── data loading ──────────────────────────────────────────────────────────
-/** Manual full refresh: fetch all active downloaders, reset error state. */
+/** Manual full refresh: fetch all active downloaders, skipping the circuit-broken ones. */
 async function loadTorrents() {
+  const targetIds = activeDownloaderIds.value.filter((id) => !suspendedDownloaders.value.has(id));
+  if (targetIds.length === 0) {
+    // 全被熔断时点刷新会"什么都没发生"，必须说清去哪恢复
+    if (activeDownloaderIds.value.length > 0) {
+      runtimeStore.showSnakebar(t("MyClient.allSuspended"), { color: "warning", timeout: 8000 });
+    }
+    return;
+  }
   loading.value = true;
   tableSelected.value = [];
-  resetRefreshState();
   try {
-    await Promise.allSettled(activeDownloaderIds.value.map((id) => loadSingleDownloader(id)));
+    await Promise.allSettled(targetIds.map((id) => loadSingleDownloader(id)));
   } finally {
     loading.value = false;
     await loadVisibleClientMeta();

@@ -123,7 +123,7 @@ const advanceOptions = computed(() => clientMeta.value?.advanceAddTorrentOptions
         :step="1e3"
         :tooltip="{ formatter: (v: number) => formatTimeout(v) }"
       />
-      <a-button type="text" size="small" @click="clientConfig.timeout = 60e3">
+      <a-button type="text" size="small" @click="clientConfig.timeout = 10e3">
         {{ formatTimeout(clientConfig.timeout ?? 0) }}
       </a-button>
     </a-form-item>

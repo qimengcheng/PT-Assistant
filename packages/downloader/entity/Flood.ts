@@ -31,7 +31,7 @@ export const clientConfig: TorrentClientConfig = {
   address: "http://127.0.0.1:3000",
   username: "",
   password: "",
-  timeout: 60 * 1e3,
+  timeout: 10 * 1e3,
 };
 
 // noinspection JSUnusedGlobalSymbols

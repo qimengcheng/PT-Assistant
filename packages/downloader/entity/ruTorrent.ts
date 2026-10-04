@@ -29,7 +29,7 @@ export const clientConfig: TorrentClientConfig = {
   address: "https://myrut.com/rutorrent",
   username: "admin",
   password: "",
-  timeout: 60 * 1e3,
+  timeout: 10 * 1e3,
 };
 
 // noinspection JSUnusedGlobalSymbols

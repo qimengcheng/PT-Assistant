@@ -26,7 +26,7 @@ export const clientConfig: DownloaderBaseConfig = {
   name: "Aria2",
   address: "http://localhost:6800/jsonrpc",
   password: "",
-  timeout: 60 * 1e3,
+  timeout: 10 * 1e3,
 };
 
 export const clientMetaData: TorrentClientMetaData = {

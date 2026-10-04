@@ -42,7 +42,7 @@ export const clientConfig: TorrentClientConfig = {
   address: "http://localhost:9091/",
   username: "",
   password: "",
-  timeout: 60 * 1e3,
+  timeout: 10 * 1e3,
 };
 
 // noinspection JSUnusedGlobalSymbols

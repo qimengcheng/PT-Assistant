@@ -24,7 +24,6 @@ export const globalRefreshInterval = ref(0);
 export const autoRefreshRunning = ref(false);
 
 // private – not reactive, managed by the composable only
-const failCounts = new Map<string, number>();
 const refreshTimers = new Map<string, number>();
 
 // ── composable ────────────────────────────────────────────────────────────
@@ -55,34 +54,28 @@ export function useClientRefresh() {
   }
 
   /**
-   * @param quiet 自动刷新的前两次失败不弹提示（见下方 3 次挂起逻辑），手动刷新一定弹。
+   * @param quiet 自动刷新失败时只报「已跳过」，手动刷新额外带上失败原因。
    */
   async function load(id: string, quiet: boolean): Promise<void> {
     try {
       const result = await sendMessage("getClientTorrents", id);
       torrents.value = { ...torrents.value, [id]: result };
-      failCounts.set(id, 0);
     } catch (error) {
       const name = metadataStore.downloaders[id]?.name ?? id;
-      const next = (failCounts.get(id) ?? 0) + 1;
-      failCounts.set(id, next);
-      if (next >= 3) {
-        suspendedDownloaders.value.add(id);
-        clearDownloaderTimer(id);
-        runtimeStore.showSnakebar(t("MyClient.autoRefresh.clientSuspended", { name }), {
-          color: "error",
-          timeout: 8000,
-        });
-        return;
-      }
-      // 手动刷新必须当场报错：消息没有接收方（offscreen 未就绪）时表格只会一片空白，
-      // 不给原因的话用户只能猜测是"没数据"还是"坏了"。
-      if (!quiet) {
-        runtimeStore.showSnakebar(
-          t("MyClient.refreshFailed", { name, message: error instanceof Error ? error.message : String(error) }),
-          { color: "error", timeout: 8000 },
-        );
-      }
+      // 一次失败就熔断：连不上的机器每轮都占着整次刷新（超时默认 10s，且像登录+列表
+      // 这样的多次请求会叠加），不熔断的话用户每次点刷新都要重新等一个死地址。
+      // 恢复入口在客户端状态弹窗的重试按钮（resumeDownloaderRefresh）。
+      suspendedDownloaders.value.add(id);
+      clearDownloaderTimer(id);
+      runtimeStore.showSnakebar(
+        quiet
+          ? t("MyClient.autoRefresh.clientSuspended", { name })
+          : t("MyClient.refreshFailed", {
+              name,
+              message: error instanceof Error ? error.message : String(error),
+            }),
+        { color: "error", timeout: 8000 },
+      );
     }
   }
 
@@ -110,15 +103,15 @@ export function useClientRefresh() {
     autoRefreshRunning.value = false;
   }
 
-  /** Reset failure-tracking and suspended state (call before a manual full reload). */
+  /** 清空熔断名单并停表（关闭自动刷新时用；手动刷新不再清，否则熔断等于没做）。 */
   function resetRefreshState() {
     suspendedDownloaders.value = new Set();
-    failCounts.clear();
   }
 
-  function resumeDownloaderRefresh(id: string) {
+  /** 解除单台熔断并立刻重拉一次；仍然失败会再次熔断。 */
+  async function resumeDownloaderRefresh(id: string) {
     suspendedDownloaders.value.delete(id);
-    failCounts.set(id, 0);
+    await load(id, false);
     if (autoRefreshRunning.value) {
       scheduleDownloaderRefresh(id);
     }

@@ -522,6 +522,7 @@
     "noDownloader": "没有可用的下载器，请先在设置中添加下载器。",
     "noDownloaderForSite": "当前站点没有可用的下载器，请检查下载器设置中的站点过滤配置。",
     "pauseOnAdd": "添加时默认暂停",
+    "placeholderInput": "请输入替换 {0} 中的 <...> 的内容：",
     "savePath": "保存路径",
     "savePathHint": "不设置则为该下载服务器的默认路径",
     "selectDownloader": "选择下载器",

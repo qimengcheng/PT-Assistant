@@ -19,3 +19,21 @@
   font-size: 13px;
   color: #1f2328;
 }
+
+/**
+ * shadowRoot 内的浮层宿主（元素由 init.ts 创建，ConfigProvider / message 把弹窗注到这里）。
+ *
+ * 必须是 fixed：modal 的 mask/wrap 本身就是 fixed，父级是否 fixed 不影响其视口定位；
+ * 但 dropdown 面板是 absolute，需要这个容器作为 offsetParent 才能按 antd 算出的视口坐标落位。
+ * 0x0 面积保证容器自己不吃页面点击。
+ */
+/*noinspection CssUnknownTarget*/
+#ptd-content-script-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  /* 与 .ptd-root 同级，靠 DOM 顺序（overlay 在后）压在悬浮球之上 */
+  z-index: 9999999;
+}

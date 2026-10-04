@@ -406,7 +406,7 @@ function keywordChecked(keyword: string) {
                   </template>
                 </a-button>
               </a-tooltip>
-              <template #overlay>
+              <template #popupRender>
                 <EditSearchEntryList :item="record" />
               </template>
             </a-dropdown>

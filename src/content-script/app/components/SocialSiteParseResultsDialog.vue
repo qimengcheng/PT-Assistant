@@ -98,7 +98,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
           <a-tag color="blue">{{ t("contentScript.SocialSiteParseResultsDialog.searchId") }}</a-tag>
           <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
             <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-            <template #overlay>
+            <template #popupRender>
               <a-menu>
                 <a-menu-item
                   v-for="plan in searchPlans"
@@ -124,7 +124,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
             <a-tag color="green">{{ t("contentScript.SocialSiteParseResultsDialog.searchExternalId") }}</a-tag>
             <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
               <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-              <template #overlay>
+              <template #popupRender>
                 <a-menu>
                   <a-menu-item
                     v-for="plan in searchPlans"
@@ -149,7 +149,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
           <a-tag color="default">{{ t("contentScript.SocialSiteParseResultsDialog.searchTitle") }}</a-tag>
           <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
             <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-            <template #overlay>
+            <template #popupRender>
               <a-menu>
                 <a-menu-item
                   v-for="plan in searchPlans"
@@ -177,7 +177,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
                 <a-tag color="default">{{ t("contentScript.SocialSiteParseResultsDialog.searchTitle") }}</a-tag>
                 <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
                   <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-                  <template #overlay>
+                  <template #popupRender>
                     <a-menu>
                       <a-menu-item
                         v-for="plan in searchPlans"
@@ -205,7 +205,7 @@ function shouldShowSeriesTitle(result: ISocialSitePageInformation, index: number
             <a-tag color="default">{{ t("contentScript.SocialSiteParseResultsDialog.searchTitle") }}</a-tag>
             <a-dropdown v-if="shouldShowSearchPlanMenu" trigger="hover" placement="bottomRight">
               <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
-              <template #overlay>
+              <template #popupRender>
                 <a-menu>
                   <a-menu-item
                     v-for="plan in searchPlans"

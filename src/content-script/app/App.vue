@@ -22,7 +22,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 
 import type { IRemoteDownloadDialogData } from "./types.ts";
-import { currentView, type IPtdData, pageType, updatePageType } from "./utils.ts";
+import { contentOverlay, currentView, type IPtdData, pageType, updatePageType } from "./utils.ts";
 
 import SpeedDialBtn from "./components/SpeedDialBtn.vue";
 import SentToDownloaderDialog from "@/options/components/SentToDownloaderDialog/Index.vue";
@@ -36,18 +36,12 @@ const ptdData = inject<IPtdData>("ptd_data", {});
 const shadowRoot = inject<ShadowRoot>("ptd_shadow_root");
 
 /**
- * antd 浮层（modal / dropdown / tooltip）默认挂到 document.body，而本扩展的两套样式
- * —— Vite 抽出的 SFC CSS 与 StyleProvider 的 CSS-in-JS —— 全在 shadowRoot 里。
- * 挂在 body 上的浮层因此拿不到任何样式：弹窗其实开了，只是零样式且落在视口之外
- * （2026-10-03 实测 light.modal=1 / shadow.modal=0，用户看到的就是"点了没反应"）。
- * 容器元素由 init.ts 创建，定位规则见 app.css 的 #ptd-content-script-overlay。
+ * 把组件树里的浮层（modal / dropdown / tooltip）收进 shadowRoot 内的浮层宿主，
+ * 否则它们挂到 document.body、拿不到扩展的任何样式。宿主元素见 utils.ts 的 contentOverlay。
  */
-const overlayRoot = shadowRoot?.getElementById("ptd-content-script-overlay") ?? null;
 function getPopupContainer(): HTMLElement {
-  return overlayRoot ?? document.body;
+  return contentOverlay.value ?? document.body;
 }
-// 静态 message 不读 ConfigProvider 上下文，它的容器是全局配置，得单独指一次
-antdMessage.config({ getContainer: () => getPopupContainer() });
 
 const el = useTemplateRef<HTMLElement>("el");
 provide("app", el);

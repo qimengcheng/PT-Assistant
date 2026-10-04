@@ -14,9 +14,11 @@
  */
 import appCss from "./app.css?inline";
 
-import { createApp } from "vue";
+import { createApp, h } from "vue";
+import { ConfigProvider, message, StyleProvider } from "antdv-next";
 
 import App from "./App.vue";
+import { contentOverlay } from "./utils.ts";
 import { piniaInstance as pinia } from "@/options/plugins/pinia.ts";
 import { i18nInstance as i18n } from "@/options/plugins/i18n.ts";
 // content 侧不共用 options 的全量 antd install：整包 antd 会让 content-app 单个 chunk
@@ -87,6 +89,23 @@ export function mountApp(document: Document, data: Record<string, any> = {}) {
   const overlayElement = document.createElement("div");
   overlayElement.id = "ptd-content-script-overlay";
   shadowRoot.appendChild(overlayElement);
+
+  /**
+   * 静态方法（message / Modal.confirm）走的是 detached render()，看不到组件树里的
+   * <a-style-provider>，CSS-in-JS 因此注进 document.head —— 而 shadow DOM 不继承
+   * light DOM 的样式表，于是 toast 的容器虽然指对了位置，样式仍然是丢的。
+   *
+   * antdv-next 为此留的口子是 ConfigProvider.config({ holderRender })：静态树渲染前
+   * 会过一遍 global.holderRender（message/index.js 与 modal/confirm.js 都读它）。
+   * 重挂时这里会重新执行，指向新的 shadowRoot —— 旧的连同宿主一起被丢弃，正是想要的。
+   */
+  ConfigProvider.config({
+    holderRender: (node) => h(StyleProvider, { container: shadowRoot }, () => node),
+  });
+  // 静态 message 的容器是全局配置，不读 ConfigProvider 的 getPopupContainer
+  message.config({ getContainer: () => overlayElement });
+  // 同一个容器交给 utils.ts 的模块级 ref，静态 Modal.confirm 在那里显式传 getContainer
+  contentOverlay.value = overlayElement;
 
   document.body.append(contentRoot);
 

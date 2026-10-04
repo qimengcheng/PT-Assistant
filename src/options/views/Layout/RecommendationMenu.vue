@@ -159,10 +159,13 @@ function searchRecommendation(item: ISocialRecommendationItem) {
   emit("search", item.title);
 }
 
-function getRecommendationRegionClass(region?: string) {
-  return region && /(中国|华语|香港|台湾|澳门)/.test(region)
-    ? "hot-recommendation-chip-region-domestic"
-    : "hot-recommendation-chip-region-foreign";
+/**
+ * 地区 → a-tag 的语义色。国内/海外用 blue / cyan 区分，比原来两套手写色值
+ * （#8a3b12 on #fff0d5 / #0f5c68 on #dff6f8）更贴近组件库的色板，
+ * 也不会在暗色主题下和文字对比度失配 —— 原来那套是纯手写 hex，不随主题走。
+ */
+function getRecommendationRegionColor(region?: string) {
+  return region && /(中国|华语|香港|台湾|澳门)/.test(region) ? "orange" : "blue";
 }
 
 function getRecommendationPosterSrc(item: ISocialRecommendationItem) {
@@ -272,22 +275,15 @@ watch(isRecommendationMenuOpen, (isOpen) => {
                     </div>
 
                     <div class="hot-recommendation-meta">
-                      <span v-if="item.releaseYear" class="hot-recommendation-chip hot-recommendation-chip-year">
+                      <a-tag v-if="item.releaseYear" color="purple">
                         {{ item.releaseYear }}
-                      </span>
-                      <span
-                        v-if="item.region"
-                        :class="['hot-recommendation-chip', getRecommendationRegionClass(item.region)]"
-                      >
+                      </a-tag>
+                      <a-tag v-if="item.region" :color="getRecommendationRegionColor(item.region)">
                         {{ item.region }}
-                      </span>
-                      <span
-                        v-for="genre in item.genres?.slice(0, 3)"
-                        :key="genre"
-                        class="hot-recommendation-chip hot-recommendation-chip-genre"
-                      >
+                      </a-tag>
+                      <a-tag v-for="genre in item.genres?.slice(0, 3)" :key="genre" color="green">
                         {{ genre }}
-                      </span>
+                      </a-tag>
                     </div>
 
                     <div class="hot-recommendation-summary">
@@ -427,35 +423,17 @@ watch(isRecommendationMenuOpen, (isOpen) => {
   min-height: 20px;
 }
 
-.hot-recommendation-chip {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
+// 原来这里是 31 行手写 chip 样式（.hot-recommendation-chip 及其 4 个变体，
+// 全部是纯 hex 色值、不随主题变化）。改用 a-tag 后整块删除。
+// a-tag 没有 size prop（真实 props：color/closable/closeIcon/icon/href/target/
+// disabled/bordered/variant/rootClass/prefixCls/classes/styles），
+// 尺寸只能靠下面的 CSS 压回去 —— scripts/check-dead-props.mjs 也会拦 size="small"。
+.hot-recommendation-meta :deep(.ant-tag) {
   height: 18px;
   padding: 0 6px;
-  border-radius: 4px;
   font-size: 0.68rem;
-  line-height: 18px;
-}
-
-.hot-recommendation-chip-year {
-  color: #6750a4;
-  background: #eee8ff;
-}
-
-.hot-recommendation-chip-region-domestic {
-  color: #8a3b12;
-  background: #fff0d5;
-}
-
-.hot-recommendation-chip-region-foreign {
-  color: #0f5c68;
-  background: #dff6f8;
-}
-
-.hot-recommendation-chip-genre {
-  color: #2f5d37;
-  background: #e6f4ea;
+  line-height: 16px;
+  border-radius: 4px;
 }
 
 .hot-recommendation-summary {

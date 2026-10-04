@@ -183,57 +183,73 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
       <!-- 搜索中：结果区给加载反馈；未搜索 / 空结果给不同空态文案 -->
       <a-spin :spinning="runtimeStore.mediaServerSearch.isSearching">
         <!-- 瀑布流形式展示媒体服务器搜索结果 -->
-        <div v-if="runtimeStore.mediaServerSearch.searchResult.length > 0" class="masonry-grid">
-        <div v-for="item in runtimeStore.mediaServerSearch.searchResult" :key="item.url" class="masonry-item">
-          <div v-if="item.poster" class="poster-wrap">
-            <img :src="item.poster" :title="item.name" :alt="item.name" class="poster-img" />
+        <a-masonry
+          v-if="runtimeStore.mediaServerSearch.searchResult.length > 0"
+          class="masonry-grid"
+          :items="runtimeStore.mediaServerSearch.searchResult"
+          :columns="{ xs: 2, sm: 4, md: 5, lg: 5, xl: 7, xxl: 7 }"
+          :gutter="16"
+        >
+          <!-- 必须用 #itemRender 插槽而不是 :itemRender 函数 prop：
+               函数 prop 收到的参数只有 item 本身、没有 index（SSR 实测会渲染成
+               "undefined:甲"），插槽拿到的才是 {...item, index}。
+               不起解构别名 —— 插槽参数本身就是原对象，多一个 index 字段而已，
+               直接当 IMediaServerItem 传给 firstVideoTitle / openItem 即可。
+               另外 Masonry 没有 item-key prop（真实 props 只有
+               classes/styles/gutter/items/itemRender/columns/fresh/rootClass/prefixCls），
+               key 由 items 里的对象身份决定，不需要也不能传。 -->
+          <template #itemRender="item">
+            <div class="masonry-item">
+              <div v-if="item.poster" class="poster-wrap">
+                <img :src="item.poster" :title="item.name" :alt="item.name" class="poster-img" />
 
-            <!-- 左上角：格式 / 大小 -->
-            <div class="poster-tags poster-tags-left">
-              <a-tag v-if="item.format" color="blue" class="poster-tag">
-                <PlaySquareOutlined />
-                {{ item.format?.toUpperCase() }}
-                <template v-if="firstVideoTitle(item)"> / {{ firstVideoTitle(item) }}</template>
-              </a-tag>
-              <a-tag v-if="item.size" class="poster-tag">
-                <HddOutlined />
-                {{ formatSize(item.size ?? 0) }}
-              </a-tag>
-            </div>
+                <!-- 左上角：格式 / 大小 -->
+                <div class="poster-tags poster-tags-left">
+                  <a-tag v-if="item.format" color="blue" class="poster-tag">
+                    <PlaySquareOutlined />
+                    {{ item.format?.toUpperCase() }}
+                    <template v-if="firstVideoTitle(item)"> / {{ firstVideoTitle(item) }}</template>
+                  </a-tag>
+                  <a-tag v-if="item.size" class="poster-tag">
+                    <HddOutlined />
+                    {{ formatSize(item.size ?? 0) }}
+                  </a-tag>
+                </div>
 
-            <!-- 右上角：观看 / 喜欢状态 -->
-            <div v-if="item.user" class="poster-tags poster-tags-right">
-              <CheckOutlined v-if="item.user?.IsPlayed" class="user-state played" />
-              <HeartFilled v-if="item.user?.IsFavorite" class="user-state favorite" />
-              <HeartOutlined v-else class="user-state favorite-outline" />
-            </div>
+                <!-- 右上角：观看 / 喜欢状态 -->
+                <div v-if="item.user" class="poster-tags poster-tags-right">
+                  <CheckOutlined v-if="item.user?.IsPlayed" class="user-state played" />
+                  <HeartFilled v-if="item.user?.IsFavorite" class="user-state favorite" />
+                  <HeartOutlined v-else class="user-state favorite-outline" />
+                </div>
 
-            <!-- 悬停遮罩：详情 / 访问 -->
-            <div class="poster-overlay">
-              <a-button block class="overlay-btn" @click="() => showItemInformation(item)">
-                <InfoCircleOutlined />
-                {{ t("MediaServerEntity.detail") }}
-              </a-button>
-              <a-button block class="overlay-btn" @click="() => openItem(item)">
-                <ExportOutlined />
-                {{ t("common.visit") }}
-              </a-button>
-            </div>
-          </div>
+                <!-- 悬停遮罩：详情 / 访问 -->
+                <div class="poster-overlay">
+                  <a-button block class="overlay-btn" @click="() => showItemInformation(item)">
+                    <InfoCircleOutlined />
+                    {{ t("MediaServerEntity.detail") }}
+                  </a-button>
+                  <a-button block class="overlay-btn" @click="() => openItem(item)">
+                    <ExportOutlined />
+                    {{ t("common.visit") }}
+                  </a-button>
+                </div>
+              </div>
 
-          <div class="item-caption">
-            <a :href="item.url" :title="item.name" class="item-name" target="_blank">{{ item.name }}</a>
-            <div v-if="metadataStore.mediaServers[item.server]" class="item-server">
-              <img
-                :src="getMediaServerIcon(metadataStore.mediaServers[item.server].type)"
-                :alt="metadataStore.mediaServers[item.server].name"
-                class="server-type-icon"
-              />
-              <span>{{ metadataStore.mediaServers[item.server].name }}</span>
+              <div class="item-caption">
+                <a :href="item.url" :title="item.name" class="item-name" target="_blank">{{ item.name }}</a>
+                <div v-if="metadataStore.mediaServers[item.server]" class="item-server">
+                  <img
+                    :src="getMediaServerIcon(metadataStore.mediaServers[item.server].type)"
+                    :alt="metadataStore.mediaServers[item.server].name"
+                    class="server-type-icon"
+                  />
+                  <span>{{ metadataStore.mediaServers[item.server].name }}</span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </template>
+        </a-masonry>
 
         <a-empty
           v-else
@@ -309,33 +325,20 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
   object-fit: contain;
 }
 
-/* ===== 瀑布流（CSS columns，断点与旧版一致） ===== */
+/* 瀑布流的列数与间距交给 a-masonry（columns 断点 + gutter）。
+   原来这里是 24 行 CSS columns + 5 档媒体查询，断点行为不好对齐：
+   CSS columns 的列数是硬切，而 a-masonry 走组件库统一的 Breakpoint 栅格。 */
 .masonry-grid {
-  column-gap: 1rem;
+  width: 100%;
 }
-@media (max-width: 599.98px) {
-  .masonry-grid {
-    column-count: 2;
-  }
-}
-@media (min-width: 600px) and (max-width: 959.98px) {
-  .masonry-grid {
-    column-count: 4;
-  }
-}
-@media (min-width: 960px) and (max-width: 1279.98px) {
-  .masonry-grid {
-    column-count: 5;
-  }
-}
-@media (min-width: 1280px) {
-  .masonry-grid {
-    column-count: 7;
-  }
+
+/* 条目间距由 a-masonry 的 gutter 负责，这里不能再加 margin-bottom，
+   否则会与 gutter 叠加造成列间距明显大于行间距。 */
+.masonry-item {
+  break-inside: avoid;
 }
 .masonry-item {
   break-inside: avoid;
-  margin-bottom: 1rem;
 }
 .poster-wrap {
   position: relative;

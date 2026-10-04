@@ -1,21 +1,5 @@
-import { openDB, type IDBPDatabase } from "idb";
-import { type IPtdDBSchemaV1, type IPtdDBSchema, type IPtdDBSchemaV2 } from "@/shared/types.ts";
-
-export const ptdIndexDb = openDB<IPtdDBSchema>("ptd", 4, {
-  upgrade(db, oldVersion) {
-    if (oldVersion < 1) {
-      const dbV1 = db as unknown as IDBPDatabase<IPtdDBSchemaV1>;
-      dbV1.createObjectStore("social_information");
-    }
-    if (oldVersion < 2) {
-      const dbV2 = db as unknown as IDBPDatabase<IPtdDBSchemaV2>;
-      dbV2.createObjectStore("download_history", { keyPath: "id", autoIncrement: true });
-    }
-    if (oldVersion < 3) {
-      db.createObjectStore("favicon");
-    }
-    if (oldVersion < 4) {
-      db.createObjectStore("local_fingerprint");
-    }
-  },
-});
+/**
+ * 已上移到 `@/shared/indexdb.ts`（options 侧现在也要读同一个库）。
+ * 这里只做再导出，保留 offscreen 内部 `../adapter/indexdb.ts` 这条既有引用路径。
+ */
+export { ptdIndexDb } from "@/shared/indexdb.ts";

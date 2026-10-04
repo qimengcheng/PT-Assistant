@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { watchDebounced } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -206,10 +206,20 @@ const filteredTableData = computed<IUserInfoItem[]>(() => {
   return tableData.value.filter((raw) => tableFilterFn(undefined, query, { raw }));
 });
 
-// 挂载时加载表格数据
-onMounted(() => initTableData());
+// 首屏取数必须挂在 metadata 水合完成这个事件上，不能挂在 onMounted 上。
+// webExtPersistence 的 restore() 是异步的（chrome.storage.local.get + $patch），而本 store
+// 是在这个懒加载路由 chunk 求值时才第一次被 useMetadataStore() 创建（见 lastUserData.ts 模块
+// 顶层），所以 onMounted 那一刻 metadataStore.sites 恒为初始空对象 —— initTableData 会
+// 拿到 0 个站点、空跑一遍就把 loading 关掉，表格既不转圈也没数据。
+// 原来这条首屏链路实际是靠下面那个 5s 防抖的 watcher「误打误撞」补救的：水合改动
+// lastUserInfo → 5s 后才静默重建，实测水合→首行 5403ms，其中 5000ms 纯属白等。
+// 仓库里同一坑早有先例并都用 $onReady 处理（options/App.vue 的版本弹窗、content-script
+// App.vue 的 speedDial），这里补齐。
+void metadataStore.$onReady(() => initTableData());
 
 // 监听用户信息变化（ offscreen 直接定时刷新的情况 ）
+// 注：debounce 保持 5s 不动。它现在只服务后台刷新合并，已不在首屏路径上；
+// 调小会让 23 个站点逐个写回时各触发一次整表重建，反而更卡。
 watchDebounced(
   () => metadataStore.lastUserInfo,
   () => {

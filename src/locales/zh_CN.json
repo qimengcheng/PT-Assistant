@@ -247,6 +247,7 @@
       "title": "确认重新校验"
     },
     "refresh": "刷新",
+    "refreshFailed": "{name} 加载失败：{message}",
     "resumeSelected": "开始",
     "searchPlaceholder": "搜索种子名称、Hash、标签、路径",
     "speedLimit": {

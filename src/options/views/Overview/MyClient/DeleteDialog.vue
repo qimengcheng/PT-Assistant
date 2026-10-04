@@ -34,8 +34,10 @@ function wrappedConfirmDelete(id: string) {
     @all-delete="emits('allDelete')"
   >
     <template #append-text>
-      <!-- 原 v-checkbox color="error" density="compact" hide-details -->
-      <a-checkbox v-model:checked="removeData" danger class="ml-2">
+      <!-- 原 v-checkbox color="error" density="compact" hide-details。
+           a-checkbox 没有 danger/color 这类属性（dist/checkbox 里搜不到 danger），
+           原先写的 danger 是死属性，已删；要红色文案得自己加 class。 -->
+      <a-checkbox v-model:checked="removeData" class="ml-2">
         {{ t("MyClient.dialog.removeData") }}
       </a-checkbox>
     </template>

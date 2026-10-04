@@ -312,7 +312,7 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
           :min="0"
           :max="10 * 60e3"
           :step="1e3"
-          :tooltip-formatter="(v?: number) => formatDate(v ?? 0, 'mm:ss')"
+          :tooltip="{ formatter: (v?: number) => formatDate(v ?? 0, 'mm:ss') }"
         />
         <a-button size="small" @click="timeout = 30e3">
           <span :style="{ color: timeoutColor }">{{ formatDate(timeout, "mm:ss") }}</span>

@@ -580,7 +580,7 @@ provide(THEME_KEY, echartsTheme);
               v-model:value="configStore.userName"
               :options="userNameOptions"
               :readonly="!allowEditName"
-              :popup-match-selector-width="true"
+              :popup-match-select-width="true"
               class="flex-1-1-0"
             />
             <a-button type="text" size="small" :title="configStore.getUserNames.perfName" @click="configStore.userName = configStore.getUserNames.perfName">

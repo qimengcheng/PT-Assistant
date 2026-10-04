@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   ArrowDownOutlined,
@@ -22,6 +22,7 @@ import {
   TagsOutlined,
 } from "@antdv-next/icons";
 
+import type { TableColumnsType } from "antdv-next";
 import type {
   CTorrent,
   CTorrentFile,
@@ -83,9 +84,69 @@ const trackerStatusIcon: Record<CTrackerState, any> = {
   error: ExclamationCircleOutlined,
 };
 
+/**
+ * a-table 的 #bodyCell 插槽拿到的 record 是 any（该插槽不携带列泛型），
+ * 直接拿它去索引 Record<CTrackerState> 会报 TS7053，这里收一道类型再查表。
+ */
+function trackerStatusIconOf(status: CTrackerState): unknown {
+  return trackerStatusIcon[status];
+}
+
 function featureAllowed(feature: keyof NonNullable<TorrentClientMetaData["feature"]>): boolean {
   return metaData.value?.feature?.[feature]?.allowed ?? false;
 }
+
+// ============================================================================
+// 详情页三张表的列定义。
+// 原来是手搓 <table class="plain-table">，表头底色 / 斑马纹 / 边框全部写死在 CSS 里
+// （其中条纹底色 #fafafa 与 vuetify-compat.css 的 .table-stripe 同值，是当初互相抄的，
+// 并不是 Table 的 rowHoverBg token）。换成 a-table 后这些交给组件按 token 生成。
+// 列定义放 computed 是因为标题走 t()，要跟着 locale 变。
+// ============================================================================
+const fileColumns = computed<TableColumnsType<CTorrentFile>>(() => [
+  { title: t("MyClient.detail.fileColumnName"), dataIndex: "path", key: "path" },
+  { title: t("MyClient.detail.fileColumnSize"), dataIndex: "size", key: "size", align: "right" },
+  { title: t("MyClient.detail.fileColumnProgress"), dataIndex: "progress", key: "progress", align: "right" },
+  {
+    title: t("MyClient.detail.fileColumnPriority"),
+    dataIndex: "priority",
+    key: "priority",
+    align: "right",
+    width: 150,
+  },
+]);
+
+const peerColumns = computed<TableColumnsType<CTorrentPeer>>(() => [
+  { title: t("MyClient.detail.peersColumnIp"), dataIndex: "ip", key: "ip" },
+  { title: t("MyClient.detail.peersColumnClient"), dataIndex: "client", key: "client" },
+  { title: t("MyClient.detail.peersColumnProgress"), dataIndex: "progress", key: "progress", align: "right" },
+  { title: t("MyClient.detail.peersColumnDownloadSpeed"), dataIndex: "downloadSpeed", key: "downloadSpeed", align: "right" },
+  { title: t("MyClient.detail.peersColumnUploadSpeed"), dataIndex: "uploadSpeed", key: "uploadSpeed", align: "right" },
+  { title: t("MyClient.detail.peersColumnEncrypted"), dataIndex: "encrypted", key: "encrypted", align: "center" },
+  { title: t("MyClient.detail.peersColumnCountry"), dataIndex: "country", key: "country", align: "center" },
+]);
+
+// 最后一列（删除 tracker）只有客户端声明了 TrackerManage 能力时才存在，
+// 所以它得跟着 featureAllowed 动态进出列定义，而不是在单元格里 v-if。
+const trackerColumns = computed<TableColumnsType<CTorrentTracker>>(() => {
+  const columns: TableColumnsType<CTorrentTracker> = [
+    { title: t("MyClient.detail.trackerColumnUrl"), dataIndex: "url", key: "url" },
+    { title: t("MyClient.detail.trackerColumnTier"), dataIndex: "tier", key: "tier", align: "center", width: 80 },
+    { title: t("MyClient.detail.trackerColumnStatus"), dataIndex: "status", key: "status", align: "center", width: 90 },
+    { title: t("MyClient.detail.trackerColumnSeeds"), dataIndex: "seeds", key: "seeds", align: "right", width: 90 },
+    { title: t("MyClient.detail.trackerColumnLeeches"), dataIndex: "leeches", key: "leeches", align: "right", width: 90 },
+    {
+      title: t("MyClient.detail.trackerColumnLastAnnounce"),
+      dataIndex: "lastAnnounce",
+      key: "lastAnnounce",
+      width: 140,
+    },
+  ];
+  if (featureAllowed("TrackerManage")) {
+    columns.push({ title: "", dataIndex: "action", key: "action", align: "center", width: 70 });
+  }
+  return columns;
+});
 
 async function loadMetaData() {
   if (!torrent || metaData.value) return;
@@ -348,33 +409,30 @@ function formatTimestamp(timestamp: number | undefined): string {
         <div v-if="filesLoading" class="loading-box">
           <a-spin />
         </div>
-        <table v-else-if="files.length > 0" class="plain-table">
-          <thead>
-            <tr>
-              <th>{{ t("MyClient.detail.fileColumnName") }}</th>
-              <th class="text-end">{{ t("MyClient.detail.fileColumnSize") }}</th>
-              <th class="text-end">{{ t("MyClient.detail.fileColumnProgress") }}</th>
-              <th class="text-end" style="width: 150px">{{ t("MyClient.detail.fileColumnPriority") }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="file in files" :key="file.index">
-              <td class="text-body-small">{{ file.path }}</td>
-              <td class="text-end text-body-small">{{ formatSize(file.size) }}</td>
-              <td class="text-end text-body-small">{{ file.progress.toFixed(1) }}%</td>
-              <td class="text-end">
-                <a-select
-                  v-if="featureAllowed('FilePriority')"
-                  :value="file.priority"
-                  :options="priorityItems"
-                  size="small"
-                  @change="(value: TorrentFilePriority | null) => updateFilePriority(file, value)"
-                />
-                <span v-else class="text-body-small">{{ file.priority }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <a-table
+          v-else-if="files.length > 0"
+          class="detail-table"
+          :columns="fileColumns"
+          :data-source="files"
+          :row-key="(record: CTorrentFile) => record.index"
+          :pagination="false"
+          size="small"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'size'">{{ formatSize(record.size) }}</template>
+            <template v-else-if="column.key === 'progress'">{{ record.progress.toFixed(1) }}%</template>
+            <template v-else-if="column.key === 'priority'">
+              <a-select
+                v-if="featureAllowed('FilePriority')"
+                :value="record.priority"
+                :options="priorityItems"
+                size="small"
+                @change="(value: TorrentFilePriority | null) => updateFilePriority(record, value)"
+              />
+              <span v-else>{{ record.priority }}</span>
+            </template>
+          </template>
+        </a-table>
         <a-alert v-else type="info" show-icon banner>{{ t("MyClient.detail.noFiles") }}</a-alert>
       </div>
 
@@ -383,33 +441,28 @@ function formatTimestamp(timestamp: number | undefined): string {
         <div v-if="peersLoading" class="loading-box">
           <a-spin />
         </div>
-        <table v-else-if="peers.length > 0" class="plain-table">
-          <thead>
-            <tr>
-              <th>{{ t("MyClient.detail.peersColumnIp") }}</th>
-              <th>{{ t("MyClient.detail.peersColumnClient") }}</th>
-              <th class="text-end">{{ t("MyClient.detail.peersColumnProgress") }}</th>
-              <th class="text-end">{{ t("MyClient.detail.peersColumnDownloadSpeed") }}</th>
-              <th class="text-end">{{ t("MyClient.detail.peersColumnUploadSpeed") }}</th>
-              <th class="text-center">{{ t("MyClient.detail.peersColumnEncrypted") }}</th>
-              <th class="text-center">{{ t("MyClient.detail.peersColumnCountry") }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(peer, index) in peers" :key="`${peer.ip}-${index}`">
-              <td class="text-body-small">{{ peer.ip }}</td>
-              <td class="text-body-small">{{ peer.client || "-" }}</td>
-              <td class="text-end text-body-small">{{ peer.progress.toFixed(1) }}%</td>
-              <td class="text-end text-body-small">{{ formatSize(peer.downloadSpeed) }}/s</td>
-              <td class="text-end text-body-small">{{ formatSize(peer.uploadSpeed) }}/s</td>
-              <td class="text-center">
-                <LockOutlined v-if="peer.encrypted" style="font-size: 12px" />
-                <span v-else>-</span>
-              </td>
-              <td class="text-center text-body-small">{{ peer.country || "-" }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <a-table
+          v-else-if="peers.length > 0"
+          class="detail-table"
+          :columns="peerColumns"
+          :data-source="peers"
+          :row-key="(record: CTorrentPeer, index: number) => `${record.ip}-${index}`"
+          :pagination="false"
+          :scroll="{ y: 320 }"
+          size="small"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'client'">{{ record.client || "-" }}</template>
+            <template v-else-if="column.key === 'progress'">{{ record.progress.toFixed(1) }}%</template>
+            <template v-else-if="column.key === 'downloadSpeed'">{{ formatSize(record.downloadSpeed) }}/s</template>
+            <template v-else-if="column.key === 'uploadSpeed'">{{ formatSize(record.uploadSpeed) }}/s</template>
+            <template v-else-if="column.key === 'encrypted'">
+              <LockOutlined v-if="record.encrypted" style="font-size: 12px" />
+              <span v-else>-</span>
+            </template>
+            <template v-else-if="column.key === 'country'">{{ record.country || "-" }}</template>
+          </template>
+        </a-table>
         <a-alert v-else type="info" show-icon banner>{{ t("MyClient.detail.noPeers") }}</a-alert>
       </div>
 
@@ -430,41 +483,34 @@ function formatTimestamp(timestamp: number | undefined): string {
         <div v-if="trackersLoading" class="loading-box">
           <a-spin />
         </div>
-        <table v-else-if="trackers.length > 0" class="plain-table">
-          <thead>
-            <tr>
-              <th>{{ t("MyClient.detail.trackerColumnUrl") }}</th>
-              <th class="text-center" style="width: 80px">{{ t("MyClient.detail.trackerColumnTier") }}</th>
-              <th class="text-center" style="width: 90px">{{ t("MyClient.detail.trackerColumnStatus") }}</th>
-              <th class="text-end" style="width: 90px">{{ t("MyClient.detail.trackerColumnSeeds") }}</th>
-              <th class="text-end" style="width: 90px">{{ t("MyClient.detail.trackerColumnLeeches") }}</th>
-              <th style="width: 140px">{{ t("MyClient.detail.trackerColumnLastAnnounce") }}</th>
-              <th v-if="featureAllowed('TrackerManage')" class="text-center" style="width: 70px"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="tracker in trackers" :key="tracker.url">
-              <td class="text-body-small">{{ tracker.url }}</td>
-              <td class="text-center text-body-small">{{ tracker.tier }}</td>
-              <td class="text-center">
-                <component :is="trackerStatusIcon[tracker.status]" style="font-size: 12px" />
-              </td>
-              <td class="text-end text-body-small">{{ tracker.seeds ?? "-" }}</td>
-              <td class="text-end text-body-small">{{ tracker.leeches ?? "-" }}</td>
-              <td class="text-body-small">{{ formatTimestamp(tracker.lastAnnounce) }}</td>
-              <td v-if="featureAllowed('TrackerManage')" class="text-center">
-                <a-button
-                  type="text"
-                  size="small"
-                  :title="t('MyClient.detail.removeTracker')"
-                  @click="removeTracker(tracker)"
-                >
-                  <template #icon><DeleteOutlined /></template>
-                </a-button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <a-table
+          v-else-if="trackers.length > 0"
+          class="detail-table"
+          :columns="trackerColumns"
+          :data-source="trackers"
+          :row-key="(record: CTorrentTracker) => record.url"
+          :pagination="false"
+          size="small"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'status'">
+              <component :is="trackerStatusIconOf(record.status)" style="font-size: 12px" />
+            </template>
+            <template v-else-if="column.key === 'seeds'">{{ record.seeds ?? "-" }}</template>
+            <template v-else-if="column.key === 'leeches'">{{ record.leeches ?? "-" }}</template>
+            <template v-else-if="column.key === 'lastAnnounce'">{{ formatTimestamp(record.lastAnnounce) }}</template>
+            <template v-else-if="column.key === 'action'">
+              <a-button
+                type="text"
+                size="small"
+                :title="t('MyClient.detail.removeTracker')"
+                @click="removeTracker(record)"
+              >
+                <template #icon><DeleteOutlined /></template>
+              </a-button>
+            </template>
+          </template>
+        </a-table>
         <a-alert v-else type="info" show-icon banner>{{ t("MyClient.detail.noTrackers") }}</a-alert>
       </div>
     </template>
@@ -486,26 +532,10 @@ function formatTimestamp(timestamp: number | undefined): string {
   padding: 24px 0;
 }
 
-.plain-table {
-  width: 100%;
-  border-collapse: collapse;
-
-  th,
-  td {
-    padding: 6px 8px;
-    border-bottom: 1px solid #f0f0f0;
-    text-align: left;
-  }
-
-  th {
-    font-weight: 500;
-    color: #8c8c8c;
-    background: #fafafa;
-  }
-
-  tbody tr:nth-of-type(odd) {
-    background: #fafafa;
-  }
+// 原来手搓 <table> 时单元格统一用 text-body-small（12px）；a-table 默认跟随全局
+// fontSize:13px，这里压回去保持视觉一致。
+.detail-table :deep(.ant-table-tbody td) {
+  font-size: 12px;
 }
 
 // 原始 JSON 内容较长，展开后自带滚动区，避免依赖 dialog/tabs 外层布局的滚动

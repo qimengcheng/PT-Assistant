@@ -157,15 +157,15 @@
     },
     "autoRefresh": {
       "btnTitle": "Auto-Refresh",
-      "clientSuspended": "{name} failed 3 times in a row. Auto-refresh suspended. Click the chip to resume.",
+      "clientSuspended": "{name} failed to load and is now skipped by later refreshes. Click the retry icon in Downloader Status to resume.",
       "downloaderFilter": "Downloader Filter",
       "intervalLabel": "Refresh interval",
       "intervalUnit": "seconds (0 = off)",
-      "resumeDownloader": "Resume auto-refresh for this downloader",
+      "resumeDownloader": "Un-skip this downloader and reload it now",
       "start": "Start auto-refresh",
       "stop": "Stop auto-refresh",
       "stopDownloader": "Stop auto-refresh for this downloader",
-      "suspendedTip": "This client has been suspended due to 3 consecutive failures. Click the alert icon to resume."
+      "suspendedTip": "Skipped after a load failure; it no longer takes part in refreshes. Click the retry icon on the right to resume."
     },
     "clientStatusDialog": {
       "openBtn": "All Downloaders Status",
@@ -247,7 +247,8 @@
       "title": "Confirm Recheck"
     },
     "refresh": "Refresh",
-    "refreshFailed": "Failed to load {name}: {message}",
+    "refreshFailed": "Failed to load {name}: {message} - this downloader is now skipped",
+    "allSuspended": "Every downloader is skipped after a load failure. Click the retry icon in Downloader Status to resume.",
     "resumeSelected": "Resume",
     "searchPlaceholder": "Search by name, hash, label, or path",
     "speedLimit": {
@@ -1379,6 +1380,7 @@
     },
     "SocialSiteParseResultsDialog": {
       "defaultSeasonTitle": "Season",
+      "empty": "Nothing on this page could be parsed into a searchable entry",
       "searchEntryTitle": "Search {title}",
       "searchExternalId": "Search External ID",
       "searchId": "Search ID",

@@ -96,7 +96,7 @@ function selectSite(siteId: string) {
               v-for="siteId in advanceItemPropsRef.site"
               :key="siteId"
               :color="siteId === selectedSite ? 'blue' : undefined"
-              :bordered="siteId !== selectedSite"
+              :variant="siteId === selectedSite ? 'solid' : 'outlined'"
               class="mr-1 mb-1"
               @click.stop="selectSite(siteId)"
             >
@@ -110,7 +110,9 @@ function selectSite(siteId: string) {
 
         <!-- 选中种子信息条 -->
         <a-divider orientation="vertical" class="mx-2" />
-        <a-tag class="my-2 chip_limit_width" color="blue" :bordered="true">
+        <!-- 这里原本给 a-tag 传了 `bordered` 属性，antdv-next 1.5.6 下 true/false 都渲染 filled（死属性），
+             已删；确实要描边请写 variant="outlined" -->
+        <a-tag class="my-2 chip_limit_width" color="blue">
           <CheckCircleFilled class="mr-1" />
           {{
             smAndDown

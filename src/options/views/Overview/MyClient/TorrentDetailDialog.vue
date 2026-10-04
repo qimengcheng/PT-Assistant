@@ -64,12 +64,15 @@ const trackersLoading = ref(false);
 const trackersLoaded = ref(false);
 const trackerInput = ref("");
 
-const priorityItems: Array<{ title: string; value: TorrentFilePriority }> = [
-  { title: t("MyClient.detail.prioritySkip"), value: "skip" },
-  { title: t("MyClient.detail.priorityLow"), value: "low" },
-  { title: t("MyClient.detail.priorityNormal"), value: "normal" },
-  { title: t("MyClient.detail.priorityHigh"), value: "high" },
-  { title: t("MyClient.detail.priorityHighest"), value: "highest" },
+// options 的 label 键必须叫 `label`：a-select 的默认 optionLabelProp 取的是
+// `options[i].label`，写成 `title` 只会被当成原生 title 属性，label 恒为 undefined
+// → 下拉项和回显全部显示原始 value（skip / low / …）。
+const priorityItems: Array<{ label: string; value: TorrentFilePriority }> = [
+  { label: t("MyClient.detail.prioritySkip"), value: "skip" },
+  { label: t("MyClient.detail.priorityLow"), value: "low" },
+  { label: t("MyClient.detail.priorityNormal"), value: "normal" },
+  { label: t("MyClient.detail.priorityHigh"), value: "high" },
+  { label: t("MyClient.detail.priorityHighest"), value: "highest" },
 ];
 
 const trackerStatusIcon: Record<CTrackerState, any> = {

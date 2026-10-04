@@ -191,7 +191,9 @@ function formatSizeTooltip(value?: number) {
           @toggle="(v) => toggleKeywordStateFn('tags', String(v))"
         >
           <template #item="{ item: tag }">
-            <a-tag :color="tag.color" :bordered="true" class="mr-1">
+            <!-- 原本给 a-tag 传了 `bordered` 属性，antdv-next 1.5.6 下 true/false 都渲染 filled（死属性），
+                 已删，外观不变；确实要描边请写 variant="outlined" -->
+            <a-tag :color="tag.color" class="mr-1">
               <template v-if="preDefinedTorrentTagNameSet.includes(tag.name)" #icon>
                 <PushpinOutlined class="pin-icon" />
               </template>

@@ -1,4 +1,4 @@
-import { createApp, markRaw, watchEffect } from "vue";
+import { createApp, watchEffect } from "vue";
 
 import App from "./App.vue";
 
@@ -32,11 +32,3 @@ void useConfigStore().$onReady(() => {
     i18nInstance.global.locale.value = useConfigStore().lang;
   });
 });
-
-// DEBUG-PROBE: 临时插桩供无头探针定位搜索表格空数据问题（验证后移除）
-(window as any).__pinia = piniaInstance;
-(window as any).__vue = { markRaw };
-(window as any).__lastErr = null;
-app.config.errorHandler = (err) => {
-  (window as any).__lastErr = String((err as Error)?.stack || err);
-};

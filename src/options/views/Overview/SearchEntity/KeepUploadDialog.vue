@@ -646,7 +646,8 @@ async function createKeepUploadTask() {
               </span>
             </div>
             <div v-if="localBadges(item).length" class="d-flex ga-1 mt-1 flex-wrap">
-              <a-tag v-for="badge in localBadges(item)" :key="badge.key" :color="badge.color" :bordered="false" :title="badge.title">
+              <!-- 这里原本给 a-tag 传了 `bordered` 属性，antdv-next 1.5.6 下它是死属性（false 同样渲染 filled），已删 -->
+              <a-tag v-for="badge in localBadges(item)" :key="badge.key" :color="badge.color" :title="badge.title">
                 {{ badge.text }}
               </a-tag>
               <span

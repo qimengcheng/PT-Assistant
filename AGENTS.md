@@ -36,8 +36,46 @@ PT-Plugin-Plus / PT-depiler 的**重写版**：旧版是 Vue 3 + Vuetify 4 + vit
 - CI 与 Release 以 `package.json` 为唯一真源，commit 里的 `vX.Y.Z` 是给人看的；
   两者不一致时以 `package.json` 为准，但那就说明提交漏了东西。
 
+#### 版本号只能从 git log 推导，不要看工作区
+
+**这是 v0.21.1 踩过的坑，也是本节最容易违反的一条。**
+
+当时另一个 agent 把 `package.json` 预 bump 到 `0.5.43` 但**还没提交**，我把这个数
+当成了「已经用掉的版本」，改成 `0.5.44` 提交 —— **0.5.43 从此成为死号**，历史出现缺口，
+直到 v0.21.2 才回头重编号修正。
+
+根因不是算错，是**参照物选错**：工作区 `package.json` 的值是「当前工作进度」的信号，
+不是「已发布版本」。真相源只有 `git log`。
+
+选号直接用工具，不要手算，也不要拿工作区的值 +1：
+
 ```bash
-# 提交前自检
+node scripts/check-version.mjs --next     # 输出下一个该用的版本号，例如 v0.22.0
+```
+
+#### 本地 hook 是主防线，CI 只是兜底
+
+`.githooks/` 下两个钩子在**提交的瞬间**拦截：
+
+| 钩子 | 查什么 |
+|---|---|
+| `pre-commit` | 暂存的 `package.json` 版本号 == git 历史最大 + 1（抓跳号） |
+| `commit-msg` | 提交消息里的版本号 == 暂存的 `package.json`（抓三处不一致） |
+
+**每个新克隆必须启用一次**（仓库级配置，不入库，所以不在 git 里）：
+
+```bash
+git config core.hooksPath .githooks
+```
+
+为什么不能只靠 CI：CI 只在 push 时触发。本地连提 5 次它一次都不跑，等 push 时历史
+已经定型，只能事后告诉你「曾经跳过某个版本」，那时重写 5 条提交远比当场改麻烦。
+CI 里那份（`check-version.mjs --committed`）是兜底，因为 clone 出来的仓库没有本地
+hook，且 `--no-verify` 能绕过。
+
+```bash
+# 提交前自检（不想等 hook 拦，也可以手动先跑）
+node scripts/check-version.mjs --next      # 该用哪个号
 git show --stat HEAD | head -3
 git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version"
 ```
@@ -50,8 +88,12 @@ git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'u
 | 产物 `manifest.json` → `version` | 构建时从 package.json 注入 |
 | commit 消息里的 `vX.Y.Z` | 与上面两者一致 |
 
-**踩坑记录**：曾出现 commit 标 v0.16.0 但漏提交 `package.json`，仓库停在 0.5.1，CI 读到的版本与
+**踩坑记录 1**：曾出现 commit 标 v0.16.0 但漏提交 `package.json`，仓库停在 0.5.1，CI 读到的版本与
 提交说明不一致。**bump 版本号时务必把 `package.json` 一起 `git add`。**
+
+**踩坑记录 2（跳号）**：见 §1.2「版本号只能从 git log 推导」。本地 `pre-commit` 会当场拦住，
+提交后也要核对一次：`node scripts/check-version.mjs --committed`，
+再扫一遍历史连续性 `git log -10 --format=%s` 看有没有缺口。
 
 ### 1.4 多 agent 并行下的 git 纪律
 

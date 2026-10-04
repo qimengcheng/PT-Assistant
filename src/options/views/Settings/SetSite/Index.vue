@@ -232,13 +232,13 @@ function keywordChecked(keyword: string) {
   <a-card size="small">
     <template #title>
       <div class="toolbar">
-        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span class="ml-1">{{ t('common.btn.add') }}</span></a-button>
+        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
         <a-divider type="vertical" class="mx-2" />
 
-        <a-button @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span class="ml-1">{{ t('SetSite.index.oneClickImport') }}</span></a-button>
+        <a-button @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span>{{ t('SetSite.index.oneClickImport') }}</span></a-button>
 
         <a-divider type="vertical" class="mx-2" />
 
@@ -255,7 +255,7 @@ function keywordChecked(keyword: string) {
           <span class="ml-1">{{ t("SetSite.index.table.flushFavicon") }}</span>
         </a-button>
 
-        <a-button @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span class="ml-1">{{ t('SetSite.index.reBuildMap') }}</span></a-button>
+        <a-button @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span>{{ t('SetSite.index.reBuildMap') }}</span></a-button>
 
         <div class="toolbar-spacer" />
 

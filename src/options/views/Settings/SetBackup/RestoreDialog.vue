@@ -218,7 +218,7 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
     v-model:open="showDialog"
     :title="t('SetBackup.RestoreDialog.title')"
     :width="800"
-    :mask-closable="!isDoingRestore"
+    :mask="{ closable: !isDoingRestore }"
     :keyboard="!isDoingRestore"
     :closable="!isDoingRestore"
     destroy-on-hidden

@@ -33,6 +33,13 @@ const {
 
 const dateUnits = ["day", "week", "month", "quarter", "year"] as const;
 
+/** a-range-picker 给的是 dayjs，setDateRangeByDatePicker 要的是 Date[]（与 SearchEntity 版同一契约） */
+function onCustomDateRangeChange(dates: unknown) {
+  if (!Array.isArray(dates) || dates.length === 0) return;
+  const range = dates as { toDate: () => Date }[];
+  advanceFilterDictRef.value.downloadAt = setDateRangeByDatePicker(range.map((d) => d.toDate()));
+}
+
 function updateTableFilter() {
   updateTableFilterValueFn();
   showDialog.value = false;
@@ -108,7 +115,7 @@ function enterDialog() {
             <a-range-picker
               size="small"
               :show-time="false"
-              @change="(v: unknown) => (advanceFilterDictRef.downloadAt = setDateRangeByDatePicker(v as unknown[]))"
+              @change="onCustomDateRangeChange"
             />
           </template>
           <a-tag class="date-unit-tag">{{ t("common.AdvanceFilterGenerateDialog.dateUnit.custom") }}</a-tag>

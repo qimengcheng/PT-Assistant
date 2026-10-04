@@ -208,7 +208,7 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
     class="debugger-warning"
     type="warning"
     show-icon
-    :message="t('Debugger.title')"
+    :title="t('Debugger.title')"
     :description="t('Debugger.consoleOutput')"
   />
 
@@ -314,7 +314,7 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
         <tr>
           <th class="debugger-label">{{ t("Debugger.pluginReset") }}</th>
           <td>
-            <a-alert class="debugger-danger" type="error" show-icon :message="t('Debugger.dangerWarning')" />
+            <a-alert class="debugger-danger" type="error" show-icon :title="t('Debugger.dangerWarning')" />
             <div class="debugger-reset">
               <div v-for="item in resetItems" :key="item.title" class="debugger-reset-item">
                 <a-button danger @click="() => resetFnWrapper(item.resetFn)">{{ t("common.dialog.reset") }}</a-button>

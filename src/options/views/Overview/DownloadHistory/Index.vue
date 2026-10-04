@@ -149,10 +149,10 @@ onUnmounted(() => {
   <a-card size="small">
     <template #title>
       <div class="toolbar">
-        <a-button type="primary" :loading="isLoadingHistory" @click="() => throttleLoadDownloadHistory()"><template #icon><SyncOutlined /></template><span class="ml-1">{{ t('DownloadHistory.refresh') }}</span></a-button>
+        <a-button type="primary" :loading="isLoadingHistory" @click="() => throttleLoadDownloadHistory()"><template #icon><SyncOutlined /></template><span>{{ t('DownloadHistory.refresh') }}</span></a-button>
         <a-divider type="vertical" class="mx-2" />
-        <a-button :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('DownloadHistory.reDownload') }}</span></a-button>
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
+        <a-button :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span>{{ t('DownloadHistory.reDownload') }}</span></a-button>
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
         <div class="toolbar-spacer" />
         <a-input
           v-model:value="tableWaitFilterRef"
@@ -260,7 +260,7 @@ onUnmounted(() => {
       class="mb-3"
       type="error"
       show-icon
-      :message="t('DownloadHistory.detail.errorMessage')"
+      :title="t('DownloadHistory.detail.errorMessage')"
       :description="downloadDetail.errorMessage"
     />
     <pre class="detail-json">{{ JSON.stringify(downloadDetail, null, 2) }}</pre>

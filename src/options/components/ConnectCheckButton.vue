@@ -48,7 +48,6 @@ async function checkConnect() {
   <a-button
     block
     type="text"
-    :disabled="isTestingConnectRef"
     :loading="isTestingConnectRef"
     @click="checkConnect"
   >

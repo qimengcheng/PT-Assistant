@@ -515,7 +515,7 @@ provide(THEME_KEY, echartsTheme);
     <div class="user-statistic-layout">
       <div id="chartContainer" class="user-statistic-charts">
         <!-- 总上传、总下载、总积分 -->
-        <a-card v-if="configStore.userStatisticControl.showChart.totalSiteBase" class="user-statistic-card" size="small" :body-style="{ padding: '8px' }">
+        <a-card v-if="configStore.userStatisticControl.showChart.totalSiteBase" class="user-statistic-card" size="small" :styles="{ body: { padding: '8px' } }">
           <VChart
             :option="totalSiteBaseInfoChartOptions"
             :style="{ height: `${perChartHeight}px` }"
@@ -525,7 +525,7 @@ provide(THEME_KEY, echartsTheme);
           />
         </a-card>
         <!-- 总保种体积、总保种数量 -->
-        <a-card v-if="configStore.userStatisticControl.showChart.totalSiteSeeding" class="user-statistic-card" size="small" :body-style="{ padding: '8px' }">
+        <a-card v-if="configStore.userStatisticControl.showChart.totalSiteSeeding" class="user-statistic-card" size="small" :styles="{ body: { padding: '8px' } }">
           <VChart
             :option="totalSiteSeedingInfoChartOptions"
             :style="{ height: `${perChartHeight}px` }"
@@ -542,7 +542,7 @@ provide(THEME_KEY, echartsTheme);
               configStore.userStatisticControl.showChart[chart.key]
             "
             size="small"
-            :body-style="{ padding: '8px' }"
+            :styles="{ body: { padding: '8px' } }"
             class="user-statistic-card"
           >
             <VChart
@@ -559,13 +559,13 @@ provide(THEME_KEY, echartsTheme);
 
       <div class="user-statistic-control">
         <div class="d-flex align-center mb-2">
-          <a-button @click="() => router.back()"><template #icon><ArrowLeftOutlined /></template><span class="ml-1">{{ t('common.back') }}</span></a-button>
+          <a-button @click="() => router.back()"><template #icon><ArrowLeftOutlined /></template><span>{{ t('common.back') }}</span></a-button>
           <div class="flex-1-1-0" />
-          <a-button @click="exportStatisticImg"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.exportImage') }}</span></a-button>
-          <a-button type="primary" class="ml-2" @click="saveControl"><template #icon><SaveOutlined /></template><span class="ml-1">{{ t('common.saveSettings') }}</span></a-button>
+          <a-button @click="exportStatisticImg"><template #icon><ExportOutlined /></template><span>{{ t('common.exportImage') }}</span></a-button>
+          <a-button type="primary" class="ml-2" @click="saveControl"><template #icon><SaveOutlined /></template><span>{{ t('common.saveSettings') }}</span></a-button>
         </div>
 
-        <a-alert type="info" :message="t('UserDataStatistic.chart.chartStyleSettings')" class="mb-2" />
+        <a-alert type="info" :title="t('UserDataStatistic.chart.chartStyleSettings')" class="mb-2" />
 
         <div class="user-statistic-field">
           <span class="user-statistic-field-label">{{ t("common.username") }}</span>
@@ -659,7 +659,7 @@ provide(THEME_KEY, echartsTheme);
         <div class="d-flex align-center">
           <a-alert
             type="info"
-            :message="t('UserDataStatistic.chart.displaySiteSettings')"
+            :title="t('UserDataStatistic.chart.displaySiteSettings')"
             :description="t('UserDataStatistic.chart.hideLowPercentLabel')"
             class="flex-1-1-0"
           />

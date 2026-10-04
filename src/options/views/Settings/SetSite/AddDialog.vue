@@ -78,7 +78,7 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
     :title="t('SetSite.add.title')"
     :width="800"
     :closable="false"
-    :body-style="{ maxHeight: '70vh', overflowY: 'auto' }"
+    :styles="{ body: { maxHeight: '70vh', overflowY: 'auto' } }"
     :after-open-change="(open: boolean) => (open ? loadCanAddSites() : resetDialog())"
   >
     <!-- wiki 入口原先挂在 #title 插槽里（富标题会和右上角相撞），移到内容区顶部 -->

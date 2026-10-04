@@ -251,7 +251,7 @@ function toggleAll(checked: boolean) {
     @ok="doImport"
   >
     <a-space class="mb-2" style="width: 100%; justify-content: space-between">
-      <a-alert type="info" show-icon message="勾选要导入用户数据的站点" style="flex: 1" />
+      <a-alert type="info" show-icon title="勾选要导入用户数据的站点" style="flex: 1" />
       <a-space>
         <a-button size="small" @click="toggleAll(true)">全选</a-button>
         <a-button size="small" @click="toggleAll(false)">全不选</a-button>

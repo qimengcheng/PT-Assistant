@@ -283,32 +283,32 @@ const showExportDialog = ref(false);
 </script>
 
 <template>
-  <a-alert :message="t('route.Overview.MyData')" type="info" :show-icon="true" class="mb-4" />
+  <a-alert :title="t('route.Overview.MyData')" type="info" :show-icon="true" class="mb-4" />
   <a-card variant="outlined">
     <div class="my-data-toolbar">
       <!-- 刷新，取消刷新 -->
-      <a-button type="primary" v-if="runtimeStore.isUserInfoFlush" @click="cancelFlushSiteLastUserInfo"><template #icon><StopOutlined /></template><span class="ml-1">{{ t('MyData.index.flushCancel') }}</span></a-button>
+      <a-button type="primary" v-if="runtimeStore.isUserInfoFlush" @click="cancelFlushSiteLastUserInfo"><template #icon><StopOutlined /></template><span>{{ t('MyData.index.flushCancel') }}</span></a-button>
 
-      <a-button type="primary" v-else @click="multiFlush"><template #icon><SyncOutlined /></template><span class="ml-1">{{ t('MyData.index.flushSelectSite') }}</span></a-button>
+      <a-button type="primary" v-else @click="multiFlush"><template #icon><SyncOutlined /></template><span>{{ t('MyData.index.flushSelectSite') }}</span></a-button>
 
-      <a-button :disabled="tableSelected.length === 0" @click="multiOpen"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('MyData.index.multiOpen') }}</span></a-button>
+      <a-button :disabled="tableSelected.length === 0" @click="multiOpen"><template #icon><ExportOutlined /></template><span>{{ t('MyData.index.multiOpen') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
-      <a-button @click="viewTimeline"><template #icon><LineChartOutlined /></template><span class="ml-1">{{ t('MyData.index.viewTimeline') }}</span></a-button>
-      <a-button @click="viewStatistic"><template #icon><BarChartOutlined /></template><span class="ml-1">{{ t('MyData.index.viewStatistic') }}</span></a-button>
+      <a-button @click="viewTimeline"><template #icon><LineChartOutlined /></template><span>{{ t('MyData.index.viewTimeline') }}</span></a-button>
+      <a-button @click="viewStatistic"><template #icon><BarChartOutlined /></template><span>{{ t('MyData.index.viewStatistic') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
       <!-- 导出按钮 -->
-      <a-button @click="showExportDialog = true"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('MyData.index.exportData') }}</span></a-button>
+      <a-button @click="showExportDialog = true"><template #icon><ExportOutlined /></template><span>{{ t('MyData.index.exportData') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
       <!-- 表格设置面板：原 v-menu + v-list，antdv-next 没有 a-list，改用 a-popover + 普通 div -->
       <a-popover trigger="click" placement="bottomLeft">
         <template #default>
-          <a-button class="mr-1"><template #icon><SettingOutlined /></template><span class="ml-1">{{ t('MyData.index.setting') }}</span></a-button>
+          <a-button class="mr-1"><template #icon><SettingOutlined /></template><span>{{ t('MyData.index.setting') }}</span></a-button>
         </template>
         <template #content>
           <div class="table-setting-panel">

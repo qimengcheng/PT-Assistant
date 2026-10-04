@@ -185,7 +185,7 @@ const columns = [
     </div>
 
     <a-alert class="mb-3" type="info" show-icon
-      message="媒体服务器用于在搜索结果中联动检索媒体库（如 Emby / Jellyfin / Plex / fnOS），确认片库中是否已有对应影片。" />
+      title="媒体服务器用于在搜索结果中联动检索媒体库（如 Emby / Jellyfin / Plex / fnOS），确认片库中是否已有对应影片。" />
 
     <a-table
       :columns="columns"
@@ -250,7 +250,7 @@ const columns = [
           class="mb-2"
           type="warning"
           show-icon
-          :message="w"
+          title="w"
         />
 
         <a-form-item label="名称">

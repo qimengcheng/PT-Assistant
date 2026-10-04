@@ -184,7 +184,7 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
     <div class="section-title">{{ t("common.basicInfo") }}</div>
     <a-row :gutter="12">
       <a-col :span="8">
-        <a-form-item :label="t('SetSite.common.name')" :validate-status="nameMissing ? 'error' : ''" :help="nameMissing ? requiredHint : ''">
+        <a-form-item :label="t('SetSite.common.name')" :validate-status="nameMissing ? 'error' : ''" :help="nameMissing ? requiredHint : undefined">
           <a-auto-complete
             v-model:value="siteName"
             :options="nameOptions"
@@ -202,7 +202,7 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
         <a-form-item
           :label="t('common.sortIndex')"
           :validate-status="sortIndexMissing ? 'error' : ''"
-          :help="sortIndexMissing ? t('SetSite.editor.sortIndexTip') : ''"
+          :help="sortIndexMissing ? t('SetSite.editor.sortIndexTip') : undefined"
         >
           <a-input-number
             v-model:value="siteUserConfig.sortIndex"

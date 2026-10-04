@@ -13,10 +13,10 @@
  * 抽出模板里出现的全部 `a-*` 标签，再用 Node 实跑每个组件的 `install()`
  * 得到「谁注册谁」的权威映射，做最小集合覆盖。
  *
- * 全量 install 共注册 139 个组件名，这里只装 19 个父组件 + StyleProvider，
- * 覆盖模板实际用到的 23 个组件（父组件的 install 会连带注册自己的子组件，
+ * 全量 install 共注册 139 个组件名，这里只装 20 个父组件 + StyleProvider，
+ * 覆盖模板实际用到的 24 个组件（父组件的 install 会连带注册自己的子组件，
  * 例如 Menu → AMenuItem/ASubMenu/AMenuDivider，Table → ATableColumn/ATableSummary…，
- * 连带后实际注册 42 个名字）。下面的计数取自 2026-10-04 的校验脚本输出。
+ * 连带后实际注册 43 个名字）。下面的计数取自 2026-10-04 的校验脚本输出。
  *
  * TODO(维护)：新增/删除 content 侧模板里的 `a-*` 标签时，必须同步这张表，并跑
  * `node scripts/check-content-antd-lite.mjs` 复核（它做依赖闭包 + 标签比对，FAIL 时非零退出）。
@@ -25,6 +25,7 @@
  */
 import {
   Alert,
+  App,
   AutoComplete,
   Button,
   Col,
@@ -45,11 +46,12 @@ import {
   Table,
   Tag,
 } from "antdv-next";
-import type { App, Plugin } from "vue";
+import type { App as VueApp, Plugin } from "vue";
 
 /** 模板直接用到的父组件；各自的 install 顺带注册子组件 */
 const usedComponents = [
   Alert, // a-alert
+  App, // a-app —— usePromptInDialog 靠 App.useApp() 拿 modal，见 app/App.vue 的包裹点
   AutoComplete, // a-auto-complete
   Button, // a-button
   Col, // a-col
@@ -76,7 +78,7 @@ const usedComponents = [
  * 只拦 resolve 失败的告警，其余 warn 原样透出；生产构建不装这个 handler，
  * 避免把 Vue 的告警文案带到站点控制台。
  */
-function registerDevResolverGuard(app: App) {
+function registerDevResolverGuard(app: VueApp) {
   const upstream = app.config.warnHandler;
   app.config.warnHandler = (msg, instance, trace) => {
     if (import.meta.env.DEV && msg.includes("Failed to resolve component")) {
@@ -92,7 +94,7 @@ function registerDevResolverGuard(app: App) {
 
 /** 与 antdInstance 同形的插件对象，供 createApp(...).use(antdLiteInstance) 使用 */
 export const antdLiteInstance = {
-  install(app: App) {
+  install(app: VueApp) {
     /**
      * `as Plugin` 不是随手写的：withInstall 在运行时给每个组件挂了 `install`，
      * 但 antdv-next 的 .d.ts 把组件声明成裸 DefineComponent（见 dist/components.d.ts），

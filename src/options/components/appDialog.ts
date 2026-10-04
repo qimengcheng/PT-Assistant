@@ -20,6 +20,21 @@ export interface IDialogModalApi {
 
 export type TTranslate = (key: string) => string;
 
+/**
+ * makePromptInDialog 的返回形状，也给需要注入输入框能力的调用方做类型锚点。
+ *
+ * @param content 提示文案
+ * @param defaultValue 输入框默认值
+ * @param options.allowEmpty 空串是否算有效输入。默认 false（空串当取消，符合"改方案名"这类场景）；
+ *   但下载器 `savePath`/`label` 的 `<...>` 占位符**允许替换成空**，那边必须传 true，
+ *   否则用户清空输入会被误判成取消整个推送。
+ */
+export type TPromptInDialog = (
+  content: string,
+  defaultValue?: string,
+  options?: { allowEmpty?: boolean },
+) => Promise<string | null>;
+
 /** 返回 Promise<boolean>：确定 true，取消/关闭 false */
 export function makeConfirmDanger(modal: IDialogModalApi, t: TTranslate) {
   return function confirmDanger(content: string, okType: "danger" | "primary" = "danger"): Promise<boolean> {
@@ -38,14 +53,12 @@ export function makeConfirmDanger(modal: IDialogModalApi, t: TTranslate) {
 }
 
 /**
- * 返回 Promise<string | null>：确定返回输入值（去首尾空白，空串视为取消），取消/关闭返回 null。
- *
- * @param content 提示文案
- * @param defaultValue 输入框默认值
+ * 返回 Promise<string | null>：确定返回输入值（去首尾空白），取消/关闭返回 null。
+ * 空串算不算有效输入由调用方的 allowEmpty 决定，见 TPromptInDialog。
  */
-export function makePromptInDialog(modal: IDialogModalApi, t: TTranslate) {
-  return function promptInDialog(content: string, defaultValue = ""): Promise<string | null> {
-    return new Promise<string | null>((resolve) => {
+export function makePromptInDialog(modal: IDialogModalApi, t: TTranslate): TPromptInDialog {
+  return (content, defaultValue = "", options) =>
+    new Promise<string | null>((resolve) => {
       let value = defaultValue;
 
       modal.confirm({
@@ -63,9 +76,11 @@ export function makePromptInDialog(modal: IDialogModalApi, t: TTranslate) {
           ]),
         okText: t("common.dialog.ok"),
         cancelText: t("common.dialog.cancel"),
-        onOk: () => resolve(value.trim() || null),
+        onOk: () => {
+          const trimmed = value.trim();
+          resolve(options?.allowEmpty ? trimmed : trimmed || null);
+        },
         onCancel: () => resolve(null),
       });
     });
-  };
 }

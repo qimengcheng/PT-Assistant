@@ -204,8 +204,8 @@ function dialogLeave() {
     :mask-closable="!isSending"
     :closable="!isSending"
     :keyboard="!isSending"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
-    @after-close="dialogLeave"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-close="dialogLeave"
   >
 
     <a-alert v-if="isSending" type="info" show-icon>

@@ -222,7 +222,7 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
     :keyboard="!isDoingRestore"
     :closable="!isDoingRestore"
     destroy-on-hidden
-    @after-open-change="(open: boolean) => open && resetDialog()"
+    :after-open-change="(open: boolean) => open && resetDialog()"
   >
     <a-alert class="mb-3" type="info">
       <!-- a-alert 不渲染默认插槽，正文要放 #message / #title -->

@@ -48,7 +48,7 @@ function enterDialog() {
     v-model:open="showDialog"
     :title="t('common.AdvanceFilterGenerateDialog.title')"
     :width="800"
-    @after-open-change="(open: boolean) => open && enterDialog()"
+    :after-open-change="(open: boolean) => open && enterDialog()"
   >
 
     <div class="filter-body">

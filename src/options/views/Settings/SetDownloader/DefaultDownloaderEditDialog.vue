@@ -53,7 +53,7 @@ function enterDialog() {
     :title="t('SetDownloader.index.editDefaultDownloaderBtn')"
     width="600px"
     :footer="null"
-    @after-open-change="(open: boolean) => open && enterDialog()"
+    :after-open-change="(open: boolean) => open && enterDialog()"
   >
     <a-form layout="vertical">
       <a-form-item :label="t('SetDownloader.index.editDefaultDownloaderBtn')">

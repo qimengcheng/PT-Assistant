@@ -56,7 +56,7 @@ async function dialogEnter() {
     :mask-closable="!isDeleting"
     :closable="!isDeleting"
     :keyboard="!isDeleting"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 
     <div class="text-body-large">

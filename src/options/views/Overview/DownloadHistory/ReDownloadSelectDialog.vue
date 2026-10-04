@@ -93,7 +93,7 @@ function dialogEnter() {
     :title="t('DownloadHistory.ReDownloadSelectDialog.title', [torrentItems.length])"
     :width="600"
     :footer="null"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 
     <a-space class="redownload-actions" direction="vertical">

@@ -90,7 +90,7 @@ const selectedDescription = computed(() => {
     :title="t('SetDownloader.add.title')"
     width="800px"
     :footer="null"
-    @after-close="resetDialog"
+    :after-close="resetDialog"
   >
     <a-steps :current="currentStep" size="small" :items="stepItems" style="margin-bottom: 24px" />
 

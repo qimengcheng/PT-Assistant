@@ -245,8 +245,8 @@ function formatTimestamp(timestamp: number | undefined): string {
     :width="900"
     :footer="null"
     destroy-on-hidden
-    @after-open-change="(open: boolean) => open && afterEnter()"
-    @after-close="resetDialog"
+    :after-open-change="(open: boolean) => open && afterEnter()"
+    :after-close="resetDialog"
   >
 
     <template v-if="torrent">

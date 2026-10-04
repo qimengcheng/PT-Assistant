@@ -250,7 +250,7 @@ const searchKey = ref<string>("");
 const searchPlanKey = ref<string>("default");
 
 const searchPlanOptions = computed(() => [
-  { value: "default", label: "默认搜索方案" },
+  { value: "default", label: t("SearchEntity.index.defaultSearchPlan") },
   ...metadataStore.getSearchSolutions
     .filter((x: any) => !!x.enabled)
     .sort((a: any, b: any) => b.sort - a.sort)
@@ -369,13 +369,13 @@ const hiddenTagNamesText = computed({
   <a-select
     v-model:value="searchPlanKey"
     :options="searchPlanOptions"
-    placeholder="搜索方案"
+    :placeholder="t('SearchEntity.index.alert.plan')"
     style="width: 200px"
   />
   <a-input-search
     v-model:value="searchKey"
-    enter-button="搜索"
-    placeholder="输入关键词开始搜索"
+    :enter-button="t('common.search')"
+    :placeholder="t('SearchEntity.index.searchKeywordPlaceholder')"
     enterkeyhint="search"
     style="max-width: 480px"
     @search="startSearchEntity"

@@ -111,7 +111,8 @@
       "item2": "助手仅对种子文件做简单验证，不保证辅种成功，请自行斟酌是否要使用辅种功能！",
       "item3": "如出现因辅种失败造成的爆仓，由用户自行负责！",
       "title": "警告："
-    }
+    },
+    "downloaderNotFound": "下载器不存在"
   },
   "Logger": {
     "action": {
@@ -347,7 +348,9 @@
       "siteStatus": "站点状态",
       "updateAtFormatAsAlive": "更新时间显示为相对时间",
       "viewStatistic": "数据图表",
-      "viewTimeline": "时间轴"
+      "viewTimeline": "时间轴",
+      "timelineNotMigrated": "时间线视图尚未迁移到 WXT 版（依赖 konva）",
+      "statisticNotMigrated": "统计视图尚未迁移到 WXT 版（依赖 echarts）"
     },
     "table": {
       "action": {
@@ -489,7 +492,9 @@
         "time": "发布于(≈)",
         "title": "标题"
       },
-      "uploadAtFormatAsAlive": "上传时间显示为相对时间"
+      "uploadAtFormatAsAlive": "上传时间显示为相对时间",
+      "defaultSearchPlan": "默认搜索方案",
+      "searchKeywordPlaceholder": "输入关键词开始搜索"
     },
     "siteFilter": {
       "all": "全部站点"
@@ -531,7 +536,8 @@
   },
   "SetBackup": {
     "AddDialog": {
-      "title": "添加备份服务器"
+      "title": "添加备份服务器",
+      "selectTypePlaceholder": "请选择备份服务器类型"
     },
     "Editor": {
       "backupConfig": "备份配置",
@@ -747,6 +753,134 @@
       "afterTime": "每日最早刷新时间",
       "userDataRefresh": "用户数据刷新",
       "userInfoDisplay": "用户信息展示"
+    },
+    "Index": {
+      "pageTitle": "基础设置",
+      "saveHint": "变更即时保存，无需手动确认",
+      "tabUi": "界面与内容脚本",
+      "tabUserInfo": "用户信息",
+      "tabSearch": "搜索",
+      "tabDownload": "下载",
+      "tabBackup": "备份",
+      "tabSocialInformation": "社交信息",
+      "tabNativeBridge": "原生通信桥"
+    },
+    "UiWindow": {
+      "interfaceLanguage": "界面语言",
+      "groupTableAndVersion": "表格与版本",
+      "saveTableBehavior": "记住表格的显示列配置",
+      "enableTableMultiSort": "允许多列排序",
+      "showReleaseNote": "版本更新后显示更新说明",
+      "groupContentScript": "站点页面助手（content script）",
+      "enableContentScript": "启用站点页面助手",
+      "socialSiteSearchBy": "社交站点搜索方式",
+      "groupContextMenu": "右键菜单",
+      "enableContextMenu": "启用浏览器右键菜单扩展项",
+      "allowExceptionSites": "允许配置不显示助手的站点",
+      "enabledAtSocialSite": "在社交站点启用助手",
+      "applyTheme": "跟随扩展主题样式",
+      "defaultOpenSpeedDial": "默认展开快捷按钮（SpeedDial）",
+      "stackedButtons": "使用堆叠按钮",
+      "fadeEnterStyle": "默认半透明，移入不透明",
+      "doubleConfirmAction": "批量操作前二次确认",
+      "dragLinkOnSpeedDial": "允许拖拽链接到快捷按钮",
+      "socialSiteSearchById": "使用 ID 搜索",
+      "socialSiteSearchByTitle": "使用主标题搜索",
+      "socialSiteSearchByImdb": "使用 IMDb 编号搜索",
+      "socialSiteSearchByChosen": "使用用户选择的方式"
+    },
+    "UserInfoWindow": {
+      "groupRefresh": "用户信息刷新",
+      "autoReflush": "自动刷新用户信息",
+      "interval": "刷新间隔（分钟）",
+      "afterTime": "启动后延迟（秒）",
+      "queueConcurrency": "同时刷新站点数",
+      "retryMax": "重试最大次数（0 = 不重试）",
+      "retryInterval": "重试间隔（秒）",
+      "groupDisplay": "展示",
+      "alwaysPickLastUserInfo": "优先使用最近一次获取的用户信息",
+      "showDeadSiteInOverview": "显示已死亡/无法访问的站点",
+      "groupCookie": "Cookie 自动延长",
+      "autoExtendCookies": "启用 Cookie 过期自动延长（防止长期未访问导致登录态丢失）",
+      "triggerThreshold": "触发阈值（剩余周数）",
+      "extensionDuration": "延长时长（月）"
+    },
+    "SearchEntityWindow": {
+      "groupSearchBehavior": "搜索行为",
+      "queueConcurrency": "同时搜索站点数",
+      "allowSingleSiteSearch": "允许只搜索选中的单个站点",
+      "saveLastFilter": "记住上次使用的筛选条件",
+      "quickSiteFilter": "启用快捷站点筛选",
+      "autoDetectOfficialGroupFromTitle": "从标题自动识别官方制作组",
+      "forceImdbIdMatchFilter": "强制使用 IMDb 编号匹配过滤",
+      "groupTagDisplay": "标签显示",
+      "maxTagCountBeforeGroup": "分组前最大标签数",
+      "hiddenTagNames": "隐藏的标签名（多个用 , 分隔）",
+      "groupMediaServer": "媒体服务器联动",
+      "autoSearchWhenMount": "打开搜索结果时自动检索媒体库",
+      "autoSearchMoreWhenScroll": "滚动时自动加载更多媒体结果",
+      "searchLimit": "单次检索条数上限",
+      "mediaQueueConcurrency": "同时检索服务器数"
+    },
+    "DownloadWindow": {
+      "groupLocalDownload": "本地下载方式",
+      "localDownloadMethod": "下载种子文件的方式",
+      "methodWeb": "打开种子页面（由浏览器接管）",
+      "methodBrowser": "扩展直接下载（默认）",
+      "methodExtension": "扩展解析后保存（高级，可控制文件名）",
+      "ignoreSiteDownloadInterval": "本地下载时忽略站点的下载间隔限制",
+      "groupSendToDownloader": "发送到下载器",
+      "allowDirectSendToClient": "允许直接推送到下载器（不弹确认）",
+      "useQuickSendToClient": "启用快速推送（使用默认下载器）",
+      "saveLastDownloader": "记住上一次使用的下载器",
+      "initDownloaderTorrentOnEnter": "进入下载器页面时自动刷新列表",
+      "allowDownloaderFilterForSite": "允许为下载器配置站点过滤器",
+      "groupDownloadHistory": "下载历史",
+      "saveDownloadHistory": "保存下载历史记录"
+    },
+    "BackupWindow": {
+      "groupEncryption": "备份加密",
+      "encryptionKey": "备份文件加密密钥",
+      "encryptionKeyHint": "导出与远程备份将使用该密钥加密（AES），恢复时需要填写相同密钥。留空表示不加密。",
+      "encryptionKeyPlaceholder": "留空则不加密",
+      "randomKeyTooltip": "随机生成一个密钥",
+      "randomKey": "随机生成",
+      "undoKeyTooltip": "撤销到上一个密钥",
+      "undo": "撤销",
+      "groupImportPtpp": "导入 PT-Plugin-Plus 用户数据",
+      "importPtppMessage": "将 PT-Plugin-Plus 导出的备份中的用户数据导入到本扩展（站点需在 340 个内置定义中）。",
+      "importPtppStep1": "1. 在 PT-Plugin-Plus 中打开「备份 & 恢复」→ 导出备份（zip），或直接使用其 userdatas.json；",
+      "importPtppStep2": "2. 在下方选择该文件；",
+      "importPtppStep3": "3. 在弹出的窗口中勾选要导入的站点并确认导入。",
+      "selectPtppFile": "选择 PT-Plugin-Plus 备份文件（zip 或 userdatas.json）",
+      "invalidFileFormat": "文件格式无效：请选择 PT-Plugin-Plus 导出的备份 zip（内含 userdatas.json）或该 json 文件本身"
+    },
+    "SocialInformationWindow": {
+      "groupPtGen": "PTGen（通用百科信息转储服务）",
+      "ptGenEndpoint": "PTGen API 端点",
+      "preferPtGen": "优先使用 PTGen 获取影片信息",
+      "groupCredentials": "站点凭据",
+      "credentialPlaceholder": "未配置则使用匿名访问",
+      "groupNetwork": "网络",
+      "timeout": "请求超时（秒）",
+      "cacheDay": "缓存天数"
+    },
+    "RestorePtppUserDataDialog": {
+      "dialogTitle": "导入 PT-Plugin-Plus 用户数据",
+      "okText": "导入",
+      "cancelText": "取消",
+      "selectSitesTip": "勾选要导入用户数据的站点",
+      "selectAll": "全选",
+      "selectNone": "全不选",
+      "recordCount": "{n} 条记录",
+      "statusUnsupported": "该站点不在 340 个内置定义中，无法导入",
+      "statusSelected": "已选择导入",
+      "overwriteExist": "覆盖本地已有的用户信息",
+      "noSiteTitle": "尚未添加任何站点",
+      "noSiteContent": "当前未添加任何站点，导入的用户数据将只写入存储（站点记录不会建立）。是否继续？",
+      "noSiteOk": "继续导入",
+      "importSuccess": "PT-Plugin-Plus 用户数据导入成功",
+      "importFailed": "PT-Plugin-Plus 用户数据导入失败"
     }
   },
   "SetDownloader": {
@@ -821,7 +955,9 @@
       "nameTip": "取一个好听又好分辨的名称",
       "password": "密码",
       "timeout": "超时时长（秒）",
-      "uidPlaceholder": "（自动生成）"
+      "uidPlaceholder": "（自动生成）",
+      "switchOn": "开",
+      "switchOff": "关"
     },
     "index": {
       "changeDefaultDownloader": "更新默认下载服务器成功！如有必要请进一步设置下载地址和标签。",
@@ -857,6 +993,31 @@
     },
     "add": {
       "title": "添加媒体服务器"
+    },
+    "index": {
+      "title": "媒体服务器",
+      "needName": "请填写媒体服务器名称",
+      "needAddress": "请填写媒体服务器地址",
+      "needAuthField": "请填写认证字段「{0}」",
+      "added": "媒体服务器已添加",
+      "updated": "媒体服务器配置已更新",
+      "deleteTitle": "删除媒体服务器",
+      "deleteConfirm": "确定删除「{0}」吗？该操作不可恢复。",
+      "deleted": "已删除",
+      "mediaSearchFailed": "媒体库检索失败",
+      "connectSuccess": "连接成功，媒体库检索返回 {0} 条",
+      "connectFailed": "连接失败：{0}",
+      "description": "媒体服务器用于在搜索结果中联动检索媒体库（如 Emby / Jellyfin / Plex / fnOS），确认片库中是否已有对应影片。",
+      "emptyTable": "还没有添加媒体服务器，点击右上角「添加媒体服务器」开始",
+      "testTooltip": "测试连接（检索一次媒体库）",
+      "editTitle": "编辑媒体服务器",
+      "serverType": "服务器类型",
+      "typePlaceholder": "选择媒体服务器类型",
+      "address": "地址",
+      "namePlaceholder": "用于辨识的名称，如 家庭 NAS Emby",
+      "credentialPlaceholder": "用户凭据",
+      "timeout": "请求超时（秒）",
+      "configId": "配置 ID"
     }
   },
   "SetNativeBridge": {
@@ -941,7 +1102,8 @@
       "otherSettings": "其他设置",
       "requestTimeout": "请求超时",
       "requestTimeoutHint": "影响该站点请求（种子搜索、用户信息获取）的超时等待时间",
-      "siteSettings": "站点设置"
+      "siteSettings": "站点设置",
+      "loadDefinitionFailed": "加载站点 [{id}] 定义失败"
     },
     "ReBuildMapDialog": {
       "doRebuildBtn": "重建",
@@ -990,7 +1152,10 @@
       "flushFaviconFailed": "刷新站点图标失败",
       "oneClickImport": "一键导入站点",
       "reBuildMap": "重建站点映射",
-      "settingNote": ["只有配置过的站点才会显示插件图标及相应的功能；", "已离线的站点不再参与搜索和信息获取；"],
+      "settingNote": [
+        "只有配置过的站点才会显示插件图标及相应的功能；",
+        "已离线的站点不再参与搜索和信息获取；"
+      ],
       "table": {
         "flushFavicon": "刷新站点图标",
         "searchEntries": "搜索入口"
@@ -1030,7 +1195,10 @@
     "stackTableColumn": {
       "homepage": "项目主页"
     },
-    "thankNote": "PT 助手的诞生是建立在这些项目基础之上，在此感谢所有项目的参与人员，感谢他们的付出！"
+    "thankNote": "PT 助手的诞生是建立在这些项目基础之上，在此感谢所有项目的参与人员，感谢他们的付出！",
+    "ptppHistoryItem": {
+      "ptPluginRhilip": "PT Plugin （Rhilip修改版）"
+    }
   },
   "UserDataStatistic": {
     "chart": {
@@ -1069,7 +1237,8 @@
       "all": "全部",
       "custom": "自定义",
       "day": "近 {0} 天"
-    }
+    },
+    "loadFailed": "统计数据加载失败"
   },
   "UserDataTimeline": {
     "controls": {
@@ -1107,7 +1276,10 @@
       "uploads": "发布数"
     },
     "ptAge": "P龄: ≈ {years} 年",
-    "total": "总"
+    "total": "总",
+    "loadDataFailed": "时间线数据加载失败",
+    "siteIsDead": "站点已失效",
+    "siteIsOffline": "站点当前离线"
   },
   "common": {
     "AdvanceFilterGenerateDialog": {
@@ -1189,7 +1361,8 @@
     "type": "类型",
     "username": "用户名",
     "version": "版本",
-    "visit": "访问"
+    "visit": "访问",
+    "noData": "无数据"
   },
   "connectCheck": {
     "default": "检查连接性",
@@ -1269,6 +1442,22 @@
       "startUsing": "开始使用",
       "title": "欢迎使用 {extName}",
       "download": "下载"
+    },
+    "nav": {
+      "home": "首页",
+      "sites": "站点管理",
+      "snapshot": "搜索快照",
+      "backup": "数据备份",
+      "downloader": "下载器",
+      "mediaServer": "媒体服务器",
+      "basicSettings": "基础设置",
+      "techStack": "技术栈",
+      "logger": "运行日志",
+      "siteDefinitions": "站点定义",
+      "devTag": "调试",
+      "backgroundOk": "background 正常",
+      "backgroundFailed": "background 未响应",
+      "backgroundConnecting": "正在连接 background…"
     }
   },
   "levelRequirement": {
@@ -1441,5 +1630,30 @@
     "queueConcurrency": "请求队列长度",
     "showDeadSite": "在概览中展示已被标记为死亡 （isDead） 的站点",
     "showPassedSite": "在概览中展示已被标记为离线 （isOffline） 或不允许查询用户信息的站点"
+  },
+  "HomeView": {
+    "welcome": "欢迎使用 PT Assistant",
+    "subtitle": "PT 站点辅助扩展（WXT + Vue 3 + antdv-next 重构版）",
+    "siteDefinitionsCard": "内置站点定义",
+    "siteDefinitionsUnit": "个 · 按需加载",
+    "modulesTitle": "功能模块",
+    "pending": "建设中",
+    "modules": {
+      "siteDefinitions": "站点定义（{0} 个，按需加载）",
+      "messageLayer": "消息层 / background 中枢",
+      "siteManage": "站点管理（添加/配置/用户信息查询）",
+      "multiSiteSearch": "多站点搜索",
+      "myData": "我的数据（用户信息总览）",
+      "backup": "数据备份/导入（本地 zip + WebDAV/S3/B2）",
+      "downloader": "种子下载器对接（qBittorrent 等）配置页与推送 UI",
+      "contentScript": "content script（页面内识别与悬浮入口）",
+      "mediaServer": "媒体服务器配置页与媒体库浏览"
+    }
+  },
+  "SiteDefinitions": {
+    "title": "站点定义",
+    "searchPlaceholder": "搜索站点 id…",
+    "loading": "加载定义中…",
+    "selectHint": "← 点击左侧站点查看按需加载的定义元数据"
   }
 }

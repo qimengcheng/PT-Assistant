@@ -111,7 +111,8 @@
       "item2": "The assistant only performs simple verification on torrent files, reseeding success is not guaranteed!",
       "item3": "Users are responsible for any issues caused by failed reseeding!",
       "title": "Warning:"
-    }
+    },
+    "downloaderNotFound": "Downloader not found"
   },
   "Logger": {
     "action": {
@@ -347,7 +348,9 @@
       "siteStatus": "Site Status",
       "updateAtFormatAsAlive": "Display update At as Relative Time",
       "viewStatistic": "Data Chart",
-      "viewTimeline": "Timeline"
+      "viewTimeline": "Timeline",
+      "timelineNotMigrated": "Timeline view has not been migrated to the WXT build yet (requires konva)",
+      "statisticNotMigrated": "Statistics view has not been migrated to the WXT build yet (requires echarts)"
     },
     "table": {
       "action": {
@@ -489,7 +492,9 @@
         "time": "Published(≈)",
         "title": "Title"
       },
-      "uploadAtFormatAsAlive": "Display Upload Time as Relative Time"
+      "uploadAtFormatAsAlive": "Display Upload Time as Relative Time",
+      "defaultSearchPlan": "Default search plan",
+      "searchKeywordPlaceholder": "Enter keywords to start searching"
     },
     "siteFilter": {
       "all": "All Site"
@@ -531,7 +536,8 @@
   },
   "SetBackup": {
     "AddDialog": {
-      "title": "Add Backup Server"
+      "title": "Add Backup Server",
+      "selectTypePlaceholder": "Select a backup server type"
     },
     "Editor": {
       "backupConfig": "Backup Configuration",
@@ -747,6 +753,134 @@
       "afterTime": "Earliest daily refresh time",
       "userDataRefresh": "User Data Refresh",
       "userInfoDisplay": "User Info Display"
+    },
+    "Index": {
+      "pageTitle": "Basic Settings",
+      "saveHint": "Changes are saved immediately, no manual confirmation needed",
+      "tabUi": "Interface & Content Script",
+      "tabUserInfo": "User Info",
+      "tabSearch": "Search",
+      "tabDownload": "Download",
+      "tabBackup": "Backup",
+      "tabSocialInformation": "Social Info",
+      "tabNativeBridge": "Native Bridge"
+    },
+    "UiWindow": {
+      "interfaceLanguage": "Interface language",
+      "groupTableAndVersion": "Table & Version",
+      "saveTableBehavior": "Remember the displayed columns of tables",
+      "enableTableMultiSort": "Allow multi-column sorting",
+      "showReleaseNote": "Show release notes after an update",
+      "groupContentScript": "Site page helper (content script)",
+      "enableContentScript": "Enable the site page helper",
+      "socialSiteSearchBy": "Search method on social sites",
+      "groupContextMenu": "Context menu",
+      "enableContextMenu": "Enable extension items in the browser context menu",
+      "allowExceptionSites": "Allow configuring sites that hide the helper",
+      "enabledAtSocialSite": "Enable the helper on social sites",
+      "applyTheme": "Follow the extension theme",
+      "defaultOpenSpeedDial": "Expand the speed dial by default",
+      "stackedButtons": "Use stacked buttons",
+      "fadeEnterStyle": "Translucent by default, opaque on hover",
+      "doubleConfirmAction": "Confirm twice before batch actions",
+      "dragLinkOnSpeedDial": "Allow dragging links onto the speed dial",
+      "socialSiteSearchById": "Search by ID",
+      "socialSiteSearchByTitle": "Search by main title",
+      "socialSiteSearchByImdb": "Search by IMDb ID",
+      "socialSiteSearchByChosen": "Use the method I choose"
+    },
+    "UserInfoWindow": {
+      "groupRefresh": "User data refresh",
+      "autoReflush": "Refresh user data automatically",
+      "interval": "Refresh interval (minutes)",
+      "afterTime": "Delay after startup (seconds)",
+      "queueConcurrency": "Sites refreshed concurrently",
+      "retryMax": "Max retries (0 = no retry)",
+      "retryInterval": "Retry interval (seconds)",
+      "groupDisplay": "Display",
+      "alwaysPickLastUserInfo": "Prefer the most recently fetched user data",
+      "showDeadSiteInOverview": "Show dead / unreachable sites",
+      "groupCookie": "Automatic cookie extension",
+      "autoExtendCookies": "Extend expiring cookies automatically (prevents sign-in loss after long inactivity)",
+      "triggerThreshold": "Trigger threshold (weeks left)",
+      "extensionDuration": "Extension length (months)"
+    },
+    "SearchEntityWindow": {
+      "groupSearchBehavior": "Search behavior",
+      "queueConcurrency": "Sites searched concurrently",
+      "allowSingleSiteSearch": "Allow searching only the selected site",
+      "saveLastFilter": "Remember the last filter used",
+      "quickSiteFilter": "Enable quick site filter",
+      "autoDetectOfficialGroupFromTitle": "Detect the official group from the title",
+      "forceImdbIdMatchFilter": "Force filtering by IMDb ID match",
+      "groupTagDisplay": "Tag display",
+      "maxTagCountBeforeGroup": "Max tags before grouping",
+      "hiddenTagNames": "Hidden tag names (separate multiple with ,)",
+      "groupMediaServer": "Media server integration",
+      "autoSearchWhenMount": "Search the media library automatically when results open",
+      "autoSearchMoreWhenScroll": "Load more media results while scrolling",
+      "searchLimit": "Max results per search",
+      "mediaQueueConcurrency": "Media servers queried concurrently"
+    },
+    "DownloadWindow": {
+      "groupLocalDownload": "Local download",
+      "localDownloadMethod": "How torrent files are downloaded",
+      "methodWeb": "Open the torrent page (handled by the browser)",
+      "methodBrowser": "Download directly by the extension (default)",
+      "methodExtension": "Save after the extension resolves it (advanced, file name controllable)",
+      "ignoreSiteDownloadInterval": "Ignore the site download interval when downloading locally",
+      "groupSendToDownloader": "Send to downloader",
+      "allowDirectSendToClient": "Allow pushing directly to the downloader (no confirmation)",
+      "useQuickSendToClient": "Enable quick push (uses the default downloader)",
+      "saveLastDownloader": "Remember the last used downloader",
+      "initDownloaderTorrentOnEnter": "Refresh the list automatically when the downloader page opens",
+      "allowDownloaderFilterForSite": "Allow configuring site filters for downloaders",
+      "groupDownloadHistory": "Download history",
+      "saveDownloadHistory": "Save download history"
+    },
+    "BackupWindow": {
+      "groupEncryption": "Backup encryption",
+      "encryptionKey": "Backup file encryption key",
+      "encryptionKeyHint": "Exports and remote backups are encrypted (AES) with this key; the same key is required when restoring. Leave it empty for no encryption.",
+      "encryptionKeyPlaceholder": "Empty for no encryption",
+      "randomKeyTooltip": "Generate a random key",
+      "randomKey": "Random",
+      "undoKeyTooltip": "Undo to the previous key",
+      "undo": "Undo",
+      "groupImportPtpp": "Import PT-Plugin-Plus user data",
+      "importPtppMessage": "Imports the user data from a PT-Plugin-Plus backup into this extension (the site must be one of the 340 built-in definitions).",
+      "importPtppStep1": "1. In PT-Plugin-Plus open 「Backup & Restore」 → export a backup (zip), or use its userdatas.json directly;",
+      "importPtppStep2": "2. Select that file below;",
+      "importPtppStep3": "3. In the dialog that opens, tick the sites to import and confirm the import.",
+      "selectPtppFile": "Select the PT-Plugin-Plus backup file (zip or userdatas.json)",
+      "invalidFileFormat": "Invalid file format: select the backup zip exported by PT-Plugin-Plus (containing userdatas.json) or that json file itself"
+    },
+    "SocialInformationWindow": {
+      "groupPtGen": "PTGen (general wiki information dump service)",
+      "ptGenEndpoint": "PTGen API endpoint",
+      "preferPtGen": "Prefer PTGen for movie information",
+      "groupCredentials": "Site credentials",
+      "credentialPlaceholder": "Leave empty to access anonymously",
+      "groupNetwork": "Network",
+      "timeout": "Request timeout (seconds)",
+      "cacheDay": "Cache days"
+    },
+    "RestorePtppUserDataDialog": {
+      "dialogTitle": "Import PT-Plugin-Plus user data",
+      "okText": "Import",
+      "cancelText": "Cancel",
+      "selectSitesTip": "Tick the sites whose user data should be imported",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "recordCount": "{n} record(s)",
+      "statusUnsupported": "This site is not among the 340 built-in definitions and cannot be imported",
+      "statusSelected": "Selected for import",
+      "overwriteExist": "Overwrite existing local user data",
+      "noSiteTitle": "No sites have been added yet",
+      "noSiteContent": "No site has been added yet, so the imported user data will only be written to storage (no site records will be created). Continue?",
+      "noSiteOk": "Continue importing",
+      "importSuccess": "PT-Plugin-Plus user data imported successfully",
+      "importFailed": "Failed to import PT-Plugin-Plus user data"
     }
   },
   "SetDownloader": {
@@ -821,7 +955,9 @@
       "nameTip": "Pick a nice and recognizable name for this Download Server",
       "password": "Password",
       "timeout": "Timeout (seconds)",
-      "uidPlaceholder": " (Generate automatically)"
+      "uidPlaceholder": " (Generate automatically)",
+      "switchOn": "On",
+      "switchOff": "Off"
     },
     "index": {
       "changeDefaultDownloader": "Default downloader updated successfully. If necessary, please further configure the download path and tags.",
@@ -857,6 +993,31 @@
     },
     "add": {
       "title": "Add Media Server"
+    },
+    "index": {
+      "title": "Media Server",
+      "needName": "Please enter the media server name",
+      "needAddress": "Please enter the media server address",
+      "needAuthField": "Please fill in the authentication field \"{0}\"",
+      "added": "Media server added",
+      "updated": "Media server configuration updated",
+      "deleteTitle": "Delete Media Server",
+      "deleteConfirm": "Delete \"{0}\"? This cannot be undone.",
+      "deleted": "Deleted",
+      "mediaSearchFailed": "Media library search failed",
+      "connectSuccess": "Connected: media library search returned {0} items",
+      "connectFailed": "Connection failed: {0}",
+      "description": "Media servers let search results cross-check your media library (Emby / Jellyfin / Plex / fnOS) to see whether a title is already there.",
+      "emptyTable": "No media server yet. Click \"Add media server\" at the top right to get started",
+      "testTooltip": "Test connection (runs one media library search)",
+      "editTitle": "Edit Media Server",
+      "serverType": "Server Type",
+      "typePlaceholder": "Select a media server type",
+      "address": "Address",
+      "namePlaceholder": "A name to identify it, e.g. Home NAS Emby",
+      "credentialPlaceholder": "User credentials",
+      "timeout": "Request Timeout (seconds)",
+      "configId": "Config ID"
     }
   },
   "SetNativeBridge": {
@@ -941,7 +1102,8 @@
       "otherSettings": "Other Settings",
       "requestTimeout": "Request Timeout",
       "requestTimeoutHint": "Affects the timeout for site requests (torrent search, user info retrieval)",
-      "siteSettings": "Site Settings"
+      "siteSettings": "Site Settings",
+      "loadDefinitionFailed": "Failed to load the site definition [{id}]"
     },
     "ReBuildMapDialog": {
       "doRebuildBtn": "Rebuild",
@@ -1033,7 +1195,10 @@
     "stackTableColumn": {
       "homepage": "Homepage"
     },
-    "thankNote": "The birth of 'PT Plugin Plus' is established on the base of these projects. Thanks all the participants of the project, thanks for your contribution!"
+    "thankNote": "The birth of 'PT Plugin Plus' is established on the base of these projects. Thanks all the participants of the project, thanks for your contribution!",
+    "ptppHistoryItem": {
+      "ptPluginRhilip": "PT Plugin (Rhilip's fork)"
+    }
   },
   "UserDataStatistic": {
     "chart": {
@@ -1072,7 +1237,8 @@
       "all": "All",
       "custom": "Custom",
       "day": "Last {0} days"
-    }
+    },
+    "loadFailed": "Failed to load the statistics data"
   },
   "UserDataTimeline": {
     "controls": {
@@ -1110,7 +1276,10 @@
       "uploads": "Uploads"
     },
     "ptAge": "PT Age: ≈ {years} years",
-    "total": "TOT "
+    "total": "TOT ",
+    "loadDataFailed": "Failed to load timeline data",
+    "siteIsDead": "Site is marked as dead",
+    "siteIsOffline": "Site is currently offline"
   },
   "common": {
     "AdvanceFilterGenerateDialog": {
@@ -1192,7 +1361,8 @@
     "type": "Type",
     "username": "Username",
     "version": "Version",
-    "visit": "Visit"
+    "visit": "Visit",
+    "noData": "No Data"
   },
   "connectCheck": {
     "default": "Check Connect",
@@ -1272,6 +1442,22 @@
       "startUsing": "Get Started",
       "title": "Welcome to {extName}",
       "download": "Download"
+    },
+    "nav": {
+      "home": "Home",
+      "sites": "Sites",
+      "snapshot": "Search Snapshot",
+      "backup": "Backup",
+      "downloader": "Downloader",
+      "mediaServer": "Media Server",
+      "basicSettings": "Basic Settings",
+      "techStack": "Tech Stack",
+      "logger": "Runtime Log",
+      "siteDefinitions": "Site Definitions",
+      "devTag": "Debug",
+      "backgroundOk": "background OK",
+      "backgroundFailed": "background not responding",
+      "backgroundConnecting": "connecting to background…"
     }
   },
   "levelRequirement": {
@@ -1444,5 +1630,30 @@
     "queueConcurrency": "Request Queue Concurrency",
     "showDeadSite": "Show sites marked as dead (isDead) in the overview",
     "showPassedSite": "Show sites marked as offline (isOffline) or not allowing user info query in the overview"
+  },
+  "HomeView": {
+    "welcome": "Welcome to PT Assistant",
+    "subtitle": "PT site assistant extension (rebuilt with WXT + Vue 3 + antdv-next)",
+    "siteDefinitionsCard": "Built-in Site Definitions",
+    "siteDefinitionsUnit": " · loaded on demand",
+    "modulesTitle": "Feature Modules",
+    "pending": "Under construction",
+    "modules": {
+      "siteDefinitions": "Site definitions ({0}, loaded on demand)",
+      "messageLayer": "Messaging layer / background hub",
+      "siteManage": "Site management (add / configure / user info query)",
+      "multiSiteSearch": "Multi-site search",
+      "myData": "My data (user info overview)",
+      "backup": "Backup & import (local zip + WebDAV/S3/B2)",
+      "downloader": "Torrent downloader integration (qBittorrent etc.) config page and push UI",
+      "contentScript": "Content script (in-page detection and floating entry)",
+      "mediaServer": "Media server config page and library browsing"
+    }
+  },
+  "SiteDefinitions": {
+    "title": "Site Definitions",
+    "searchPlaceholder": "Search site id…",
+    "loading": "Loading definition…",
+    "selectHint": "← Click a site on the left to view its on-demand definition metadata"
   }
 }

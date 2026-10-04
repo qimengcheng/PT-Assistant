@@ -6,6 +6,7 @@
  * 平移自 PT-depiler views/Settings/SetBase/RestorePtppUserDataDialog.vue。
  */
 import { computed, ref, shallowRef } from "vue";
+import { useI18n } from "vue-i18n";
 import { Modal, message } from "antdv-next";
 import {
   definitionList,
@@ -34,6 +35,7 @@ const { ptppUserData } = defineProps<{
   ptppUserData: IPtppDumpUserInfo;
 }>();
 
+const { t } = useI18n();
 const configStore = useConfigStore();
 const metadataStore = useMetadataStore();
 const runtimeStore = useRuntimeStore();
@@ -98,10 +100,10 @@ const overwriteExistUserInfo = ref<boolean>(false);
 
 function statusInfo(host: string) {
   if (!allSupportedSiteHost.value.includes(host)) {
-    return { color: "default", title: "该站点不在 340 个内置定义中，无法导入" };
+    return { color: "default", title: t("SetBase.RestorePtppUserDataDialog.statusUnsupported") };
   }
   if (toImportSite.value.includes(host)) {
-    return { color: "blue", title: "已选择导入" };
+    return { color: "blue", title: t("SetBase.RestorePtppUserDataDialog.statusSelected") };
   }
   return { color: "default", title: "" };
 }
@@ -134,10 +136,10 @@ async function doImport() {
   if (isEmpty(metadataStore.sites)) {
     // ⚠️ MV3 扩展页面原生 confirm() 静默失效，改用 antdv Modal.confirm
     Modal.confirm({
-      title: "尚未添加任何站点",
-      content: "当前未添加任何站点，导入的用户数据将只写入存储（站点记录不会建立）。是否继续？",
-      okText: "继续导入",
-      cancelText: "取消",
+      title: t("SetBase.RestorePtppUserDataDialog.noSiteTitle"),
+      content: t("SetBase.RestorePtppUserDataDialog.noSiteContent"),
+      okText: t("SetBase.RestorePtppUserDataDialog.noSiteOk"),
+      cancelText: t("SetBase.RestorePtppUserDataDialog.cancelText"),
       onOk: () => doImportInternal(),
     });
     return;
@@ -188,12 +190,12 @@ async function doImportInternal() {
     await extStore.setItem("userInfo", userInfoStorage);
     await metadataStore.$save();
 
-    runtimeStore.showSnakebar("PT-Plugin-Plus 用户数据导入成功", { color: "success" });
+    runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.importSuccess"), { color: "success" });
 
     setTimeout(() => (showDialog.value = false), 5e3);
   } catch (e) {
     console.error("导入失败", e);
-    runtimeStore.showSnakebar("PT-Plugin-Plus 用户数据导入失败", { color: "error" });
+    runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.importFailed"), { color: "error" });
   } finally {
     // 恢复自动刷新的状态
     configStore.userInfo.autoReflush.enabled = autoReflushStatus;
@@ -242,19 +244,19 @@ function toggleAll(checked: boolean) {
 <template>
   <a-modal
     v-model:open="showDialog"
-    title="导入 PT-Plugin-Plus 用户数据"
+    :title="t('SetBase.RestorePtppUserDataDialog.dialogTitle')"
     width="800px"
     :confirm-loading="isImporting"
-    ok-text="导入"
-    cancel-text="取消"
+    :ok-text="t('SetBase.RestorePtppUserDataDialog.okText')"
+    :cancel-text="t('SetBase.RestorePtppUserDataDialog.cancelText')"
     :after-open-change="(open: boolean) => open && entryDialog()"
     @ok="doImport"
   >
     <a-space class="mb-2" style="width: 100%; justify-content: space-between">
-      <a-alert type="info" show-icon title="勾选要导入用户数据的站点" style="flex: 1" />
+      <a-alert type="info" show-icon :title="t('SetBase.RestorePtppUserDataDialog.selectSitesTip')" style="flex: 1" />
       <a-space>
-        <a-button size="small" @click="toggleAll(true)">全选</a-button>
-        <a-button size="small" @click="toggleAll(false)">全不选</a-button>
+        <a-button size="small" @click="toggleAll(true)">{{ t("SetBase.RestorePtppUserDataDialog.selectAll") }}</a-button>
+        <a-button size="small" @click="toggleAll(false)">{{ t("SetBase.RestorePtppUserDataDialog.selectNone") }}</a-button>
       </a-space>
     </a-space>
 
@@ -274,7 +276,7 @@ function toggleAll(checked: boolean) {
           </template>
           <a-tooltip :title="statusInfo(host as string).title">
             <a-tag :color="statusInfo(host as string).color" style="margin-left: auto">
-              {{ Object.keys(data).length - 1 }} 条记录
+              {{ t("SetBase.RestorePtppUserDataDialog.recordCount", { n: Object.keys(data).length - 1 }) }}
             </a-tag>
           </a-tooltip>
         </div>
@@ -283,7 +285,7 @@ function toggleAll(checked: boolean) {
 
     <div class="overwrite-row">
       <a-switch v-model:checked="overwriteExistUserInfo" size="small" :disabled="isImporting" />
-      <span class="label">覆盖本地已有的用户信息</span>
+      <span class="label">{{ t("SetBase.RestorePtppUserDataDialog.overwriteExist") }}</span>
     </div>
   </a-modal>
 </template>

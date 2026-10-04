@@ -129,7 +129,11 @@ const advanceOptions = computed(() => clientMeta.value?.advanceAddTorrentOptions
     </a-form-item>
 
     <a-form-item v-if="clientMeta?.feature?.DefaultAutoStart?.allowed" :label="t('SetDownloader.editor.autoStart')">
-      <a-switch v-model:checked="clientConfig.feature!.DefaultAutoStart" checked-children="开" un-checked-children="关" />
+      <a-switch
+        v-model:checked="clientConfig.feature!.DefaultAutoStart"
+        :checked-children="t('SetDownloader.editor.switchOn')"
+        :un-checked-children="t('SetDownloader.editor.switchOff')"
+      />
     </a-form-item>
 
     <a-form-item v-if="clientMeta?.feature?.BypassCSRF?.allowed" :label="t('SetDownloader.editor.bypassCsrf')">

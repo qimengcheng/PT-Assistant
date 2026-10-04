@@ -68,7 +68,7 @@ async function initSiteData(id: TSiteID, flush = false) {
     }
     // 原来完全没有 catch：加载失败时表单永远空白且没有任何提示，用户无从判断是加载失败还是站点没数据
     console.error("[SetSite] load site definition failed", id, e);
-    runtimeStore.showSnakebar(`加载站点 [${id}] 定义失败`, { color: "error" });
+    runtimeStore.showSnakebar(t("SetSite.Editor.loadDefinitionFailed", { id }), { color: "error" });
   }
 }
 

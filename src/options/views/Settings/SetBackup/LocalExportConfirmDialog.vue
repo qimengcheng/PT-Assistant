@@ -25,7 +25,7 @@ function dialogEnter() {
     v-model:open="showDialog"
     :title="t('SetBackup.LocalExportConfirmDialog.title')"
     :width="600"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
   >
     <!-- v-switch + 数组 v-model + :value 是 Vuetify 的复选语义，antd 对应 a-checkbox-group -->
     <a-checkbox-group v-model:value="backupFields">

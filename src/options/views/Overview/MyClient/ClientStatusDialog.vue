@@ -93,7 +93,7 @@ function onEnter() {
     :title="t('MyClient.clientStatusDialog.title')"
     :width="800"
     :footer="null"
-    @after-open-change="(open: boolean) => open && onEnter()"
+    :after-open-change="(open: boolean) => open && onEnter()"
   >
     <!-- 刷新按钮原先挂在 #title 插槽里，会和右上角关闭按钮重叠，移到内容区顶部 -->
     <div class="d-flex justify-end">

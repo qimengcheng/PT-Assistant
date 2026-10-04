@@ -57,7 +57,7 @@ async function confirmSetLimit() {
     v-model:open="showDialog"
     :title="t('MyClient.speedLimit.title', { count: torrents.length })"
     :width="480"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 
     <a-divider class="ma-0" />

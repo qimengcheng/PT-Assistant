@@ -99,7 +99,7 @@ function enterDialog() {
   reBuildAdvanceFilter();
 }
 
-/** a-modal 的 @after-open-change（对应原 v-dialog 的 @after-enter） */
+/** a-modal 的 after-open-change（对应原 v-dialog 的 @after-enter）：它是 prop 不是 emit，必须用 : 绑定 */
 function onAfterOpenChange(open: boolean) {
   if (open) enterDialog();
 }
@@ -133,7 +133,7 @@ function formatSizeTooltip(value?: number) {
     v-model:open="showDialog"
     :title="t('common.AdvanceFilterGenerateDialog.title')"
     :width="800"
-    @after-open-change="onAfterOpenChange"
+    :after-open-change="onAfterOpenChange"
   >
 
 

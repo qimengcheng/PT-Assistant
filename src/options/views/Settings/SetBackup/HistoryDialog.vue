@@ -106,8 +106,8 @@ async function dialogLeave() {
       })
     "
     :width="1000"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
-    @after-close="dialogLeave"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-close="dialogLeave"
   >
 
     <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupHistory(tableSelected)"><template #icon><DeleteOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>

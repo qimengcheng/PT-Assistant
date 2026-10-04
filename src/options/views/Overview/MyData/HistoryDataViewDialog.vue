@@ -166,8 +166,8 @@ function afterEnter() {
     v-model:open="showDialog"
     :title="dialogTitle"
     :width="1200"
-    @after-close="() => (siteHistoryData = [])"
-    @after-open-change="(open: boolean) => open && afterEnter()"
+    :after-close="() => (siteHistoryData = [])"
+    :after-open-change="(open: boolean) => open && afterEnter()"
   >
 
     <a-divider class="ma-0" />

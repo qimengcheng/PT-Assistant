@@ -40,7 +40,7 @@ function dialogEnter() {
     v-model:open="showDialog"
     :title="t('SetSite.edit.title')"
     :width="800"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 
 

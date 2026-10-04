@@ -116,7 +116,7 @@ async function submit() {
     v-model:open="showDialog"
     :title="t('MyClient.pushToDownloader.title')"
     :width="560"
-    @after-open-change="(open: boolean) => open && cleanStatus()"
+    :after-open-change="(open: boolean) => open && cleanStatus()"
   >
 
     <a-segmented v-model:value="inputMode" :options="inputModeOptions" block class="mb-4" />

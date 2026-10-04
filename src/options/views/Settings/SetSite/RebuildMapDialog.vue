@@ -38,7 +38,7 @@ const canReBuild = computed<boolean>(() => Object.values(reBuildControlRef.value
     v-model:open="showDialog"
     :title="t('SetSite.ReBuildMapDialog.title')"
     :width="600"
-    @after-open-change="(open: boolean) => open && resetReBuildControlRef()"
+    :after-open-change="(open: boolean) => open && resetReBuildControlRef()"
   >
 
     <label class="switch-row">

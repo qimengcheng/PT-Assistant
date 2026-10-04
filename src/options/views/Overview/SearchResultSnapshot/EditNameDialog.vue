@@ -33,8 +33,8 @@ function dialogEnter() {
     :title="t('SearchResultSnapshot.EditNameDialog.title')"
     :width="500"
     :footer="null"
-    @after-open-change="(open: boolean) => open && props.editId && dialogEnter()"
-    @after-close="() => (snapshotName = '')"
+    :after-open-change="(open: boolean) => open && props.editId && dialogEnter()"
+    :after-close="() => (snapshotName = '')"
   >
 
     <a-input

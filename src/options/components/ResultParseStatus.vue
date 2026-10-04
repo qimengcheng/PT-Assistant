@@ -43,7 +43,9 @@ const meta = computed<{ text: string; color?: string; title?: string }>(() => {
 </script>
 
 <template>
-  <a-tag :color="meta.color" :title="meta.title" :bordered="false" style="margin-inline-end: 0">
+  <!-- 这条曾经写 `bordered` prop：antdv-next 1.5.6 里它已退化成死属性（true/false
+       都渲染 filled），所以直接删掉、不影响外观；真要区分描边请改 variant="outlined" -->
+  <a-tag :color="meta.color" :title="meta.title" style="margin-inline-end: 0">
     {{ meta.text }}
   </a-tag>
 </template>

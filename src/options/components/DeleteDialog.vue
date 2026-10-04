@@ -53,7 +53,7 @@ async function dialogEnter() {
     :title="t('common.dialog.title.confirmAction')"
     wrap-class-name="modal-title--danger"
     :width="340"
-    :mask-closable="!isDeleting"
+    :mask="{ closable: !isDeleting }"
     :closable="!isDeleting"
     :keyboard="!isDeleting"
     :after-open-change="(open: boolean) => open && dialogEnter()"

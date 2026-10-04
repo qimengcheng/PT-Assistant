@@ -43,7 +43,6 @@ const runtimeStore = useRuntimeStore();
 
 const solution = ref<ISearchSolutionMetadata>(initSolution());
 const formRef = ref();
-const formValid = ref<boolean>(false);
 
 const siteWaitFilter = ref("");
 const siteFilter = refDebounced(siteWaitFilter, 500); // 延迟搜索过滤词的生成
@@ -107,8 +106,6 @@ async function saveSolutionState() {
 watch(showDialog, (visible) => {
   if (!visible) return;
 
-  formValid.value = false;
-
   // 生成站点列表
   Promise.all(
     metadataStore.getAddedSiteIds
@@ -143,8 +140,8 @@ function dialogLeave() {
     wrap-class-name="set-search-solution-edit-modal"
     :ok-text="t('common.dialog.ok')"
     :cancel-text="t('common.dialog.cancel')"
-    :ok-button-props="{ disabled: !formValid || solution.solutions.length === 0 }"
-    :destroy-on-close="true"
+    :ok-button-props="{ disabled: solution.solutions.length === 0 }"
+    destroy-on-hidden
     @update:open="(v: boolean) => {
       if (!v) {
         showDialog = false;
@@ -157,7 +154,6 @@ function dialogLeave() {
       ref="formRef"
       :model="solution"
       :rules="formRules"
-      @validate="({ errorFields }: { errorFields?: any[] }) => (formValid = !errorFields?.length)"
     >
       <a-row :gutter="16">
         <a-col :flex="'auto'">
@@ -199,7 +195,7 @@ function dialogLeave() {
         </a-col>
 
         <a-col :xs="24" :md="9">
-          <a-alert type="success" :message="t('SetSearchSolution.edit.addCount', [solution.solutions.length])" style="margin-bottom: 8px" />
+          <a-alert type="success" :title="t('SetSearchSolution.edit.addCount', [solution.solutions.length])" style="margin-bottom: 8px" />
           <div class="selected-list">
             <SolutionLabel :group-props="{ column: true }" :solutions="solution.solutions" closable @remove:solution="removeSolution" />
           </div>

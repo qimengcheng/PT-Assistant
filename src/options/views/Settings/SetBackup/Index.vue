@@ -154,13 +154,13 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 
   <a-card class="set-backup">
     <div class="table-toolbar">
-      <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span class="ml-1">{{ t('common.btn.add') }}</span></a-button>
-      <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupServer(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
+      <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
+      <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupServer(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
       <div class="toolbar-divider" />
 
-      <a-button :loading="doBackupStatus[localBackup]" @click="doBackup(localBackup)"><template #icon><DatabaseOutlined /></template><span class="ml-1">{{ t('SetBackup.localExport') }}</span></a-button>
-      <a-button @click="() => (showRestoreDialog = true)"><template #icon><ImportOutlined /></template><span class="ml-1">{{ t('SetBackup.localImport') }}</span></a-button>
+      <a-button :loading="doBackupStatus[localBackup]" @click="doBackup(localBackup)"><template #icon><DatabaseOutlined /></template><span>{{ t('SetBackup.localExport') }}</span></a-button>
+      <a-button @click="() => (showRestoreDialog = true)"><template #icon><ImportOutlined /></template><span>{{ t('SetBackup.localImport') }}</span></a-button>
 
       <div style="flex: 1" />
 

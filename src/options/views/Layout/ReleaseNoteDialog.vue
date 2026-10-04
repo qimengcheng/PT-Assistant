@@ -46,7 +46,7 @@ function onAfterOpenChange(open: boolean) {
     v-model:open="showDialog"
     :width="600"
     :closable="false"
-    :mask-closable="false"
+    :mask="{ closable: false }"
     :keyboard="false"
     :title="t('layout.releaseNote.title', { extName: 'PT Assistant' })"
     :after-open-change="onAfterOpenChange"

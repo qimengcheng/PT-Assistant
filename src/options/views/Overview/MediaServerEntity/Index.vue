@@ -136,7 +136,7 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
 
 <template>
   <div class="media-server-entity">
-    <a-alert :message="t('route.Overview.MediaServerEntity')" type="info" show-icon style="margin-bottom: 12px" />
+    <a-alert :title="t('route.Overview.MediaServerEntity')" type="info" show-icon style="margin-bottom: 12px" />
 
     <a-card>
       <div class="search-row">

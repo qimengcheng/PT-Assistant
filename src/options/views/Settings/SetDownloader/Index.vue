@@ -174,17 +174,17 @@ const columns = [
 
 <template>
   <div class="set-downloader">
-    <a-alert :message="t('route.Settings.SetDownloader')" type="info" show-icon style="margin-bottom: 12px" />
+    <a-alert :title="t('route.Settings.SetDownloader')" type="info" show-icon style="margin-bottom: 12px" />
 
     <a-card>
       <div class="toolbar">
-        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span class="ml-1">{{ t('common.btn.add') }}</span></a-button>
+        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
         <a-divider type="vertical" />
 
-        <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
+        <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span>{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
 
         <div class="toolbar-right">
           <a-input

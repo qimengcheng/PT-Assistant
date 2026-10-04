@@ -201,7 +201,7 @@ function dialogLeave() {
     v-model:open="showDialog"
     :title="t('SentToDownloaderDialog.title', [torrentItems.length])"
     :width="800"
-    :mask-closable="!isSending"
+    :mask="{ closable: !isSending }"
     :closable="!isSending"
     :keyboard="!isSending"
     :after-open-change="(open: boolean) => open && dialogEnter()"

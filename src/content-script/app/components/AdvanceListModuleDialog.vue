@@ -131,14 +131,13 @@ const rowSelection = computed(() => ({
     v-model:open="showDialog"
     :title="t('contentScript.AdvanceListModuleDialog.title', [torrentItems.length])"
     :width="1200"
-    :footer="null"
-    styles="{ body: { maxHeight: `${windowHeight - 256}px`, overflow: 'auto' } }"
+    :styles="{ body: { maxHeight: `${windowHeight - 256}px`, overflow: 'auto' } }"
     :after-open-change="(open: boolean) => open && enterDialog()"
   >
 
     <div style="margin-bottom: 8px">
-      <a-button type="primary" @click="handleSelectSeeders"><template #icon><InboxOutlined /></template><span class="ml-1">{{ t('contentScript.AdvanceListModuleDialog.selectSeeders') }}</span></a-button>
-      <a-button type="primary" @click="handleSelectNotSeeding"><template #icon><MinusCircleOutlined /></template><span class="ml-1">{{ t('contentScript.AdvanceListModuleDialog.selectNotSeeding') }}</span></a-button>
+      <a-button type="primary" @click="handleSelectSeeders"><template #icon><InboxOutlined /></template><span>{{ t('contentScript.AdvanceListModuleDialog.selectSeeders') }}</span></a-button>
+      <a-button type="primary" @click="handleSelectNotSeeding"><template #icon><MinusCircleOutlined /></template><span>{{ t('contentScript.AdvanceListModuleDialog.selectNotSeeding') }}</span></a-button>
     </div>
 
     <a-table
@@ -169,6 +168,7 @@ const rowSelection = computed(() => ({
       </template>
     </a-table>
 
+    <!-- 不设 :footer="null"：那会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...） -->
     <template #footer>
       <div style="display: flex; align-items: center; gap: 8px">
         <span v-show="hasSelectedTorrent">
@@ -182,13 +182,13 @@ const rowSelection = computed(() => ({
 
         <div style="flex: 1"></div>
 
-        <a-button type="primary" :disabled="!hasSelectedTorrent" :loading="localDownloadMultiStatus" @click="handleLocalDownloadMulti"><template #icon><SaveOutlined /></template><span class="ml-1">{{ t('downloaderLabel.localDownload') }}</span></a-button>
+        <a-button type="primary" :disabled="!hasSelectedTorrent" :loading="localDownloadMultiStatus" @click="handleLocalDownloadMulti"><template #icon><SaveOutlined /></template><span>{{ t('downloaderLabel.localDownload') }}</span></a-button>
 
-        <a-button type="primary" :disabled="!hasSelectedTorrent" :loading="linkCopyMultiStatus" @click="handleLinkCopyMulti"><template #icon><CopyOutlined /></template><span class="ml-1">{{ t('contentScript.copyLink') }}</span></a-button>
+        <a-button type="primary" :disabled="!hasSelectedTorrent" :loading="linkCopyMultiStatus" @click="handleLinkCopyMulti"><template #icon><CopyOutlined /></template><span>{{ t('contentScript.copyLink') }}</span></a-button>
 
-        <a-button type="primary" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti()"><template #icon><CloudDownloadOutlined /></template><span class="ml-1">{{ t('contentScript.pushTo') }}</span></a-button>
+        <a-button type="primary" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti()"><template #icon><CloudDownloadOutlined /></template><span>{{ t('contentScript.pushTo') }}</span></a-button>
 
-        <a-button type="primary" v-if="metadataStore.defaultDownloader?.id" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti(true)"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('contentScript.pushToDefault') }}</span></a-button>
+        <a-button type="primary" v-if="metadataStore.defaultDownloader?.id" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti(true)"><template #icon><DownloadOutlined /></template><span>{{ t('contentScript.pushToDefault') }}</span></a-button>
       </div>
     </template>
   </a-modal>

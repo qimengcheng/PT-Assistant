@@ -23,16 +23,13 @@ const clientMeta = computedAsync<TorrentClientMetaData>(
 const showPassword = ref<boolean>(false);
 
 const formRef = ref();
-const formValid = ref<boolean>(false);
 
 async function validateForm() {
   if (!formRef.value) return false;
   try {
     await formRef.value.validateFields();
-    formValid.value = true;
     return true;
   } catch {
-    formValid.value = false;
     return false;
   }
 }
@@ -71,7 +68,6 @@ const advanceOptions = computed(() => clientMeta.value?.advanceAddTorrentOptions
     ref="formRef"
     :model="clientConfig"
     layout="vertical"
-    @validate="({ errorFields }: { errorFields?: any[] }) => (formValid = !errorFields?.length)"
   >
     <a-row :gutter="16">
       <a-col :span="24" :md="6">

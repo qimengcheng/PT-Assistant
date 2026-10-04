@@ -589,7 +589,7 @@ async function createKeepUploadTask() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :title="t('SearchEntity.KeepUploadDialog.title')" :width="1024" :mask-closable="false">
+  <a-modal v-model:open="showDialog" :title="t('SearchEntity.KeepUploadDialog.title')" :width="1024" :mask="{ closable: false }">
     <!-- 「怎么用」入口原先挂在 #title 插槽里，会和右上角相撞，移到内容区顶部 -->
     <div class="d-flex justify-end">
       <a-button

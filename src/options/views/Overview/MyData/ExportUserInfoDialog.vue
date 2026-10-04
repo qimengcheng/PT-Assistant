@@ -243,7 +243,7 @@ function convertToJSON(items: IHistoryUserInfo[]): string {
       <div class="d-flex align-center pa-4">
         <div class="flex-1-1-0" />
         <a-button class="mr-2" @click="showDialog = false">{{ t("common.dialog.cancel") }}</a-button>
-        <a-button type="primary" :disabled="isLoading" :loading="isLoading" @click="doExport">
+        <a-button type="primary" :loading="isLoading" @click="doExport">
           <template #icon><ExportOutlined /></template>
           {{ t("common.export") }}
         </a-button>

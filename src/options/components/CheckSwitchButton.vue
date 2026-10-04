@@ -16,9 +16,9 @@ function updateSelected(value: T[]) {
 </script>
 
 <template>
-  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected(all)"><template #icon><CheckSquareOutlined /></template><span class="ml-1">{{ t('common.checkbox.all') }}</span></a-button>
-  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected([])"><template #icon><BorderOutlined /></template><span class="ml-1">{{ t('common.checkbox.none') }}</span></a-button>
-  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected(all.filter((item) => !selected.includes(item)))"><template #icon><MinusSquareOutlined /></template><span class="ml-1">{{ t('common.checkbox.invert') }}</span></a-button>
+  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected(all)"><template #icon><CheckSquareOutlined /></template><span>{{ t('common.checkbox.all') }}</span></a-button>
+  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected([])"><template #icon><BorderOutlined /></template><span>{{ t('common.checkbox.none') }}</span></a-button>
+  <a-button type="primary" size="small" v-bind="$attrs" @click="() => updateSelected(all.filter((item) => !selected.includes(item)))"><template #icon><MinusSquareOutlined /></template><span>{{ t('common.checkbox.invert') }}</span></a-button>
 </template>
 
 <style scoped lang="scss"></style>

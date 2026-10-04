@@ -35,6 +35,20 @@ const ptdIcon = chrome.runtime.getURL("icon/128.png");
 const ptdData = inject<IPtdData>("ptd_data", {});
 const shadowRoot = inject<ShadowRoot>("ptd_shadow_root");
 
+/**
+ * antd 浮层（modal / dropdown / tooltip）默认挂到 document.body，而本扩展的两套样式
+ * —— Vite 抽出的 SFC CSS 与 StyleProvider 的 CSS-in-JS —— 全在 shadowRoot 里。
+ * 挂在 body 上的浮层因此拿不到任何样式：弹窗其实开了，只是零样式且落在视口之外
+ * （2026-10-03 实测 light.modal=1 / shadow.modal=0，用户看到的就是"点了没反应"）。
+ * 容器元素由 init.ts 创建，定位规则见 app.css 的 #ptd-content-script-overlay。
+ */
+const overlayRoot = shadowRoot?.getElementById("ptd-content-script-overlay") ?? null;
+function getPopupContainer(): HTMLElement {
+  return overlayRoot ?? document.body;
+}
+// 静态 message 不读 ConfigProvider 上下文，它的容器是全局配置，得单独指一次
+antdMessage.config({ getContainer: () => getPopupContainer() });
+
 const el = useTemplateRef<HTMLElement>("el");
 provide("app", el);
 
@@ -88,6 +102,19 @@ configStore.$onReady(() => {
   rightX.value = clientWidth - x.value;
   bottomY.value = clientHeight - y.value;
 });
+
+/**
+ * FAB 点击：先重算页面类型，再开合按钮组。
+ *
+ * 为什么需要显式写：上游是 `<v-speed-dial v-model="openSpeedDial">`，开合由 Vuetify 组件
+ * 自己接管；迁到 antdv-next 后（没有 speed-dial 组件）外层换成裸 div，v-model 那条翻转就丢了，
+ * openSpeedDial 只剩「声明 + 从配置读初值」两处，于是球能画出来但点了永远没反应。
+ * 点子按钮不自动收起，对应上游的 :close-on-content-click="false"。
+ */
+function toggleSpeedDial() {
+  updatePageType(ptdData).catch((e) => console.error("[PTD] updatePageType failed", e));
+  openSpeedDial.value = !openSpeedDial.value;
+}
 
 const remoteDownloadDialogData = shallowReactive<IRemoteDownloadDialogData>({
   show: false,
@@ -271,46 +298,49 @@ onBeforeUnmount(() => stopSnakebarWatch());
 <template>
   <!-- 把 antd 的 CSS-in-JS 注入目标指向 shadow root，避免污染站点样式 -->
   <a-style-provider :container="shadowRoot">
-    <div
-      ref="el"
-      :style="style"
-      class="ptd-root"
-      :class="{ 'ptd-fade-enter': configStore.contentScript.fadeEnterStyle }"
-    >
-      <!-- 主按钮（FAB） -->
-      <a-button
-        shape="circle"
-        size="large"
-        class="ptd-fab"
-        :loading="false"
-        @click="updatePageType(ptdData)"
-        @mouseleave.prevent="isDragging = false"
-        @dragleave.prevent="isDragging = false"
-        v-on="dropAction"
+    <!-- 浮层容器指向 shadowRoot 内的 #ptd-content-script-overlay，否则弹窗挂到 body 上拿不到样式 -->
+    <a-config-provider :get-popup-container="getPopupContainer">
+      <div
+        ref="el"
+        :style="style"
+        class="ptd-root"
+        :class="{ 'ptd-fade-enter': configStore.contentScript.fadeEnterStyle }"
       >
-        <img :src="ptdIcon" alt="PT Assistant" class="ptd-fab-icon" :class="{ 'ptd-fab-loading': isDragging }" />
-      </a-button>
+        <!-- 主按钮（FAB） -->
+        <a-button
+          shape="circle"
+          size="large"
+          class="ptd-fab"
+          :loading="false"
+          @click="toggleSpeedDial"
+          @mouseleave.prevent="isDragging = false"
+          @dragleave.prevent="isDragging = false"
+          v-on="dropAction"
+        >
+          <img :src="ptdIcon" alt="PT Assistant" class="ptd-fab-icon" :class="{ 'ptd-fab-loading': isDragging }" />
+        </a-button>
 
-      <!-- 展开的按钮组 -->
-      <div v-show="openSpeedDial" class="ptd-actions">
-        <!-- 这里根据 pageType 来决定显示哪些按钮 -->
-        <component :is="currentView" :key="pageType" />
+        <!-- 展开的按钮组 -->
+        <div v-show="openSpeedDial" class="ptd-actions">
+          <!-- 这里根据 pageType 来决定显示哪些按钮 -->
+          <component :is="currentView" :key="pageType" />
 
-        <SpeedDialBtn
-          key="home"
-          color="#ffc107"
-          :icon="HomeOutlined"
-          :title="t('contentScript.openPTD')"
-          @click="openOptions"
-        />
+          <SpeedDialBtn
+            key="home"
+            color="#ffc107"
+            :icon="HomeOutlined"
+            :title="t('contentScript.openPTD')"
+            @click="openOptions"
+          />
+        </div>
       </div>
-    </div>
 
-    <SentToDownloaderDialog
-      v-model="remoteDownloadDialogData.show"
-      :torrent-items="remoteDownloadDialogData.torrents"
-      :is-default-send="remoteDownloadDialogData.isDefaultSend"
-    />
+      <SentToDownloaderDialog
+        v-model="remoteDownloadDialogData.show"
+        :torrent-items="remoteDownloadDialogData.torrents"
+        :is-default-send="remoteDownloadDialogData.isDefaultSend"
+      />
+    </a-config-provider>
   </a-style-provider>
 </template>
 

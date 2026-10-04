@@ -236,7 +236,7 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
                 :placeholder="'site'"
                 show-search
                 allow-clear
-                :filter-option="false"
+                option-filter-prop="label"
               />
               <a-checkbox v-model:checked="useCustomerConfig">{{ t("Debugger.mergeUserConfig") }}</a-checkbox>
               <a-button :disabled="!selectedSite" @click="log(getSiteMetadata())">
@@ -266,7 +266,7 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
                 :placeholder="serverType"
                 show-search
                 allow-clear
-                :filter-option="false"
+                option-filter-prop="label"
               />
               <span class="debugger-hint">{{ t("Debugger.addServerFirst", { serverType }) }}</span>
               <a-button
@@ -302,7 +302,7 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
                 placeholder="piniaStore"
                 show-search
                 allow-clear
-                :filter-option="false"
+                option-filter-prop="label"
               />
               <a-button :disabled="!selectedPiniaStore" @click="log(getPiniaStore(selectedPiniaStore))">
                 {{ t("Debugger.outputPinia") }}
@@ -329,7 +329,7 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
                   :options="siteSelectItems"
                   :placeholder="t('Debugger.selectSite')"
                   show-search
-                  :filter-option="false"
+                  option-filter-prop="label"
                 />
               </div>
             </div>

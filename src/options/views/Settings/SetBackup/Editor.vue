@@ -182,6 +182,10 @@ function syncFormValid() {
 // 打开对话框时表单已带上了已保存的值，同步一次，避免「内容合法但按钮不可点」
 onMounted(syncFormValid);
 
+// 父对话框的「保存」原本只在 @after:check-connect 里拿 configValid，不点测试连接就永远禁用；
+// 这里让校验结果自己上报，immediate 是为了挂载那一次同步的结果也能送出去。
+watch(formValid, (v) => emits("update:configValid", v), { immediate: true });
+
 async function checkConnect() {
   const clientType = clientConfig.value?.type;
   if (formValid.value && clientConfig.value && clientType) {

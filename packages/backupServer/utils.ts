@@ -241,7 +241,19 @@ export function localSort(files: IBackupFileInfo[], options: IBackupFileListOpti
           break;
       }
 
-      const compareRep = v1.toString().localeCompare(v2.toString());
+      // size/time 是数字，必须按数值比：字符串序会把 999999 排到 1000000 之后。
+      // 只有 name 才该走 localeCompare。
+      let compareRep: number;
+      if (orderBy === EListOrderBy.name) {
+        compareRep = String(v1).localeCompare(String(v2));
+      } else {
+        const n1 = Number(v1);
+        const n2 = Number(v2);
+        // size 允许是 "N/A"（后端 list 拿不到大小）→ Number() 得 NaN。
+        // 这种不参与比较、也不翻转，保持后端返回的原始相对顺序，
+        // 免得在 asc/desc 下被推到两端产生"忽前忽后"的观感。
+        compareRep = Number.isNaN(n1) || Number.isNaN(n2) ? 0 : n1 - n2;
+      }
       return orderMode === EListOrderMode.desc ? -compareRep : compareRep;
     });
   }

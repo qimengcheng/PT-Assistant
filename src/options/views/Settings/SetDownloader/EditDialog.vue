@@ -39,18 +39,11 @@ function editClientConfig() {
     v-model:open="showDialog"
     :title="t('SetDownloader.edit.title')"
     width="800px"
-    :footer="null"
+    :ok-text="t('common.dialog.ok')"
+    :cancel-text="t('common.dialog.cancel')"
     :after-open-change="(open: boolean) => open && dialogEnter()"
+    @ok="editClientConfig"
   >
     <Editor v-model="clientConfig" />
-
-    <div style="text-align: right; margin-top: 16px">
-      <a-button @click="showDialog = false" style="margin-right: 8px">
-        {{ t("common.dialog.cancel") }}
-      </a-button>
-      <a-button type="primary" @click="editClientConfig">
-        {{ t("common.dialog.ok") }}
-      </a-button>
-    </div>
   </a-modal>
 </template>

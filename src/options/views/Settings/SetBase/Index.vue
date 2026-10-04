@@ -112,12 +112,6 @@ watch(activeKey, (key) => {
 .set-base .compact-form :deep(.ant-select) {
   width: 260px;
 }
-
-.set-base .page-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 14px 18px 6px;
-}
 </style>
 
 <style scoped>

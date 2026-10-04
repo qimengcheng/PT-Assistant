@@ -255,7 +255,7 @@ async function multiFlush() {
 // 这里用 hasRoute 守卫而不是删按钮：将来补上路由后无需再改，按钮自动恢复可用。
 function viewTimeline() {
   if (!router.hasRoute("UserDataTimeline")) {
-    runtimeStore.showSnakebar("时间线视图尚未迁移到 WXT 版（依赖 konva）", { color: "warning" });
+    runtimeStore.showSnakebar(t("MyData.index.timelineNotMigrated"), { color: "warning" });
     return;
   }
   router.push({
@@ -268,7 +268,7 @@ function viewTimeline() {
 
 function viewStatistic() {
   if (!router.hasRoute("UserDataStatistic")) {
-    runtimeStore.showSnakebar("统计视图尚未迁移到 WXT 版（依赖 echarts）", { color: "warning" });
+    runtimeStore.showSnakebar(t("MyData.index.statisticNotMigrated"), { color: "warning" });
     return;
   }
   router.push({

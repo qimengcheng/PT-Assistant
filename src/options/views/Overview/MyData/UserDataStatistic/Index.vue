@@ -447,7 +447,7 @@ onMounted(async () => {
     }
   } catch (e) {
     console.error("UserDataStatistic: 数据加载失败", e);
-    useRuntimeStore().showSnakebar("统计数据加载失败", { color: "error" });
+    useRuntimeStore().showSnakebar(t("UserDataStatistic.loadFailed"), { color: "error" });
   }
 });
 

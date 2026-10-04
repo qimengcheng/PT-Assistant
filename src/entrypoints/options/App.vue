@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { message } from "antdv-next";
 import {
   AppstoreOutlined,
@@ -31,6 +32,7 @@ import ReleaseNoteDialog from "@/options/views/Layout/ReleaseNoteDialog.vue";
 
 const version = browser.runtime.getManifest().version;
 const route = useRoute();
+const { t } = useI18n();
 const runtimeStore = useRuntimeStore();
 const configStore = useConfigStore();
 
@@ -64,25 +66,25 @@ onMounted(async () => {
   }
 });
 
-const navItems = [
-  { path: "/", label: "首页", icon: HomeOutlined },
-  { path: "/sites", label: "站点管理", icon: GlobalOutlined },
-  { path: "/search", label: "搜索", icon: SearchOutlined },
-  { path: "/my-data", label: "我的数据", icon: BarChartOutlined },
-  { path: "/search-result-snapshot", label: "搜索快照", icon: FolderOpenOutlined },
-  { path: "/download-history", label: "下载历史", icon: HistoryOutlined },
-  { path: "/keep-upload-task", label: "辅种任务", icon: InboxOutlined },
-  { path: "/media-server-entity", label: "媒体库", icon: PlaySquareOutlined },
-  { path: "/set-backup", label: "数据备份", icon: CloudUploadOutlined },
-  { path: "/set-downloader", label: "下载器", icon: DownloadOutlined },
-  { path: "/set-media-server", label: "媒体服务器", icon: PlayCircleOutlined },
-  { path: "/set-base", label: "基础设置", icon: SettingOutlined },
-  { path: "/technology-stack", label: "技术栈", icon: AppstoreOutlined },
-  { path: "/special-thank", label: "特别感谢", icon: TeamOutlined },
-  { path: "/logger", label: "运行日志", icon: FileSearchOutlined },
-  { path: "/debug/site-definitions", label: "站点定义", icon: FileTextOutlined, dev: true },
-  { path: "/debugger", label: "调试信息", icon: ToolOutlined, dev: true },
-];
+const navItems = computed(() => [
+  { path: "/", label: t("layout.nav.home"), icon: HomeOutlined },
+  { path: "/sites", label: t("layout.nav.sites"), icon: GlobalOutlined },
+  { path: "/search", label: t("common.search"), icon: SearchOutlined },
+  { path: "/my-data", label: t("route.Overview.MyData"), icon: BarChartOutlined },
+  { path: "/search-result-snapshot", label: t("layout.nav.snapshot"), icon: FolderOpenOutlined },
+  { path: "/download-history", label: t("route.Overview.DownloadHistory"), icon: HistoryOutlined },
+  { path: "/keep-upload-task", label: t("route.Overview.KeepUploadTask"), icon: InboxOutlined },
+  { path: "/media-server-entity", label: t("route.Overview.MediaServerEntity"), icon: PlaySquareOutlined },
+  { path: "/set-backup", label: t("layout.nav.backup"), icon: CloudUploadOutlined },
+  { path: "/set-downloader", label: t("layout.nav.downloader"), icon: DownloadOutlined },
+  { path: "/set-media-server", label: t("layout.nav.mediaServer"), icon: PlayCircleOutlined },
+  { path: "/set-base", label: t("layout.nav.basicSettings"), icon: SettingOutlined },
+  { path: "/technology-stack", label: t("layout.nav.techStack"), icon: AppstoreOutlined },
+  { path: "/special-thank", label: t("route.About.SpecialThank"), icon: TeamOutlined },
+  { path: "/logger", label: t("layout.nav.logger"), icon: FileSearchOutlined },
+  { path: "/debug/site-definitions", label: t("layout.nav.siteDefinitions"), icon: FileTextOutlined, dev: true },
+  { path: "/debugger", label: t("route.Devtools.Debugger"), icon: ToolOutlined, dev: true },
+]);
 
 /**
  * 需要缓存的路由组件名，对应各 Index.vue 里的 defineOptions({ name })。
@@ -143,14 +145,14 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
             >
               <component :is="item.icon" style="font-size: 14px" />
               <span>{{ item.label }}</span>
-              <a-tag v-if="item.dev" color="blue" style="margin-left: auto">调试</a-tag>
+              <a-tag v-if="item.dev" color="blue" style="margin-left: auto">{{ t("layout.nav.devTag") }}</a-tag>
             </router-link>
           </nav>
 
           <footer class="nav-footer">
-            <span v-if="backgroundOk === true" class="status ok">● background 正常</span>
-            <span v-else-if="backgroundOk === false" class="status bad">● background 未响应</span>
-            <span v-else class="status">● 正在连接 background…</span>
+            <span v-if="backgroundOk === true" class="status ok">● {{ t("layout.nav.backgroundOk") }}</span>
+            <span v-else-if="backgroundOk === false" class="status bad">● {{ t("layout.nav.backgroundFailed") }}</span>
+            <span v-else class="status">● {{ t("layout.nav.backgroundConnecting") }}</span>
           </footer>
         </aside>
 

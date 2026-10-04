@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { definitionList, getDefinedSiteMetadata } from "@ptd/site";
 import type { ISiteMetadata } from "@ptd/site";
 
@@ -8,6 +9,8 @@ import type { ISiteMetadata } from "@ptd/site";
  * 点击某个站点时才通过 getDefinedSiteMetadata() 动态 import 对应的 definition chunk ——
  * 这是「340 个定义按需加载」架构的直接验证。
  */
+const { t } = useI18n();
+
 const keyword = ref("");
 const selected = ref<ISiteMetadata | null>(null);
 const selectedId = ref<string | null>(null);
@@ -39,10 +42,10 @@ async function viewSite(id: string) {
   <div class="layout">
     <aside class="defs">
       <header>
-        <h1>站点定义</h1>
+        <h1>{{ t("SiteDefinitions.title") }}</h1>
         <span class="count">{{ filteredList.length }} / {{ definitionList.length }}</span>
       </header>
-      <input v-model="keyword" type="search" placeholder="搜索站点 id…" class="search" />
+      <input v-model="keyword" type="search" :placeholder="t('SiteDefinitions.searchPlaceholder')" class="search" />
       <ul class="site-list">
         <li
           v-for="id in filteredList"
@@ -56,7 +59,7 @@ async function viewSite(id: string) {
     </aside>
 
     <section class="defs-detail">
-      <div v-if="loading" class="hint">加载定义中…</div>
+      <div v-if="loading" class="hint">{{ t("SiteDefinitions.loading") }}</div>
       <div v-else-if="error" class="hint error">{{ error }}</div>
       <template v-else-if="selected">
         <h2>{{ selected.name ?? selectedId }}</h2>
@@ -89,7 +92,7 @@ async function viewSite(id: string) {
           </tbody>
         </table>
       </template>
-      <div v-else class="hint">← 点击左侧站点查看按需加载的定义元数据</div>
+      <div v-else class="hint">{{ t("SiteDefinitions.selectHint") }}</div>
     </section>
   </div>
 </template>

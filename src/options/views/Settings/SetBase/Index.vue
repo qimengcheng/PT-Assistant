@@ -5,6 +5,7 @@
  * 自动持久化（每次变更自动 $save），无需手动保存按钮。
  */
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
 import UiWindow from "./UiWindow.vue";
@@ -15,14 +16,16 @@ import BackupWindow from "./BackupWindow.vue";
 import SocialInformationWindow from "./SocialInformationWindow.vue";
 import NativeBridgeWindow from "./NativeBridgeWindow.vue";
 
+const { t } = useI18n();
+
 const tabs = [
-  { key: "ui", label: "界面与内容脚本", component: UiWindow },
-  { key: "user-info", label: "用户信息", component: UserInfoWindow },
-  { key: "search-entity", label: "搜索", component: SearchEntityWindow },
-  { key: "download", label: "下载", component: DownloadWindow },
-  { key: "backup", label: "备份", component: BackupWindow },
-  { key: "social-information", label: "社交信息", component: SocialInformationWindow },
-  { key: "native-bridge", label: "原生通信桥", component: NativeBridgeWindow },
+  { key: "ui", label: t("SetBase.Index.tabUi"), component: UiWindow },
+  { key: "user-info", label: t("SetBase.Index.tabUserInfo"), component: UserInfoWindow },
+  { key: "search-entity", label: t("SetBase.Index.tabSearch"), component: SearchEntityWindow },
+  { key: "download", label: t("SetBase.Index.tabDownload"), component: DownloadWindow },
+  { key: "backup", label: t("SetBase.Index.tabBackup"), component: BackupWindow },
+  { key: "social-information", label: t("SetBase.Index.tabSocialInformation"), component: SocialInformationWindow },
+  { key: "native-bridge", label: t("SetBase.Index.tabNativeBridge"), component: NativeBridgeWindow },
 ] as const;
 
 const route = useRoute();
@@ -39,8 +42,8 @@ watch(activeKey, (key) => {
 <template>
   <div class="set-base">
     <div class="page-header">
-      <h2>基础设置</h2>
-      <span class="hint">变更即时保存，无需手动确认</span>
+      <h2>{{ t("SetBase.Index.pageTitle") }}</h2>
+      <span class="hint">{{ t("SetBase.Index.saveHint") }}</span>
     </div>
 
     <div class="set-base-body">

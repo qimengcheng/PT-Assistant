@@ -42,15 +42,6 @@ body {
   background: var(--pt-color-bg-body);
 }
 
-/* ===== 全局布局修正 =====
-   antd 的 a-card 标题区（#title）默认没有下边距，多个页面把工具栏放在标题槽、
-   表格放在正文槽，两者会紧贴在一起。这里统一补一段间距。
-   用属性包含选择器而非固定类名，是为了不依赖 antd 的 prefixCls
-   （它由 getPrefixCls 动态拼出，写死 ant- 前缀在换前缀或版本时会静默失效）。 */
-[class*="card-head-title"] {
-  padding-bottom: 12px;
-}
-
 /* 工具栏与下方表格/内容的间距。多数页面的 .toolbar 定义在 scoped style 里且只写了
    gap / padding，没有 margin-bottom，这里统一补上；scoped 的特异性更高，
    但它们没声明 margin-bottom，所以本规则仍会生效。
@@ -198,12 +189,6 @@ body {
 .home .sub {
   color: var(--pt-color-text-secondary);
   margin-bottom: 24px;
-}
-
-.cards {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 28px;
 }
 
 .card {

@@ -239,7 +239,7 @@ function keywordChecked(keyword: string) {
 <template>
   <a-card size="small">
     <template #title>
-      <div class="toolbar">
+      <a-flex align="center" gap="small">
         <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
         <a-button danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
@@ -265,60 +265,60 @@ function keywordChecked(keyword: string) {
 
         <a-button @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span>{{ t('SetSite.index.reBuildMap') }}</span></a-button>
 
-        <div class="toolbar-spacer" />
-
-        <a-input
-          v-model:value="tableWaitFilterRef"
-          allow-clear
-          size="small"
-          class="toolbar-filter"
-        >
-          <template #prefix>
-            <a-popover trigger="click" placement="bottomLeft">
-              <template #content>
-                <div class="filter-panel">
-                  <label
-                    v-for="keyword in booleanUserConfigKeywords"
-                    :key="keyword"
-                    class="filter-row"
-                  >
-                    <a-checkbox
-                      :checked="keywordChecked(keyword)"
-                      @change="
-                        (e: any) => {
-                          toggleUserConfigFilter(keyword, e.target.checked);
-                        }
-                      "
+        <a-flex flex="auto" justify="flex-end" align="center">
+          <a-input
+            v-model:value="tableWaitFilterRef"
+            allow-clear
+            size="small"
+            class="toolbar-filter"
+          >
+            <template #prefix>
+              <a-popover trigger="click" placement="bottomLeft">
+                <template #content>
+                  <div class="filter-panel">
+                    <label
+                      v-for="keyword in booleanUserConfigKeywords"
+                      :key="keyword"
+                      class="filter-row"
                     >
-                      {{ t(`SetSite.common.${keyword}`) }}
-                    </a-checkbox>
-                  </label>
+                      <a-checkbox
+                        :checked="keywordChecked(keyword)"
+                        @change="
+                          (e: any) => {
+                            toggleUserConfigFilter(keyword, e.target.checked);
+                          }
+                        "
+                      >
+                        {{ t(`SetSite.common.${keyword}`) }}
+                      </a-checkbox>
+                    </label>
 
-                  <a-divider class="filter-divider" />
+                    <a-divider class="filter-divider" />
 
-                  <div class="filter-subtitle">{{ t("SetSite.common.groups") }}</div>
-                  <label v-for="(sites, group) in metadataStore.getSitesGroupData" :key="group" class="filter-row">
-                    <a-checkbox
-                      :checked="groupChecked(String(group))"
-                      @change="
-                        (e: any) => {
-                          toggleGroupFilter(String(group), e.target.checked);
-                        }
-                      "
-                    >
-                      {{ group }} ({{ sites.length }})
-                    </a-checkbox>
-                  </label>
-                </div>
-              </template>
-              <FilterOutlined class="filter-trigger" @click="buildFilterDictFn('')" />
-            </a-popover>
-          </template>
-          <template #suffix>
-            <SearchOutlined />
-          </template>
-        </a-input>
-      </div>
+                    <div class="filter-subtitle">{{ t("SetSite.common.groups") }}</div>
+                    <label v-for="(sites, group) in metadataStore.getSitesGroupData" :key="group" class="filter-row">
+                      <a-checkbox
+                        :checked="groupChecked(String(group))"
+                        @change="
+                          (e: any) => {
+                            toggleGroupFilter(String(group), e.target.checked);
+                          }
+                        "
+                      >
+                        {{ group }} ({{ sites.length }})
+                      </a-checkbox>
+                    </label>
+                  </div>
+                </template>
+                <FilterOutlined class="filter-trigger" @click="buildFilterDictFn('')" />
+              </a-popover>
+            </template>
+            <template #suffix>
+              <SearchOutlined />
+            </template>
+          </a-input>
+        </a-flex>
+      </a-flex>
     </template>
 
     <a-table
@@ -456,16 +456,7 @@ function keywordChecked(keyword: string) {
 </template>
 
 <style scoped lang="scss">
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-spacer {
-  flex: 1 1 0;
-}
-
+/* 筛选框宽度上限：不是布局，交给 a-flex 也表达不了 */
 .toolbar-filter {
   max-width: 320px;
 }

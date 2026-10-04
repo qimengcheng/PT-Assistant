@@ -151,8 +151,7 @@ async function submit() {
     </template>
 
     <template #footer>
-      <div class="dialog-footer">
-        <div style="flex: 1" />
+      <a-flex justify="flex-end" align="center" gap="small">
         <a-button color="blue" variant="text" icon-placement="start" @click="showDialog = false">
           <template #icon>
             <CloseCircleOutlined />
@@ -171,7 +170,7 @@ async function submit() {
           </template>
           <span class="ml-1">{{ t("common.dialog.ok") }}</span>
         </a-button>
-      </div>
+      </a-flex>
     </template>
   </a-modal>
 
@@ -183,13 +182,6 @@ async function submit() {
 </template>
 
 <style scoped lang="scss">
-/* 标题栏右侧的关闭按钮（原来放在 v-toolbar 的 #append 上，antd 标题插槽需自行排版） */
-.dialog-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 /* 原 v-textarea / v-file-input 的 persistent-hint */
 .field-hint {
   margin-top: 4px;

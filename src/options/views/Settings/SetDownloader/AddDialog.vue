@@ -124,7 +124,7 @@ const selectedDescription = computed(() => {
     </div>
 
     <template #footer>
-      <div class="dialog-footer">
+      <a-flex align="center" gap="small">
         <a-button
           :href="`${REPO_URL}/tree/master/src/packages/downloader`"
           color="default"
@@ -138,54 +138,49 @@ const selectedDescription = computed(() => {
           {{ t("SetDownloader.add.newType") }}
         </a-button>
 
-        <div style="flex: 1" />
-
-        <a-button color="danger" variant="text" @click="showDialog = false">
-          <template #icon>
-            <CloseCircleOutlined />
-          </template>
-          {{ t("common.dialog.cancel") }}
-        </a-button>
-        <a-button
-          v-if="currentStep === 1"
-          color="blue"
-          variant="text"
-          icon-placement="start"
-          @click="currentStep--"
-        >
-          <template #icon>
-            <LeftOutlined />
-          </template>
-          {{ t("common.dialog.prev") }}
-        </a-button>
-        <a-button
-          v-if="currentStep === 0"
-          :disabled="selectedClientType == null"
-          color="blue"
-          variant="text"
-          icon-placement="end"
-          @click="currentStep++"
-        >
-          {{ t("common.dialog.next") }}
-          <template #icon>
-            <RightOutlined />
-          </template>
-        </a-button>
-        <a-button v-if="currentStep === 1" type="primary" @click="saveStoredDownloaderConfig">
-          <template #icon>
-            <CheckCircleOutlined />
-          </template>
-          {{ t("common.dialog.ok") }}
-        </a-button>
-      </div>
+        <!-- 右侧这组用 flex="auto" 吃掉剩余宽度并自己右对齐，而不是靠外层
+             justify="space-between"：步骤 2 时左侧「新建类型」按钮 v-show 隐藏，
+             space-between 剩一个子元素会贴到左边，整条按钮组就跑位了。 -->
+        <a-flex flex="auto" justify="flex-end" align="center" gap="small">
+          <a-button color="danger" variant="text" @click="showDialog = false">
+            <template #icon>
+              <CloseCircleOutlined />
+            </template>
+            {{ t("common.dialog.cancel") }}
+          </a-button>
+          <a-button
+            v-if="currentStep === 1"
+            color="blue"
+            variant="text"
+            icon-placement="start"
+            @click="currentStep--"
+          >
+            <template #icon>
+              <LeftOutlined />
+            </template>
+            {{ t("common.dialog.prev") }}
+          </a-button>
+          <a-button
+            v-if="currentStep === 0"
+            :disabled="selectedClientType == null"
+            color="blue"
+            variant="text"
+            icon-placement="end"
+            @click="currentStep++"
+          >
+            {{ t("common.dialog.next") }}
+            <template #icon>
+              <RightOutlined />
+            </template>
+          </a-button>
+          <a-button v-if="currentStep === 1" type="primary" @click="saveStoredDownloaderConfig">
+            <template #icon>
+              <CheckCircleOutlined />
+            </template>
+            {{ t("common.dialog.ok") }}
+          </a-button>
+        </a-flex>
+      </a-flex>
     </template>
   </a-modal>
 </template>
-
-<style scoped lang="scss">
-.dialog-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-</style>

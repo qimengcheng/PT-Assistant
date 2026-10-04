@@ -148,27 +148,28 @@ onUnmounted(() => {
 <template>
   <a-card size="small">
     <template #title>
-      <div class="toolbar">
+      <a-flex align="center" gap="small">
         <a-button type="primary" :loading="isLoadingHistory" @click="() => throttleLoadDownloadHistory()"><template #icon><SyncOutlined /></template><span>{{ t('DownloadHistory.refresh') }}</span></a-button>
         <a-divider type="vertical" class="mx-2" />
         <a-button :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span>{{ t('DownloadHistory.reDownload') }}</span></a-button>
         <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-        <div class="toolbar-spacer" />
-        <a-input
-          v-model:value="tableWaitFilterRef"
-          allow-clear
-          size="small"
-          class="toolbar-filter"
-          :placeholder="t('DownloadHistory.filterPlaceholder')"
-        >
-          <template #prefix>
-            <FilterOutlined class="filter-trigger" @click="showAdvanceFilterDialog = true" />
-          </template>
-          <template #suffix>
-            <SearchOutlined />
-          </template>
-        </a-input>
-      </div>
+        <a-flex flex="auto" justify="flex-end" align="center">
+          <a-input
+            v-model:value="tableWaitFilterRef"
+            allow-clear
+            size="small"
+            class="toolbar-filter"
+            :placeholder="t('DownloadHistory.filterPlaceholder')"
+          >
+            <template #prefix>
+              <FilterOutlined class="filter-trigger" @click="showAdvanceFilterDialog = true" />
+            </template>
+            <template #suffix>
+              <SearchOutlined />
+            </template>
+          </a-input>
+        </a-flex>
+      </a-flex>
     </template>
 
     <a-table
@@ -268,16 +269,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-spacer {
-  flex: 1 1 0;
-}
-
+/* 筛选框宽度上限：不是布局，交给 a-flex 也表达不了 */
 .toolbar-filter {
   max-width: 360px;
 }

@@ -63,34 +63,23 @@ async function viewSite(id: string) {
       <div v-else-if="error" class="hint error">{{ error }}</div>
       <template v-else-if="selected">
         <h2>{{ selected.name ?? selectedId }}</h2>
-        <table class="detail">
-          <tbody>
-            <tr>
-              <th>id</th>
-              <td>{{ selectedId }}</td>
-            </tr>
-            <tr>
-              <th>schema</th>
-              <td>{{ selected.schema }}</td>
-            </tr>
-            <tr>
-              <th>type</th>
-              <td>{{ selected.type }}</td>
-            </tr>
-            <tr v-if="selected.tags?.length">
-              <th>tags</th>
-              <td>
-                <span v-for="tag in selected.tags" :key="tag" class="tag">{{ tag }}</span>
-              </td>
-            </tr>
-            <tr>
-              <th>urls</th>
-              <td>
-                <div v-for="url in selected.urls" :key="url" class="url">{{ url }}</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <a-descriptions class="detail" :column="1" size="small" bordered>
+          <a-descriptions-item label="id">
+            <span>{{ selectedId }}</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="schema">
+            <span>{{ selected.schema }}</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="type">
+            <span>{{ selected.type }}</span>
+          </a-descriptions-item>
+          <a-descriptions-item v-if="selected.tags?.length" label="tags">
+            <a-tag v-for="tag in selected.tags" :key="tag" color="blue">{{ tag }}</a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="urls">
+            <div v-for="url in selected.urls" :key="url" class="url">{{ url }}</div>
+          </a-descriptions-item>
+        </a-descriptions>
       </template>
       <div v-else class="hint">{{ t("SiteDefinitions.selectHint") }}</div>
     </section>

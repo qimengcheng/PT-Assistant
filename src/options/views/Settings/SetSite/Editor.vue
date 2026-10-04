@@ -80,8 +80,19 @@ watch(siteId, (newValue) => {
   void initSiteData(newValue);
 });
 
-// ===== 校验：替代旧实现的 Vuetify v-form + :rules，改为显式派生，保持 OK 按钮门控语义 =====
-// 提示文案直接复用 formValidateRules 的默认信息，与旧表单实际显示的文本一致
+// ===== 校验：显式派生，保持 OK 按钮门控语义 =====
+//
+// 这里**刻意不用 a-form 的 :rules**（之前那份重构清单把它列成候选，我核过代码后撤回）：
+// 1) 门控条件里有两项拿不到 form 的校验模型里 —— `missingRequiredSetting` 要遍历
+//    siteMetaData.userInputSettingMeta 做动态必填校验（规则集运行时才确定，
+//    :rules 表达不了）；`sortIndexMissing` 校验的是 number/NaN 而不是空值。
+//    这两项只能继续留在 computed 里。
+// 2) url 那一项的输入控件是 a-radio-group 里嵌的 a-input（手输自定义地址），
+//    不是 form item 的直接子控件，FormItem 绑不到它的值。
+// 既然门控仍要靠 computed，规则再写一份到 :rules 上就是两份逻辑并存 ———
+// 与其维护两份，不如保持现状，只让「红框 + 文案」的呈现走组件自己的 API。
+//
+// 提示文案复用 formValidateRules 的默认信息，与旧表单实际显示的文本一致
 const requiredHint = String(formValidateRules.require()(undefined));
 const urlHint = String(formValidateRules.url()(undefined));
 

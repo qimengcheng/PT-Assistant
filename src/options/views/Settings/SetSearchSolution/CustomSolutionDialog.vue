@@ -61,7 +61,6 @@ const dialogTitle = computed(() => {
 
 
 const formRef = ref();
-const formValid = ref<boolean>(false);
 const searchSolution = ref<ISearchSolution>({} as ISearchSolution);
 const searchSolutionEntryRequestConfig = ref<string>("");
 
@@ -106,7 +105,6 @@ async function onEnter() {
     null,
     2,
   );
-  formValid.value = false;
 }
 
 watch(showDialog, (visible) => {
@@ -147,7 +145,6 @@ async function doSubmit() {
     :width="800"
     :ok-text="t('common.dialog.ok')"
     :cancel-text="t('common.dialog.cancel')"
-    :ok-button-props="{ disabled: !formValid }"
     @update:open="(v: boolean) => (showDialog = v)"
     @ok="doSubmit"
   >
@@ -157,7 +154,6 @@ async function doSubmit() {
       :model="{ name: searchSolution.name, requestConfig: searchSolutionEntryRequestConfig }"
       :rules="rules"
       layout="vertical"
-      @validate="({ errorFields }: { errorFields?: any[] }) => (formValid = !errorFields?.length)"
     >
       <a-form-item :label="t('SetSearchSolution.CustomSolutionDialog.solutionName')" name="name">
         <a-input v-model:value="searchSolution.name" />

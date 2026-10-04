@@ -510,7 +510,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
         current: tablePage,
         pageSize,
         showSizeChanger: true,
-        size: 'default',
+        size: 'small',
         total: filteredTorrents.length,
       }"
       size="small"

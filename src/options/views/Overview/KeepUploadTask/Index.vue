@@ -235,7 +235,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 </script>
 
 <template>
-  <a-alert class="mb-2" type="info" show-icon :message="t('KeepUploadTask.title')" />
+  <a-alert class="mb-2" type="info" show-icon :title="t('KeepUploadTask.title')" />
 
   <a-card size="small">
     <template #title>
@@ -388,14 +388,14 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 
     </a-table>
 
-    <a-alert v-if="!loading && tasks.length === 0" class="mt-2" type="info" show-icon :message="t('KeepUploadTask.emptyNotice')" />
+    <a-alert v-if="!loading && tasks.length === 0" class="mt-2" type="info" show-icon :title="t('KeepUploadTask.emptyNotice')" />
   </a-card>
 
   <a-alert
     class="mt-4"
     type="warning"
     show-icon
-    :message="t('KeepUploadTask.warning.title')"
+    :title="t('KeepUploadTask.warning.title')"
   >
     <!-- a-alert 的 description 渲染为普通 div，字符串里的 \n 不会换行，
          旧写法三条注意事项会被压成一行；改用插槽逐条渲染 -->

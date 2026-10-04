@@ -242,13 +242,13 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
 
 <template>
   <div class="set-search-solution">
-    <a-alert :message="t('route.Settings.SetSearchSolution')" type="info" show-icon style="margin-bottom: 12px" />
+    <a-alert :title="t('route.Settings.SetSearchSolution')" type="info" show-icon style="margin-bottom: 12px" />
 
     <a-card>
       <div class="toolbar">
-        <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span class="ml-1">{{ t('common.btn.add') }}</span></a-button>
+        <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
         <a-divider type="vertical" />
 
@@ -260,12 +260,12 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
           style="display: none"
           @change="importSearchSolution"
         />
-        <a-button @click="triggerImportFile"><template #icon><ImportOutlined /></template><span class="ml-1">{{ t('common.import') }}</span></a-button>
-        <a-button :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.export') }}</span></a-button>
+        <a-button @click="triggerImportFile"><template #icon><ImportOutlined /></template><span>{{ t('common.import') }}</span></a-button>
+        <a-button :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span>{{ t('common.export') }}</span></a-button>
 
         <a-divider type="vertical" />
 
-        <a-button disabled><template #icon><QuestionCircleOutlined /></template><span class="ml-1">{{ t('common.howToUse') }}</span></a-button>
+        <a-button disabled><template #icon><QuestionCircleOutlined /></template><span>{{ t('common.howToUse') }}</span></a-button>
 
         <div class="toolbar-right">
           <a-input v-model:value="tableFilter" allow-clear :placeholder="t('common.search')" style="width: 240px">

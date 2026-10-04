@@ -211,7 +211,7 @@ onMounted(() => {
         type="warning"
         show-icon
         class="bridge-alert"
-        :message="t('SetNativeBridge.info.setupCommand')"
+        :title="t('SetNativeBridge.info.setupCommand')"
       >
         <code class="setup-command">{{ setupCommand }}</code>
         <div class="setup-hint">{{ t("SetNativeBridge.info.setupHint") }}</div>
@@ -221,7 +221,7 @@ onMounted(() => {
     <!-- ===== 说明 ===== -->
     <div class="group">
       <div class="group-title">{{ t("SetNativeBridge.info.title") }}</div>
-      <a-alert type="info" show-icon :message="t('SetNativeBridge.info.description')">
+      <a-alert type="info" show-icon :title="t('SetNativeBridge.info.description')">
         <i18n-t keypath="SetNativeBridge.info.cliRequired" tag="p" class="cli-required">
           <template #0>
             <a href="https://github.com/pt-plugins/ptd-cli" target="_blank" rel="noopener">
@@ -234,7 +234,7 @@ onMounted(() => {
         type="warning"
         show-icon
         class="bridge-alert"
-        :message="t('SetNativeBridge.info.privacy')"
+        :title="t('SetNativeBridge.info.privacy')"
       />
     </div>
   </div>

@@ -81,7 +81,7 @@ const tableDependencies = computed<ITData[]>(() => Object.values(technologyData.
 
 <template>
   <div class="technology-stack">
-    <a-alert :message="t('TechnologyStack.thankNote')" type="info" show-icon class="block-alert" />
+    <a-alert :title="t('TechnologyStack.thankNote')" type="info" show-icon class="block-alert" />
 
     <a-card :title="t('TechnologyStack.ptppHistory')" class="block-card">
       <a-timeline mode="left">

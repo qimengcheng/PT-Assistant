@@ -77,7 +77,7 @@ function save() {
     @update:open="(v: boolean) => (showDialog = v)"
     @ok="save"
   >
-    <a-alert type="info" show-icon :message="t('SetDownloader.siteFilter.excludedSitesHint')" style="margin-bottom: 12px">
+    <a-alert type="info" show-icon :title="t('SetDownloader.siteFilter.excludedSitesHint')" style="margin-bottom: 12px">
       <template #action>
         <a-checkbox v-model:checked="allChecked" :indeterminate="indeterminate">
           {{ t("SetDownloader.siteFilter.excludedSites") }}

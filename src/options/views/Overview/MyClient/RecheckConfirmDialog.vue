@@ -40,7 +40,7 @@ function dialogEnter() {
     v-model:open="showDialog"
     :title="t('MyClient.recheckDialog.title')"
     :width="420"
-    :mask-closable="!isRechecking"
+    :mask="{ closable: !isRechecking }"
     :closable="!isRechecking"
     :keyboard="!isRechecking"
     :after-open-change="(open: boolean) => open && dialogEnter()"

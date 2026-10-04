@@ -275,8 +275,8 @@ function afterEnter() {
 
       <template #footer>
         <div class="d-flex align-center">
-          <a-button type="primary" :disabled="tableSelected.length <= 0" @click="deleteSiteUserInfo(tableSelected)"><template #icon><DeleteOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
-          <a-button type="primary" @click="exportSiteHistoryData"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.export') }}</span></a-button>
+          <a-button type="primary" :disabled="tableSelected.length <= 0" @click="deleteSiteUserInfo(tableSelected)"><template #icon><DeleteOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+          <a-button type="primary" @click="exportSiteHistoryData"><template #icon><ExportOutlined /></template><span>{{ t('common.export') }}</span></a-button>
           <div class="flex-1-1-0" />
         </div>
       </template>

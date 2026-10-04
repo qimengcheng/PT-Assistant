@@ -183,13 +183,13 @@ async function dialogEnter() {
     :closable="!importStatus.isWorking"
     :mask="{ closable: !importStatus.isWorking }"
     :keyboard="!importStatus.isWorking"
-    :body-style="{ maxHeight: '72vh', overflowY: 'auto' }"
+    :styles="{ body: { maxHeight: '72vh', overflowY: 'auto' } }"
     :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 
-    <a-alert class="mb-2" type="warning" show-icon :message="t('SetSite.oneClickImportDialog.alert1')" />
+    <a-alert class="mb-2" type="warning" show-icon :title="t('SetSite.oneClickImportDialog.alert1')" />
 
-    <a-alert class="mb-1" type="info" :message="t('SetSite.oneClickImportDialog.alert2')">
+    <a-alert class="mb-1" type="info" :title="t('SetSite.oneClickImportDialog.alert2')">
       <template #description>
         <span>
           {{

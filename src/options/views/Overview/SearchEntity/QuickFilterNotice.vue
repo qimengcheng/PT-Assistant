@@ -110,8 +110,10 @@ function selectSite(siteId: string) {
 
         <!-- 选中种子信息条 -->
         <a-divider orientation="vertical" class="mx-2" />
-        <!-- 这里原本给 a-tag 传了 `bordered` 属性，antdv-next 1.5.6 下 true/false 都渲染 filled（死属性），
-             已删；确实要描边请写 variant="outlined" -->
+        <!-- 这里原本给 a-tag 传了 `bordered` 属性。注意它不是「不存在的 prop」——
+             antdv-next 1.5.6 的 Tag 确实声明了 bordered，但渲染层完全忽略：
+             SSR 实测 true / false / 不传一律输出 ant-tag-filled，彼此零差异。
+             真正切换实心/描边的是 variant="solid" / variant="outlined"，已按它改写。 -->
         <a-tag class="my-2 chip_limit_width" color="blue">
           <CheckCircleFilled class="mr-1" />
           {{

@@ -347,9 +347,11 @@ function dialogLeave() {
 
         <a-row>
           <a-col :span="24" style="padding: 0">
+            <!-- Collapse 没有 `disabled` prop，写上去会变成根 div 上的裸 HTML 属性、毫无作用；
+                 开关折叠用 `collapsible: 'disabled'`。见 scripts/check-dead-props.mjs -->
             <a-collapse
               ghost
-              :disabled="!((selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []).length > 0)"
+              :collapsible="!((selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []).length > 0) ? 'disabled' : undefined"
             >
               <a-collapse-panel key="1" :header="t('common.advancedSettings')">
                 <a-form-item

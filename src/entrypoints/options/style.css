@@ -433,8 +433,15 @@ body {
    整个弹窗随 .ant-modal-wrap 一起滚，确认按钮会被顶出视口。这里只给 body 加限高内滚动。
    220px 固定占用 = top 100 + container 上 padding 16 + 标题行 24 + 标题下间距 8
    + 底部按钮区 40（marginTop 8 + 按钮 32）+ container 下 padding 16 + 16 余量。
-   弹层（select 下拉、popover 等）默认 teleport 到 body，不在本容器内，不会被裁剪。 */
+/* 弹层（select 下拉、popover 等）默认 teleport 到 body，不在本容器内，不会被裁剪。
+   overflow-x 必须显式 hidden：一个轴设成 auto 会让另一个轴的 visible 也按 auto 计算，
+   而 antdv-next 的 .ant-modal-body 在非 wireframe 下 padding 是 0（padding 全在
+   .ant-modal-container 上，见 dist/modal/style/token 的 bodyPadding/contentPadding），
+   于是 <a-row :gutter="16"> 的 margin-inline:-8px 没有 padding 可吸收，
+   凭空撑出 16px → 每个带栅格的弹窗底部都挂一条横向滚动条（下载器编辑弹窗实测如此）。
+   裁掉的正是栅格设计上该被外层 padding 吸收的那 8px，列自带 8px 内衬，不丢内容。 */
 .ant-modal-body {
   max-height: calc(100vh - 220px);
+  overflow-x: hidden;
   overflow-y: auto;
 }

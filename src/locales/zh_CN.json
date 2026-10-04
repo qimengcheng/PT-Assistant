@@ -816,6 +816,8 @@
     "editor": {
       "addressTip": "完整的服务器地址（含端口），如：http://192.168.1.1:5000/",
       "autoStart": "发送种子时自动开始下载",
+      "bypassCsrf": "绕过 CSRF 保护",
+      "bypassCsrfTip": "移除请求的 Origin 头以绕过 qBittorrent 的跨站请求伪造(CSRF)校验，开启后无需在 qBittorrent 中关闭 CSRF 保护",
       "nameTip": "取一个好听又好分辨的名称",
       "password": "密码",
       "timeout": "超时时长（秒）",

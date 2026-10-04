@@ -816,6 +816,8 @@
     "editor": {
       "addressTip": "Full Server Address (may include port or path), Like: http://192.168.1.1:5000/",
       "autoStart": "Automatically start downloading when sending a torrent",
+      "bypassCsrf": "Bypass CSRF protection",
+      "bypassCsrfTip": "Strips the Origin header to bypass qBittorrent's cross-site request forgery (CSRF) check, so you don't need to disable CSRF protection in qBittorrent.",
       "nameTip": "Pick a nice and recognizable name for this Download Server",
       "password": "Password",
       "timeout": "Timeout (seconds)",

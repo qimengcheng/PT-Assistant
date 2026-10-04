@@ -132,32 +132,19 @@ const advanceOptions = computed(() => clientMeta.value?.advanceAddTorrentOptions
       </a-button>
     </a-form-item>
 
-    <a-form-item v-if="clientMeta?.feature?.DefaultAutoStart?.allowed">
-      <a-switch
-        v-model:checked="clientConfig.feature!.DefaultAutoStart"
-        :label="t('SetDownloader.editor.autoStart')"
-        checked-children="开"
-        un-checked-children="关"
-      />
+    <a-form-item v-if="clientMeta?.feature?.DefaultAutoStart?.allowed" :label="t('SetDownloader.editor.autoStart')">
+      <a-switch v-model:checked="clientConfig.feature!.DefaultAutoStart" checked-children="开" un-checked-children="关" />
     </a-form-item>
 
-    <a-form-item v-if="clientMeta?.feature?.BypassCSRF?.allowed">
-      <a-switch
-        v-model:checked="clientConfig.feature!.BypassCSRF"
-        label="绕过 CSRF 保护"
-      />
-      <div class="form-tip">
-        移除请求的 Origin 头以绕过 qBittorrent 的跨站请求伪造(CSRF)校验，开启后无需在 qBittorrent 中关闭 CSRF 保护
-      </div>
+    <a-form-item v-if="clientMeta?.feature?.BypassCSRF?.allowed" :label="t('SetDownloader.editor.bypassCsrf')">
+      <a-switch v-model:checked="clientConfig.feature!.BypassCSRF" />
+      <div class="form-tip">{{ t("SetDownloader.editor.bypassCsrfTip") }}</div>
     </a-form-item>
 
     <a-collapse v-if="advanceOptions.length > 0" bordered ghost>
       <a-collapse-panel :key="1" :header="t('common.advancedSettings')">
-        <a-form-item v-for="opt in advanceOptions" :key="opt.key">
-          <a-switch
-            v-model:checked="clientConfig.advanceAddTorrentOptions![opt.key]"
-            :label="opt.name"
-          />
+        <a-form-item v-for="opt in advanceOptions" :key="opt.key" :label="opt.name">
+          <a-switch v-model:checked="clientConfig.advanceAddTorrentOptions![opt.key]" />
           <div v-if="opt.description" class="form-tip">{{ opt.description }}</div>
         </a-form-item>
       </a-collapse-panel>
@@ -168,7 +155,7 @@ const advanceOptions = computed(() => clientMeta.value?.advanceAddTorrentOptions
     <a-alert v-if="clientMeta?.warning?.length" type="warning" show-icon style="margin-top: 12px">
       <template #message>
         <ul style="margin: 0; padding-left: 20px">
-          <li v-for="(data, index) in clientMeta.warning" :key="index">● {{ data }}</li>
+          <li v-for="(data, index) in clientMeta.warning" :key="index">{{ data }}</li>
         </ul>
       </template>
     </a-alert>

@@ -110,36 +110,49 @@ body {
   overflow-y: auto;
 }
 
-.menu-item {
+/* 导航项本身交给 a-menu（inline 模式）。下面几条只做三件事：
+   1) 把默认 40px 行高压回原来的紧凑高度（17 个菜单项 + brand + 状态条，矮窗口下要放得下）；
+   2) 让菜单背景透明，继承 .nav 的底色；
+   3) 把 8px 12px 的内边距从 <li> 挪到里面的 router-link <a> 上（见下）。
+   选中/悬停底色、字号、字重都由组件的 token 提供，不再手写。 */
+.menu .ant-menu-inline {
+  background: transparent;
+}
+
+.menu .ant-menu-item {
+  height: auto;
+  margin: 2px 0;
+  /* 内边距下移到 .nav-link：<li> 只留 a-menu 自己的高亮底色范围，
+     <a> 撑满整行才能让整条都是可点区域（原来 .menu-item 直接就是那个 <a>）。 */
+  padding: 0 !important;
+  line-height: normal;
+  font-size: 13px;
+}
+
+/* a-menu 把插槽包在 .ant-menu-title-content 里（inline 模式下是 flex 项），
+   让它铺满 <li> 的内容宽，下面的 <a> 才能拿到整行的点击区域。 */
+.menu .ant-menu-title-content {
+  display: block;
+  width: 100%;
+}
+
+/* 导航项本体：router-link 渲染的 <a>。flex 布局与颜色都从原 .menu-item 搬过来，
+   color:inherit / text-decoration:none 是为了让链接不带上浏览器默认的蓝色下划线，
+   文字颜色仍由 a-menu 的 token（选中态变主色）决定。 */
+.nav-link {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  font-size: 13px;
-  color: var(--pt-color-text);
+  color: inherit;
+  text-decoration: none;
   text-align: left;
   cursor: pointer;
 }
 
-.menu-item:hover {
-  background: var(--pt-color-bg-hover);
-}
-
-.menu-item.active {
-  background: var(--pt-color-bg-selected);
-  font-weight: 600;
-}
-
-.badge {
-  margin-left: auto;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--pt-color-disabled-bg);
-  color: var(--pt-color-text-secondary);
-  font-size: 10px;
+/* a-tag 在菜单项内不需要自带右边距，由 margin-left:auto 推到行尾 */
+.menu .ant-menu-item .ant-tag {
+  margin-inline-end: 0;
 }
 
 .nav-footer {

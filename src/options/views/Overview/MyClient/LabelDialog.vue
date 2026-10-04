@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { h, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
 
@@ -53,6 +53,11 @@ async function confirmSetLabel() {
     v-model:open="showDialog"
     :title="t('MyClient.label.title', { count: torrents.length })"
     :width="480"
+    :ok-text="t('common.dialog.ok')"
+    :cancel-text="t('common.dialog.cancel')"
+    :ok-button-props="{ color: 'green', variant: 'text', iconPlacement: 'start', icon: h(CheckCircleOutlined) }"
+    :cancel-button-props="{ color: 'blue', variant: 'text', iconPlacement: 'start', icon: h(CloseCircleOutlined) }"
+    @ok="confirmSetLabel"
     :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 
@@ -68,32 +73,7 @@ async function confirmSetLabel() {
     />
 
     <a-divider class="ma-0" />
-
-    <template #footer>
-      <div class="dialog-footer">
-        <div style="flex: 1" />
-        <a-button color="blue" variant="text" icon-placement="start" @click="showDialog = false">
-          <template #icon>
-            <CloseCircleOutlined />
-          </template>
-          <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
-        </a-button>
-        <a-button color="green" variant="text" icon-placement="start" @click="confirmSetLabel">
-          <template #icon>
-            <CheckCircleOutlined />
-          </template>
-          <span class="ml-1">{{ t("common.dialog.ok") }}</span>
-        </a-button>
-      </div>
-    </template>
   </a-modal>
 </template>
 
-<style scoped lang="scss">
-/* 标题栏右侧的关闭按钮（原来放在 v-toolbar 的 #append 上，antd 标题插槽需自行排版） */
-.dialog-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-</style>
+<style scoped lang="scss"></style>

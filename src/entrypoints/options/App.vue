@@ -141,17 +141,19 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
           </header>
 
           <nav class="menu">
-            <router-link
-              v-for="item in navItems"
-              :key="item.path"
-              :to="item.path"
-              class="menu-item"
-              :class="{ active: activePath === item.path }"
-            >
-              <component :is="item.icon" style="font-size: 14px" />
-              <span>{{ item.label }}</span>
-              <a-tag v-if="item.dev" color="blue" style="margin-left: auto">{{ t("layout.nav.devTag") }}</a-tag>
-            </router-link>
+            <!-- 导航项本体是 router-link 渲染的 <a>：整行可点，且保留
+                 「ctrl/中键 → 新标签页打开」。所以不用 a-menu 的 @click 自己 push
+                 —— 一旦改由菜单事件跳转，这两个修饰键点击就退化成静默无效。
+                 选中态由 :selected-keys 受控，a-menu 不参与路由。 -->
+            <a-menu mode="inline" :selected-keys="[activePath]">
+              <a-menu-item v-for="item in navItems" :key="item.path">
+                <router-link :to="item.path" class="nav-link">
+                  <component :is="item.icon" style="font-size: 14px" />
+                  <span>{{ item.label }}</span>
+                  <a-tag v-if="item.dev" color="blue" style="margin-left: auto">{{ t("layout.nav.devTag") }}</a-tag>
+                </router-link>
+              </a-menu-item>
+            </a-menu>
           </nav>
 
           <footer class="nav-footer">

@@ -1,16 +1,28 @@
 /**
- * 平移自 PT-depiler `entries/content-script/app/utils.ts`，零改动。
+ * 平移自 PT-depiler `entries/content-script/app/utils.ts`。
  *
  * 用「动态组件」的方式给 content script 实现了一个极简路由：
  * refs: https://cn.vuejs.org/guide/scaling-up/routing.html#simple-routing-from-scratch
+ *
+ * 相对上游的改动：`wrapperConfirmFn` / `doKeywordSearch` 原本走原生 `confirm()` / `prompt()`，
+ * 现改走 @/options/components/appDialog.ts 的公共对话框实现（原生弹窗挂在页面 origin 上、
+ * 阻塞主线程，且在 MV3 扩展页面被禁用）。
  */
-import { computed, shallowRef, ref, toValue } from "vue";
+import { computed, ref, shallowRef } from "vue";
+import { Modal } from "antdv-next";
 import { uniq } from "es-toolkit";
 import type { TSupportSocialSite } from "@ptd/social";
 import { getSite as createSiteInstance } from "@ptd/site";
 import type BittorrentSite from "@ptd/site/schemas/AbstractBittorrentSite.ts";
 
 import { sendMessage } from "@/messages.ts";
+import {
+  makeConfirmDanger,
+  makePromptInDialog,
+  type IDialogModalApi,
+  type TTranslate,
+} from "@/options/components/appDialog.ts";
+import { i18nInstance } from "@/options/plugins/i18n.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
@@ -77,30 +89,56 @@ export async function updatePageType(ptdData: IPtdData = {}) {
   }
 }
 
-export function wrapperConfirmFn(fn: () => any, message = "确定要执行此操作吗？") {
-  const configStore = useConfigStore();
-  const confirmStatus = configStore.contentScript.doubleConfirmAction ? confirm(message) : true;
+/**
+ * content 侧浮层宿主（shadowRoot 内那个 0x0 fixed 容器），由 init.ts 在挂载时写入。
+ * App.vue 把它交给 ConfigProvider 的 getPopupContainer，模板里的浮层才落在 shadowRoot 内。
+ */
+export const contentOverlay = shallowRef<HTMLElement | null>(null);
 
-  if (confirmStatus) {
+const translate: TTranslate = (key) => i18nInstance.global.t(key);
+
+/**
+ * content 侧的确认框与输入框对话框。
+ *
+ * 复用 appDialog.ts 的实现，但 modal 换成**静态** Modal：content 拿不到 App 上下文
+ * （App.vue 就是根组件，`<a-app>` 只能是它的后代，不能是它的祖先）。
+ * 静态方法默认挂 document.body，那里取不到扩展的任何样式，所以必须显式 getContainer
+ * 指进 shadowRoot 内的浮层宿主。
+ */
+const contentModal: IDialogModalApi = {
+  confirm: (config) => Modal.confirm({ ...config, getContainer: () => contentOverlay.value ?? document.body }),
+};
+const confirmDanger = makeConfirmDanger(contentModal, translate);
+const promptInDialog = makePromptInDialog(contentModal, translate);
+
+export async function wrapperConfirmFn(
+  fn: () => any,
+  message = translate("contentScript.confirmDefaultAction"),
+) {
+  const configStore = useConfigStore();
+  if (!configStore.contentScript.doubleConfirmAction) {
+    fn();
+    return;
+  }
+  // okType 用 primary：批量下载/复制链接不是破坏性操作，上游的原生 confirm 也没有红色按钮
+  if (await confirmDanger(message, "primary")) {
     fn();
   }
 }
 
-export function doKeywordSearch(keywords: string, plan = "default") {
-  if (!keywords) {
-    keywords = prompt("未解析到搜索关键词，请输入：", "")!;
-  }
+export async function doKeywordSearch(keywords: string, plan = "default") {
+  const search = keywords || (await promptInDialog(translate("contentScript.keywordPromptTitle")));
 
-  if (keywords) {
+  if (search) {
     // 上游 path 是 /search-entity；WXT 主路由是 /search，已在 router.ts 里配了 alias，
     // 这里沿用上游 path 以保持与原实现一致。
     sendMessage("openOptionsPage", {
       path: "/search-entity",
-      query: { search: toValue(keywords), plan, flush: 1 },
+      query: { search, plan, flush: 1 },
     }).catch();
   } else {
     const runtimeStore = useRuntimeStore();
-    runtimeStore.showSnakebar("搜索关键词不能为空", { color: "error" });
+    runtimeStore.showSnakebar(i18nInstance.global.t("contentScript.keywordEmptyError"), { color: "error" });
   }
 }
 

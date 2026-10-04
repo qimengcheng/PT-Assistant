@@ -1,51 +1,22 @@
 /**
- * 输入框对话框（原生 prompt 的替代品）。
+ * 输入框对话框（原生 prompt 的替代品，绑定到 antdv 的 App 上下文）。
  *
  * 为什么不用原生 prompt()：MV3 扩展页面禁用了原生对话框（调用**静默返回 null**，
  * 不抛错、不显示任何 UI），功能看起来就是「点了没反应」。
- * 仓库里「复制搜索方案」就是这么静默失效的。这里统一走 antdv App 上下文的 modal。
+ * 仓库里「复制搜索方案」就是这么静默失效的。
  *
- * 注意：必须在 App 上下文内使用（app.use(App) 或 ConfigProvider 包裹），
- * 否则拿不到 context，样式与 locale 会失效。
+ * 必须在 `<a-app>` 的祖先链内使用：`App.useApp()` 是 inject，拿不到上下文时默认值是
+ * `{ modal: {} }`，调 `modal.confirm` 会直接 TypeError。
+ * 上下文无关的实现在 ./appDialog.ts —— content script 没有 `<a-app>`，那边自己喂静态 Modal。
  */
-import { App, Input } from "antdv-next";
-import { h, type VNode } from "vue";
+import { App } from "antdv-next";
 import { useI18n } from "vue-i18n";
+
+import { makePromptInDialog } from "./appDialog.ts";
 
 export function usePromptInDialog() {
   const { modal } = App.useApp();
   const { t } = useI18n();
 
-  /**
-   * 返回 Promise<string | null>：确定返回输入值（去掉首尾空白，空串视为取消），取消/关闭返回 null。
-   *
-   * @param content 提示文案
-   * @param defaultValue 输入框默认值
-   */
-  function promptInDialog(content: string, defaultValue = ""): Promise<string | null> {
-    return new Promise<string | null>((resolve) => {
-      let value = defaultValue;
-
-      modal.confirm({
-        title: t("common.dialog.title.confirmAction"),
-        content: (): VNode =>
-          h("div", [
-            h("p", { style: "margin-bottom: 8px" }, content),
-            h(Input, {
-              value,
-              autofocus: true,
-              "onUpdate:value": (v: string) => {
-                value = v;
-              },
-            }),
-          ]),
-        okText: t("common.dialog.ok"),
-        cancelText: t("common.dialog.cancel"),
-        onOk: () => resolve(value.trim() || null),
-        onCancel: () => resolve(null),
-      });
-    });
-  }
-
-  return { promptInDialog };
+  return { promptInDialog: makePromptInDialog(modal, t) };
 }

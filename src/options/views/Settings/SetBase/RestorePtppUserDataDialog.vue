@@ -247,7 +247,7 @@ function toggleAll(checked: boolean) {
     :confirm-loading="isImporting"
     ok-text="导入"
     cancel-text="取消"
-    @after-open="entryDialog"
+    :after-open-change="(open: boolean) => open && entryDialog()"
     @ok="doImport"
   >
     <a-space class="mb-2" style="width: 100%; justify-content: space-between">

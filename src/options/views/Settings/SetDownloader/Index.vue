@@ -106,7 +106,7 @@ const pagination = computed(() => ({
   // 页码交给 a-table 内部非受控管理，这里只持久化 pageSize。
   pageSize: itemsPerPage.value,
   showSizeChanger: true,
-  showTotal: (total: number) => `共 ${total} 项`,
+  showTotal: (total: number) => t("common.totalItems", { total }),
 }));
 
 const columns = [
@@ -184,7 +184,7 @@ const columns = [
 
         <a-divider type="vertical" />
 
-        <a-button type="primary" :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
+        <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
 
         <div class="toolbar-right">
           <a-input

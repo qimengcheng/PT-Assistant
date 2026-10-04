@@ -559,9 +559,9 @@ provide(THEME_KEY, echartsTheme);
 
       <div class="user-statistic-control">
         <div class="d-flex align-center mb-2">
-          <a-button type="primary" @click="() => router.back()"><template #icon><ArrowLeftOutlined /></template><span class="ml-1">{{ t('common.back') }}</span></a-button>
+          <a-button @click="() => router.back()"><template #icon><ArrowLeftOutlined /></template><span class="ml-1">{{ t('common.back') }}</span></a-button>
           <div class="flex-1-1-0" />
-          <a-button type="primary" @click="exportStatisticImg"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.exportImage') }}</span></a-button>
+          <a-button @click="exportStatisticImg"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.exportImage') }}</span></a-button>
           <a-button type="primary" class="ml-2" @click="saveControl"><template #icon><SaveOutlined /></template><span class="ml-1">{{ t('common.saveSettings') }}</span></a-button>
         </div>
 

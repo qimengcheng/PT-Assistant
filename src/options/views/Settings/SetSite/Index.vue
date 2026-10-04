@@ -238,7 +238,7 @@ function keywordChecked(keyword: string) {
 
         <a-divider type="vertical" class="mx-2" />
 
-        <a-button type="primary" @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span class="ml-1">{{ t('SetSite.index.oneClickImport') }}</span></a-button>
+        <a-button @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span class="ml-1">{{ t('SetSite.index.oneClickImport') }}</span></a-button>
 
         <a-divider type="vertical" class="mx-2" />
 
@@ -255,7 +255,7 @@ function keywordChecked(keyword: string) {
           <span class="ml-1">{{ t("SetSite.index.table.flushFavicon") }}</span>
         </a-button>
 
-        <a-button type="primary" @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span class="ml-1">{{ t('SetSite.index.reBuildMap') }}</span></a-button>
+        <a-button @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span class="ml-1">{{ t('SetSite.index.reBuildMap') }}</span></a-button>
 
         <div class="toolbar-spacer" />
 

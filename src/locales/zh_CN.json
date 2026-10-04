@@ -1172,6 +1172,7 @@
     "site": "站点",
     "sortIndex": "优先级",
     "test": "测试",
+    "totalItems": "共 {total} 项",
     "time": {
       "ago": "前",
       "day": "日",

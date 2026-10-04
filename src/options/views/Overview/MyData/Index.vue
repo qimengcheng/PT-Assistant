@@ -291,24 +291,24 @@ const showExportDialog = ref(false);
 
       <a-button type="primary" v-else @click="multiFlush"><template #icon><SyncOutlined /></template><span class="ml-1">{{ t('MyData.index.flushSelectSite') }}</span></a-button>
 
-      <a-button type="primary" :disabled="tableSelected.length === 0" @click="multiOpen"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('MyData.index.multiOpen') }}</span></a-button>
+      <a-button :disabled="tableSelected.length === 0" @click="multiOpen"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('MyData.index.multiOpen') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
-      <a-button type="primary" @click="viewTimeline"><template #icon><LineChartOutlined /></template><span class="ml-1">{{ t('MyData.index.viewTimeline') }}</span></a-button>
-      <a-button type="primary" @click="viewStatistic"><template #icon><BarChartOutlined /></template><span class="ml-1">{{ t('MyData.index.viewStatistic') }}</span></a-button>
+      <a-button @click="viewTimeline"><template #icon><LineChartOutlined /></template><span class="ml-1">{{ t('MyData.index.viewTimeline') }}</span></a-button>
+      <a-button @click="viewStatistic"><template #icon><BarChartOutlined /></template><span class="ml-1">{{ t('MyData.index.viewStatistic') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
       <!-- 导出按钮 -->
-      <a-button type="primary" @click="showExportDialog = true"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('MyData.index.exportData') }}</span></a-button>
+      <a-button @click="showExportDialog = true"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('MyData.index.exportData') }}</span></a-button>
 
       <a-divider type="vertical" class="mx-2" />
 
       <!-- 表格设置面板：原 v-menu + v-list，antdv-next 没有 a-list，改用 a-popover + 普通 div -->
       <a-popover trigger="click" placement="bottomLeft">
         <template #default>
-          <a-button type="primary" class="mr-1"><template #icon><SettingOutlined /></template><span class="ml-1">{{ t('MyData.index.setting') }}</span></a-button>
+          <a-button class="mr-1"><template #icon><SettingOutlined /></template><span class="ml-1">{{ t('MyData.index.setting') }}</span></a-button>
         </template>
         <template #content>
           <div class="table-setting-panel">

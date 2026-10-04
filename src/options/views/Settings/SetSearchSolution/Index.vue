@@ -225,7 +225,7 @@ const pagination = computed(() =>
   // 页数算成负数（SetSite 已经踩过同一个坑）。
   // 另外不能写 current:1 —— 受控值写死会锁死在第 1 页，页码交给 a-table 内部管理。
   toPagination(configStore.tableBehavior.SetSearchSolution.itemsPerPage, 10, {
-    showTotal: (total: number) => `共 ${total} 项`,
+    showTotal: (total: number) => t("common.totalItems", { total }),
   }),
 );
 
@@ -260,12 +260,12 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
           style="display: none"
           @change="importSearchSolution"
         />
-        <a-button type="primary" @click="triggerImportFile"><template #icon><ImportOutlined /></template><span class="ml-1">{{ t('common.import') }}</span></a-button>
-        <a-button type="primary" :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.export') }}</span></a-button>
+        <a-button @click="triggerImportFile"><template #icon><ImportOutlined /></template><span class="ml-1">{{ t('common.import') }}</span></a-button>
+        <a-button :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span class="ml-1">{{ t('common.export') }}</span></a-button>
 
         <a-divider type="vertical" />
 
-        <a-button type="primary" disabled><template #icon><QuestionCircleOutlined /></template><span class="ml-1">{{ t('common.howToUse') }}</span></a-button>
+        <a-button disabled><template #icon><QuestionCircleOutlined /></template><span class="ml-1">{{ t('common.howToUse') }}</span></a-button>
 
         <div class="toolbar-right">
           <a-input v-model:value="tableFilter" allow-clear :placeholder="t('common.search')" style="width: 240px">

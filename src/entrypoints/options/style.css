@@ -1,6 +1,28 @@
 :root {
   /* only light：配合 index.html 的 meta，双保险禁用浏览器自动深色化（否则下拉弹层会被填成黑底） */
   color-scheme: only light;
+
+  /* ===== 外壳语义色板 =====
+     这些颜色原先以十六进制字面量散落在本文件各处（边框就有 3 种近似灰、
+     hover/active 两种蓝各自硬编码），改一处要全文搜替换。统一收敛为语义变量，
+     变量名表达用途而不是色值；仅作用于 options 外壳与调试页，组件库内部配色
+     仍由 antdv-next token 管理，避免两层主题互相打架。 */
+  --pt-color-text: #1f2328; /* 主文字 / 菜单文字 */
+  --pt-color-text-secondary: #6b7280; /* 次要文字、占位、版本号 */
+  --pt-color-border: #d0d7de; /* 卡片、侧栏等主边框 */
+  --pt-color-border-light: #eaeef2; /* 分隔线、次级边框 */
+  --pt-color-bg-body: #f6f8fa; /* body 底色 */
+  --pt-color-bg-content: #f5f6f8; /* 内容区底色 */
+  --pt-color-bg-hover: #f0f6ff; /* 菜单/列表悬停 */
+  --pt-color-bg-selected: #dbeafe; /* 菜单/列表选中 */
+  --pt-color-primary: #2563eb; /* 输入聚焦等主色强调 */
+  --pt-color-primary-text: #1d4ed8; /* 浅蓝底上的主色文字（tag） */
+  --pt-color-success: #15803d;
+  --pt-color-success-bg: #dcfce7;
+  --pt-color-danger: #b91c1c;
+  --pt-color-danger-strong: #cf1322; /* 弹窗危险标题（略亮于正文 danger） */
+  --pt-color-disabled: #9ca3af;
+  --pt-color-disabled-bg: #f3f4f6;
 }
 
 * {
@@ -16,8 +38,8 @@ body {
     "Microsoft YaHei",
     sans-serif;
   font-size: 13px;
-  color: #1f2328;
-  background: #f6f8fa;
+  color: var(--pt-color-text);
+  background: var(--pt-color-bg-body);
 }
 
 /* ===== 全局布局修正 =====
@@ -49,7 +71,7 @@ body {
   width: 220px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #d0d7de;
+  border-right: 1px solid var(--pt-color-border);
   background: #fff;
 }
 
@@ -58,7 +80,7 @@ body {
   align-items: center;
   gap: 10px;
   padding: 14px;
-  border-bottom: 1px solid #eaeef2;
+  border-bottom: 1px solid var(--pt-color-border-light);
 }
 
 .brand .logo {
@@ -72,7 +94,7 @@ body {
 }
 
 .brand .version {
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
   font-size: 11px;
 }
 
@@ -97,17 +119,17 @@ body {
   border-radius: 6px;
   background: transparent;
   font-size: 13px;
-  color: #1f2328;
+  color: var(--pt-color-text);
   text-align: left;
   cursor: pointer;
 }
 
 .menu-item:hover {
-  background: #f0f6ff;
+  background: var(--pt-color-bg-hover);
 }
 
 .menu-item.active {
-  background: #dbeafe;
+  background: var(--pt-color-bg-selected);
   font-weight: 600;
 }
 
@@ -115,28 +137,28 @@ body {
   margin-left: auto;
   padding: 1px 6px;
   border-radius: 999px;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--pt-color-disabled-bg);
+  color: var(--pt-color-text-secondary);
   font-size: 10px;
 }
 
 .nav-footer {
   margin-top: auto;
   padding: 12px 14px;
-  border-top: 1px solid #eaeef2;
+  border-top: 1px solid var(--pt-color-border-light);
 }
 
 .status {
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
   font-size: 12px;
 }
 
 .status.ok {
-  color: #15803d;
+  color: var(--pt-color-success);
 }
 
 .status.bad {
-  color: #b91c1c;
+  color: var(--pt-color-danger);
 }
 
 .content {
@@ -146,7 +168,7 @@ body {
   min-width: 0;
   overflow-y: auto;
   padding: 16px;
-  background: #f5f6f8;
+  background: var(--pt-color-bg-content);
 }
 
 /* ===== 首页 ===== */
@@ -161,7 +183,7 @@ body {
 }
 
 .home .sub {
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
   margin-bottom: 24px;
 }
 
@@ -175,7 +197,7 @@ body {
   flex: 1;
   padding: 16px;
   background: #fff;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--pt-color-border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -183,7 +205,7 @@ body {
 }
 
 .card-label {
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
   font-size: 12px;
 }
 
@@ -195,7 +217,7 @@ body {
 .card-value small {
   font-size: 12px;
   font-weight: 400;
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
 }
 
 .home h3 {
@@ -206,7 +228,7 @@ body {
 .modules {
   list-style: none;
   background: #fff;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--pt-color-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -219,11 +241,11 @@ body {
 }
 
 .modules li + li {
-  border-top: 1px solid #eaeef2;
+  border-top: 1px solid var(--pt-color-border-light);
 }
 
 .modules .pending {
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
 }
 
 .dot {
@@ -238,21 +260,21 @@ body {
 }
 
 .dot.ok {
-  background: #dcfce7;
-  color: #15803d;
+  background: var(--pt-color-success-bg);
+  color: var(--pt-color-success);
 }
 
 .dot.todo {
-  background: #f3f4f6;
-  color: #9ca3af;
+  background: var(--pt-color-disabled-bg);
+  color: var(--pt-color-disabled);
 }
 
 .pending-tag {
   margin-left: auto;
   padding: 1px 8px;
   border-radius: 999px;
-  background: #f3f4f6;
-  color: #9ca3af;
+  background: var(--pt-color-disabled-bg);
+  color: var(--pt-color-disabled);
   font-size: 11px;
 }
 
@@ -269,7 +291,7 @@ body {
   width: 260px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #d0d7de;
+  border-right: 1px solid var(--pt-color-border);
   background: #fff;
 }
 
@@ -286,20 +308,20 @@ body {
 }
 
 .count {
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
   font-size: 12px;
 }
 
 .search {
   margin: 0 14px 10px;
   padding: 7px 10px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--pt-color-border);
   border-radius: 6px;
   outline: none;
 }
 
 .search:focus {
-  border-color: #2563eb;
+  border-color: var(--pt-color-primary);
 }
 
 .site-list {
@@ -317,11 +339,11 @@ body {
 }
 
 .site-list li:hover {
-  background: #f0f6ff;
+  background: var(--pt-color-bg-hover);
 }
 
 .site-list li.active {
-  background: #dbeafe;
+  background: var(--pt-color-bg-selected);
   font-weight: 600;
 }
 
@@ -337,13 +359,13 @@ body {
 }
 
 .hint {
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
   padding-top: 40px;
   text-align: center;
 }
 
 .hint.error {
-  color: #b91c1c;
+  color: var(--pt-color-danger);
 }
 
 .detail {
@@ -353,7 +375,7 @@ body {
 .detail th {
   text-align: left;
   padding: 8px 16px 8px 0;
-  color: #6b7280;
+  color: var(--pt-color-text-secondary);
   vertical-align: top;
   white-space: nowrap;
 }
@@ -367,8 +389,8 @@ body {
   margin: 0 6px 4px 0;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--pt-color-bg-selected);
+  color: var(--pt-color-primary-text);
   font-size: 12px;
 }
 
@@ -382,7 +404,26 @@ body {
    modal 经 teleport 挂在 body 上，组件的 scoped 样式选不到 .ant-modal-title，
    所以带语义色的标题统一走 wrap-class-name + 这里的全局规则。 */
 .modal-title--danger .ant-modal-title {
-  color: #cf1322;
+  color: var(--pt-color-danger-strong);
+}
+
+/* ===== 按钮图标与文字的视觉对齐 =====
+   antdv-next 的 .ant-btn 用 inline-flex + align-items:center，居中的是行盒几何中心。
+   但字形墨迹中心并不在几何中心：Microsoft YaHei 的汉字墨迹中心明显偏低，
+   Segoe UI 的拉丁字形又略高——结果中文按钮里图标显高、英文按钮里图标显低。
+   改为按文本基线对齐：图标包裹层对齐到基线、图标相对基线下沉 0.15em
+   （经典图标对齐量，等于 cap-height 中心与 1em 几何中心之差）。
+   已用真实 cssinjs 产物在 13px 中英双语 + loading/primary 各形态下实测居中；
+   0.15em 随字号等比缩放；纯图标按钮（.ant-btn-icon-only）保持几何居中不受影响。 */
+.ant-btn:not(.ant-btn-icon-only) {
+  align-items: baseline;
+}
+.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon {
+  align-self: baseline;
+  display: inline-block;
+}
+.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon .anticon {
+  vertical-align: -0.15em;
 }
 
 /* ===== Modal：超长内容限高，标题与底部按钮保持可见 =====

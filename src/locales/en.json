@@ -1175,6 +1175,7 @@
     "site": "Site",
     "sortIndex": "Priority",
     "test": "Test",
+    "totalItems": "{total} items in total",
     "time": {
       "ago": " Ago",
       "day": "Day",

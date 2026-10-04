@@ -17,11 +17,11 @@ import type { TableColumnsType, TablePaginationConfig, TableSorterResult } from 
 
 import type { TSiteID } from "@ptd/site";
 
-import { sendMessage } from "@/messages.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
+import { flushSiteFavicon as flushFaviconStore, hasBundledIcon } from "@/options/components/SiteFavicon/utils.ts";
 
 import AddDialog from "./AddDialog.vue";
 import EditDialog from "./EditDialog.vue";
@@ -184,6 +184,13 @@ async function confirmDeleteSite(siteId: TSiteID) {
 }
 
 const isFaviconFlushing = ref(false);
+
+/**
+ * 选中的站点里只要有一个「图标不是随扩展分发」的，批量刷新才有意义。
+ * 随包图标在 getFavicon() 里优先于一切网络抓取，对它们 flush 是纯空操作。
+ */
+const canFlushSelectedFavicon = computed(() => tableSelected.value.some((id) => !hasBundledIcon(id)));
+
 async function flushSiteFavicon(siteId: TSiteID | TSiteID[]) {
   // 模板按钮虽有 :loading 禁用，这里再兜一层，防止程序化连点产生重复刷新
   if (isFaviconFlushing.value) {
@@ -192,9 +199,10 @@ async function flushSiteFavicon(siteId: TSiteID | TSiteID[]) {
   isFaviconFlushing.value = true;
   try {
     const siteIds = Array.isArray(siteId) ? siteId : [siteId];
-    for (const id of siteIds) {
-      await sendMessage("getSiteFavicon", { site: id, flush: true });
-    }
+    // 必须走 store 侧的 flushFaviconStore 而不是自己 sendMessage("getSiteFavicon", {flush:true})：
+    // 后者只让 offscreen 重抓重落库，既不清本页面内存缓存、也不回写，
+    // 而这一列图标是 <SiteFavicon> 渲染的 —— 用户点完只看到「刷新完成」提示，界面一个都不变。
+    await flushFaviconStore(siteIds);
     runtimeStore.showSnakebar(t("SetSite.index.flushFaviconFinish"), { color: "success" });
   } catch (e) {
     // 旧实现只有 finally：刷新失败时用户只看到按钮停转，没有任何失败提示
@@ -243,10 +251,10 @@ function keywordChecked(keyword: string) {
         <a-divider type="vertical" class="mx-2" />
 
         <a-button
-          :disabled="tableSelected.length === 0"
+          :disabled="tableSelected.length === 0 || !canFlushSelectedFavicon"
           :loading="isFaviconFlushing"
           size="small"
-          :title="t('SetSite.index.table.flushFavicon')"
+          :title="tableSelected.length > 0 && !canFlushSelectedFavicon ? t('SetSite.index.table.flushFaviconBundled') : t('SetSite.index.table.flushFavicon')"
           @click="() => flushSiteFavicon(tableSelected)"
         >
           <template #icon>
@@ -411,9 +419,11 @@ function keywordChecked(keyword: string) {
               </template>
             </a-dropdown>
 
-            <a-tooltip :title="t('SetSite.index.table.flushFavicon')">
+            <a-tooltip
+              :title="hasBundledIcon(record.id) ? t('SetSite.index.table.flushFaviconBundled') : t('SetSite.index.table.flushFavicon')"
+            >
               <a-button
-                :disabled="record.metadata.isDead"
+                :disabled="record.metadata.isDead || hasBundledIcon(record.id)"
                 :loading="isFaviconFlushing"
                 size="small"
                 type="text"

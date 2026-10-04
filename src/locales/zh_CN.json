@@ -1160,6 +1160,7 @@
       ],
       "table": {
         "flushFavicon": "刷新站点图标",
+        "flushFaviconBundled": "该站点图标随扩展分发，无需刷新",
         "searchEntries": "搜索入口"
       }
     },

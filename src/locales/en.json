@@ -247,6 +247,7 @@
       "title": "Confirm Recheck"
     },
     "refresh": "Refresh",
+    "refreshFailed": "Failed to load {name}: {message}",
     "resumeSelected": "Resume",
     "searchPlaceholder": "Search by name, hash, label, or path",
     "speedLimit": {

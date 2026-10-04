@@ -54,24 +54,40 @@ export function useClientRefresh() {
     }
   }
 
-  async function loadSingleDownloader(id: string): Promise<void> {
+  /**
+   * @param quiet 自动刷新的前两次失败不弹提示（见下方 3 次挂起逻辑），手动刷新一定弹。
+   */
+  async function load(id: string, quiet: boolean): Promise<void> {
     try {
       const result = await sendMessage("getClientTorrents", id);
       torrents.value = { ...torrents.value, [id]: result };
       failCounts.set(id, 0);
-    } catch {
-      const prev = failCounts.get(id) ?? 0;
-      const next = prev + 1;
+    } catch (error) {
+      const name = metadataStore.downloaders[id]?.name ?? id;
+      const next = (failCounts.get(id) ?? 0) + 1;
       failCounts.set(id, next);
       if (next >= 3) {
         suspendedDownloaders.value.add(id);
         clearDownloaderTimer(id);
+        runtimeStore.showSnakebar(t("MyClient.autoRefresh.clientSuspended", { name }), {
+          color: "error",
+          timeout: 8000,
+        });
+        return;
+      }
+      // 手动刷新必须当场报错：消息没有接收方（offscreen 未就绪）时表格只会一片空白，
+      // 不给原因的话用户只能猜测是"没数据"还是"坏了"。
+      if (!quiet) {
         runtimeStore.showSnakebar(
-          t("MyClient.autoRefresh.clientSuspended", { name: metadataStore.downloaders[id]?.name ?? id }),
+          t("MyClient.refreshFailed", { name, message: error instanceof Error ? error.message : String(error) }),
           { color: "error", timeout: 8000 },
         );
       }
     }
+  }
+
+  async function loadSingleDownloader(id: string): Promise<void> {
+    await load(id, false);
   }
 
   function scheduleDownloaderRefresh(id: string) {
@@ -81,7 +97,7 @@ export function useClientRefresh() {
 
     clearDownloaderTimer(id);
     const tid = window.setTimeout(async () => {
-      await loadSingleDownloader(id);
+      await load(id, true);
       scheduleDownloaderRefresh(id);
     }, globalRefreshInterval.value * 1000);
     refreshTimers.set(id, tid);

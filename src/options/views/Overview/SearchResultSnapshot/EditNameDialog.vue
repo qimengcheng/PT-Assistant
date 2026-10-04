@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { CloseOutlined } from "@antdv-next/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { type TSearchSnapshotKey } from "@/shared/types.ts";
@@ -32,37 +31,16 @@ function dialogEnter() {
     v-model:open="showDialog"
     :title="t('SearchResultSnapshot.EditNameDialog.title')"
     :width="500"
-    :footer="null"
+    :ok-text="t('common.save')"
+    :cancel-text="t('common.dialog.cancel')"
     :after-open-change="(open: boolean) => open && props.editId && dialogEnter()"
     :after-close="() => (snapshotName = '')"
+    @ok="saveSearchSnapshotData"
   >
-
     <a-input
       v-model:value="snapshotName"
-      size="small"
       :placeholder="t('SearchResultSnapshot.EditNameDialog.snapshotName')"
       @press-enter="saveSearchSnapshotData"
     />
-
-    <div class="dialog-actions">
-      <a-button size="small" type="text" @click="showDialog = false">
-        <template #icon>
-          <CloseOutlined />
-        </template>
-        <span class="ml-1">{{ t("common.dialog.close") }}</span>
-      </a-button>
-      <a-button size="small" type="primary" @click="saveSearchSnapshotData">
-        <span class="ml-1">{{ t("common.save") }}</span>
-      </a-button>
-    </div>
   </a-modal>
 </template>
-
-<style scoped lang="scss">
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
-}
-</style>

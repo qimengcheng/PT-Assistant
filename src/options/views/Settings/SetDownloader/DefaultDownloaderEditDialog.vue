@@ -52,8 +52,10 @@ function enterDialog() {
     v-model:open="showDialog"
     :title="t('SetDownloader.index.editDefaultDownloaderBtn')"
     width="600px"
-    :footer="null"
+    :ok-text="t('common.dialog.ok')"
+    :cancel-text="t('common.dialog.cancel')"
     :after-open-change="(open: boolean) => open && enterDialog()"
+    @ok="saveDefaultDownloader"
   >
     <a-form layout="vertical">
       <a-form-item :label="t('SetDownloader.index.editDefaultDownloaderBtn')">
@@ -96,11 +98,5 @@ function enterDialog() {
         />
       </a-form-item>
     </a-form>
-
-    <div style="text-align: right">
-      <a-button type="primary" @click="saveDefaultDownloader">
-        {{ t("common.dialog.ok") }}
-      </a-button>
-    </div>
   </a-modal>
 </template>

@@ -98,6 +98,7 @@ async function dialogLeave() {
 </script>
 
 <template>
+  <!-- 纯管理弹窗（删除/恢复均在表格内操作），无提交动作：显式去掉默认 footer，避免残留无功能的“确定”按钮 -->
   <a-modal
     v-model:open="showDialog"
     :title="
@@ -106,6 +107,7 @@ async function dialogLeave() {
       })
     "
     :width="1000"
+    :footer="null"
     :after-open-change="(open: boolean) => open && dialogEnter()"
     :after-close="dialogLeave"
   >

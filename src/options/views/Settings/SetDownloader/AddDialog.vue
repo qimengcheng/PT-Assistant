@@ -3,7 +3,13 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { computedAsync } from "@vueuse/core";
 import { nanoid } from "nanoid";
-import { AppstoreAddOutlined, QuestionCircleOutlined } from "@antdv-next/icons";
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  LeftOutlined,
+  QuestionCircleOutlined,
+  RightOutlined,
+} from "@antdv-next/icons";
 
 import type { IDownloaderMetadata } from "@/shared/types.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -89,7 +95,6 @@ const selectedDescription = computed(() => {
     v-model:open="showDialog"
     :title="t('SetDownloader.add.title')"
     width="800px"
-    :footer="null"
     :after-close="resetDialog"
   >
     <a-steps :current="currentStep" size="small" :items="stepItems" style="margin-bottom: 24px" />
@@ -118,38 +123,69 @@ const selectedDescription = computed(() => {
       <Editor v-if="storedDownloaderConfig.type" v-model="storedDownloaderConfig" />
     </div>
 
-    <div style="text-align: right; margin-top: 16px">
-      <a
-        v-if="currentStep === 0"
-        :href="`${REPO_URL}/tree/master/src/packages/downloader`"
-        target="_blank"
-        rel="noopener noreferrer nofollow"
-        style="float: left; line-height: 32px"
-      >
-        <QuestionCircleOutlined />
-        <span style="margin-left: 4px">{{ t("SetDownloader.add.newType") }}</span>
-      </a>
+    <template #footer>
+      <div class="dialog-footer">
+        <a-button
+          :href="`${REPO_URL}/tree/master/src/packages/downloader`"
+          color="default"
+          variant="solid"
+          rel="noopener noreferrer nofollow"
+          target="_blank"
+        >
+          <template #icon>
+            <QuestionCircleOutlined />
+          </template>
+          {{ t("SetDownloader.add.newType") }}
+        </a-button>
 
-      <a-button type="text" danger @click="showDialog = false" style="margin-right: 8px">
-        {{ t("common.dialog.cancel") }}
-      </a-button>
+        <div style="flex: 1" />
 
-      <a-button v-if="currentStep === 1" @click="currentStep--" style="margin-right: 8px">
-        {{ t("common.dialog.prev") }}
-      </a-button>
-
-      <a-button
-        v-if="currentStep === 0"
-        type="primary"
-        :disabled="selectedClientType == null"
-        @click="currentStep++"
-      >
-        {{ t("common.dialog.next") }}
-      </a-button>
-
-      <a-button v-if="currentStep === 1" type="primary" @click="saveStoredDownloaderConfig">
-        {{ t("common.dialog.ok") }}
-      </a-button>
-    </div>
+        <a-button color="danger" variant="text" @click="showDialog = false">
+          <template #icon>
+            <CloseCircleOutlined />
+          </template>
+          {{ t("common.dialog.cancel") }}
+        </a-button>
+        <a-button
+          v-if="currentStep === 1"
+          color="blue"
+          variant="text"
+          icon-placement="start"
+          @click="currentStep--"
+        >
+          <template #icon>
+            <LeftOutlined />
+          </template>
+          {{ t("common.dialog.prev") }}
+        </a-button>
+        <a-button
+          v-if="currentStep === 0"
+          :disabled="selectedClientType == null"
+          color="blue"
+          variant="text"
+          icon-placement="end"
+          @click="currentStep++"
+        >
+          {{ t("common.dialog.next") }}
+          <template #icon>
+            <RightOutlined />
+          </template>
+        </a-button>
+        <a-button v-if="currentStep === 1" type="primary" @click="saveStoredDownloaderConfig">
+          <template #icon>
+            <CheckCircleOutlined />
+          </template>
+          {{ t("common.dialog.ok") }}
+        </a-button>
+      </div>
+    </template>
   </a-modal>
 </template>
+
+<style scoped lang="scss">
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+</style>

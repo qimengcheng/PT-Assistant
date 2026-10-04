@@ -5,6 +5,7 @@
  * 业务包 @ptd/mediaServer（v0.2.0 平移）、消息协议 getMediaServerSearchResult（v0.3.0 注册）。
  */
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { message, Modal } from "antdv-next";
 import {
   ApiOutlined,
@@ -27,6 +28,7 @@ import type { IMediaServerMetadata, TMediaServerKey } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
 import ConnectCheckButton from "@/options/components/ConnectCheckButton.vue";
 
+const { t } = useI18n();
 const metadataStore = useMetadataStore();
 
 const mediaServers = computed<IMediaServerMetadata[]>(() => metadataStore.getMediaServers);
@@ -99,18 +101,18 @@ function openEditDialog(row: IMediaServerMetadata) {
 async function saveConfig() {
   const config = editingConfig.value;
   if (!config.name?.trim()) {
-    message.warning("请填写媒体服务器名称");
+    message.warning(t("SetMediaServer.index.needName"));
     return;
   }
   if (!config.address?.trim()) {
-    message.warning("请填写媒体服务器地址");
+    message.warning(t("SetMediaServer.index.needAddress"));
     return;
   }
   // auth 必填字段校验
   for (const rawField of currentAuthFields.value) {
     const field = normalizeAuthField(rawField);
     if (field.required && !config.auth?.[field.name]?.trim()) {
-      message.warning(`请填写认证字段「${field.name}」`);
+      message.warning(t("SetMediaServer.index.needAuthField", [field.name]));
       return;
     }
   }
@@ -121,21 +123,21 @@ async function saveConfig() {
     metadataStore.mediaServers[config.id!] = { ...config } as IMediaServerMetadata;
   }
   await metadataStore.$save();
-  message.success(isEditMode.value ? "媒体服务器配置已更新" : "媒体服务器已添加");
+  message.success(isEditMode.value ? t("SetMediaServer.index.updated") : t("SetMediaServer.index.added"));
   showEditDialog.value = false;
 }
 
 function confirmDelete(row: IMediaServerMetadata) {
   Modal.confirm({
-    title: "删除媒体服务器",
-    content: `确定删除「${row.name}」吗？该操作不可恢复。`,
+    title: t("SetMediaServer.index.deleteTitle"),
+    content: t("SetMediaServer.index.deleteConfirm", [row.name]),
     okType: "danger",
-    okText: "删除",
-    cancelText: "取消",
+    okText: t("common.remove"),
+    cancelText: t("common.dialog.cancel"),
     onOk: async () => {
       delete metadataStore.mediaServers[row.id];
       await metadataStore.$save();
-      message.success("已删除");
+      message.success(t("SetMediaServer.index.deleted"));
     },
   });
 }
@@ -151,11 +153,11 @@ async function testConnection(row: IMediaServerMetadata) {
       options: {},
     });
     if (result?.status !== 0) {
-      throw new Error(result?.errorMessage ?? "媒体库检索失败");
+      throw new Error(result?.errorMessage ?? t("SetMediaServer.index.mediaSearchFailed"));
     }
-    message.success(`连接成功，媒体库检索返回 ${result.items?.length ?? 0} 条`);
+    message.success(t("SetMediaServer.index.connectSuccess", [result.items?.length ?? 0]));
   } catch (err: any) {
-    message.error(`连接失败：${err?.message ?? err}`);
+    message.error(t("SetMediaServer.index.connectFailed", [err?.message ?? err]));
   } finally {
     testingIds.value[row.id] = false;
   }
@@ -166,33 +168,33 @@ async function toggleEnabled(row: IMediaServerMetadata, enabled: boolean) {
   await metadataStore.$save();
 }
 
-const columns = [
-  { title: "名称", key: "name", dataIndex: "name" },
-  { title: "类型", key: "type", dataIndex: "type" },
-  { title: "地址", key: "address", dataIndex: "address", ellipsis: true },
-  { title: "启用", key: "enabled", width: "80px" },
-  { title: "操作", key: "action", width: "160px" },
-];
+const columns = computed(() => [
+  { title: t("common.name"), key: "name", dataIndex: "name" },
+  { title: t("common.type"), key: "type", dataIndex: "type" },
+  { title: t("SetMediaServer.index.address"), key: "address", dataIndex: "address", ellipsis: true },
+  { title: t("common.enable"), key: "enabled", width: "80px" },
+  { title: t("common.action"), key: "action", width: "160px" },
+]);
 </script>
 
 <template>
   <div class="set-media-server">
     <div class="page-header">
-      <h2>媒体服务器</h2>
+      <h2>{{ t("SetMediaServer.index.title") }}</h2>
       <a-button type="primary" @click="openAddDialog">
-        <PlusOutlined /> 添加媒体服务器
+        <PlusOutlined /> {{ t("SetMediaServer.add.title") }}
       </a-button>
     </div>
 
     <a-alert class="mb-3" type="info" show-icon
-      title="媒体服务器用于在搜索结果中联动检索媒体库（如 Emby / Jellyfin / Plex / fnOS），确认片库中是否已有对应影片。" />
+      :title="t('SetMediaServer.index.description')" />
 
     <a-table
       :columns="columns"
       :data-source="mediaServers"
       :row-key="(r: any) => r.id"
       :pagination="false"
-      :locale="{ emptyText: '还没有添加媒体服务器，点击右上角「添加媒体服务器」开始' }"
+      :locale="{ emptyText: t('SetMediaServer.index.emptyTable') }"
       size="small"
     >
       <template #bodyCell="{ column, record }">
@@ -210,9 +212,9 @@ const columns = [
 
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-tooltip title="测试连接（检索一次媒体库）">
+            <a-tooltip :title="t('SetMediaServer.index.testTooltip')">
               <a-button size="small" :loading="testingIds[record.id]" @click="testConnection(record)">
-                <ApiOutlined /> 测试
+                <ApiOutlined /> {{ t("common.test") }}
               </a-button>
             </a-tooltip>
             <a-button size="small" type="text" @click="openEditDialog(record)">
@@ -228,19 +230,19 @@ const columns = [
 
     <a-modal
       v-model:open="showEditDialog"
-      :title="isEditMode ? '编辑媒体服务器' : '添加媒体服务器'"
+      :title="isEditMode ? t('SetMediaServer.index.editTitle') : t('SetMediaServer.add.title')"
       width="640px"
-      ok-text="保存"
-      cancel-text="取消"
+      :ok-text="t('common.save')"
+      :cancel-text="t('common.dialog.cancel')"
       @ok="saveConfig"
     >
       <a-form layout="vertical" class="ms-form">
-        <a-form-item label="服务器类型">
+        <a-form-item :label="t('SetMediaServer.index.serverType')">
           <a-select
             v-model:value="editingConfig.type"
             :options="typeOptions"
             :disabled="isEditMode"
-            placeholder="选择媒体服务器类型"
+            :placeholder="t('SetMediaServer.index.typePlaceholder')"
           />
         </a-form-item>
 
@@ -250,14 +252,14 @@ const columns = [
           class="mb-2"
           type="warning"
           show-icon
-          title="w"
+          :title="w"
         />
 
-        <a-form-item label="名称">
-          <a-input v-model:value="editingConfig.name" placeholder="用于辨识的名称，如 家庭 NAS Emby" />
+        <a-form-item :label="t('common.name')">
+          <a-input v-model:value="editingConfig.name" :placeholder="t('SetMediaServer.index.namePlaceholder')" />
         </a-form-item>
 
-        <a-form-item label="地址">
+        <a-form-item :label="t('SetMediaServer.index.address')">
           <a-input v-model:value="editingConfig.address" placeholder="http://ip:port/" />
         </a-form-item>
 
@@ -270,23 +272,23 @@ const columns = [
         >
           <a-input
             v-model:value="editingConfig.auth[normalizeAuthField(rawField).name]"
-            :placeholder="normalizeAuthField(rawField).name.toLowerCase().includes('key') ? 'API Key' : '用户凭据'"
+            :placeholder="normalizeAuthField(rawField).name.toLowerCase().includes('key') ? 'API Key' : t('SetMediaServer.index.credentialPlaceholder')"
             autocomplete="new-password"
           />
         </a-form-item>
 
-        <a-form-item label="请求超时（秒）">
+        <a-form-item :label="t('SetMediaServer.index.timeout')">
           <a-input-number v-model:value="editingConfig.timeout" :min="1" :max="600" style="width: 160px" />
         </a-form-item>
 
-        <a-form-item label="启用">
+        <a-form-item :label="t('common.enable')">
           <a-switch v-model:checked="editingConfig.enabled" />
         </a-form-item>
 
         <!-- 连通性测试：上游 Editor.vue 里由 ConnectCheckButton 承担，这里补回同一能力 -->
         <ConnectCheckButton :check-fn="checkConnect" :reset-timeout="3000" />
 
-        <a-form-item v-if="isEditMode && editingConfig.id" label="配置 ID">
+        <a-form-item v-if="isEditMode && editingConfig.id" :label="t('SetMediaServer.index.configId')">
           <span class="text-body-small">{{ editingConfig.id }}</span>
         </a-form-item>
       </a-form>

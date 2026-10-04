@@ -262,7 +262,7 @@ onMounted(async () => {
     resetTimelineDataWithControl();
   } catch (e) {
     console.error("UserDataTimeline: 数据加载失败", e);
-    useRuntimeStore().showSnakebar("时间线数据加载失败", { color: "error" });
+    useRuntimeStore().showSnakebar(t("UserDataTimeline.loadDataFailed"), { color: "error" });
   } finally {
     isLoading.value = false;
   }
@@ -758,12 +758,12 @@ function saveControl() {
                   <StopOutlined
                     v-if="allAddedSiteMetadata[siteId]?.isDead"
                     class="ml-1 text-grey"
-                    title="站点已失效"
+                    :title="t('UserDataTimeline.siteIsDead')"
                   />
                   <DisconnectOutlined
                     v-else-if="allAddedSiteMetadata[siteId]?.isOffline"
                     class="ml-1 text-grey"
-                    title="站点当前离线"
+                    :title="t('UserDataTimeline.siteIsOffline')"
                   />
                 </span>
               </span>

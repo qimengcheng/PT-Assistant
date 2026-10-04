@@ -91,7 +91,7 @@ function resetDialog() {
     <div v-show="currentStep === 0">
       <a-select
         v-model:value="selectedBackupServerType"
-        placeholder="请选择备份服务器类型"
+        :placeholder="t('SetBackup.AddDialog.selectTypePlaceholder')"
         @change="(v: IBackupServerMetadata['type']) => updateStoredDownloaderConfigByDefault(v)"
       >
         <a-select-option v-for="meta in Object.values(allBackupServerMetaData)" :key="meta.type" :value="meta.type">

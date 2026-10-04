@@ -6,6 +6,7 @@ import JSZip from "jszip";
 import { nanoid } from "nanoid";
 import { ref, shallowRef, watch } from "vue";
 import { useThrottledRefHistory } from "@vueuse/core";
+import { useI18n } from "vue-i18n";
 import { message } from "antdv-next";
 import { KeyOutlined, RollbackOutlined } from "@antdv-next/icons";
 
@@ -16,6 +17,7 @@ import RestorePtppUserDataDialog from "./RestorePtppUserDataDialog.vue";
 
 import { REPO_NAME } from "~/helper.ts";
 
+const { t } = useI18n();
 const configStore = useConfigStore();
 
 const encryptionKey = shallowRef<string>(configStore.backup.encryptionKey);
@@ -53,7 +55,7 @@ async function loadPTPPBackupFile() {
     parsedPtppUserData.value = JSON.parse(ptppUserDataFileRawContent);
     showRestorePtppUserDataDialog.value = true;
   } catch (e) {
-    message.error("文件格式无效：请选择 PT-Plugin-Plus 导出的备份 zip（内含 userdatas.json）或该 json 文件本身");
+    message.error(t("SetBase.BackupWindow.invalidFileFormat"));
   } finally {
     ptppUserDataFile.value = [];
   }
@@ -64,23 +66,26 @@ async function loadPTPPBackupFile() {
   <div class="backup-window">
     <a-form layout="vertical" class="compact-form">
       <div class="group">
-        <div class="group-title">备份加密</div>
-        <a-form-item label="备份文件加密密钥" extra="导出与远程备份将使用该密钥加密（AES），恢复时需要填写相同密钥。留空表示不加密。">
+        <div class="group-title">{{ t("SetBase.BackupWindow.groupEncryption") }}</div>
+        <a-form-item
+          :label="t('SetBase.BackupWindow.encryptionKey')"
+          :extra="t('SetBase.BackupWindow.encryptionKeyHint')"
+        >
           <a-space>
             <a-input-password
               v-model:value="encryptionKey"
-              placeholder="留空则不加密"
+              :placeholder="t('SetBase.BackupWindow.encryptionKeyPlaceholder')"
               style="width: 320px"
               autocomplete="new-password"
             />
-            <a-tooltip title="随机生成一个密钥">
+            <a-tooltip :title="t('SetBase.BackupWindow.randomKeyTooltip')">
               <a-button @click="randomEncryptionKey">
-                <KeyOutlined /> 随机生成
+                <KeyOutlined /> {{ t("SetBase.BackupWindow.randomKey") }}
               </a-button>
             </a-tooltip>
-            <a-tooltip v-if="history.length > 1" title="撤销到上一个密钥">
+            <a-tooltip v-if="history.length > 1" :title="t('SetBase.BackupWindow.undoKeyTooltip')">
               <a-button @click="undoEncryptionKey">
-                <RollbackOutlined /> 撤销
+                <RollbackOutlined /> {{ t("SetBase.BackupWindow.undo") }}
               </a-button>
             </a-tooltip>
           </a-space>
@@ -88,15 +93,13 @@ async function loadPTPPBackupFile() {
       </div>
 
       <div class="group">
-        <div class="group-title">导入 PT-Plugin-Plus 用户数据</div>
+        <div class="group-title">{{ t("SetBase.BackupWindow.groupImportPtpp") }}</div>
         <a-alert class="mb-2" type="info" show-icon>
-          <template #message>
-            将 PT-Plugin-Plus 导出的备份中的用户数据导入到本扩展（站点需在 340 个内置定义中）。
-          </template>
+          <template #message>{{ t("SetBase.BackupWindow.importPtppMessage") }}</template>
           <template #description>
-            1. 在 PT-Plugin-Plus 中打开「备份 &amp; 恢复」→ 导出备份（zip），或直接使用其 userdatas.json；<br />
-            2. 在下方选择该文件；<br />
-            3. 在弹出的窗口中勾选要导入的站点并确认导入。
+            {{ t("SetBase.BackupWindow.importPtppStep1") }}<br />
+            {{ t("SetBase.BackupWindow.importPtppStep2") }}<br />
+            {{ t("SetBase.BackupWindow.importPtppStep3") }}
           </template>
         </a-alert>
         <a-upload
@@ -107,7 +110,7 @@ async function loadPTPPBackupFile() {
           @change="(info: any) => (ptppUserDataFile = info.fileList)"
         >
           <a-button>
-            选择 PT-Plugin-Plus 备份文件（zip 或 userdatas.json）
+            {{ t("SetBase.BackupWindow.selectPtppFile") }}
           </a-button>
         </a-upload>
       </div>

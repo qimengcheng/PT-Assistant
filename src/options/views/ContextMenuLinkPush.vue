@@ -4,6 +4,7 @@
  * 平移自 PT-depiler views/ContextMenuLinkPush.vue（Vuetify → antdv）。
  */
 import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { getHostFromUrl, type ITorrent } from "@ptd/site";
 
@@ -12,6 +13,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 
 import SentToDownloaderDialog from "@/options/components/SentToDownloaderDialog/Index.vue";
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const metadataStore = useMetadataStore();
@@ -24,7 +26,7 @@ onMounted(() => {
   const link = route?.query?.link;
 
   if (!link || typeof link !== "string") {
-    runtimeStore.showSnakebar("无效的链接", { color: "error" });
+    runtimeStore.showSnakebar(t("ContextMenuLinkPush.invalidLink"), { color: "error" });
     onCancel();
     return;
   }

@@ -143,7 +143,7 @@ function saveClientConfig() {
         <a-alert
           v-if="clientMetadata?.feature?.CustomPath?.description"
           type="info"
-          title="clientMetadata.feature.CustomPath.description"
+          :title="clientMetadata.feature.CustomPath.description"
           show-icon
           style="margin-bottom: 8px"
         />

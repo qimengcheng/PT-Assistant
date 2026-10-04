@@ -215,12 +215,18 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
 否则线上是静默空白。
 
-两条 CI 静态防线（本地改完也要跑，FAIL 非零退出，挂在 ci.yml 的 `pnpm compile` 之后、构建之前）：
+三条 CI 静态防线（本地改完也要跑，FAIL 非零退出，挂在 ci.yml 的 `pnpm compile` 之后、构建之前）：
 
 ```bash
 node scripts/check-antd-tags.mjs          # 全仓扫「antdv-next 里不存在的 a-* 标签」
 node scripts/check-content-antd-lite.mjs  # content 按需清单是否覆盖其依赖闭包用到的每个标签
+node scripts/check-locale-keys.mjs        # 每个字面 t("a.b.c") 在 zh/en 两侧都可解析、两份键集合对称
 ```
+
+第三条防的是 vue-i18n 的静默失效：键取不到时**不抛异常、不进 vue-tsc、不进构建**，而是把键路径
+本身当文案渲染到界面上（内部标识符进 UI 是 §3.5 的零容忍项）。v0.20.0 整站接入就是靠它扫出
+`ExportUserInfoDialog.vue` 引用了不存在的 `common.noData`。`t("前缀" + x)` 这类动态拼接会被放过
+（静态不可判定），所以**改了动态键这条守卫拦不住，仍要人工核**。
 
 注册表是脚本在 Node 里**实跑** `install()` 得到的，不抄文档。
 

@@ -408,31 +408,21 @@ body {
 }
 
 /* ===== 按钮图标与文字的视觉对齐 =====
-   antdv-next 的 .ant-btn 用 inline-flex + align-items:center，居中的是行盒几何中心。
-   但字形墨迹中心并不在几何中心：Microsoft YaHei 的汉字墨迹中心明显偏低，
-   Segoe UI 的拉丁字形又略高——结果中文按钮里图标显高、英文按钮里图标显低。
-   改为按文本基线对齐：图标包裹层对齐到基线、图标相对基线下沉 0.15em
-   （经典图标对齐量，等于 cap-height 中心与 1em 几何中心之差）。
-   已用真实 cssinjs 产物在 13px 中英双语 + loading/primary 各形态下实测居中；
-   0.15em 随字号等比缩放；纯图标按钮（.ant-btn-icon-only）保持几何居中不受影响。
+   antdv-next 的 .ant-btn 是 inline-flex + align-items:center，这里只给图标一个随字号
+   等比的光学下沉量：汉字墨迹中心偏低、拉丁字形略高，纯几何居中会让中文按钮里图标显高、
+   英文按钮里图标显低。
 
-   ⚠️ baseline 只能用于「图标 + 文字」按钮，纯文字按钮必须留给 antd 的 center：
-   antdv-next 按钮高度固定（中号 32px）且 padding-block 为 0，纯文字时 flex 行里
-   没有任何兄弟元素把基线往下推，align-items:baseline 会让文字直接贴顶
-   （实测 32px 按钮：文字距顶 0.8px、距底 11.2px，偏上 10.4px；搜索框的蓝色
-   “搜索”按钮与全部纯文字 primary/default 按钮都受此影响）。
-   用 :has(> .ant-btn-icon) 限定——loading 转圈同样渲染成 .ant-btn-icon
-   （.ant-btn-loading-icon），故 loading+文字形态自动命中；:has 需 Chrome 105+，
-   MV3 面向的 Chromium 版本满足。 */
-.ant-btn:not(.ant-btn-icon-only):has(> .ant-btn-icon) {
-  align-items: baseline;
-}
-.ant-btn:not(.ant-btn-icon-only):has(> .ant-btn-icon) > .ant-btn-icon {
-  align-self: baseline;
-  display: inline-block;
-}
-.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon .anticon {
-  vertical-align: -0.15em;
+   必须用 transform：.ant-btn-icon 是 display:inline-flex（button/style/index.js:31），
+   里面的 .anticon 是 flex item，vertical-align 对它无效（antd 自己写的
+   verticalAlign:"middle" 同样无效）——所以旧写法 `vertical-align:-0.15em` 其实是死属性。
+
+   ⚠️ 不要改成 align-items: baseline（v0.20.2 踩过、v0.20.6 撤掉）：按钮高度固定
+   （中号 32px）且 padding-block: 0，baseline 会把整行基线推到内容盒顶部，图标和文字
+   **一起贴顶**（实测偏上约 10px）。当时以为只有纯文字按钮受影响、用
+   `:has(> .ant-btn-icon)` 把图标+文字形态排除掉就行，实际是反过来的——受影响的正是
+   被保留下来的那一批。 */
+.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon {
+  transform: translateY(0.15em);
 }
 
 /* ===== Modal：超长内容限高，标题与底部按钮保持可见 =====

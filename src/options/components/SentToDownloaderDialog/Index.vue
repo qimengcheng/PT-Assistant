@@ -19,6 +19,7 @@ import {
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
+import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
 import type { IDownloaderMetadata } from "@/shared/types.ts";
 
 import { sendTorrentToDownloader } from "./utils.ts";
@@ -37,6 +38,8 @@ const { t } = useI18n();
 const configStore = useConfigStore();
 const runtimeStore = useRuntimeStore();
 const metadataStore = useMetadataStore();
+// 依赖 <a-app> 祖先：选项页在 entrypoints/options/App.vue 里包，content 在 content-script/app/App.vue 里包
+const { promptInDialog } = usePromptInDialog();
 
 const isSending = ref(false);
 const quickSendToClient = ref<boolean>(false);
@@ -124,11 +127,13 @@ async function sendToDownloader() {
 
   isSending.value = true;
 
-  sendTorrentToDownloader(torrentItems, selectedDownloader.value.id, addTorrentOptions.value).finally(() => {
-    isSending.value = false;
-    showDialog.value = false;
-    emit("done");
-  });
+  sendTorrentToDownloader(torrentItems, selectedDownloader.value.id, addTorrentOptions.value, promptInDialog).finally(
+    () => {
+      isSending.value = false;
+      showDialog.value = false;
+      emit("done");
+    },
+  );
 }
 
 function quickSendToDownloader(downloader: IDownloaderMetadata, path: string = "", label?: string) {

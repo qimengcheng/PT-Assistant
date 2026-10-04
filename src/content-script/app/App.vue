@@ -329,11 +329,15 @@ onBeforeUnmount(() => stopSnakebarWatch());
         </div>
       </div>
 
-      <SentToDownloaderDialog
-        v-model="remoteDownloadDialogData.show"
-        :torrent-items="remoteDownloadDialogData.torrents"
-        :is-default-send="remoteDownloadDialogData.isDefaultSend"
-      />
+      <!-- SentToDownloaderDialog 内部用 usePromptInDialog()，那是 inject(App 上下文)，
+           所以它的祖先链上必须有 <a-app>（选项页由 entrypoints/options/App.vue 提供同一层） -->
+      <a-app>
+        <SentToDownloaderDialog
+          v-model="remoteDownloadDialogData.show"
+          :torrent-items="remoteDownloadDialogData.torrents"
+          :is-default-send="remoteDownloadDialogData.isDefaultSend"
+        />
+      </a-app>
     </a-config-provider>
   </a-style-provider>
 </template>

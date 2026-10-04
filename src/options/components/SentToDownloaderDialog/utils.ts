@@ -2,14 +2,20 @@ import type { ITorrent } from "@ptd/site";
 import type { TDownloaderKey } from "@/shared/types/storages/metadata.ts";
 import type { CAddTorrentOptions } from "@ptd/downloader";
 import { formatDate } from "@/options/utils.ts";
+import { type TPromptInDialog } from "@/options/components/appDialog.ts";
+import { i18nInstance } from "@/options/plugins/i18n.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { sendMessage } from "@/messages.ts";
 
-export function sendTorrentToDownloader(
+export async function sendTorrentToDownloader(
   torrentItems: ITorrent[],
   downloaderId: TDownloaderKey,
   addTorrentOptions: CAddTorrentOptions,
+  // 本组件被选项页与 content script 共用，而原生 prompt() 在 MV3 扩展页面是禁用的
+  // （静默返回 null → 下面的取消分支恒成立，`<...>` 占位符功能整个失效），
+  // 所以输入框由调用方注入。
+  promptInDialog: TPromptInDialog,
 ): Promise<void> {
   const runtimeStore = useRuntimeStore();
   const metadataStore = useMetadataStore();
@@ -18,7 +24,11 @@ export function sendTorrentToDownloader(
   for (const key of ["savePath", "label"] as (keyof typeof addTorrentOptions)[]) {
     if ((addTorrentOptions[key] as string).includes("<...>")) {
       // 此处允许空字符 ""， 但不允许用户取消（即取消动态替换操作则认为取消推送任务）
-      const userInput = prompt(`请输入替换 ${key} 中的 <...> 的内容：`);
+      const userInput = await promptInDialog(
+        i18nInstance.global.t("SentToDownloaderDialog.placeholderInput", [key]),
+        "",
+        { allowEmpty: true },
+      );
       if (userInput !== null) {
         // @ts-ignore
         addTorrentOptions[key] = (addTorrentOptions[key] as string).replace("<...>", userInput.trim());

@@ -39,7 +39,7 @@ function dialogEnter() {
     </a-checkbox-group>
 
     <template #footer>
-      <div class="dialog-footer">
+      <a-flex justify="flex-end" align="center" gap="small">
         <a-button color="danger" variant="text" @click="showDialog = false">
           <template #icon>
             <CloseCircleOutlined />
@@ -52,16 +52,7 @@ function dialogEnter() {
           </template>
           {{ t("common.export") }}
         </a-button>
-      </div>
+      </a-flex>
     </template>
   </a-modal>
 </template>
-
-<style scoped lang="scss">
-/* 底部操作按钮统一右对齐 */
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-</style>

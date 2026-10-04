@@ -245,7 +245,7 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
     <a-alert :title="t('route.Settings.SetSearchSolution')" type="info" show-icon style="margin-bottom: 12px" />
 
     <a-card>
-      <div class="toolbar">
+      <a-flex align="center" gap="small" wrap style="margin-bottom: 16px">
         <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
         <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
@@ -267,12 +267,12 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
 
         <a-button disabled><template #icon><QuestionCircleOutlined /></template><span>{{ t('common.howToUse') }}</span></a-button>
 
-        <div class="toolbar-right">
+        <a-flex flex="auto" justify="flex-end" align="center">
           <a-input v-model:value="tableFilter" allow-clear :placeholder="t('common.search')" style="width: 240px">
             <template #prefix><SearchOutlined /></template>
           </a-input>
-        </div>
-      </div>
+        </a-flex>
+      </a-flex>
 
       <a-table
         :columns="columns"
@@ -370,15 +370,5 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
 <style scoped>
 .set-search-solution {
   padding: 16px;
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.toolbar-right {
-  margin-left: auto;
 }
 </style>

@@ -354,9 +354,7 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
     </div>
 
     <template #footer>
-      <div class="dialog-footer">
-        <div style="flex: 1" />
-
+      <a-flex justify="flex-end" align="center" gap="small">
         <a-button :disabled="isDoingRestore" color="danger" variant="text" @click="showDialog = false">
           <template #icon>
             <CloseCircleOutlined />
@@ -400,7 +398,7 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
           </template>
           {{ t("common.dialog.ok") }}
         </a-button>
-      </div>
+      </a-flex>
     </template>
   </a-modal>
 </template>
@@ -433,11 +431,5 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
 
 .switch-label {
   margin-left: 8px;
-}
-
-.dialog-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 </style>

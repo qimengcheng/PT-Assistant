@@ -109,21 +109,22 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
 <template>
   <a-card size="small">
     <template #title>
-      <div class="toolbar">
+      <a-flex align="center" gap="small">
         <a-button danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-        <div class="toolbar-spacer" />
-        <a-input
-          v-model:value="tableWaitFilter"
-          allow-clear
-          size="small"
-          class="toolbar-filter"
-          :placeholder="t('SearchResultSnapshot.table.filterLabel')"
-        >
-          <template #prefix>
-            <SearchOutlined />
-          </template>
-        </a-input>
-      </div>
+        <a-flex flex="auto" justify="flex-end" align="center">
+          <a-input
+            v-model:value="tableWaitFilter"
+            allow-clear
+            size="small"
+            class="toolbar-filter"
+            :placeholder="t('SearchResultSnapshot.table.filterLabel')"
+          >
+            <template #prefix>
+              <SearchOutlined />
+            </template>
+          </a-input>
+        </a-flex>
+      </a-flex>
     </template>
 
     <a-table
@@ -177,16 +178,7 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
 </template>
 
 <style scoped lang="scss">
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-spacer {
-  flex: 1 1 0;
-}
-
+/* 筛选框宽度上限：不是布局，交给 a-flex 也表达不了 */
 .toolbar-filter {
   max-width: 320px;
 }

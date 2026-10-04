@@ -49,8 +49,7 @@ function dialogEnter() {
     <div class="text-body-large">{{ t("MyClient.recheckDialog.text", { count: torrentCount }) }}</div>
 
     <template #footer>
-      <div class="dialog-footer">
-        <div style="flex: 1" />
+      <a-flex justify="flex-end" align="center" gap="small">
         <a-button color="blue" variant="text" icon-placement="start" :disabled="isRechecking" @click="showDialog = false">
           <template #icon>
             <CloseCircleOutlined />
@@ -63,16 +62,7 @@ function dialogEnter() {
           </template>
           <span class="ml-1">{{ t("common.dialog.ok") }}</span>
         </a-button>
-      </div>
+      </a-flex>
     </template>
   </a-modal>
 </template>
-
-<style scoped lang="scss">
-/* 原 v-card-title class="bg-cyan-lighten-2" */
-.dialog-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-</style>

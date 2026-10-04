@@ -216,6 +216,12 @@ const userLevelGroupIcon = computed(() => {
 /* 原 v-card max-height/max-width + content-class="bg-white pa-0" */
 .level-requirement-panel {
   background: #fff;
+  /* antdv-next 的浮层底色是 colorBgSpotlight（近黑），并把 color 设成浅色；
+     这个面板强制白底却不覆盖 color 时，浅色字就落在白底上 —— 白底白字，整块看不见。
+     显式压回深色，保住 Vuetify 时代「深色浮层里放一张白卡片」的观感。
+     没改成 a-popover：Popover 的浮层底色同样是 colorBgSpotlight，换组件解决不了，
+     照样得手动设色，还要额外处理 teleport 之后的样式作用域。 */
+  color: rgba(0, 0, 0, 0.88);
   padding: 8px;
   max-width: 800px;
   max-height: 500px;

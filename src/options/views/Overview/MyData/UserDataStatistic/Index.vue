@@ -576,10 +576,12 @@ provide(THEME_KEY, echartsTheme);
                 <LockOutlined v-else />
               </template>
             </a-button>
+            <!-- AutoComplete 没有 `readonly` prop：不声明的属性会被透传到根 <div readonly>（SSR 实测），
+                   压根没到内部 input，锁定状态下照样能打字。用 `disabled`。 -->
             <a-auto-complete
               v-model:value="configStore.userName"
               :options="userNameOptions"
-              :readonly="!allowEditName"
+              :disabled="!allowEditName"
               :popup-match-select-width="true"
               class="flex-1-1-0"
             />

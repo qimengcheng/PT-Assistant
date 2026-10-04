@@ -132,8 +132,15 @@ function saveClientConfig() {
     @ok="saveClientConfig"
   >
     <a-collapse v-model:active-key="activeKeys">
-      <a-collapse-panel key="path" :disabled="clientMetadata?.feature?.CustomPath?.allowed === false">
-        <template #label>
+      <!-- antdv-next 的 CollapsePanel 没有 `disabled` 这个 prop，写上去会被当普通 attr 塞进
+           根 div（SSR 实测渲染成 <div disabled ... aria-disabled="false" tabindex="0">，照样能折叠）。
+           真正的开关是 `collapsible`：`'disabled'` 会加 ant-collapse-item-disabled、
+           aria-disabled=true、tabindex=-1。见 scripts/check-dead-props.mjs。 -->
+      <a-collapse-panel
+        key="path"
+        :collapsible="clientMetadata?.feature?.CustomPath?.allowed === false ? 'disabled' : undefined"
+      >
+        <template #header>
           <span>{{ t("SetDownloader.PathAndTag.downloadPath.title") }}</span>
           <a-tag :color="(clientConfig?.suggestFolders?.length ?? 0) > 0 ? 'blue' : 'default'" style="margin-left: 8px">
             +{{ clientConfig?.suggestFolders?.length ?? 0 }}
@@ -181,7 +188,7 @@ function saveClientConfig() {
       </a-collapse-panel>
 
       <a-collapse-panel key="tag">
-        <template #label>
+        <template #header>
           <span>{{ t("SetDownloader.PathAndTag.tags.title") }}</span>
           <a-tag :color="(clientConfig?.suggestTags?.length ?? 0) > 0 ? 'blue' : 'default'" style="margin-left: 8px">
             +{{ clientConfig?.suggestTags?.length ?? 0 }}

@@ -181,7 +181,13 @@ function dialogLeave() {
 
           <div class="site-list">
             <a-collapse v-model:active-key="activeSiteKeys">
-              <a-collapse-panel v-for="site in filteredSite" :key="site" :disabled="!!metadataStore.sites[site].isOffline">
+              <!-- CollapsePanel 没有 `disabled` prop（写上去只是塞进根 div，面板照样能折叠），
+                   真正的开关是 `collapsible: 'disabled'`。见 scripts/check-dead-props.mjs -->
+              <a-collapse-panel
+                v-for="site in filteredSite"
+                :key="site"
+                :collapsible="!!metadataStore.sites[site].isOffline ? 'disabled' : undefined"
+              >
                 <template #header>
                   <span class="site-panel-header">
                     <SiteFavicon :site-id="site" :size="18" />

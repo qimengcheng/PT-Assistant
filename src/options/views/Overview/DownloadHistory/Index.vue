@@ -151,7 +151,7 @@ onUnmounted(() => {
       <div class="toolbar">
         <a-button type="primary" :loading="isLoadingHistory" @click="() => throttleLoadDownloadHistory()"><template #icon><SyncOutlined /></template><span class="ml-1">{{ t('DownloadHistory.refresh') }}</span></a-button>
         <a-divider type="vertical" class="mx-2" />
-        <a-button type="primary" :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('DownloadHistory.reDownload') }}</span></a-button>
+        <a-button :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span class="ml-1">{{ t('DownloadHistory.reDownload') }}</span></a-button>
         <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
         <div class="toolbar-spacer" />
         <a-input

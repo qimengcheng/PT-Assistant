@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { definitionList } from "@ptd/site";
 
 // 本组件是 router-view 直接渲染的路由页，没有调用方可以传 props，所以版本与站点数在组件内自取。
@@ -8,17 +9,21 @@ const version = browser.runtime.getManifest().version;
 const definitionCount = definitionList.length;
 
 // 功能模块状态（随 Roadmap 平移逐个点亮）
-const modules = [
-  { name: "站点定义（340 个，按需加载）", status: "ok" as const },
+// 注意：状态必须与代码实装保持一致，不要凭记忆标注——
+// 下载器（SetDownloader + SentToDownloaderDialog 推送）、content script（悬浮入口 +
+// 站点/社交页解析）、媒体服务器（SetMediaServer 配置 + MediaServerEntity 库浏览）
+// 均已实装，曾长期误标 todo。新增条目时同步更新。
+const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
+  { name: `站点定义（${definitionCount} 个，按需加载）`, status: "ok" as const },
   { name: "消息层 / background 中枢", status: "ok" as const },
   { name: "站点管理（添加/配置/用户信息查询）", status: "ok" as const },
   { name: "多站点搜索", status: "ok" as const },
   { name: "我的数据（用户信息总览）", status: "ok" as const },
   { name: "数据备份/导入（本地 zip + WebDAV/S3/B2）", status: "ok" as const },
-  { name: "种子下载器对接（qBittorrent 等）配置页与推送 UI", status: "todo" as const },
-  { name: "content script（页面内识别与悬浮入口）", status: "todo" as const },
-  { name: "媒体服务器配置页", status: "todo" as const },
-];
+  { name: "种子下载器对接（qBittorrent 等）配置页与推送 UI", status: "ok" as const },
+  { name: "content script（页面内识别与悬浮入口）", status: "ok" as const },
+  { name: "媒体服务器配置页与媒体库浏览", status: "ok" as const },
+]);
 </script>
 
 <template>

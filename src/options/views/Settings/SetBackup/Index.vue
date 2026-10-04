@@ -159,8 +159,8 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 
       <div class="toolbar-divider" />
 
-      <a-button type="primary" :loading="doBackupStatus[localBackup]" @click="doBackup(localBackup)"><template #icon><DatabaseOutlined /></template><span class="ml-1">{{ t('SetBackup.localExport') }}</span></a-button>
-      <a-button type="primary" @click="() => (showRestoreDialog = true)"><template #icon><ImportOutlined /></template><span class="ml-1">{{ t('SetBackup.localImport') }}</span></a-button>
+      <a-button :loading="doBackupStatus[localBackup]" @click="doBackup(localBackup)"><template #icon><DatabaseOutlined /></template><span class="ml-1">{{ t('SetBackup.localExport') }}</span></a-button>
+      <a-button @click="() => (showRestoreDialog = true)"><template #icon><ImportOutlined /></template><span class="ml-1">{{ t('SetBackup.localImport') }}</span></a-button>
 
       <div style="flex: 1" />
 

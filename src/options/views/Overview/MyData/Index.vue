@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
-import { watchDebounced } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { isUndefined } from "es-toolkit/compat";
@@ -43,7 +42,7 @@ import BonusFormatSpan from "./BonusFormatSpan.vue";
 import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
 
 import { formatRatio } from "./utils/format.ts";
-import { tableData, initTableData, isTableLoading, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
+import { tableData, isTableLoading, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
 
 // 本文件名为 Index.vue，与 SearchEntity/Index.vue 同名；<script setup> 推断出的
 // __name 会是 "Index"，导致 App.vue 的 KeepAlive :include 无法区分两者（会互相顶掉缓存）。
@@ -206,30 +205,17 @@ const filteredTableData = computed<IUserInfoItem[]>(() => {
   return tableData.value.filter((raw) => tableFilterFn(undefined, query, { raw }));
 });
 
-// 首屏取数必须挂在 metadata 水合完成这个事件上，不能挂在 onMounted 上。
-// webExtPersistence 的 restore() 是异步的（chrome.storage.local.get + $patch），而本 store
-// 是在这个懒加载路由 chunk 求值时才第一次被 useMetadataStore() 创建（见 lastUserData.ts 模块
-// 顶层），所以 onMounted 那一刻 metadataStore.sites 恒为初始空对象 —— initTableData 会
-// 拿到 0 个站点、空跑一遍就把 loading 关掉，表格既不转圈也没数据。
-// 原来这条首屏链路实际是靠下面那个 5s 防抖的 watcher「误打误撞」补救的：水合改动
-// lastUserInfo → 5s 后才静默重建，实测水合→首行 5403ms，其中 5000ms 纯属白等。
-// 仓库里同一坑早有先例并都用 $onReady 处理（options/App.vue 的版本弹窗、content-script
-// App.vue 的 speedDial），这里补齐。
-void metadataStore.$onReady(() => initTableData());
-
-// 监听用户信息变化（ offscreen 直接定时刷新的情况 ）
-// 注：debounce 保持 5s 不动。它现在只服务后台刷新合并，已不在首屏路径上；
-// 调小会让 23 个站点逐个写回时各触发一次整表重建，反而更卡。
-watchDebounced(
-  () => metadataStore.lastUserInfo,
-  () => {
-    // 此时前端并没有进行刷新，强制更新（silent：后台数据变化，不亮整表 loading）
-    if (!Object.values(runtimeStore.userInfo.flushPlan).some((isFlushing) => isFlushing)) {
-      initTableData({ silent: true });
-    }
-  },
-  { debounce: 5e3, deep: true },
-);
+// 这里什么都不用挂。
+//
+// 表格数据（utils/lastUserData.ts 的 tableData）是从 metadataStore.sites / allAddedSiteMetadata /
+// metadataStore.lastUserInfo 三处派生出来的 computed，而 pinia 水合完成的那次 $patch 本身就是一次
+// 依赖变化 —— Vue 会自动重算，不需要 onMounted 去拉、不需要 $onReady 等水合、也不需要
+// 「监听 lastUserInfo 变化后整表重建」的 debounce watcher。
+//
+// 上面这三样东西原来都存在，且只有 $onReady + 5 秒 debounce watcher 这一条路能走通：
+// 挂载时 sites 还是水合前的空对象，取数空跑一遍，真正让数据出现的是水合触发 watcher、5 秒后
+// 重建整表 —— 实测「水合 → 首行」5403ms，其中 5000ms 是白等的 debounce。
+// 那是给一条 Vue 已经免费提供的边手动补的轮子。v0.22.9 用 $onReady 止血，本次连同轮子一起拆掉。
 
 const showHistoryDataViewDialog = ref<boolean>(false);
 const historyDataViewDialogSiteId = ref<TSiteID | null>(null);

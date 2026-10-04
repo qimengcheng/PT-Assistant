@@ -111,7 +111,7 @@ const filteredSearchPlan = computed(() => {
           <br />
           <span class="text-label-large text-grey"> <{{ searchPlan.searchEntryName }}> </span>
         </div>
-        <span class="text-label-large text-end">
+        <span class="text-label-large text-end status-msg">
           <ResultParseStatus :status="searchPlan.status" />
           <template v-if="searchPlan.status === EResultParseStatus.success">
             <br />
@@ -168,5 +168,15 @@ const filteredSearchPlan = computed(() => {
 <style scoped lang="scss">
 .status-filter {
   gap: 4px 8px;
+}
+
+/* 状态消息列必须能自己变窄：`chrome-extension://…/chunks/xxx.js` 这类无空格整串的
+   min-content 宽度接近 500px，而它左边那列是 .flex-1-1-0（含 min-width:0），
+   于是错误行里左边会被挤到 1 个字符宽、`<default>` 竖成一列。
+   这里给消息列同样的 flex:1 1 0 + min-width:0，并允许在列内折断长串。 */
+.status-msg {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 </style>

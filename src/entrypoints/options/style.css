@@ -414,11 +414,20 @@ body {
    改为按文本基线对齐：图标包裹层对齐到基线、图标相对基线下沉 0.15em
    （经典图标对齐量，等于 cap-height 中心与 1em 几何中心之差）。
    已用真实 cssinjs 产物在 13px 中英双语 + loading/primary 各形态下实测居中；
-   0.15em 随字号等比缩放；纯图标按钮（.ant-btn-icon-only）保持几何居中不受影响。 */
-.ant-btn:not(.ant-btn-icon-only) {
+   0.15em 随字号等比缩放；纯图标按钮（.ant-btn-icon-only）保持几何居中不受影响。
+
+   ⚠️ baseline 只能用于「图标 + 文字」按钮，纯文字按钮必须留给 antd 的 center：
+   antdv-next 按钮高度固定（中号 32px）且 padding-block 为 0，纯文字时 flex 行里
+   没有任何兄弟元素把基线往下推，align-items:baseline 会让文字直接贴顶
+   （实测 32px 按钮：文字距顶 0.8px、距底 11.2px，偏上 10.4px；搜索框的蓝色
+   “搜索”按钮与全部纯文字 primary/default 按钮都受此影响）。
+   用 :has(> .ant-btn-icon) 限定——loading 转圈同样渲染成 .ant-btn-icon
+   （.ant-btn-loading-icon），故 loading+文字形态自动命中；:has 需 Chrome 105+，
+   MV3 面向的 Chromium 版本满足。 */
+.ant-btn:not(.ant-btn-icon-only):has(> .ant-btn-icon) {
   align-items: baseline;
 }
-.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon {
+.ant-btn:not(.ant-btn-icon-only):has(> .ant-btn-icon) > .ant-btn-icon {
   align-self: baseline;
   display: inline-block;
 }

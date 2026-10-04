@@ -109,6 +109,8 @@ const pagination = computed(() => ({
   showTotal: (total: number) => t("common.totalItems", { total }),
 }));
 
+// 列渲染回调的键名是 render(value, record, index)：antdv-next 没有 ant-design-vue 那个
+// customRender({ text, record })，写成 customRender 会被整列静默忽略、退化成原始值。
 const columns = [
   { title: "№", dataIndex: "sortIndex", width: 70, align: "right" as const },
   {
@@ -116,13 +118,13 @@ const columns = [
     dataIndex: "type",
     width: 90,
     align: "center" as const,
-    customRender: ({ record }: any) =>
+    render: (_value: any, record: any) =>
       h("img", { src: getDownloaderIcon(record.type), alt: record.type, style: "width:24px;height:24px" }),
   },
   {
     title: t("SetDownloader.common.name"),
     dataIndex: "name",
-    customRender: ({ record }: any) => {
+    render: (_value: any, record: any) => {
       const isDefault = record.id === metadataStore.defaultDownloader?.id;
       return h("div", { style: "display:flex;align-items:center;gap:6px" }, [
         isDefault ? h(PushpinFilled, { style: "color:#1677ff;transform:rotate(45deg)" }) : null,
@@ -133,7 +135,7 @@ const columns = [
   {
     title: t("SetDownloader.common.address"),
     dataIndex: "address",
-    customRender: ({ record }: any) =>
+    render: (_value: any, record: any) =>
       h("a", { href: record.address, target: "_blank", rel: "noopener noreferrer" }, record.address),
   },
   { title: t("common.username"), dataIndex: "username" },
@@ -142,7 +144,7 @@ const columns = [
     dataIndex: "enabled",
     width: 80,
     align: "center" as const,
-    customRender: ({ record }: any) =>
+    render: (_value: any, record: any) =>
       h(aSwitch, {
         checked: record.enabled,
         disabled: record.id === metadataStore.defaultDownloader?.id,
@@ -155,7 +157,7 @@ const columns = [
     dataIndex: "feature.DefaultAutoStart",
     width: 80,
     align: "center" as const,
-    customRender: ({ record }: any) =>
+    render: (_value: any, record: any) =>
       h(aSwitch, {
         checked: !!record.feature?.DefaultAutoStart,
         size: "small",

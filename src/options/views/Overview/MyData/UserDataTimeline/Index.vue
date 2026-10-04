@@ -234,6 +234,17 @@ const userNameOptions = computed(() =>
 onMounted(async () => {
   isLoading.value = true;
 
+  // 等 metadata 水合完成再取数。
+  // 本页与 MyData 是同一个问题：onMounted 时 metadataStore.sites / lastUserInfo 还是水合前的
+  // 空对象，下面两步会连着错 —— loadAllAddedSiteMetadata 拿到空数组、canThisSiteShow 又因
+  // allAddedSiteMetadata 为空把所有站点过滤掉，结果时间线一片空白。
+  //
+  // 这里**不**照 MyData 那样改成 computedAsync 派生：本 onMounted 还负责一次性初始化
+  // selectedSites（优先级 route 参数 > 已保存配置 > 全部站点），放进会重算的派生链里，
+  // 站点数据一变就会把用户刚勾好的选择冲掉。要防它反而得再加 once 标志 —— 那是加机制。
+  // 所以这一页只做最小的一件事：等数据齐，然后按原逻辑跑一次。
+  await metadataStore.$onReady();
+
   try {
     // 加载所有站点的元数据
     await loadAllAddedSiteMetadata(Object.keys(metadataStore.sites));

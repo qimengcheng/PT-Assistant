@@ -52,8 +52,15 @@ function calculateDailyIncremental(
 }
 
 export async function loadFullData(): Promise<IUserDataStatistic> {
-  const rawData = (await extStore.getItem("userInfo")) as TUserInfoStorageSchema;
   const metadataStore = useMetadataStore();
+
+  // 等 metadata 水合完成再读镜像。
+  // getAddedSiteIds 在水合前的空镜像上算出「零个站点」，于是下面那行 filteredRawData 会把
+  // 全部历史数据当孤儿过滤掉（:61 的 filter 依赖 addedSiteIds），图表整页为空且没有任何报错。
+  // 与 MyData / UserDataTimeline 同一个根因，只是症状不同。
+  await metadataStore.$onReady();
+
+  const rawData = (await extStore.getItem("userInfo")) as TUserInfoStorageSchema;
   const addedSiteIds = metadataStore.getAddedSiteIds;
 
   // 提前过滤已删除的站点数据，避免后续不必要的计算

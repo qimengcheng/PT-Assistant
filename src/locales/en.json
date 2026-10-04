@@ -1449,6 +1449,7 @@
       "snapshot": "Search Snapshot",
       "backup": "Backup",
       "downloader": "Downloader",
+      "myClient": "My Clients",
       "mediaServer": "Media Server",
       "basicSettings": "Basic Settings",
       "techStack": "Tech Stack",

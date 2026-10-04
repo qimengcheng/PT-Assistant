@@ -28,7 +28,7 @@ export const clientConfig: TorrentClientConfig = {
   address: "http://127.0.0.1:8080/gui/",
   username: "admin",
   password: "",
-  timeout: 60 * 1e3,
+  timeout: 10 * 1e3,
 };
 
 // noinspection JSUnusedGlobalSymbols

@@ -29,7 +29,7 @@ export const clientConfig: DownloaderBaseConfig = {
   name: "Deluge",
   address: "http://localhost:8112/",
   password: "",
-  timeout: 60 * 1e3,
+  timeout: 10 * 1e3,
 };
 
 // noinspection JSUnusedGlobalSymbols

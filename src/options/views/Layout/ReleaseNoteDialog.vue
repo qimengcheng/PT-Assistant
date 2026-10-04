@@ -49,7 +49,7 @@ function onAfterOpenChange(open: boolean) {
     :mask-closable="false"
     :keyboard="false"
     :title="t('layout.releaseNote.title', { extName: 'PT Assistant' })"
-    @after-open-change="onAfterOpenChange"
+    :after-open-change="onAfterOpenChange"
   >
     <div class="release-note">
       <div class="brand">

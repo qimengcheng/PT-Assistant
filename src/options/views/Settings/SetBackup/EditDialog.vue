@@ -34,7 +34,7 @@ function editClientConfig() {
     v-model:open="showDialog"
     :title="t('SetDownloader.edit.title')"
     :width="800"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
   >
     <Editor v-if="clientConfig" v-model="clientConfig" />
 

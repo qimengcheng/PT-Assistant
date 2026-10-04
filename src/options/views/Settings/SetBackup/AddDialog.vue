@@ -64,7 +64,7 @@ function resetDialog() {
     v-model:open="showDialog"
     :title="t('SetBackup.AddDialog.title')"
     :width="800"
-    @after-close="resetDialog"
+    :after-close="resetDialog"
   >
     <!-- wiki 入口原先挂在 #title 插槽里（.dialog-title 的 space-between 把它推到最右，
          正好压在 antd 绝对定位的关闭按钮上 —— 就是截图里问号与 X 重叠的成因），移到内容区顶部 -->

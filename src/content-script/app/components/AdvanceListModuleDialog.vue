@@ -133,7 +133,7 @@ const rowSelection = computed(() => ({
     :width="1200"
     :footer="null"
     styles="{ body: { maxHeight: `${windowHeight - 256}px`, overflow: 'auto' } }"
-    @after-open-change="(open: boolean) => open && enterDialog()"
+    :after-open-change="(open: boolean) => open && enterDialog()"
   >
 
     <div style="margin-bottom: 8px">

@@ -53,7 +53,7 @@ async function confirmSetLabel() {
     v-model:open="showDialog"
     :title="t('MyClient.label.title', { count: torrents.length })"
     :width="480"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 
     <a-divider class="ma-0" />

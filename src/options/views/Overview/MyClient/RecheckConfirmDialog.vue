@@ -43,7 +43,7 @@ function dialogEnter() {
     :mask-closable="!isRechecking"
     :closable="!isRechecking"
     :keyboard="!isRechecking"
-    @after-open-change="(open: boolean) => open && dialogEnter()"
+    :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 
     <div class="text-body-large">{{ t("MyClient.recheckDialog.text", { count: torrentCount }) }}</div>

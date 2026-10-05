@@ -1,7 +1,7 @@
 # AGENTS.md — PT Assistant (WXT) 开发约定
 
 > 本文件是**跨会话 / 跨 agent 共享**的硬约定。每个接手本仓库的 AI（含并行会话）动手前必读。
-> 与 `README.md`（项目说明）配套使用。
+> 与 `README.md`（现状：架构 / 目录 / 命令 / CI 守卫）和 `PLAYBOOK.md`（经历：坑、根因、结论落在哪）配套使用。
 
 ## 0. 项目一句话
 
@@ -38,20 +38,14 @@ PT-Plugin-Plus / PT-depiler 的**重写版**：旧版是 Vue 3 + Vuetify 4 + vit
 
 #### 版本号只能从 git log 推导，不要看工作区
 
-**这是本仓库真踩过一次的坑，也是本节最容易违反的一条。**
+**本节最容易违反的一条。** 工作区 `package.json` 的值是「当前工作进度」的信号，不是「已发布版本」，
+真相源只有 `git log`。把它当已发布版本用，就会造出没有任何提交用过的死号（事故经过见 PLAYBOOK §19）。
 
-当时另一个 agent 把 `package.json` 预 bump 到某个号 N 但**还没提交**，我把 N 当成了
-「已经用掉的版本」，改成 N+1 提交 —— **N 从此成为死号**，历史出现缺口，事后只能靠重写
-提交把它补上。
-
-> **读史须知**：2026-10-04 本仓库把版本号方案从 `0.5.x` 整体重编号为 `0.2x`（历史被改写
-> 并强推过远端）。因此旧提交消息、旧代码注释、旧文档里出现的 `0.5.xx` **都不再对应任何现存
-> 提交**；引用某个历史版本号之前先确认它还在：`git log --format=%s | grep "v0\.X\.Y\b"`。
-> 同理，代码注释里「vX 起改成…」这类版本门（例如 `config.ts` 的
-> `initTorrentOnEnterDefaultOnSince`）在重编号后会静默失效，改编号时必须逐个复核。
-
-根因不是算错，是**参照物选错**：工作区 `package.json` 的值是「当前工作进度」的信号，
-不是「已发布版本」。真相源只有 `git log`。
+> **读史须知**：本仓库做过 `0.5.x` → `0.2x` 的整体重编号，历史被改写并强推过远端。
+> 旧提交消息、旧代码注释、旧文档里出现的 `0.5.xx` **都不再对应任何现存提交**；
+> 代码注释里「vX 起改成…」这类版本门（例如 `config.ts` 的 `initTorrentOnEnterDefaultOnSince`）
+> 会静默失效，改编号时必须逐个复核。引用某个历史版本号之前先确认它还在：
+> `git log --format=%s | grep "v0\.X\.Y\b"`（详见 PLAYBOOK §0）。
 
 选号直接用工具，不要手算，也不要拿工作区的值 +1：
 
@@ -81,10 +75,10 @@ node scripts/check-version.mjs --next     # 输出下一个该用的版本号，
   事后历史里 amend 与重复用号可区分）。
 - `--amend` 时**顺手改号**会把被改那条的号变成死号，两个钩子和 CI 都拦不住：那一刻
   暂存号 == HEAD 的号 + 1，与一次完全正常的提交无法区分。等下一条提交压上去，缺口就进了
-  历史中段，而 `--committed` 只校验 HEAD 一条，中段缺口是盲区（v0.5.1 在测试仓库里就是这么没了的）。
+  历史中段，而 `--committed` 只校验 HEAD 一条，中段缺口是盲区（实测见 PLAYBOOK §21）。
   → **amend 只改消息和内容，不改版本号**，见 §1.6。
-- `commit-msg` **不扫正文**，提交消息里引用别的版本号绝对安全。「正文别写别的版本号」
-  是一条不存在、我曾误记过的规则，别再往下传。
+- `commit-msg` **不扫正文**，提交消息里引用别的版本号绝对安全 —— 并不存在「正文别写版本号」
+  这条规则，曾有误记往下传，别再传（PLAYBOOK §21）。
 - 首行的锚定规则是「模型名右方括号之后第一个 `vX.Y.Z`」，所以 `[OpenCode]-[Space Bunny Alpha 1.0.0] v0.22.16 …`
   这种模型名自带三段式数字的写法不会抢位（§1.1 要求逐字照抄模型名，撞上是迟早的事）。
 
@@ -114,12 +108,15 @@ git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'u
 | 产物 `manifest.json` → `version` | 构建时从 package.json 注入 |
 | commit 消息里的 `vX.Y.Z` | 与上面两者一致 |
 
-**踩坑记录 1**：曾出现 commit 标 v0.16.0 但漏提交 `package.json`，`version` 因此一直停在
-上一个已提交的号上，CI 读到的版本与提交说明不一致。**bump 版本号时务必把 `package.json` 一起 `git add`。**
+**所以 bump 版本号时务必把 `package.json` 一起 `git add`** —— 它是多会话共享热点，最容易漏，
+一漏 CI 读到的版本就和提交说明不一致（PLAYBOOK §20）。
 
-**踩坑记录 2（跳号）**：见 §1.2「版本号只能从 git log 推导」。本地 `pre-commit` 会当场拦住，
-提交后也要核对一次：`node scripts/check-version.mjs --committed`，
-再扫一遍历史连续性 `git log -10 --format=%s` 看有没有缺口。
+跳号同理：本地 `pre-commit` 会当场拦住，提交后还要再核对一次连续性：
+
+```bash
+node scripts/check-version.mjs --committed   # HEAD 那条：消息版本号 == package.json == 父提交 + 1
+git log -10 --format=%s                      # 肉眼扫有没有缺口
+```
 
 ### 1.4 多 agent 并行下的 git 纪律
 
@@ -131,8 +128,10 @@ git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'u
 3. **新文件写完立刻 `git add`**，否则可能被别的会话的 `git clean` 删掉。
 4. 判断是否有并行会话：`git status` 里有你没动过的文件，或用 node 查 mtime 跟你自己的改动时间对齐
    （bash 的 `ls` 在本机不可用）。
-5. 共享热点文件（`package.json`、`Footer.tsx`、`config.ts`、路由表、CHANGELOG）冲突概率最高，
-   改之前先 `git diff` 看别人的在改什么。
+5. 共享热点文件冲突概率最高，改之前先 `git diff` 看别人的在改什么。按近 30 条提交的被改动次数排：
+   `package.json`（30 次，每条提交都碰）、`AGENTS.md`、`src/locales/{zh_CN,en}.json`、
+   `src/shared/indexdb.ts`、`src/options/plugins/router.ts`、`src/options/stores/config.ts`。
+   （仓库里**没有** `CHANGELOG` 文件，也没有 `Footer.tsx` —— 别照着旧名单找。）
 
 ### 1.5 push
 
@@ -179,9 +178,8 @@ git commit --amend -m '<合并后的完整消息>'
 #### amend 的三条硬约束
 
 1. **amend 前先确认 HEAD 就是你自己的那一条。** 本仓库多会话共用一棵工作树，HEAD 随时可能被
-   别人抢先推进；`git commit --amend` 不报错，它会**直接把别人的提交改掉**。
-   本次就差点出事：`[OpenCode]` 在本会话提交之后落了一条 v0.22.17，随后那次试手性的 amend
-   改的会是他的提交，而不是我的。只有 `git log -1 --format='%s'` 里的前缀是你自己的，才能动手。
+   别人抢先推进；`git commit --amend` 不报错，它会**直接把别人的提交改掉**（真出过一次险情，
+   见 PLAYBOOK §22）。只有 `git log -1 --format='%s'` 里的前缀是你自己的，才能动手。
    ```bash
    git log -1 --format='%an %s'      # 先看 HEAD 是谁的
    git log --oneline origin/master..HEAD   # 再看它没推出去
@@ -191,8 +189,8 @@ git commit --amend -m '<合并后的完整消息>'
    三条都拦不住（CI 的 `--committed` 只校验 HEAD 一条，等下一条提交压上去，缺口进了历史中段
    就彻底看不见）。要换号就是新开一条提交，不是 amend。
 3. **不再需要 `--no-verify`。** `pre-commit` 认得 amend 了：暂存版本号 == HEAD 自己的版本号时，
-   基线取 `HEAD~1` 而不是 `HEAD`（见 §1.2）。在此之前，按本节流程走的 amend 会被当成跳号拦死 ——
-   当时唯一的出路就是绕过钩子，那等于把这条流程从受保护变成不受保护。
+   基线取 `HEAD~1` 而不是 `HEAD`（见 §1.2）。在此之前这条流程只能靠绕钩子走，那等于把它
+   从受保护变成不受保护（演变过程见 PLAYBOOK §21）。
 
 ---
 
@@ -201,9 +199,14 @@ git commit --amend -m '<合并后的完整消息>'
 ### 2.1 命令
 
 ```bash
-PTD_SESSION=<会话标识> pnpm build   # 产物 → dist-<会话标识>/chrome-mv3（多会话并行时必须带，见 §2.2）
+PTD_SESSION=<会话标识> pnpm build   # 加锁构建 → dist-<会话标识>-<版本号>/chrome-mv3，并把 dist-verify 换指到它
 pnpm build                        # 不带变量时落在默认 .output/chrome-mv3（CI 走的就是这条）
 ```
+
+- **构建入口是 `scripts/build-verify.mjs`（`pnpm build` / `pnpm zip` 都指到这里），别绕开它直接调 `wxt`。**
+  它负责三件事：拿构建锁、换指 `dist-verify`、清理本会话旧快照。绕开它就等于在多人共用的
+  `.wxt/` 与 `node_modules/.vite/` 上打架。锁只管 `build`/`zip`，不管 `pnpm dev`（长跑，占着锁会堵死别人；
+  dev 也就**不会换指 `dist-verify`**，用 dev 调试时加载路径得另说）。
 
 - **本地只构建 Chrome**。**不要在本地跑 `pnpm build:firefox` / `dev:firefox`** ——
   纯浪费时间（Firefox 产物由 CI 统一构建，见 §2.4）。
@@ -215,12 +218,11 @@ pnpm build                        # 不带变量时落在默认 .output/chrome-m
   | `wxt zip -b firefox` | Firefox 分支的产物路径与 Chrome 不同（`firefox-mv2`、manifest 变体），本地只构建 Chrome **覆盖不到**它 |
   | `node scripts/smoke-background.mjs` | 唯一一处**把打包产物真的 import 一次**的地方，抓「模块顶层执行浏览器 API」这类 vue-tsc / 源码审查 / Chrome 构建全都看不见的 SW 崩溃 |
 
-  实测踩过：v0.22.16 让 background 引到含模块级 `openDB(...)` 的共享库，
-  `indexedDB is not defined` 只在**跑产物**时炸（真浏览器里有 `indexedDB`，线上不报）。
-  它当时没被发现，是因为那批提交里没人跑过这两条 —— 而 CI 报出来时，
-  责任落在最后一个 push 的人身上（一次 push 只打一个 tag，见 §2.4），查出病灶的是他、CI 报在名下的是我。
+  为什么本地也要跑：这类 SW 崩溃（模块顶层执行浏览器 API）**只有跑产物才抓得到**，
+  vue-tsc 和源码审查都看不见；一旦漏到 CI 才暴露，报的是最后一个 push 的人名下
+  （一次 push 只打一个 tag，见 §2.4）。实例见 PLAYBOOK §25、§23。
   **推之前跑完这两条，十分钟内能确认自己没往主线扔一颗雷。**
-- 构建报 `remove C:\...\Temp\esbuild-*: Access is denied` 时（README 踩坑 §13，杀软句柄导致，
+- 构建报 `remove C:\...\Temp\esbuild-*: Access is denied` 时（PLAYBOOK §13，杀软句柄导致，
   时好时坏），**别重启机器**，把临时目录指到仓库内已 gitignore 的 `.tmp-build/` 即可：
   `PTD_SESSION=<标识> TEMP="$PWD/.tmp-build" TMP="$PWD/.tmp-build" TMPDIR="$PWD/.tmp-build" pnpm build`。
 - **不要再绕着调 `./node_modules/.bin/wxt build`**：`pnpm-workspace.yaml` 里已配
@@ -239,34 +241,41 @@ pnpm build                        # 不带变量时落在默认 .output/chrome-m
 
 **每次让用户验收，必须同时给出：**
 
-1. **产物加载绝对路径**：`E:\DeepSeek Harness\ptassistant\PT-assistant-wxt\dist-<会话标识>\chrome-mv3`
-   （`<会话标识>` 用本 agent 名的短横线小写形式，例如 `dist-qwenwork`、`dist-workbuddy`）
-2. **版本号**
+1. **产物加载绝对路径**：`E:\DeepSeek Harness\ptassistant\PT-assistant-wxt\dist-verify\chrome-mv3`
+   —— **永远只有这一个**，用户只往 Chrome 里加载它一次；每次构建成功后它自动指向本次产物。
+2. **版本号**（从构建输出或 `dist-verify` 同级的 `BUILDINFO.json` 里读），并说明这份是谁在什么时候建的
 
-只说「改好了」而不给路径 = 未完成。**不再有「同步到 dist-latest」这一步**，直接加载自己会话的目录。
+只说「改好了」而不给路径 = 未完成。
 
-**多 agent 共用一棵工作树，产物必须各走各的目录：**
+**为什么是固定路径而不是「这次构建在哪个目录」：** Chrome 给未打包扩展算 id 用的是**加载路径**，
+每换一个新目录就要「移除旧的 + 加载新的」，扩展 id 跟着变 → 站点配置、下载器设置全都要重来一遍。
+所以目录名带版本号（`dist-<会话>-<版本>`）只用来**归属与排查**，不作为加载入口。
+
+**多 agent 共用一棵工作树，构建的真身仍必须各走各的目录：**
 
 ```bash
-PTD_SESSION=qwenwork pnpm build     # → dist-qwenwork/chrome-mv3
+PTD_SESSION=qwenwork pnpm build     # → dist-qwenwork-<package.json 版本号>/chrome-mv3，再把 dist-verify 换指到它
 ```
 
-为什么：`wxt` 每次构建都会**先清空 outDir**。实测发生过两起互擦事故 ——
-① 本会话把 `.output/chrome-mv3` 拷成 `dist-latest` 时，另一会话的构建正好把它清空，
-交付目录一度是 0 文件；② 另一会话一次失败的构建把共享的 `.output` 整个留空。
+为什么：`wxt` 每次构建都会**先清空 outDir**，并行会话会互相擦掉交付目录（两起事故见 PLAYBOOK §14）。
+所以真身按会话隔离，`dist-verify` 只是一层目录联接（junction），换指是瞬时的、不会把对方擦成空目录。
 
 WXT 0.21.4 的 `wxt build` **没有 `--output` 参数**（可用项只有 root/config/mode/browser/
 filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里的
-`outDir: sessionTag ? 'dist-' + tag : '.output'` 实现，值取自环境变量 `PTD_SESSION`。
+`outDir: sessionTag ? \`dist-${tag}-${pkgVersion}\` : ".output"` 实现：会话标识取自环境变量
+`PTD_SESSION`，版本号取自 `package.json`（与注入 manifest 的是同一个值，不会各说一套）。
 **不设该变量时仍是默认 `.output`** —— CI（`ci.yml` 的 build job）依赖这个默认值取
-`.output/*.zip`，别让 CI 带上 PTD_SESSION。
+`.output/*.zip`，别让 CI 带上 PTD_SESSION（CI 也就不会碰 `dist-verify`）。
+
+**验收期间用户如果发现界面变了**：说明另一个会话构建完并把联接换走了。让他看
+`dist-verify` 目标目录里的 `BUILDINFO.json`（version / session / gitHead / builtAt）即可判定是哪份。
 
 ### 2.4 Firefox 产物由 CI 构建
 
 **只有一个 workflow：`.github/workflows/ci.yml`**，三个 job 串起来 `verify → build → release`。
-（旧文档写的 `build.yml` / `release.yml` 两个文件都不存在，v0.22.13 那轮订正漏掉了这处。）
+（没有 `build.yml` / `release.yml` 这两个文件，曾有文档写错，见 PLAYBOOK §24。）
 
-- `verify`：`pnpm compile` + 五条静态防线 + `check-version.mjs --committed`。
+- `verify`：`pnpm compile` + 七条守卫 + `check-version.mjs --committed`。
 - `build`：`wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
   `PT-Assistant-<version>-{chrome,firefox,sources}.zip` 三个包，外加 `smoke-background.mjs`。
 - `release`：`ncipollo/release-action` 按 `package.json` 的 version 打 `v<version>` tag 并挂上
@@ -275,8 +284,8 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 **本地只跑 Chrome 构建即可**，不要为了 Firefox 产物在本地重复构建。
 
 **一次 push 只会被打一个 tag**：workflow 检出的是这次 push 的 tip commit，所以把多个版本号
-攒在一次 push 里，只有最顶那版会拿到 tag 和 Release，下面的全部静默漏掉。实测踩过：
-v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所以**每个版本号单独 push**。
+攒在一次 push 里，只有最顶那版会拿到 tag 和 Release，下面的全部静默漏掉（实测见 PLAYBOOK §23）。
+所以**每个版本号单独 push**。
 
 ---
 
@@ -298,9 +307,7 @@ v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所�
 - `@ptd/site/types/base.ts` 无任何 import，是安全的（可运行时取 `EResultParseStatus` 枚举）。
 - **SW 的导入图里不许有「导入即执行」的浏览器 API 调用。** 模块级写 `export const db = openDB(...)`
   等于「谁 import 谁开库」，哪怕它一次都不碰。上一条那个崩溃是同一类：崩溃点在顶层，
-  而 background 只是**恰好 import 到了**。实例：v0.22.16 让 `fixer.ts` 引了按天存档模块，
-  就把这条 openDB 接进 SW，被 `smoke-background.mjs` 以 `indexedDB is not defined` 当场拦下 ——
-  真浏览器里不会报这个错，所以这类问题只能靠跑产物来抓。
+  而 background 只是**恰好 import 到了**。真浏览器里不报这类错，只能靠跑产物抓（PLAYBOOK §25）。
   共享库句柄一律走 `@/shared/indexdb` 的 `ptdIndexDb()`（懒开），别改回模块级 Promise。
   懒开带来的两条不变量（失败不缓存 rejection / 成功必须复用）**静态扫不出来**，由
   `scripts/check-indexdb-retry.mjs` 用行为断言钉住并挂在 CI；改那个函数前先跑它。
@@ -312,7 +319,7 @@ v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所�
 `app.use(i18nInstance)` —— 必须传 i18n 插件**本体**，传 `i18nInstance.global`（Composer）会抛
 `NOT_INSTALLED(27)`，表现为整个页面白屏。
 
-### 3.4 antdv-next 踩过的坑（Vuetify → antdv 迁移必读）
+### 3.4 antdv-next 组件用法约定（Vuetify 迁移对照）
 
 | 坑 | 现象 | 正解 |
 |---|---|---|
@@ -321,7 +328,7 @@ v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所�
 | `a-auto-complete` 选中后 | 输入框显示的是 **value**（如下载器随机 id），`option-label-prop` 不生效 | 固定列表选择一律用 `a-select`（单选固定显示 label）+ `show-search` + `option-filter-prop="label"` |
 | `a-table` 的 `sorter: true` | 排序箭头动、**数据不排** | antd `getSortFunction` 静默跳过无 compare 的 sorter，必须给真正 compare 函数 |
 | `a-list` 传 `:data-source="[]"` | 渲染内置「暂无数据」占位 | 不用 data-source，直接渲染子项 |
-| `<a-step>` 等注册表里不存在的 `a-*` 标签 | 被当原生未知元素，**内容静默丢失**（带对象插槽时整块空白） | antdv-next 全量 install 实测只有 139 个注册名，**没有** `AStep`/`AList`；Steps 只有 `:items` 数组写法。CI 的 check-antd-tags 会拦（v0.18.2 踩过） |
+| `<a-step>` 等注册表里不存在的 `a-*` 标签 | 被当原生未知元素，**内容静默丢失**（带对象插槽时整块空白） | antdv-next 全量 install 实测只有 139 个注册名，**没有** `AStep`/`AList`；Steps 只有 `:items` 数组写法。CI 的 check-antd-tags 会拦 |
 | 图标 `import * as Icons from "@antdv-next/icons"` | 1760 个图标模块**全进包** | 只具名导入用到的：`import { DeleteOutlined } from "@antdv-next/icons"` |
 
 原子类兼容层：`src/entrypoints/options/vuetify-compat.css` 复刻的 Vuetify 原子类
@@ -330,9 +337,9 @@ v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所�
 #### content script 侧是按需注册，不是全局 install
 
 设置页模板直接写 `a-xxx` 即可（全局 install）；content script 是独立入口，全量 install 会把
-139 个组件打进每个站点都要加载的 content chunk（曾达 4.3MB，占全部产物 JS 的 65%）。
-按需清单在 `src/content-script/antd-lite.ts`（21 个父组件 → 实际注册 44 个名字；
-这两个数以 `check-content-antd-lite.mjs` 的输出为准，别手抄进文档），
+139 个组件打进每个站点都要加载的 content chunk（实测 4.3MB，占全部产物 JS 的 65%）。
+按需清单在 `src/content-script/antd-lite.ts`（父组件数与实际注册名数**以
+`check-content-antd-lite.mjs` 的输出为准，别手抄进文档** —— 抄一次就过期一次），
 接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
 否则线上是静默空白。
 
@@ -351,9 +358,8 @@ node scripts/check-fingerprint.mjs        # 种子指纹三层逻辑自检（含
 ```
 
 第三条防的是 vue-i18n 的静默失效：键取不到时**不抛异常、不进 vue-tsc、不进构建**，而是把键路径
-本身当文案渲染到界面上（内部标识符进 UI 是 §3.5 的零容忍项）。v0.20.0 整站接入就是靠它扫出
-`ExportUserInfoDialog.vue` 引用了不存在的 `common.noData`。`t("前缀" + x)` 这类动态拼接会被放过
-（静态不可判定），所以**改了动态键这条守卫拦不住，仍要人工核**。
+本身当文案渲染到界面上（内部标识符进 UI 是 §3.5 的零容忍项，它上线时扫出的真问题见 PLAYBOOK §28）。
+`t("前缀" + x)` 这类动态拼接会被放过（静态不可判定），所以**改了动态键这条守卫拦不住，仍要人工核**。
 
 第四条防的是 antdv-next 的 `inheritAttrs` 默认行为：没声明的 prop 被当普通属性原样塞进根 DOM，
 不报错、不警告、生产环境完全静默；没匹配的命名插槽则直接渲染成空。`vue-tsc` 抓不到它
@@ -364,16 +370,16 @@ node scripts/check-fingerprint.mjs        # 种子指纹三层逻辑自检（含
 
 第五条防的是 `persistWebExt` store 的**异步水合竞态**：取数走 `chrome.storage.local.get`，
 水合完成前 store 里是初始值（对象 `{}`、数组 `[]`），不是 `undefined` —— 所以
-`onMounted(() => 读 metadataStore.sites)` 这类写法不报错、不进 vue-tsc、不进构建，只是首屏静默空着。
-「我的数据」页要等 5 秒多才出表就是这个根因：有人为了绕开它手搓了一个 5 秒 debounce 轮询存储，
-症状被掩盖，代价摊给所有人。两条出路，`$onReady` 或改成派生（`computedAsync` / `computed`）：
-后者不需要等待，水合一到自动重算，是首选。
+`onMounted(() => 读 metadataStore.sites)` 这类写法不报错、不进 vue-tsc、不进构建，只是首屏静默空着
+（这个竞态曾被 5 秒 debounce 掩盖，代价摊给所有人，见 PLAYBOOK §26）。
+两条出路：`$onReady`，或改成派生（`computedAsync` / `computed`）—— 后者不需要等待，
+水合一到自动重算，是首选。
 
 它的边界同样是「宁可漏报」，**报干净不等于真干净**：store 清单靠扫源码得到（`persistWebExt`
 为 true/对象的才算，`runtime` 走 sessionStorage 同步水合所以排除）；只跟同文件内的词法调用展开
 3 层，跨文件转发的不追；观察器 / 定时器 / 事件监听这类**异步边界**里的读取一律放过（那些不在
-挂载路径上执行）。反过来 getter 到底读没读 `state` 静态判不出来 —— 首版就把纯透传的
-`getSiteMetadata` 误报成了一处，靠人工核对源码才排除。所以它报出来的每一条都要回源码看一眼。
+挂载路径上执行）。反过来 getter 到底读没读 `state` 静态判不出来（首版就误报过一处纯透传 getter，
+见 PLAYBOOK §27）。所以它报出来的每一条都要回源码看一眼。
 
 注册表是脚本在 Node 里**实跑** `install()` 得到的，不抄文档。
 
@@ -396,9 +402,8 @@ node scripts/check-fingerprint.mjs        # 种子指纹三层逻辑自检（含
 ## 4. 迁移进度判断陷阱
 
 **文件存在 ≠ 用户能看到。** 迁移完的页面必须核对**路由表是否真的挂上**（`src/options/plugins/router.ts`）。
-曾出现「站点管理页 490 行早已迁移完成，但路由一直挂着一个简易调试页」的情况，
-还有「三个组件平移了但从没接线进任何页面」。盘点迁移进度时除了 diff 文件清单，
-**必须 grep 路由表 + grep 组件的实际引用点**。
+盘点迁移进度时除了 diff 文件清单，**必须 grep 路由表 + grep 组件的实际引用点** ——
+「490 行的页面一直被挂在调试页位置上」「三个组件平移了却从没接线」这两起误判见 PLAYBOOK §29。
 
 排查手法：
 

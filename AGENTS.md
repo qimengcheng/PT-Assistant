@@ -38,11 +38,17 @@ PT-Plugin-Plus / PT-depiler 的**重写版**：旧版是 Vue 3 + Vuetify 4 + vit
 
 #### 版本号只能从 git log 推导，不要看工作区
 
-**这是 v0.21.1 踩过的坑，也是本节最容易违反的一条。**
+**这是本仓库真踩过一次的坑，也是本节最容易违反的一条。**
 
-当时另一个 agent 把 `package.json` 预 bump 到 `0.5.43` 但**还没提交**，我把这个数
-当成了「已经用掉的版本」，改成 `0.5.44` 提交 —— **0.5.43 从此成为死号**，历史出现缺口，
-直到 v0.21.2 才回头重编号修正。
+当时另一个 agent 把 `package.json` 预 bump 到某个号 N 但**还没提交**，我把 N 当成了
+「已经用掉的版本」，改成 N+1 提交 —— **N 从此成为死号**，历史出现缺口，事后只能靠重写
+提交把它补上。
+
+> **读史须知**：2026-10-04 本仓库把版本号方案从 `0.5.x` 整体重编号为 `0.2x`（历史被改写
+> 并强推过远端）。因此旧提交消息、旧代码注释、旧文档里出现的 `0.5.xx` **都不再对应任何现存
+> 提交**；引用某个历史版本号之前先确认它还在：`git log --format=%s | grep "v0\.X\.Y\b"`。
+> 同理，代码注释里「vX 起改成…」这类版本门（例如 `config.ts` 的
+> `initTorrentOnEnterDefaultOnSince`）在重编号后会静默失效，改编号时必须逐个复核。
 
 根因不是算错，是**参照物选错**：工作区 `package.json` 的值是「当前工作进度」的信号，
 不是「已发布版本」。真相源只有 `git log`。
@@ -88,8 +94,8 @@ git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'u
 | 产物 `manifest.json` → `version` | 构建时从 package.json 注入 |
 | commit 消息里的 `vX.Y.Z` | 与上面两者一致 |
 
-**踩坑记录 1**：曾出现 commit 标 v0.16.0 但漏提交 `package.json`，仓库停在 0.5.1，CI 读到的版本与
-提交说明不一致。**bump 版本号时务必把 `package.json` 一起 `git add`。**
+**踩坑记录 1**：曾出现 commit 标 v0.16.0 但漏提交 `package.json`，`version` 因此一直停在
+上一个已提交的号上，CI 读到的版本与提交说明不一致。**bump 版本号时务必把 `package.json` 一起 `git add`。**
 
 **踩坑记录 2（跳号）**：见 §1.2「版本号只能从 git log 推导」。本地 `pre-commit` 会当场拦住，
 提交后也要核对一次：`node scripts/check-version.mjs --committed`，
@@ -253,22 +259,31 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 
 设置页模板直接写 `a-xxx` 即可（全局 install）；content script 是独立入口，全量 install 会把
 139 个组件打进每个站点都要加载的 content chunk（曾达 4.3MB，占全部产物 JS 的 65%）。
-按需清单在 `src/content-script/antd-lite.ts`（18 个父组件，实际注册 41 个名字），
+按需清单在 `src/content-script/antd-lite.ts`（21 个父组件 → 实际注册 44 个名字；
+这两个数以 `check-content-antd-lite.mjs` 的输出为准，别手抄进文档），
 接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
 否则线上是静默空白。
 
-三条 CI 静态防线（本地改完也要跑，FAIL 非零退出，挂在 ci.yml 的 `pnpm compile` 之后、构建之前）：
+四条 CI 静态防线（本地改完也要跑，FAIL 非零退出，挂在 ci.yml 的 `pnpm compile` 之后、构建之前）：
 
 ```bash
 node scripts/check-antd-tags.mjs          # 全仓扫「antdv-next 里不存在的 a-* 标签」
 node scripts/check-content-antd-lite.mjs  # content 按需清单是否覆盖其依赖闭包用到的每个标签
 node scripts/check-locale-keys.mjs        # 每个字面 t("a.b.c") 在 zh/en 两侧都可解析、两份键集合对称
+node scripts/check-dead-props.mjs         # 传给 a-* 的属性 / 插槽里，哪些是该组件根本不认的死项
 ```
 
 第三条防的是 vue-i18n 的静默失效：键取不到时**不抛异常、不进 vue-tsc、不进构建**，而是把键路径
 本身当文案渲染到界面上（内部标识符进 UI 是 §3.5 的零容忍项）。v0.20.0 整站接入就是靠它扫出
 `ExportUserInfoDialog.vue` 引用了不存在的 `common.noData`。`t("前缀" + x)` 这类动态拼接会被放过
 （静态不可判定），所以**改了动态键这条守卫拦不住，仍要人工核**。
+
+第四条防的是 antdv-next 的 `inheritAttrs` 默认行为：没声明的 prop 被当普通属性原样塞进根 DOM，
+不报错、不警告、生产环境完全静默；没匹配的命名插槽则直接渲染成空。`vue-tsc` 抓不到它
+（`a-*` 的类型来自 `GlobalComponents`，允许任意 attr），`check-antd-tags.mjs` 也抓不到
+（那条只看标签名存不存在）。判定依据同样是在 Node 里实跑 `install()` 取 props、读 `dist` 下的
+`.d.ts` 取插槽映射。它的放行口径是「宁可漏报也不误报」：取不到 props/slots 声明的整组件跳过、
+自定义组件是否转发插槽静态不可判定跳过、`:[x]` 动态参数不查 —— 所以**它报干净不等于真干净**。
 
 注册表是脚本在 Node 里**实跑** `install()` 得到的，不抄文档。
 

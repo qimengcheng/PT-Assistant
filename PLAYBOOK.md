@@ -281,8 +281,17 @@ offscreen 文档是有 `storage` 权限的扩展页，content script 也有 stor
    `node_modules/.vite/`（依赖预打包缓存）、系统 Temp 里 esbuild 的自删（§13，并行时概率翻倍）。
    锁只管 `build` / `zip`，**不管 `pnpm dev`**（长跑会堵死别人，所以 dev 也不换指 `dist-verify`）。
 
-**CI 依赖的默认行为**：不设 `PTD_SESSION` 时产物仍在 `.output`、且不碰联接，CI 按 `.output/*.zip` 取包。
+**CI 依赖的默认行为**：没有 `PTD_SESSION` 时产物在 `.output`、且不碰联接，CI 按 `.output/*.zip` 取包。
 所以别让 CI 带上这个变量。
+
+**后续（2026-10-05）**：这条默认分支把**用户自己**的构建也一起挡掉了 —— 他在 WebStorm 里跑
+`pnpm build`，看到的是一句「未设 PTD_SESSION…跳过联接与清理」，`dist-verify` 还指着某个 agent 的产物。
+他没有会话标识，也不该为了拿固定加载路径去配环境变量。
+现在的做法：`build-verify.mjs` 在「没给会话名 **且** 不在 CI（看 `CI` / `GITHUB_ACTIONS`）」时按
+`owner` 这个会话走，产物落 `dist-owner-<版本号>/chrome-mv3`、照常换指联接；CI 分支原样不动。
+为什么不是「把联接直接指到 `.output`」：`.output` 每次构建都被清空，那样等于把用户正在加载的目录
+擦成 0 文件 —— 就是本节上面第 ① 起事故的形状。代价是 agent 裸跑 `pnpm build` 也会写进 `owner` 桶并
+抢走联接，所以 AGENTS.md §2.1 明确要求 agent 一律带自己的标识。
 
 验收流程与固定路径的现状陈述见 README「命令」；跨会话纪律见 AGENTS.md §2.2。
 

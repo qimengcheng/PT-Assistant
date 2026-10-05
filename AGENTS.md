@@ -200,8 +200,12 @@ git commit --amend -m '<合并后的完整消息>'
 
 ```bash
 PTD_SESSION=<会话标识> pnpm build   # 加锁构建 → dist-<会话标识>-<版本号>/chrome-mv3，并把 dist-verify 换指到它
-pnpm build                        # 不带变量时落在默认 .output/chrome-mv3（CI 走的就是这条）
+pnpm build                        # 不带变量：本地按 `owner` 会话构建（人自己手跑），同样换指 dist-verify
+CI=true pnpm build                # 本地复现 CI 那条路径 → 默认 .output/chrome-mv3，不建联接、不清理
 ```
+
+**agent 一律带上自己的 `PTD_SESSION`**：不带就被算成 `owner`（用户自己的桶），
+构建产物会盖进 `dist-owner-*`、并把用户的 `dist-verify` 联接换指到你这份。
 
 - **构建入口是 `scripts/build-verify.mjs`（`pnpm build` / `pnpm zip` 都指到这里），别绕开它直接调 `wxt`。**
   它负责三件事：拿构建锁、换指 `dist-verify`、清理本会话旧快照。绕开它就等于在多人共用的
@@ -264,8 +268,10 @@ WXT 0.21.4 的 `wxt build` **没有 `--output` 参数**（可用项只有 root/c
 filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里的
 `outDir: sessionTag ? \`dist-${tag}-${pkgVersion}\` : ".output"` 实现：会话标识取自环境变量
 `PTD_SESSION`，版本号取自 `package.json`（与注入 manifest 的是同一个值，不会各说一套）。
-**不设该变量时仍是默认 `.output`** —— CI（`ci.yml` 的 build job）依赖这个默认值取
-`.output/*.zip`，别让 CI 带上 PTD_SESSION（CI 也就不会碰 `dist-verify`）。
+`wxt.config.ts` 只看这个变量本身：**没有它就是默认 `.output`**，CI（`ci.yml` 的 build job）依赖
+这个默认值取 `.output/*.zip`，别让 CI 带上 PTD_SESSION（CI 也就不会碰 `dist-verify`）。
+本地裸 build 的 `owner` 默认值是在 `build-verify.mjs` 里补的（判 CI 用 `CI` / `GITHUB_ACTIONS`），
+所以「人自己 build 也拿得到固定加载路径」不需要配环境变量 —— 见 §2.1。
 
 **验收期间用户如果发现界面变了**：说明另一个会话构建完并把联接换走了。让他看
 `dist-verify` 目标目录里的 `BUILDINFO.json`（version / session / gitHead / builtAt）即可判定是哪份。

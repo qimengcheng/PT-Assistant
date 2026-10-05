@@ -14,8 +14,10 @@
  *    不需要管理员权限；真符号链接需要，`cmd /c mklink` 则会被仓库路径里的空格咬掉）。
  * 3. **清理本会话旧快照**：只删 `dist-<本会话>-*` 里不是本次的那些，别的会话不碰。
  *
- * 不设 PTD_SESSION 时（CI 走的就是这条）只加锁 + 原样构建，不建联接、不清理，
- * 因为 CI 按 `.output/*.zip` 取包。
+ * 会话标识与 CI：`PTD_SESSION` 没设时，**本地**默认按 `owner` 这个会话处理（人在 WebStorm / 终端里
+ * 手跑构建，不该为了拿固定加载路径去配环境变量）；只有在 CI（`CI` / `GITHUB_ACTIONS` 为真）里
+ * 才落回 WXT 默认的 `.output` 且不碰联接 —— CI 按 `.output/*.zip` 取包。
+ * 想在本地复现 CI 那条路径：`CI=true pnpm build`。
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -30,7 +32,11 @@ const LINK_PATH = path.join(ROOT, LINK_NAME);
 const LOCK_TIMEOUT_MS = 20 * 60 * 1000;
 const POLL_MS = 2000;
 
-const sessionTag = (process.env.PTD_SESSION ?? "").trim();
+const isTruthyEnv = (v) => /^(true|1)$/i.test((v ?? "").trim());
+const inCI = isTruthyEnv(process.env.CI) || isTruthyEnv(process.env.GITHUB_ACTIONS);
+const rawSession = (process.env.PTD_SESSION ?? "").trim();
+/** 没给会话名时的默认：本地算「用户自己」（owner），CI 保持 WXT 默认的 `.output`。 */
+const sessionTag = rawSession || (inCI ? "" : "owner");
 const pkgVersion = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 
 function log(msg) {
@@ -71,7 +77,7 @@ function acquireLock() {
       fs.mkdirSync(LOCK_DIR);
       fs.writeFileSync(
         path.join(LOCK_DIR, "owner.json"),
-        JSON.stringify({ session: sessionTag || "(未设 PTD_SESSION)", pid: process.pid, startedAt: new Date().toISOString() }, null, 2),
+        JSON.stringify({ session: sessionTag || "(CI: .output)", pid: process.pid, startedAt: new Date().toISOString() }, null, 2),
       );
       return () => {
         try {
@@ -181,23 +187,28 @@ const wxtCmd = cmdIdx >= 0 ? args.splice(cmdIdx, 1)[0].slice("--wxt-cmd=".length
  * 让构建脚本依赖它等于把构建也一起弄坏。等价于 pnpm exec 做的事。
  */
 function runWxt() {
+  // outDir 由 wxt.config.ts 读 PTD_SESSION 决定，所以这里要把推导出来的会话名传下去
+  // （本地裸 build 时环境里本来没有这个变量，不传就会构建到 .output 去，联接也就指错了地方）。
+  const env = { ...process.env, PTD_SESSION: sessionTag };
   const bin = path.join(ROOT, "node_modules", "wxt", "bin", "wxt.mjs");
   if (fs.existsSync(bin)) {
-    return spawnSync(process.execPath, [bin, wxtCmd, ...args], { cwd: ROOT, stdio: "inherit" });
+    return spawnSync(process.execPath, [bin, wxtCmd, ...args], { cwd: ROOT, stdio: "inherit", env });
   }
-  return spawnSync("pnpm", ["exec", "wxt", wxtCmd, ...args], { cwd: ROOT, stdio: "inherit", shell: true });
+  return spawnSync("pnpm", ["exec", "wxt", wxtCmd, ...args], { cwd: ROOT, stdio: "inherit", shell: true, env });
 }
 
 const release = acquireLock();
 let code = 1;
 try {
+  if (sessionTag && !rawSession) {
+    log(`未设 PTD_SESSION，按 ${sessionTag} 构建（要复现 CI 那条 .output 路径就 CI=true pnpm build）`);
+  }
   const r = runWxt();
-  code = r.status ?? 1;
   code = r.status ?? 1;
   if (code !== 0) {
     console.error(`[build-verify] 构建失败（退出码 ${code}），不动联接、不清理旧目录`);
   } else if (!sessionTag) {
-    log("未设 PTD_SESSION，按默认 .output 构建（CI 路径），跳过联接与清理");
+    log("CI 路径：按 WXT 默认的 .output 构建（取包靠 .output/*.zip），跳过联接与清理");
   } else {
     const outRoot = path.join(ROOT, `dist-${sessionTag}-${pkgVersion}`);
     const loaded = path.join(outRoot, "chrome-mv3");

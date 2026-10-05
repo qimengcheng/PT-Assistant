@@ -37,6 +37,9 @@ import QuickFilterNotice from "./QuickFilterNotice.vue";
 import SearchStatusDialog from "./SearchStatusDialog.vue";
 import SaveSnapshotDialog from "./SaveSnapshotDialog.vue";
 import AdvanceFilterGenerateDialog from "./AdvanceFilterGenerateDialog.vue";
+import SearchScopeSelect from "./SearchScopeSelect.vue";
+// 搜索方案管理页整块复用（而不是抄一份精简版）：增删改/启默/导入导出全在那一个组件里
+import SetSearchSolutionPage from "@/options/views/Settings/SetSearchSolution/Index.vue";
 
 // 主要助手方法
 import { tableCustomFilter } from "./utils/filter";
@@ -244,18 +247,11 @@ function onRowSelectionChange(_keys: any, rows: any[]) {
 
 // ============================================================================
 // 搜索输入区：旧项目的关键词输入在全局顶栏（Topbar），antdv 版没有顶栏，
-// 在搜索页顶部提供「搜索方案 + 关键词 + 搜索」，回车/点击走 query → 上方 watch 触发 doSearch。
+// 在搜索页顶部提供「作用域（方案 / 直接勾站点）+ 关键词 + 搜索」，
+// 回车/点击走 query → 上方 watch 触发 doSearch。
 // ============================================================================
 const searchKey = ref<string>("");
 const searchPlanKey = ref<string>("default");
-
-const searchPlanOptions = computed(() => [
-  { value: "default", label: t("SearchEntity.index.defaultSearchPlan") },
-  ...metadataStore.getSearchSolutions
-    .filter((x: any) => !!x.enabled)
-    .sort((a: any, b: any) => b.sort - a.sort)
-    .map((x: any) => ({ value: x.id, label: x.name })),
-]);
 
 function startSearchEntity() {
   router.push({
@@ -266,6 +262,10 @@ function startSearchEntity() {
     },
   });
 }
+
+// /set-search-solution 没进左侧导航（App.vue 的 navItems），这个弹层是它唯一的入口。
+// 就地弹层而不是跳页：跳走会打断「选方案 → 搜」这条线，改完还得点回来。
+const showSearchPlanSettingsDialog = ref<boolean>(false);
 
 // 热门推荐：点选推荐条目后把标题灌进关键词并立即搜索（query watch 会触发 doSearch）
 function searchRecommendation(title: string) {
@@ -366,12 +366,7 @@ const hiddenTagNamesText = computed({
 
 <template>
 <div class="search-toolbar">
-  <a-select
-    v-model:value="searchPlanKey"
-    :options="searchPlanOptions"
-    :placeholder="t('SearchEntity.index.alert.plan')"
-    style="width: 200px"
-  />
+  <SearchScopeSelect v-model="searchPlanKey" />
   <a-input-search
     v-model:value="searchKey"
     :enter-button="t('common.search')"
@@ -385,6 +380,10 @@ const hiddenTagNamesText = computed({
     :disabled="runtimeStore.search.isSearching"
     @search="searchRecommendation"
   />
+  <a-button type="text" @click="showSearchPlanSettingsDialog = true">
+    <template #icon><SettingOutlined /></template>
+    {{ t("SearchEntity.index.searchPlanSettings") }}
+  </a-button>
 </div>
   <a-alert type="info">
     <template #message>
@@ -683,6 +682,19 @@ const hiddenTagNamesText = computed({
   <AdvanceFilterGenerateDialog v-model="showAdvanceFilterGenerateDialog" />
   <SearchStatusDialog v-model="showSearchStatusDialog" />
   <SaveSnapshotDialog v-model="showSaveSnapshotDialog" />
+
+  <!-- 标题只走 :title 属性（#title 插槽会和右上角关闭按钮相撞）；body 定高是为了让
+       复用进来的 .page 骨架（height:100% + 1fr 面板行）在弹层内部滚动，而不是撑长页面 -->
+  <a-modal
+    v-model:open="showSearchPlanSettingsDialog"
+    :title="t('SearchEntity.index.searchPlanSettings')"
+    :width="'90%'"
+    :body-style="{ height: '70vh', overflow: 'hidden' }"
+    :footer="null"
+    destroy-on-hidden
+  >
+    <SetSearchSolutionPage />
+  </a-modal>
 </template>
 
 <style scoped lang="scss">

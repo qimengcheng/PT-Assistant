@@ -97,7 +97,7 @@ const FAVICON_TIMEOUT = 8000;
 
 export async function getSiteFavicon(site: TSiteID | getFaviconMetadata, flush: boolean = false): Promise<string> {
   const siteId = typeof site === "string" ? site : site.id;
-  let siteFavicon = (await (await ptdIndexDb).get("favicon", siteId)) ?? false;
+  let siteFavicon = (await (await ptdIndexDb()).get("favicon", siteId)) ?? false;
   if (flush || !siteFavicon) {
     const siteInstance = await getSiteInstance(siteId);
     if (siteInstance) {
@@ -113,7 +113,7 @@ export async function getSiteFavicon(site: TSiteID | getFaviconMetadata, flush: 
         ]);
       });
 
-      await (await ptdIndexDb).put("favicon", siteFavicon, siteId);
+      await (await ptdIndexDb()).put("favicon", siteFavicon, siteId);
     }
   }
 
@@ -129,7 +129,7 @@ onMessage("getSiteFavicon", async ({ data: { site, flush } }) => (await getSiteF
 
 export async function clearSiteFaviconCache() {
   logger({ msg: `clearSiteFaviconCache` });
-  return await (await ptdIndexDb).clear("favicon");
+  return await (await ptdIndexDb()).clear("favicon");
 }
 
 onMessage("clearSiteFaviconCache", async () => await clearSiteFaviconCache());

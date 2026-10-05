@@ -31,7 +31,7 @@ let migration: Promise<void> | null = null;
 /** 幂等：并发调用共享同一个 promise，只搬一次 */
 export function ensureMigrated(): Promise<void> {
   migration ??= (async () => {
-    const db = await ptdIndexDb;
+    const db = await ptdIndexDb();
     const legacy = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
 
     let moved = 0;
@@ -60,7 +60,7 @@ export function ensureMigrated(): Promise<void> {
 /** 取某站点的全部按天历史（date → userInfo） */
 export async function readSiteArchive(siteId: string): Promise<Record<string, IStoredUserInfo>> {
   await ensureMigrated();
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   const rows = await db.getAll("user_info", siteKeyRange(siteId));
 
   const result: Record<string, IStoredUserInfo> = {};
@@ -73,7 +73,7 @@ export async function readSiteArchive(siteId: string): Promise<Record<string, IS
 /** 取整份存档（备份导出、脏数据修复用）。返回结构与迁移前的 chrome.storage 版本完全一致 */
 export async function readAllArchive(): Promise<TUserInfoStorageSchema> {
   await ensureMigrated();
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   const rows = await db.getAll("user_info");
 
   const result: TUserInfoStorageSchema = {};
@@ -87,7 +87,7 @@ export async function readAllArchive(): Promise<TUserInfoStorageSchema> {
 /** 写入/覆盖单条。这是本次迁移的主要收益点：O(1)，不再整块读改写 */
 export async function putArchiveEntry(siteId: string, date: string, userInfo: IStoredUserInfo): Promise<void> {
   await ensureMigrated();
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   await db.put("user_info", { ...userInfo, site: siteId, date });
 }
 
@@ -95,7 +95,7 @@ export async function putArchiveEntry(siteId: string, date: string, userInfo: IS
 export async function deleteArchiveEntries(siteId: string, dates: string[]): Promise<void> {
   if (dates.length === 0) return;
   await ensureMigrated();
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   const tx = db.transaction("user_info", "readwrite");
   for (const date of dates) {
     await tx.store.delete([siteId, date]);
@@ -106,14 +106,14 @@ export async function deleteArchiveEntries(siteId: string, dates: string[]): Pro
 /** 删掉某站点的全部历史（调试页「清空指定站点数据」用）。主键前缀范围一次删完，O(该站点条数) */
 export async function clearSiteArchive(siteId: string): Promise<void> {
   await ensureMigrated();
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   await db.delete("user_info", siteKeyRange(siteId));
 }
 
 /** 清空整份存档（调试页「清空所有站点数据」用） */
 export async function clearArchive(): Promise<void> {
   await ensureMigrated();
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   await db.clear("user_info");
 }
 
@@ -126,7 +126,7 @@ export async function clearArchive(): Promise<void> {
  */
 export async function replaceArchive(data: TUserInfoStorageSchema): Promise<void> {
   await ensureMigrated();
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   const tx = db.transaction("user_info", "readwrite");
   await tx.store.clear();
   for (const [siteId, byDate] of Object.entries(data ?? {})) {

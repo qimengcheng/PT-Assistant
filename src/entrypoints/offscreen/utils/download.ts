@@ -583,20 +583,20 @@ function getErrorMessage(error: unknown): string {
 }
 
 export async function getDownloadHistory() {
-  return await (await ptdIndexDb).getAll("download_history");
+  return await (await ptdIndexDb()).getAll("download_history");
 }
 
 onMessage("getDownloadHistory", getDownloadHistory);
 
 export async function getDownloadHistoryById(downloadId: TTorrentDownloadKey) {
-  return await (await ptdIndexDb).get("download_history", downloadId);
+  return await (await ptdIndexDb()).get("download_history", downloadId);
 }
 
 onMessage("getDownloadHistoryById", async ({ data: downloadId }) => (await getDownloadHistoryById(downloadId))!);
 
 export async function setDownloadHistory(data: ITorrentDownloadMetadata) {
   const allowedSave = await isAllowedSaveDownloadHistory();
-  return allowedSave ? await (await ptdIndexDb).put("download_history", data) : 0;
+  return allowedSave ? await (await ptdIndexDb()).put("download_history", data) : 0;
 }
 
 export async function patchDownloadHistory(downloadId: TTorrentDownloadKey, data: Partial<ITorrentDownloadMetadata>) {
@@ -616,13 +616,13 @@ async function setDownloadStatus(
 }
 
 export async function deleteDownloadHistoryById(downloadId: TTorrentDownloadKey) {
-  return await (await ptdIndexDb).delete("download_history", downloadId);
+  return await (await ptdIndexDb()).delete("download_history", downloadId);
 }
 
 onMessage("deleteDownloadHistoryById", async ({ data: downloadId }) => await deleteDownloadHistoryById(downloadId));
 
 export async function clearDownloadHistory() {
-  return await (await ptdIndexDb).clear("download_history");
+  return await (await ptdIndexDb()).clear("download_history");
 }
 
 onMessage("clearDownloadHistory", clearDownloadHistory);

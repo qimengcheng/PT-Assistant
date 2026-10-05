@@ -41,7 +41,7 @@ export async function getSocialInformation(
   const socialInformationConfig = configStoreRaw.socialSiteInformation ?? {};
 
   const key = `${site}:${sid}`;
-  let stored = await (await ptdIndexDb).get("social_information", key);
+  let stored = await (await ptdIndexDb()).get("social_information", key);
 
   const isExpired = stored && stored.createAt < Date.now() - 86400000 * (socialInformationConfig.cacheDay ?? 3);
   // 仅在本会话尚未因缺失字段重取过该 key 时才允许补取，避免源本身无数据时反复联网。
@@ -91,16 +91,16 @@ onMessage("matchSocialPage", async ({ data: url }) => matchSocialPage(url));
 
 export async function setSocialInformation(site: TSupportSocialSite$1, sid: string, val: ISocialInformation) {
   const key = `${site}:${sid}`;
-  return await (await ptdIndexDb).put("social_information", val, key);
+  return await (await ptdIndexDb()).put("social_information", val, key);
 }
 
 export async function deleteSocialInformation(site: TSupportSocialSite$1, sid: string) {
   const key = `${site}:${sid}`;
-  return await (await ptdIndexDb).delete("social_information", key);
+  return await (await ptdIndexDb()).delete("social_information", key);
 }
 
 export async function clearSocialInformation() {
-  return await (await ptdIndexDb).clear("social_information");
+  return await (await ptdIndexDb()).clear("social_information");
 }
 
 onMessage("clearSocialInformationCache", async () => {

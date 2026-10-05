@@ -19,7 +19,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 站点定义 | 340 个 definition，import.meta.glob 按需加载 | **原样平移，零修改**（packages/site） |
 | Buffer polyfill | 全局注入（background 464KB） | 不注入 |
 | i18n | vue-i18n 双语言全量注册（~118KB） | vue-i18n 双语言全量注册（默认语言静态 import，切换语言动态 import） |
-| 测试 | 无 | 类型检查 + 4 条 CI 静态防线 + 产物 smoke test（ESLint / Vitest 尚未引入） |
+| 测试 | 无 | 类型检查 + 5 条 CI 静态防线 + 产物 smoke test（ESLint / Vitest 尚未引入） |
 
 > **UI 框架已从 Vuetify 换成 antdv-next**（v0.13.1 完成迁移）。
 >
@@ -44,6 +44,8 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 防线 ② | `scripts/check-content-antd-lite.mjs` | content 侧 antd 按需注册的覆盖度比对 |
 | 防线 ③ | `scripts/check-locale-keys.mjs` | i18n 键在 zh/en 两侧都能解析（取不到时 vue-i18n 不报错，而是把键路径渲染到界面） |
 | 防线 ④ | `scripts/check-dead-props.mjs` | 传给 `a-*` 的死 prop / 死插槽（`GlobalComponents` 声明允许任意 attr，vue-tsc 抓不到，运行时不报错） |
+| 防线 ⑤ | `scripts/check-store-hydration.mjs` | 挂载钩子里命令式读「`persistWebExt` 异步水合的 store」的地方（水合前那些字段是初始值，界面静默空着，不报错也不进 tsc） |
+| 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑 18 项断言，验守卫自己的判定边界（amend 放行 / 跳号拦住 / 模型名带数字不抢位）。改 `check-version.mjs` 前必跑 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 指纹自检 | `scripts/check-fingerprint.mjs` | 种子指纹三层逻辑的纯函数断言（误判「本地已有」会让 qBittorrent 重下、直接打负分享率）。**未挂 CI，手动跑** |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
@@ -203,6 +205,7 @@ pnpm version:check  # 校验 HEAD 那条的版本号 == package.json == 父提�
 - [x] ~~我的数据三件套：概览表格 + echarts 统计页 + konva 时间线页~~（v0.13.1）
 - [x] ~~面向用户文案全站接入 i18n~~（v0.20.0，默认语言静态注册 + 切换语言动态 import）
 - [x] ~~CI 流水线 + 4 条静态防线 + 版本号守卫 + 自动发版~~（v0.20.1 ~ v0.22.2）
+- [x] ~~防线 ⑤：挂载钩子里命令式读异步水合 store 的守卫，并修掉它扫出的 5 处真问题~~（v0.22.19）
 
 **待办**：
 

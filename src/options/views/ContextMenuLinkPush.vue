@@ -22,7 +22,7 @@ const runtimeStore = useRuntimeStore();
 const showDialog = ref(false);
 const torrentItems = ref<ITorrent[]>([]);
 
-onMounted(() => {
+onMounted(async () => {
   const link = route?.query?.link;
 
   if (!link || typeof link !== "string") {
@@ -32,6 +32,10 @@ onMounted(() => {
   }
 
   const torrent = { link } as ITorrent;
+
+  // siteHostMap 属于靠 chrome.storage 异步水合的 metadata store，不等待就是读到初始空对象，
+  // 于是「从链接反解站点」这一步静默失效 —— 弹窗照样打开，只是 site 那一栏空着，没有任何报错。
+  await metadataStore.$onReady();
 
   // 尝试从 link 中解出站点
   if (link.match(/https?:\/\/([^/]+)/)) {

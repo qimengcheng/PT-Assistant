@@ -207,6 +207,19 @@ pnpm build                        # 不带变量时落在默认 .output/chrome-m
 
 - **本地只构建 Chrome**。**不要在本地跑 `pnpm build:firefox` / `dev:firefox`** ——
   纯浪费时间（Firefox 产物由 CI 统一构建，见 §2.4）。
+- ⚠️ **「不跑 Firefox 构建」≠「不验证 Firefox 能构建」，也不等于可以不碰产物级检查。**
+  CI 的 `build` job 比本地这套多跑两条命令，两条都各有必要性：
+
+  | CI 独有步骤 | 本地为什么也得跑 |
+  | --- | --- |
+  | `wxt zip -b firefox` | Firefox 分支的产物路径与 Chrome 不同（`firefox-mv2`、manifest 变体），本地只构建 Chrome **覆盖不到**它 |
+  | `node scripts/smoke-background.mjs` | 唯一一处**把打包产物真的 import 一次**的地方，抓「模块顶层执行浏览器 API」这类 vue-tsc / 源码审查 / Chrome 构建全都看不见的 SW 崩溃 |
+
+  实测踩过：v0.22.16 让 background 引到含模块级 `openDB(...)` 的共享库，
+  `indexedDB is not defined` 只在**跑产物**时炸（真浏览器里有 `indexedDB`，线上不报）。
+  它当时没被发现，是因为那批提交里没人跑过这两条 —— 而 CI 报出来时，
+  责任落在最后一个 push 的人身上（一次 push 只打一个 tag，见 §2.4），查出病灶的是他、CI 报在名下的是我。
+  **推之前跑完这两条，十分钟内能确认自己没往主线扔一颗雷。**
 - 构建报 `remove C:\...\Temp\esbuild-*: Access is denied` 时（README 踩坑 §13，杀软句柄导致，
   时好时坏），**别重启机器**，把临时目录指到仓库内已 gitignore 的 `.tmp-build/` 即可：
   `PTD_SESSION=<标识> TEMP="$PWD/.tmp-build" TMP="$PWD/.tmp-build" TMPDIR="$PWD/.tmp-build" pnpm build`。
@@ -323,7 +336,9 @@ v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所�
 接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
 否则线上是静默空白。
 
-五条 CI 静态防线（本地改完也要跑，FAIL 非零退出，挂在 ci.yml 的 `pnpm compile` 之后、构建之前）：
+CI 上挂在 `pnpm compile` 之后、构建之前的守卫共 7 条（本地改完也要跑，FAIL 非零退出）。
+前五条是**静态扫描**，后两条是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
+不需要 loader、不引入新依赖）：
 
 ```bash
 node scripts/check-antd-tags.mjs          # 全仓扫「antdv-next 里不存在的 a-* 标签」
@@ -331,6 +346,8 @@ node scripts/check-content-antd-lite.mjs  # content 按需清单是否覆盖其�
 node scripts/check-locale-keys.mjs        # 每个字面 t("a.b.c") 在 zh/en 两侧都可解析、两份键集合对称
 node scripts/check-dead-props.mjs         # 传给 a-* 的属性 / 插槽里，哪些是该组件根本不认的死项
 node scripts/check-store-hydration.mjs    # 挂载钩子里命令式读「异步水合的 store」的地方
+node scripts/check-indexdb-retry.mjs      # 共享库懒开的两条不变量：失败不缓存、成功必复用
+node scripts/check-fingerprint.mjs        # 种子指纹三层逻辑自检（含「本该不同」的用例）
 ```
 
 第三条防的是 vue-i18n 的静默失效：键取不到时**不抛异常、不进 vue-tsc、不进构建**，而是把键路径

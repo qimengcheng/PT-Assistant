@@ -245,7 +245,16 @@ export interface IConfigPiniaStorageSchema {
     // 用于备份文件加密、解密的密钥
     encryptionKey: string;
 
-    // TODO 是否开启自动备份
+    /**
+     * @deprecated 死字段，**没有任何读取点**，别再拿它当自动备份的开关。
+     *
+     * 自动备份早就在跑了（background/utils/alarms.ts 每 10 分钟一次调度），
+     * 真正的闸门是**每个备份服务器自己**的 `metadata.backupServers[].enabled`
+     * 与 `backupInterval`（见 SetBackup/Index.vue 的开关列）。
+     *
+     * 别在这上面接闸门：默认值是 false，存量用户的持久化数据里也是 false，
+     * 一接就等于给所有用户静默关掉自动备份。
+     */
     enabledAutoBackup: boolean;
   };
 

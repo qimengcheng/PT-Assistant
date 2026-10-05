@@ -5,7 +5,10 @@ import { toMerged } from "es-toolkit";
 import {
   AppstoreOutlined,
   CheckCircleOutlined,
+  CheckOutlined,
   CloseCircleOutlined,
+  CloseOutlined,
+  EditOutlined,
   EllipsisOutlined,
   LinkOutlined,
 } from "@antdv-next/icons";
@@ -123,6 +126,8 @@ interface IChoiceItem {
   label: string;
   /** 路径用等宽字体，标签不用 */
   mono?: boolean;
+  /** 只有真实的推荐目录可删，两个哨兵项不是配置内容 */
+  deletable?: boolean;
 }
 interface IChoiceGroup {
   /** 空串表示这一组不显示标题 */
@@ -130,23 +135,23 @@ interface IChoiceGroup {
   items: IChoiceItem[];
 }
 
-const toPathItem = (v: string): IChoiceItem => ({ value: v, label: v, mono: true });
 const toTagItem = (v: string): IChoiceItem => ({ value: v, label: v });
 
 const pathGroups = computed<IChoiceGroup[]>(() => {
-  const head: IChoiceItem = { value: CHOICE_DEFAULT, label: t("SentToDownloaderDialog.defaultPath") };
-  const tail: IChoiceItem = { value: CHOICE_CUSTOM, label: t("SentToDownloaderDialog.manualInput") };
-  const category = suggestFolders.value.filter((f) => f.startsWith(CATEGORY_FOLDER_PREFIX)).map(toPathItem);
-  const other = suggestFolders.value.filter((f) => !f.startsWith(CATEGORY_FOLDER_PREFIX)).map(toPathItem);
+  const toPath = (v: string): IChoiceItem => ({ value: v, label: v, mono: true, deletable: true });
+  const category = suggestFolders.value.filter((f) => f.startsWith(CATEGORY_FOLDER_PREFIX)).map(toPath);
+  const other = suggestFolders.value.filter((f) => !f.startsWith(CATEGORY_FOLDER_PREFIX)).map(toPath);
 
-  if (category.length === 0) {
-    return [{ title: "", items: [head, ...other, tail] }];
-  }
-  // 没有普通路径可列时不硬撑"其他路径"这个标题，那一组只剩首尾两个特殊项
-  return [
-    { title: t("SentToDownloaderDialog.categoryGroup"), items: category },
-    { title: other.length > 0 ? t("SentToDownloaderDialog.otherGroup") : "", items: [head, ...other, tail] },
+  // 四类各占一行：默认路径和手动输入不混进候选堆里，它们不是"某个目录"
+  const groups: IChoiceGroup[] = [
+    { title: "", items: [{ value: CHOICE_DEFAULT, label: t("SentToDownloaderDialog.defaultPath") }] },
   ];
+  if (category.length > 0) groups.push({ title: t("SentToDownloaderDialog.categoryGroup"), items: category });
+  if (other.length > 0) {
+    groups.push({ title: category.length > 0 ? t("SentToDownloaderDialog.otherGroup") : "", items: other });
+  }
+  groups.push({ title: "", items: [{ value: CHOICE_CUSTOM, label: t("SentToDownloaderDialog.manualInput") }] });
+  return groups;
 });
 
 const labelItems = computed<IChoiceItem[]>(() => [
@@ -157,6 +162,9 @@ const labelItems = computed<IChoiceItem[]>(() => [
 
 /** 高级设置面板默认展开：这里存的是 a-collapse 的 activeKey */
 const advancedActiveKeys = ref<string[]>(["advanced"]);
+
+/** 编辑推荐目录：打开后每个候选变成带叉的可删块，选择功能整排停掉 */
+const editingPaths = ref(false);
 
 const currentSiteIds = computed(() => [...new Set(torrentItems.map((t) => t.site).filter(Boolean))]);
 const enabledDownloadersBySite = computed(() => {
@@ -192,6 +200,18 @@ function onDownloaderChange() {
 function syncChoiceFields() {
   savePathField.sync();
   labelField.sync();
+}
+
+/** 就地删掉某条推荐目录：改的是该下载器的配置，和去设置页里删一行等价 */
+async function removeSuggestedPath(path: string) {
+  const current = selectedDownloader.value;
+  if (!current) return;
+  const next = (current.suggestFolders ?? []).filter((f) => f !== path);
+  await metadataStore.addDownloader({ ...current, suggestFolders: next });
+  // addDownloader 写进 store 的是新对象，本地引用得跟过去，否则 suggestFolders 还读旧的
+  selectedDownloader.value = metadataStore.downloaders[current.id] ?? null;
+  // 删掉的如果正是当前选中那条，退到「手动输入」并留着已填的值，不要静默清空
+  syncChoiceFields();
 }
 
 function restoreAddTorrentOptions(downloader?: IDownloaderMetadata) {
@@ -257,8 +277,9 @@ function quickSendToDownloader(downloader: IDownloaderMetadata, path: string = "
 }
 
 function dialogEnter() {
-  // 每次打开都展开：初值只能保证第一次，用户上次手动折叠过会残留
+  // 每次打开都回到初始形态：初值只保第一次，用户手动折叠过 / 进过编辑态会残留
   advancedActiveKeys.value = ["advanced"];
+  editingPaths.value = false;
 
   // 如果是默认下载发送，则直接设置为快速发送到客户端模式
   if (isDefaultSend) {
@@ -419,12 +440,49 @@ function dialogLeave() {
           </a-radio-group>
         </a-form-item>
 
-        <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.savePath')">
+        <a-form-item v-if="downloaderOptions.length > 0">
+          <template #label>
+            <span class="field-label">
+              {{ t("SentToDownloaderDialog.savePath") }}
+              <a-tooltip
+                :title="editingPaths ? t('SentToDownloaderDialog.finishEdit') : t('SentToDownloaderDialog.editPaths')"
+              >
+                <a-button type="text" size="small" @click="editingPaths = !editingPaths">
+                  <template #icon>
+                    <CheckOutlined v-if="editingPaths" />
+                    <EditOutlined v-else />
+                  </template>
+                </a-button>
+              </a-tooltip>
+            </span>
+          </template>
+
           <div v-for="(grp, gi) in pathGroups" :key="gi" class="choice-block">
             <div v-if="grp.title" class="choice-group-title">{{ grp.title }}</div>
+            <!-- 编辑态：候选变成带叉的块，整排停掉选择，此时点块体不改变当前选择。
+                 默认路径 / 手动输入不是配置内容，所以不给叉、并压暗。 -->
+            <div v-if="editingPaths" class="choice-group edit-chip-row">
+              <span
+                v-for="item in grp.items"
+                :key="item.value"
+                class="edit-chip"
+                :class="{ 'edit-chip-locked': !item.deletable }"
+              >
+                <span class="choice-mono">{{ item.label }}</span>
+                <a-tooltip v-if="item.deletable" :title="t('SentToDownloaderDialog.removePath')">
+                  <CloseOutlined class="edit-chip-close" @click.stop="removeSuggestedPath(item.value)" />
+                </a-tooltip>
+              </span>
+            </div>
             <!-- 每组是一个独立的 a-radio-group，但绑同一个值：选中项落在哪一组，
                  另一组就整体不亮，跨组互斥由受控模式本身保证，不依赖原生 radio 的 name。 -->
-            <a-radio-group v-model:value="savePathField.choice" size="small" button-style="solid" class="choice-group">
+            <a-radio-group
+              v-else
+              v-model:value="savePathField.choice"
+              size="small"
+              button-style="solid"
+              class="choice-group"
+            >
               <a-radio-button v-for="item in grp.items" :key="item.value" :value="item.value">
                 <span v-if="item.mono" class="choice-mono" :title="item.label">{{ item.label }}</span>
                 <template v-else>{{ item.label }}</template>
@@ -434,9 +492,10 @@ function dialogLeave() {
           <!-- 手输项单独占一行：嵌进按钮里会让那一段比别的宽出一截。
                占位符（$torrent.title$ / <...>）在发送时才展开，见 utils.ts。 -->
           <a-input
-            v-if="savePathField.choice === CHOICE_CUSTOM"
+            v-if="!editingPaths && savePathField.choice === CHOICE_CUSTOM"
             v-model:value="savePathField.custom"
             size="small"
+            class="choice-input"
             :placeholder="t('SentToDownloaderDialog.customPathPlaceholder')"
           />
         </a-form-item>
@@ -451,6 +510,7 @@ function dialogLeave() {
             v-if="labelField.choice === CHOICE_CUSTOM"
             v-model:value="labelField.custom"
             size="small"
+            class="choice-input"
             :placeholder="t('SentToDownloaderDialog.labelHint')"
           />
         </a-form-item>
@@ -479,15 +539,17 @@ function dialogLeave() {
           <!-- Collapse 没有 `disabled` prop，写上去会变成根 div 上的裸 HTML 属性、毫无作用；
                开关折叠用 `collapsible: 'disabled'`。见 scripts/check-dead-props.mjs -->
           <a-collapse-panel key="advanced" :header="t('common.advancedSettings')">
-            <a-form-item
-              v-for="opt in selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []"
-              :key="opt.key"
-              :label="opt.name"
-              :extra="opt.description"
-              :colon="false"
-            >
-              <a-switch v-model:checked="addTorrentOptions.advanceAddTorrentOptions![opt.key]" />
-            </a-form-item>
+            <div class="advanced-grid">
+              <a-form-item
+                v-for="opt in selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []"
+                :key="opt.key"
+                :label="opt.name"
+                :extra="opt.description"
+                :colon="false"
+              >
+                <a-switch v-model:checked="addTorrentOptions.advanceAddTorrentOptions![opt.key]" />
+              </a-form-item>
+            </div>
           </a-collapse-panel>
         </a-collapse>
       </div>
@@ -588,6 +650,11 @@ function dialogLeave() {
   font-size: 12px;
 }
 
+// 手输框紧跟在「手动输入」那一行按钮之后，不留间距会和按钮贴在一起
+.choice-input {
+  margin-top: 8px;
+}
+
 .choice-with-icon {
   display: inline-flex;
   align-items: center;
@@ -621,5 +688,62 @@ function dialogLeave() {
 .switch-label {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.88);
+}
+
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+// 编辑态的候选块：叉探在右上角，所以行与行之间留 10px 让出位置，
+// 否则上一行的叉会压住下一行的块
+.edit-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 10px;
+}
+
+.edit-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid rgba(5, 5, 5, 0.12);
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+}
+
+// 默认路径 / 手动输入不是可删的配置项
+.edit-chip-locked {
+  opacity: 0.45;
+}
+
+.edit-chip .choice-mono {
+  max-width: 320px;
+}
+
+.edit-chip-close {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  padding: 2px;
+  border-radius: 50%;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 10px;
+  cursor: pointer;
+
+  &:hover {
+    color: #ff4d4f;
+  }
+}
+
+// 高级设置里的下载器专有项排两列：一列时 label 短、开关靠右，整块高度白涨
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
 }
 </style>

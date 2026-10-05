@@ -342,6 +342,14 @@ export const useConfigStore = defineStore("config", {
 
       quickSiteFilter: true,
       showHotRecommendations: true,
+
+      /**
+       * 搜索页顶部「搜索方案」作用域上次的选择（方案 id、`all`、或 `site:a,b,c`）。
+       * 存在这里而不是页面自己的 ref，是因为每次打开选项页都重置成"默认搜索方案"、
+       * 反复要点同一个方案。读取侧见 SearchEntity/Index.vue 的 searchPlanKey：
+       * 它会校验这个键是否还有效（方案被删/被禁用、站点被移除都要回落）。
+       */
+      lastPlanKey: "default",
     },
 
     mediaServerEntity: {

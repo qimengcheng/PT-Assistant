@@ -37,8 +37,10 @@ export const useRuntimeStore = defineStore("runtime", {
      * 搜索流式回填时每批结果都会触发一次全量 JSON.stringify + 同步 setItem —— 主线程卡顿，
      * 且很快撞上sessionStorage 配额（约 5-10MB）抛 QuotaExceededError。
      *
-     * 这里保留 searchKey / searchPlanKey / isSearching 等标量（刷新后仍停在同一个搜索方案），
-     * 但结果集与逐站点状态字典一律不跨刷新保留。
+     * 这里只保留 search.searchKey / search.searchPlanKey / mediaServerSearch.searchKey
+     * 这三个用户输入的标量（刷新后仍停在同一个搜索方案），但结果集与逐站点状态字典
+     * 一律不跨刷新保留。注意**不是**「isSearching 等标量」—— 原注释那么写，
+     * 与下方 serialize 的实际行为自相矛盾（它只留上面这三个，isSearching 被有意丢掉）。
      */
     serialize: (state: Partial<IRuntimePiniaStorageSchema>) =>
       JSON.stringify({

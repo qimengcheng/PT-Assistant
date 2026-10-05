@@ -180,7 +180,8 @@ export function matchLocalFingerprint(
     }
   }
 
-  // 本地一条可比条目都没有：没有证据可用，不构成任何结论
+  // 落到这里 = 第 1 层也没命中。分界是「本地有没有可比条目」：
+  // 有（只是没匹配上）→ absent；一条都没有 → unavailable（没有任何证据可用）。
   return comparableCount > 0 ? empty("absent") : empty("unavailable");
 }
 
@@ -237,7 +238,14 @@ export function screenByTitleSizeKey<T extends { title?: string; size?: number }
  * 与需求里的三条规则一一对应：
  * - 第 1 层命中 → `review`（只算候选，绝不直接加）
  * - 第 2 层命中 → `exclude` + `suggestPieceVerify`（高度可信，但仍建议抽样验 piece）
- * - 只有本地没有任何可比指纹时才可能落到 `add`（`no-local-fingerprint`）
+ *
+ * ⚠️ `add` 有**三条**出路，原先这里只写了一条（且写的那条是错的）：
+ * - `different`                     → add（verified-different）：确定不是同一份
+ * - `identical` 但 piece 抽样不符   → add（verified-different）：文件清单相同只能是巧合
+ * - `absent`                        → add（no-local-fingerprint）：本地压根没有这份数据
+ *
+ * 反过来，`unavailable`（本地一条可比条目都没有）落到的是 `review` 而**不是** `add` ——
+ * 没证据时不该自动辅种。上面三条都排在 tracker 那道闸门之后。
  *
  * 另外单独看 tracker：`match.sites` 里有目标站点，说明这份数据已经挂在那个站上，
  * 从根上避免把同一站的东西再辅一遍。

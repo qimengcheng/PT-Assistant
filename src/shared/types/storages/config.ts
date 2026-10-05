@@ -141,8 +141,10 @@ export interface IConfigPiniaStorageSchema {
 
   /**
    * 注意：
-   * showTorrentTag, showTorrentSubtitle, showSocialInformation, socialInformationSearchTargetBlank
+   * showTorrentTag, showTorrentSubtitle, showSocialInformation, socialInformationSearchOnNewTab
    * 这四个选项同时影响下载历史中的展示
+   *（第四个原先被写成 socialInformationSearchTargetBlank —— **该键全仓不存在**，
+   *   照它去设置页找会判定功能缺失）
    */
   searchEntifyControl: {
     // 是否展示站点名称

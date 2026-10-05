@@ -157,6 +157,15 @@ jobs:
       - name: Check lazy IndexedDB open retries on failure and caches on success
         run: node scripts/check-indexdb-retry.mjs
 
+      # 种子指纹三层逻辑的自检。指纹算错的代价是**不对称且不可逆**的：误判「本地已有」
+      # 会让 qBittorrent 校验失败重新下载，PT 站更直接把分享率打到负数。
+      # 这套纯函数断言（含「本该不同」的用例：单文件 vs 多文件、根目录不同、目录层级不同）
+      # 在此之前一直是手动跑的 —— 守卫没进 CI，就等于靠人记得跑，而人总会忘。
+      # 与 check-indexdb-retry.mjs 同属「行为断言」：都直接 import src/ 下的源码，
+      # 不依赖构建产物、不需要 loader、不引入新依赖。
+      - name: Check torrent fingerprint self-test
+        run: node scripts/check-fingerprint.mjs
+
       # 版本号守卫的**兜底**（主防线是本地 .githooks 里的 pre-commit / commit-msg：
       # CI 只在 push 时触发，本地连提 5 次它一次都不跑，等历史定型就晚了）。
       # 这里检查 HEAD 这一条：「提交消息版本号 == package.json」且「== 父提交最大 + 1」。

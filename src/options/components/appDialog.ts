@@ -2,9 +2,13 @@
  * 确认框 / 输入框对话框的**上下文无关**实现。
  *
  * 为什么要拆出这一层：`useConfirmDanger` / `usePromptInDialog` 靠 `App.useApp()` 拿 modal，
- * 而 `useApp()` 内部是 `inject(AppContextKey, { modal: {} })` —— 只看组件的**祖先链**。
- * content script 的根组件（App.vue）没有 `<a-app>` 祖先，也挂不了（它自己就是根），
- * 于是那两处原生 confirm()/prompt() 的替代品在 content 里用不上。
+ * 而 `useApp()` 内部是 `inject(AppContextKey, { modal: {} })` —— 只看组件的**祖先链**，
+ * 拿不到上下文时默认值是 `{ modal: {} }`，调 `modal.confirm` 会直接 TypeError。
+ *
+ * ⚠️ content 侧用不上 App 上下文版，**原因不是「没有 `<a-app>` 祖先」** ——
+ * content-script/app/App.vue:334 本身就渲染了 `<a-app>`，SentToDownloaderDialog 就挂在它里面，
+ * 用的正是 App 上下文版（见 antd-lite.ts 里的 `App` 注册项）。
+ * 真正的原因是那两处在**模块作用域**被调用，没有「当前组件实例」，inject 无从谈起。
  *
  * 所以把「弹什么、按钮文案、返回值语义」放在这里，两个入口各自喂自己那套 modal：
  * 选项页喂 App 上下文的 modal（见那两个 use* 文件），content 喂静态 Modal +

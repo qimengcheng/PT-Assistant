@@ -650,7 +650,9 @@ async function createKeepUploadTask() {
               </span>
             </div>
             <div v-if="localBadges(item).length" class="d-flex ga-1 mt-1 flex-wrap">
-              <!-- 这里原本给 a-tag 传了 `bordered` 属性，antdv-next 1.5.6 下它是死属性（false 同样渲染 filled），已删 -->
+              <!-- 这里原本给 a-tag 传了 `bordered`，已删。注意它**不是死属性**（早先注释这么写是错的）：
+                   Tag 声明了 bordered?: boolean 且无 @deprecated，hooks/useColor.js:16 真读它，
+                   语义是降级（false → 强制 filled）—— 它造不出描边，要描边请用 variant="outlined" -->
               <a-tag v-for="badge in localBadges(item)" :key="badge.key" :color="badge.color" :title="badge.title">
                 {{ badge.text }}
               </a-tag>

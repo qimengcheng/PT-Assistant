@@ -58,7 +58,7 @@ export async function createBackupData(backupFields: TBackupFields[] = []): Prom
 
   // 备份下载历史
   if (backupFields.includes("downloadHistory")) {
-    backupData["downloadHistory"] = await (await ptdIndexDb).getAll("download_history");
+    backupData["downloadHistory"] = await (await ptdIndexDb()).getAll("download_history");
   }
 
   backupData.manifest = {
@@ -196,7 +196,7 @@ export async function restoreBackupData(
 
   // 恢复下载历史
   if (restoreFields.includes("downloadHistory")) {
-    const db = await ptdIndexDb;
+    const db = await ptdIndexDb();
     await db.clear("download_history");
     for (const downloadHistoryElement of restoreData.downloadHistory) {
       await db.put("download_history", downloadHistoryElement);

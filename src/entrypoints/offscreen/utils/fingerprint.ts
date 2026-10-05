@@ -186,7 +186,7 @@ export async function getLocalFingerprintIndex(
   }
 
   if (!options.refresh) {
-    const cached = (await (await ptdIndexDb).get("local_fingerprint", downloaderId)) ?? undefined;
+    const cached = (await (await ptdIndexDb()).get("local_fingerprint", downloaderId)) ?? undefined;
     if (cached && Date.now() - cached.updatedAt < INDEX_TTL) {
       logger({ msg: `getLocalFingerprintIndex: hit cache for ${downloaderId}`, data: cached.updatedAt });
       return cached;
@@ -291,15 +291,15 @@ async function buildLocalFingerprintIndex(
     data: { totalTorrents: index.totalTorrents, unresolved: index.unresolved },
   });
 
-  await (await ptdIndexDb).put("local_fingerprint", index, downloaderId);
+  await (await ptdIndexDb()).put("local_fingerprint", index, downloaderId);
   return index;
 }
 
 export async function clearLocalFingerprintIndex(downloaderId?: string): Promise<void> {
   if (downloaderId) {
-    await (await ptdIndexDb).delete("local_fingerprint", downloaderId);
+    await (await ptdIndexDb()).delete("local_fingerprint", downloaderId);
   } else {
-    await (await ptdIndexDb).clear("local_fingerprint");
+    await (await ptdIndexDb()).clear("local_fingerprint");
   }
   hostSiteMapCache = null;
 }

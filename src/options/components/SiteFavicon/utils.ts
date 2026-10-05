@@ -62,7 +62,7 @@ const inflight = new Map<TSiteID, Promise<string>>();
 async function readFaviconFromIdb(siteId: TSiteID): Promise<string | null> {
   try {
     // store 一定存在：openDB 的 upgrade 是 @/shared/indexdb.ts 里唯一的一份定义
-    return ((await (await ptdIndexDb).get("favicon", siteId)) as string | undefined) ?? null;
+    return ((await (await ptdIndexDb()).get("favicon", siteId)) as string | undefined) ?? null;
   } catch (e) {
     // 读缓存失败不该影响主流程，降级去问 offscreen
     console.error(`[PTD] 读 favicon 缓存失败: ${siteId}`, e);
@@ -129,7 +129,7 @@ export async function getSiteFavicon(siteId: TSiteID, flush: boolean = false): P
 export async function flushSiteFavicon(siteIds: TSiteID[]): Promise<void> {
   if (siteIds.length === 0) return;
 
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   for (const siteId of siteIds) {
     delete faviconCache.value[siteId];
     await db.delete("favicon", siteId).catch((e) => {
@@ -144,6 +144,6 @@ export async function flushSiteFavicon(siteIds: TSiteID[]): Promise<void> {
 /** 清空整张 favicon 缓存（调试页用） */
 export async function clearFaviconCaches(): Promise<void> {
   faviconCache.value = {};
-  const db = await ptdIndexDb;
+  const db = await ptdIndexDb();
   await db.clear("favicon");
 }

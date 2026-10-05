@@ -283,6 +283,12 @@ v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所�
   `import.meta.glob("/packages/site/definitions/*.ts")` 取**键**（注意必须是项目根绝对 pattern，
   相对 pattern 在 entrypoint 虚拟模块里会静默匹配出空 map）。只要类型就 `import type`。
 - `@ptd/site/types/base.ts` 无任何 import，是安全的（可运行时取 `EResultParseStatus` 枚举）。
+- **SW 的导入图里不许有「导入即执行」的浏览器 API 调用。** 模块级写 `export const db = openDB(...)`
+  等于「谁 import 谁开库」，哪怕它一次都不碰。上一条那个崩溃是同一类：崩溃点在顶层，
+  而 background 只是**恰好 import 到了**。实例：v0.22.16 让 `fixer.ts` 引了按天存档模块，
+  就把这条 openDB 接进 SW，被 `smoke-background.mjs` 以 `indexedDB is not defined` 当场拦下 ——
+  真浏览器里不会报这个错，所以这类问题只能靠跑产物来抓。
+  共享库句柄一律走 `@/shared/indexdb` 的 `ptdIndexDb()`（懒开），别改回模块级 Promise。
 
 ### 3.3 i18n
 

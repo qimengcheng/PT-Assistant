@@ -36,8 +36,12 @@ const pkgVersion = (await import("./package.json", { with: { type: "json" } })).
  * `scripts/build-verify.mjs` 在每次构建成功后换指的目录联接，固定路径才不会让 Chrome 的
  * 未打包扩展 id 每次变（详见 AGENTS §2.2）。
  *
- * 不设 PTD_SESSION 时仍是 WXT 默认的 `.output` —— CI（单文件流水线 ci.yml 的 build job）
- * 就没有并发会话，它按 `.output/*.zip` 取包，绝不能被这条改动影响。
+ * 这里只看环境变量本身，不参与推断：**没有 `PTD_SESSION` 时就是 WXT 默认的 `.output`**，
+ * CI（单文件流水线 ci.yml 的 build job）靠这个默认值按 `.output/*.zip` 取包，绝不能被影响。
+ * 本地裸 `pnpm build` / `pnpm zip` 拿不到固定加载路径的问题，是在上一层解决的：
+ * `scripts/build-verify.mjs` 检测到「没给会话名且不在 CI」时按 `owner` 传下来，
+ * 于是产物落 `dist-owner-<版本号>/chrome-mv3` 并照常换指 `dist-verify`。
+ * `pnpm dev` 不经那个脚本，所以裸 `pnpm dev` 仍然写 `.output`、也不碰联接。
  */
 const sessionTag = (process.env.PTD_SESSION ?? "").trim();
 

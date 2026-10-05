@@ -113,9 +113,11 @@ PT-assistant-wxt/
 
 ```bash
 pnpm install        # 安装 + wxt prepare（生成 .wxt 类型）
+pnpm build          # 本地默认：按 `owner` 会话构建 → dist-owner-<版本号>/chrome-mv3，并把 dist-verify 换指到它
+PTD_SESSION=<会话标识> pnpm build  # 同上，只是换个会话桶（多个 agent 并行时各占一个）
+CI=true pnpm build  # 本地复现 CI 那条路径 → .output/chrome-mv3，不建联接、不清理（CI 自己就是这么跑的）
 PTD_SESSION=<会话标识> pnpm dev    # 开发模式（产物 → dist-<会话标识>-<版本号>/chrome-mv3；不加构建锁、不换指 dist-verify）
-PTD_SESSION=<会话标识> pnpm build  # 生产构建（同上，且成功后把 dist-verify 换指到本次产物）
-pnpm build          # 不带变量 → .output/chrome-mv3（CI 走这条，别改）
+pnpm dev            # 裸 dev 不经构建脚本，仍是 .output，且不碰 dist-verify
 pnpm zip            # 打包 zip（Chrome 产物 + Firefox 强制要求的 -sources.zip）
 pnpm compile        # vue-tsc 类型检查
 pnpm version:next   # 算出下一个该用的版本号（check-version.mjs --next）
@@ -128,10 +130,10 @@ pnpm version:check  # 校验 HEAD 那条的版本号 == package.json == 父提�
 > CI 侧的 `verify` job 是兜底，两者互不替代。
 
 交付验收流程：本仓库常有**多个 agent 会话并行改同一棵工作树**，`wxt` 每次构建又会先清空输出目录，
-所以构建必须带 `PTD_SESSION=<会话标识>`，真身落在 `dist-<会话标识>-<版本号>/chrome-mv3`；
-构建脚本随后把 **`dist-verify`** 这个目录联接换指到本次产物 —— 浏览器里**只加载
-`dist-verify\chrome-mv3` 这一个路径**（Chrome 未打包扩展的 id 按加载路径算，换目录等于换个新扩展、
-配置全丢）。改完代码重新 build，再去 `chrome://extensions` 点重载即可，不用换加载路径。
+所以真身按会话隔离在 `dist-<会话标识>-<版本号>/chrome-mv3`（agent 必须带 `PTD_SESSION=<自己的标识>`；
+人不带就落进 `owner` 这个桶，见上面的命令表）；构建脚本随后把 **`dist-verify`** 这个目录联接换指到
+本次产物 —— 浏览器里**只加载 `dist-verify\chrome-mv3` 这一个路径**（Chrome 未打包扩展的 id 按加载路径算，
+换目录等于换个新扩展、配置全丢）。改完代码重新 build，再去 `chrome://extensions` 点重载即可，不用换加载路径。
 `pnpm build` / `pnpm zip` 都先取 `.build-lock/` 互斥锁；三层机制的成因见 PLAYBOOK §14，规矩见 AGENTS.md §2.2。
 
 ## Roadmap（待办）

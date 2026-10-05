@@ -57,10 +57,22 @@ const addTorrentOptions = ref<Required<Omit<CAddTorrentOptions, "localDownloadOp
 const suggestFolders = computed(() => selectedDownloader.value?.suggestFolders ?? []);
 const suggestTags = computed(() => selectedDownloader.value?.suggestTags ?? []);
 
-// ⚠️ antdv-next 的 AutoComplete 传字符串数组（string[]）options 会渲染成空控件
-// （顶部下载器那个传 {value,label} 对象数组就是正常的），这里统一对象化
-const suggestFolderOptions = computed(() => suggestFolders.value.map((v) => ({ value: v, label: v })));
+// ⚠️ antdv-next 的 AutoComplete 传字符串数组（string[]）options 会渲染成空控件，这里统一对象化
 const suggestTagOptions = computed(() => suggestTags.value.map((v) => ({ value: v, label: v })));
+
+/**
+ * 保存路径用单选列表，两个哨兵值代表列表外的两种状态：
+ * 不指定（交给下载器自己的默认目录）与手动输入。
+ * 前缀 `::` 保证不会和真实路径撞车，也不含 `$...$` / `<...>` 模板，
+ * 所以不会被 utils.ts 的动态替换分支误当成待展开的路径。
+ */
+const PATH_DEFAULT = "::default::";
+const PATH_CUSTOM = "::custom::";
+const savePathChoice = ref<string>(PATH_DEFAULT);
+const customSavePath = ref("");
+
+/** 高级设置面板默认展开：这里存的是 a-collapse 的 activeKey */
+const advancedActiveKeys = ref<string[]>(["advanced"]);
 
 const currentSiteIds = computed(() => [...new Set(torrentItems.map((t) => t.site).filter(Boolean))]);
 const enabledDownloadersBySite = computed(() => {
@@ -77,7 +89,7 @@ const sortedEnabledDownloadersBySite = computed(() =>
 const downloaderTitle = (downloader: IDownloaderMetadata) => `${downloader.name} [${downloader.address}]`;
 const getDownloaderIcon = (x: string) => chrome.runtime.getURL(getDownloaderIconRaw(x));
 
-// antd 的 Select/AutoComplete 绑定的是标量，这里用 id 作为 v-model 的值，
+// 单选列表绑的是标量，这里用 id 作为 v-model 的值，
 // 再映射回 metadataStore.downloaders 里的完整对象，保持下游逻辑不变。
 const selectedDownloaderId = computed<string | undefined>({
   get: () => selectedDownloader.value?.id,
@@ -94,12 +106,39 @@ function onDownloaderChange() {
   restoreAddTorrentOptions(selectedDownloader.value ?? undefined);
 }
 
+/** 依据已定下的 savePath 反推单选态：空 → 默认路径，命中推荐目录 → 该项，否则 → 手动输入 */
+function syncSavePathChoice() {
+  const path = addTorrentOptions.value.savePath;
+  if (!path) {
+    savePathChoice.value = PATH_DEFAULT;
+    customSavePath.value = "";
+  } else if (suggestFolders.value.includes(path)) {
+    savePathChoice.value = path;
+    customSavePath.value = "";
+  } else {
+    savePathChoice.value = PATH_CUSTOM;
+    customSavePath.value = path;
+  }
+}
+
+watch(savePathChoice, (choice) => {
+  if (choice === PATH_DEFAULT) addTorrentOptions.value.savePath = "";
+  else if (choice === PATH_CUSTOM) addTorrentOptions.value.savePath = customSavePath.value;
+  else addTorrentOptions.value.savePath = choice;
+});
+
+// 手动输入模式下，输入框的内容就是最终路径
+watch(customSavePath, (value) => {
+  if (savePathChoice.value === PATH_CUSTOM) addTorrentOptions.value.savePath = value;
+});
+
 function restoreAddTorrentOptions(downloader?: IDownloaderMetadata) {
   addTorrentOptions.value.localDownload = true;
   addTorrentOptions.value.addAtPaused = !(downloader?.feature?.DefaultAutoStart ?? true);
   addTorrentOptions.value.savePath = "";
   addTorrentOptions.value.label = "";
   addTorrentOptions.value.advanceAddTorrentOptions = downloader?.advanceAddTorrentOptions ?? {};
+  syncSavePathChoice();
 }
 
 watch(selectedDownloader, (value) => {
@@ -150,11 +189,15 @@ function quickSendToDownloader(downloader: IDownloaderMetadata, path: string = "
   if (label) {
     addTorrentOptions.value.label = label;
   }
+  syncSavePathChoice();
 
   return sendToDownloader();
 }
 
 function dialogEnter() {
+  // 每次打开都展开：初值只能保证第一次，用户上次手动折叠过会残留
+  advancedActiveKeys.value = ["advanced"];
+
   // 如果是默认下载发送，则直接设置为快速发送到客户端模式
   if (isDefaultSend) {
     const downloader = metadataStore.downloaders[metadataStore.defaultDownloader.id!];
@@ -165,6 +208,7 @@ function dialogEnter() {
     selectedDownloader.value = downloader;
     addTorrentOptions.value.savePath = metadataStore.defaultDownloader.folder ?? "";
     addTorrentOptions.value.label = metadataStore.defaultDownloader.tags ?? "";
+    syncSavePathChoice();
 
     // 直接调用发送函数
     sendToDownloader();
@@ -174,18 +218,19 @@ function dialogEnter() {
 
     // 如果不是快速发送到客户端模式，则尝试设置默认下载器
     if (!quickSendToClient.value) {
-      const lastDownloaderId = metadataStore.lastDownloader?.id;
-      selectedDownloader.value = lastDownloaderId // 如果有上次选择的下载器，则直接使用
-        ? metadataStore.downloaders[lastDownloaderId]
-        : sortedEnabledDownloadersBySite.value.length === 1 // 如果只有一个启用的下载器，则直接使用
-          ? sortedEnabledDownloadersBySite.value[0]
-          : null;
+      // 上次的下载器必须在本次的候选里：单选列表只会渲染候选，选中一个不在列表里的 id
+      // 会让界面看起来一个都没勾上，而「完成」按钮又是可点的。
+      const candidates = sortedEnabledDownloadersBySite.value;
+      const lastId = metadataStore.lastDownloader?.id;
+      const remembered = lastId ? candidates.find((d) => d.id === lastId) : undefined;
+      selectedDownloader.value = remembered ?? (candidates.length === 1 ? candidates[0] : null);
 
       // 将上一次的下载器选项通过 toMerged 合并到当前选项中，而不是直接覆盖
       addTorrentOptions.value = toMerged(
         addTorrentOptions.value,
         metadataStore.lastDownloader?.options ?? {},
       ) as Required<Omit<CAddTorrentOptions, "localDownloadOption">>;
+      syncSavePathChoice();
     }
   }
 }
@@ -280,95 +325,103 @@ function dialogLeave() {
 
       <!-- 普通下载选项 -->
       <div v-else style="padding-bottom: 0">
-        <a-row>
-          <a-col :span="24">
-            <!-- 下载器是固定列表，不需要自由输入：用 Select 而非 AutoComplete。
-                 AutoComplete（combobox 模式）选中后输入框显示的是选项的 value，
-                 也就是下载器那串随机 id，option-label-prop 在这种组件里不接管显示，
-                 用户看到的就是「osuXXXX_...」这种编号。Select 单选时输入框固定显示 label。 -->
-            <a-select
-              v-model:value="selectedDownloaderId"
-              :options="downloaderOptions"
-              show-search
-              option-filter-prop="label"
-              :placeholder="t('SentToDownloaderDialog.selectDownloader')"
-              allow-clear
-              style="width: 100%"
-              @change="onDownloaderChange"
-            >
-              <template #option="opt">
-                <!-- 同上的 a-list-item-meta，antdv-next 无此组件，改普通 flex 容器 -->
-                <div class="downloader-option">
+        <a-alert v-if="downloaderOptions.length === 0" type="warning" show-icon style="margin-bottom: 12px">
+          {{
+            currentSiteIds.length > 0 && configStore.download.allowDownloaderFilterForSite
+              ? t("SentToDownloaderDialog.noDownloaderForSite")
+              : t("SentToDownloaderDialog.noDownloader")
+          }}
+        </a-alert>
+
+        <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.selectDownloader')">
+          <!-- 下载器是固定列表且数量少，用单选列表直出全部候选（带图标与类型），
+               不再套一层 Select 下拉：下拉要点开才能看见有哪些、当前选的是哪个。 -->
+          <a-radio-group v-model:value="selectedDownloaderId" class="choice-group" @change="onDownloaderChange">
+            <div v-for="opt in downloaderOptions" :key="opt.value" class="choice-row">
+              <a-radio :value="opt.value">
+                <span class="choice-with-icon">
                   <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.type" />
-                  <span class="downloader-option-label" :title="opt.label">{{ opt.label }}</span>
+                  <span class="choice-text" :title="opt.label">{{ opt.label }}</span>
                   <a-tag color="blue">{{ opt.raw.type }}</a-tag>
-                </div>
-              </template>
-            </a-select>
-          </a-col>
-        </a-row>
+                </span>
+              </a-radio>
+            </div>
+          </a-radio-group>
+        </a-form-item>
 
-        <a-row :gutter="12">
-          <a-col :span="12">
-            <a-form-item :label="t('SentToDownloaderDialog.savePath')" :extra="t('SentToDownloaderDialog.savePathHint')">
-              <a-auto-complete
-                v-model:value="addTorrentOptions.savePath"
-                :options="suggestFolderOptions"
-                :placeholder="t('SentToDownloaderDialog.savePathHint')"
-                allow-clear
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item :label="t('SentToDownloaderDialog.label')" :extra="t('SentToDownloaderDialog.labelHint')">
-              <a-auto-complete
-                v-model:value="addTorrentOptions.label"
-                :options="suggestTagOptions"
-                :placeholder="t('SentToDownloaderDialog.labelHint')"
-                allow-clear
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
+        <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.savePath')">
+          <a-radio-group v-model:value="savePathChoice" class="choice-group">
+            <div class="choice-row">
+              <a-radio :value="PATH_DEFAULT">{{ t("SentToDownloaderDialog.defaultPath") }}</a-radio>
+            </div>
+            <div v-for="folder in suggestFolders" :key="folder" class="choice-row">
+              <a-radio :value="folder">
+                <span class="choice-mono" :title="folder">{{ folder }}</span>
+              </a-radio>
+            </div>
+            <!-- 推荐目录可能为空、也可能不含这次想要的路径，所以留一个手输项。
+                 模板占位符（$torrent.title$ / <...>）在发送时才展开，见 utils.ts。 -->
+            <div class="choice-row">
+              <a-radio :value="PATH_CUSTOM">
+                <a-input
+                  v-model:value="customSavePath"
+                  size="small"
+                  class="choice-input"
+                  :placeholder="t('SentToDownloaderDialog.customPathPlaceholder')"
+                />
+              </a-radio>
+            </div>
+          </a-radio-group>
+        </a-form-item>
 
-        <a-row :gutter="12">
-          <a-col :span="12">
-            <a-form-item :label="t('SentToDownloaderDialog.localRelay')" :colon="false">
-              <a-switch
-                v-model:checked="addTorrentOptions.localDownload"
-                :disabled="!configStore.download.allowDirectSendToClient"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item :label="t('SentToDownloaderDialog.pauseOnAdd')" :colon="false">
-              <a-switch v-model:checked="addTorrentOptions.addAtPaused" />
-            </a-form-item>
-          </a-col>
-        </a-row>
+        <a-form-item
+          v-if="downloaderOptions.length > 0"
+          :label="t('SentToDownloaderDialog.label')"
+          :extra="t('SentToDownloaderDialog.labelHint')"
+        >
+          <a-auto-complete
+            v-model:value="addTorrentOptions.label"
+            :options="suggestTagOptions"
+            :placeholder="t('SentToDownloaderDialog.labelHint')"
+            allow-clear
+          />
+        </a-form-item>
 
-        <a-row>
-          <a-col :span="24" style="padding: 0">
-            <!-- Collapse 没有 `disabled` prop，写上去会变成根 div 上的裸 HTML 属性、毫无作用；
-                 开关折叠用 `collapsible: 'disabled'`。见 scripts/check-dead-props.mjs -->
-            <a-collapse
-              ghost
-              :collapsible="!((selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []).length > 0) ? 'disabled' : undefined"
+        <div v-if="downloaderOptions.length > 0" class="switch-bar">
+          <div class="switch-item">
+            <a-switch
+              v-model:checked="addTorrentOptions.localDownload"
+              size="small"
+              :disabled="!configStore.download.allowDirectSendToClient"
+            />
+            <span class="switch-label">{{ t("SentToDownloaderDialog.localRelay") }}</span>
+          </div>
+          <div class="switch-item">
+            <a-switch v-model:checked="addTorrentOptions.addAtPaused" size="small" />
+            <span class="switch-label">{{ t("SentToDownloaderDialog.pauseOnAdd") }}</span>
+          </div>
+        </div>
+
+        <a-collapse
+          v-if="downloaderOptions.length > 0"
+          v-model:active-key="advancedActiveKeys"
+          ghost
+          :collapsible="!((selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []).length > 0) ? 'disabled' : undefined"
+        >
+          <!-- Collapse 没有 `disabled` prop，写上去会变成根 div 上的裸 HTML 属性、毫无作用；
+               开关折叠用 `collapsible: 'disabled'`。见 scripts/check-dead-props.mjs -->
+          <a-collapse-panel key="advanced" :header="t('common.advancedSettings')">
+            <a-form-item
+              v-for="opt in selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []"
+              :key="opt.key"
+              :label="opt.name"
+              :extra="opt.description"
+              :colon="false"
             >
-              <a-collapse-panel key="1" :header="t('common.advancedSettings')">
-                <a-form-item
-                  v-for="opt in selectedDownloaderMetadata?.advanceAddTorrentOptions ?? []"
-                  :key="opt.key"
-                  :label="opt.name"
-                  :extra="opt.description"
-                  :colon="false"
-                >
-                  <a-switch v-model:checked="addTorrentOptions.advanceAddTorrentOptions![opt.key]" />
-                </a-form-item>
-              </a-collapse-panel>
-            </a-collapse>
-          </a-col>
-        </a-row>
+              <a-switch v-model:checked="addTorrentOptions.advanceAddTorrentOptions![opt.key]" />
+            </a-form-item>
+          </a-collapse-panel>
+        </a-collapse>
       </div>
     </a-form>
 
@@ -444,21 +497,58 @@ function dialogLeave() {
 
 .quick-send-item-title,
 .quick-send-item-subtitle,
-.downloader-option-label {
+.choice-text,
+.choice-mono {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.downloader-option {
+// 单选列表：让每一项独占一行，而不是 antd 默认的横向紧挨着排
+.choice-group {
+  display: block;
+  width: 100%;
+}
+
+.choice-row {
+  display: flex;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.choice-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 520px;
+}
+
+.choice-mono {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.choice-input {
+  width: 360px;
+  max-width: 100%;
+}
+
+// 两个开关并成一条，省掉 a-form-item 上下各一段的垂直留白
+.switch-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 4px 0 12px;
+}
+
+.switch-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 0;
 }
 
-.downloader-option-label {
-  flex: 1;
-  min-width: 0;
+.switch-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
 }
 </style>

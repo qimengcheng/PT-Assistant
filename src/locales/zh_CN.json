@@ -296,6 +296,8 @@
       "title": "用户历史数据"
     },
     "UserLevelRequirementsTd": {
+      "collapseLevelList": "收起等级列表",
+      "expandLevelList": "查看全部 {count} 个等级",
       "levelList": "用户等级列表"
     },
     "exportDialog": {
@@ -317,6 +319,7 @@
       "title": "导出用户信息"
     },
     "index": {
+      "columns": "显示列",
       "exportData": "导出数据",
       "filter": {
         "lastUpdateError": "最后更新状态异常",
@@ -372,6 +375,13 @@
     }
   },
   "SearchEntity": {
+    "scope": {
+      "planSection": "搜索方案",
+      "siteSection": "站点",
+      "selectedSites": "已选 {0} 个站点",
+      "clearSites": "清空勾选",
+      "moreSites": "{0} 等 {1} 个站点"
+    },
     "solutionAll": "全站",
     "ActionTd": {
       "copyLink": "复制下载链接",
@@ -499,7 +509,8 @@
       },
       "uploadAtFormatAsAlive": "上传时间显示为相对时间",
       "defaultSearchPlan": "默认搜索方案",
-      "searchKeywordPlaceholder": "输入关键词开始搜索"
+      "searchKeywordPlaceholder": "输入关键词开始搜索",
+      "searchPlanSettings": "搜索方案设置"
     },
     "siteFilter": {
       "all": "全部站点"
@@ -524,6 +535,8 @@
     }
   },
   "SentToDownloaderDialog": {
+    "customPathPlaceholder": "手动输入路径，支持 $torrent.title$ 等占位符",
+    "defaultPath": "下载器默认路径",
     "isSending": "正在向下载器 {name} [{address}] 发送种子，请稍候...",
     "label": "种子标签",
     "labelHint": "（如果该下载服务器支持）",
@@ -534,7 +547,6 @@
     "pauseOnAdd": "添加时默认暂停",
     "placeholderInput": "请输入替换 {0} 中的 <...> 的内容：",
     "savePath": "保存路径",
-    "savePathHint": "不设置则为该下载服务器的默认路径",
     "selectDownloader": "选择下载器",
     "selectDownloaderFirst": "请先选择下载器",
     "title": "为 {0} 个种子选择下载器"
@@ -1670,6 +1682,39 @@
     "title": "站点定义",
     "searchPlaceholder": "搜索站点 id…",
     "loading": "加载定义中…",
-    "selectHint": "← 点击左侧站点查看按需加载的定义元数据"
+    "selectHint": "← 点击左侧站点查看按需加载的定义元数据",
+    "colId": "站点 id",
+    "colField": "字段",
+    "colValue": "值",
+    "itemCount": "{0} 项",
+    "keyCount": "{0} 个键",
+    "field": {
+      "id": "键名，与 definitions/ 下的文件名一致",
+      "version": "解析版本号",
+      "name": "站点名",
+      "aka": "别名",
+      "description": "站点说明",
+      "tags": "站点标签",
+      "timezoneOffset": "时区",
+      "collaborator": "协作者",
+      "type": "站点类型",
+      "schema": "解析模板",
+      "urls": "站点地址",
+      "legacyUrls": "历史地址",
+      "favicon": "站点图标",
+      "isDead": "已停止运营",
+      "category": "分类",
+      "requestDelay": "请求延迟（毫秒）",
+      "officialGroupPattern": "官方组匹配规则",
+      "search": "搜索配置",
+      "searchEntry": "搜索入口",
+      "list": "列表页配置",
+      "detail": "详情页配置",
+      "download": "下载配置",
+      "noLoginAssert": "未登录判定",
+      "userInfo": "个人信息配置",
+      "levelRequirements": "用户等级",
+      "userInputSettingMeta": "额外输入项"
+    }
   }
 }

@@ -22,6 +22,15 @@ const deprecatedConfigKeys = [
  */
 const initTorrentOnEnterDefaultOnSince = "0.21.3";
 
+/**
+ * v0.22.37 起「记住上一次使用的下载器」默认改为开：
+ * 推送弹窗把下载器/保存路径改成单选列表后，「默认选中上次用的」成了主要交互，
+ * 而这个开关关着时那条数据根本不会被写入，界面上就永远只停在第一项。
+ * 存量里那个 false 同样是旧默认值、不是用户的选择，所以按版本号纠正一次；
+ * 追平后不再干预，用户主动关掉就能关掉。
+ */
+const saveLastDownloaderDefaultOnSince = "0.22.37";
+
 /** 语义化版本按 x.y.z 逐段比数值；空串/异常串按 0.0.0 处理（即"很旧"）。 */
 function isOlderVersion(a: string, b: string): boolean {
   const pa = String(a ?? "")
@@ -87,6 +96,14 @@ export const useConfigStore = defineStore("config", {
         isOlderVersion(state.version, initTorrentOnEnterDefaultOnSince)
       ) {
         state.download.initDownloaderTorrentOnEnter = true;
+        needsSave = true;
+      }
+
+      if (
+        state.download?.saveLastDownloader === false &&
+        isOlderVersion(state.version, saveLastDownloaderDefaultOnSince)
+      ) {
+        state.download.saveLastDownloader = true;
         needsSave = true;
       }
 
@@ -306,7 +323,7 @@ export const useConfigStore = defineStore("config", {
       saveDownloadHistory: true,
       allowDownloaderFilterForSite: false,
       initDownloaderTorrentOnEnter: true,
-      saveLastDownloader: false,
+      saveLastDownloader: true,
       allowDirectSendToClient: false,
       localDownloadMethod: "browser",
       ignoreSiteDownloadIntervalWhenLocalDownload: true,

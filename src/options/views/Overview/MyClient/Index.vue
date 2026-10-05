@@ -225,7 +225,12 @@ async function loadTorrents() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // 两条分支都读异步水合的 store：`downloaders` 决定 `?downloader=<id>` 能不能预选上，
+  // `download.initDownloaderTorrentOnEnter` 决定进来要不要自动拉种子列表。
+  // 不等水合就是：从「下载器」页跳过来时预选丢失、自动加载按默认值走 —— 都是静默的。
+  await Promise.all([metadataStore.$onReady(), configStore.$onReady()]);
+
   // 支持从 SetDownloader 等页面通过 ?downloader=<id> 预选单个下载服务器
   const queryDownloaderId = route.query.downloader as string | undefined;
   if (queryDownloaderId && metadataStore.downloaders[queryDownloaderId]) {

@@ -253,7 +253,7 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 **只有一个 workflow：`.github/workflows/ci.yml`**，三个 job 串起来 `verify → build → release`。
 （旧文档写的 `build.yml` / `release.yml` 两个文件都不存在，v0.22.13 那轮订正漏掉了这处。）
 
-- `verify`：`pnpm compile` + 四条静态防线 + `check-version.mjs --committed`。
+- `verify`：`pnpm compile` + 五条静态防线 + `check-version.mjs --committed`。
 - `build`：`wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
   `PT-Assistant-<version>-{chrome,firefox,sources}.zip` 三个包，外加 `smoke-background.mjs`。
 - `release`：`ncipollo/release-action` 按 `package.json` 的 version 打 `v<version>` tag 并挂上
@@ -313,13 +313,14 @@ v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所�
 接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
 否则线上是静默空白。
 
-四条 CI 静态防线（本地改完也要跑，FAIL 非零退出，挂在 ci.yml 的 `pnpm compile` 之后、构建之前）：
+五条 CI 静态防线（本地改完也要跑，FAIL 非零退出，挂在 ci.yml 的 `pnpm compile` 之后、构建之前）：
 
 ```bash
 node scripts/check-antd-tags.mjs          # 全仓扫「antdv-next 里不存在的 a-* 标签」
 node scripts/check-content-antd-lite.mjs  # content 按需清单是否覆盖其依赖闭包用到的每个标签
 node scripts/check-locale-keys.mjs        # 每个字面 t("a.b.c") 在 zh/en 两侧都可解析、两份键集合对称
 node scripts/check-dead-props.mjs         # 传给 a-* 的属性 / 插槽里，哪些是该组件根本不认的死项
+node scripts/check-store-hydration.mjs    # 挂载钩子里命令式读「异步水合的 store」的地方
 ```
 
 第三条防的是 vue-i18n 的静默失效：键取不到时**不抛异常、不进 vue-tsc、不进构建**，而是把键路径
@@ -333,6 +334,19 @@ node scripts/check-dead-props.mjs         # 传给 a-* 的属性 / 插槽里，�
 （那条只看标签名存不存在）。判定依据同样是在 Node 里实跑 `install()` 取 props、读 `dist` 下的
 `.d.ts` 取插槽映射。它的放行口径是「宁可漏报也不误报」：取不到 props/slots 声明的整组件跳过、
 自定义组件是否转发插槽静态不可判定跳过、`:[x]` 动态参数不查 —— 所以**它报干净不等于真干净**。
+
+第五条防的是 `persistWebExt` store 的**异步水合竞态**：取数走 `chrome.storage.local.get`，
+水合完成前 store 里是初始值（对象 `{}`、数组 `[]`），不是 `undefined` —— 所以
+`onMounted(() => 读 metadataStore.sites)` 这类写法不报错、不进 vue-tsc、不进构建，只是首屏静默空着。
+「我的数据」页要等 5 秒多才出表就是这个根因：有人为了绕开它手搓了一个 5 秒 debounce 轮询存储，
+症状被掩盖，代价摊给所有人。两条出路，`$onReady` 或改成派生（`computedAsync` / `computed`）：
+后者不需要等待，水合一到自动重算，是首选。
+
+它的边界同样是「宁可漏报」，**报干净不等于真干净**：store 清单靠扫源码得到（`persistWebExt`
+为 true/对象的才算，`runtime` 走 sessionStorage 同步水合所以排除）；只跟同文件内的词法调用展开
+3 层，跨文件转发的不追；观察器 / 定时器 / 事件监听这类**异步边界**里的读取一律放过（那些不在
+挂载路径上执行）。反过来 getter 到底读没读 `state` 静态判不出来 —— 首版就把纯透传的
+`getSiteMetadata` 误报成了一处，靠人工核对源码才排除。所以它报出来的每一条都要回源码看一眼。
 
 注册表是脚本在 Node 里**实跑** `install()` 得到的，不抄文档。
 

@@ -75,7 +75,7 @@ function runSearch(options: { searchKey: string; loadMore?: boolean }) {
   return doSearch(options);
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadMoreObserver = new IntersectionObserver(
     (entries) => {
       if (
@@ -92,6 +92,11 @@ onMounted(() => {
   if (loadMoreSentinel.value) {
     loadMoreObserver.observe(loadMoreSentinel.value);
   }
+
+  // autoSearchWhenMount 是用户存下来的偏好，而 config store 靠 chrome.storage 异步水合：
+  // 不等它就判断，读到的是初始值，表现为「设置了首屏自动搜索但冷启动不搜」，且完全不报错。
+  // 观察器的接线在上面已经做完、不依赖水合，所以等待放在这里而不是钩子开头。
+  await configStore.$onReady();
 
   if (configStore.mediaServerEntity.autoSearchWhenMount && runtimeStore.mediaServerSearch.searchResult.length === 0) {
     void runSearch({ searchKey: search.value });

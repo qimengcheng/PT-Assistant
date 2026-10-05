@@ -141,6 +141,15 @@ jobs:
       - name: Check dead props and slots on a-* components
         run: node scripts/check-dead-props.mjs
 
+      # 第五条静态防线：挂载钩子里命令式读取「靠 persistWebExt 异步水合」的 store 字段。
+      # chrome.storage 取数是异步的，水合完成前那些字段是**初始值**（不是 undefined），
+      # 所以这类写法不报错、不进 vue-tsc、不进构建，只是界面静默空着或按默认值走。
+      # 「我的数据」页等 5 秒多才出表就是这么来的：为了绕开这个竞态手搓了 5 秒 debounce，
+      # 症状被掩盖、代价摊给了所有人。store 清单由扫源码得出（persistWebExt 为 true 的那些），
+      # 不抄文档；runtime store 走 sessionStorage 同步水合，自动排除在外。
+      - name: Check no imperative async-store reads in mount hooks
+        run: node scripts/check-store-hydration.mjs
+
       # 版本号守卫的**兜底**（主防线是本地 .githooks 里的 pre-commit / commit-msg：
       # CI 只在 push 时触发，本地连提 5 次它一次都不跑，等历史定型就晚了）。
       # 这里检查 HEAD 这一条：「提交消息版本号 == package.json」且「== 父提交最大 + 1」。

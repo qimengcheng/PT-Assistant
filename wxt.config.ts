@@ -27,8 +27,14 @@ const pkgVersion = (await import("./package.json", { with: { type: "json" } })).
  * 注意 WXT 0.21.4 的 `wxt build` **没有 `--output` 参数**（只有 root/config/mode/browser/
  * filter-entrypoint/mv3/analyze/debug/level），隔离只能走这里的 `outDir` 配置，用环境变量传：
  *
- *     PTD_SESSION=qwenwork pnpm build     → dist-qwenwork/chrome-mv3
- *     PTD_SESSION=workbuddy pnpm dev      → dist-workbuddy/chrome-mv3
+ *     PTD_SESSION=qwenwork pnpm build     → dist-qwenwork-<版本号>/chrome-mv3
+ *     PTD_SESSION=workbuddy pnpm dev      → dist-workbuddy-<版本号>/chrome-mv3
+ *
+ * 目录名带上版本号：本机同时躺着七八个会话的产物目录，光看 `dist-qoder` 分不清是哪个版本，
+ * 而「加载哪个目录验收」恰恰是要报给用户的问题。版本号取自 package.json（与注入 manifest 的
+ * 是同一个值）。**用户实际加载的不是这些目录，而是 `dist-verify`** —— 一个由
+ * `scripts/build-verify.mjs` 在每次构建成功后换指的目录联接，固定路径才不会让 Chrome 的
+ * 未打包扩展 id 每次变（详见 AGENTS §2.2）。
  *
  * 不设 PTD_SESSION 时仍是 WXT 默认的 `.output` —— CI（单文件流水线 ci.yml 的 build job）
  * 就没有并发会话，它按 `.output/*.zip` 取包，绝不能被这条改动影响。
@@ -37,7 +43,7 @@ const sessionTag = (process.env.PTD_SESSION ?? "").trim();
 
 export default defineConfig({
   srcDir: "src",
-  outDir: sessionTag ? `dist-${sessionTag}` : ".output",
+  outDir: sessionTag ? `dist-${sessionTag}-${pkgVersion}` : ".output",
   modules: ["@wxt-dev/module-vue"],
   manifest: {
     name: "PT Assistant",

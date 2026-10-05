@@ -206,17 +206,40 @@ const { width: windowWidth, height: windowHeight } = useWindowSize();
 const tableScrollY = ref(400);
 
 /**
- * 表体可视高度 = 视口高度 − 表格顶部位置 − 表头 − 分页 − 底部留白，
- * 让表格始终铺满视口右下区域（scroll.y 固定后横向滚动条也常驻可见）。
+ * 表体（scroll.y）高度 = 表格容器高度 − 表头 − 分页器 − 表格底部到容器底部那一截。
+ *
+ * 这个函数改过两次，两次都是同一类错：**拿会漂的量当基准、拿猜的数当减数**。
+ *
+ * 一开始是 `视口高度 − 表格 top − 55 − 64 − 16`。`top` 取自 `getBoundingClientRect().top`，
+ * 那是**视口**坐标，而 `.content` 自己就是滚动容器（overflow-y: auto）—— 页面往下一滚，
+ * 同一个表格的 top 一直变小，`视口高度 − top` 越来越大，表格被算得越来越高，
+ * 底部就顶出一段空白。中间又换成 `.content` 的 clientHeight，滚动时确实稳了，
+ * 但 55 / 64 / 16 仍是当年目测的三个整数，卡片内衬一改就失准。
+ *
+ * 现在的基准是 `#ptd-search-entity-table` 自己的 clientHeight：容器已被
+ * `.result-card` 的 flex:1 撑到剩余高度，这个值既不随滚动位置变，也不随表格内容变，
+ * 所以不会有「表格变高 → 容器变高 → 再算一次」的循环。减数全部实测：
+ * 表头高度、分页器高度、以及分页器底部到容器底部的那一截（含横向滚动条与间距）。
  */
 function recalcTableScrollY() {
   const el = tableWrapperRef.value;
   if (!el) return;
-  const top = el.getBoundingClientRect().top;
-  tableScrollY.value = Math.max(windowHeight.value - top - 55 - 64 - 16, 200);
+
+  const containerHeight = el.clientHeight;
+  if (containerHeight <= 0) return;
+
+  const rect = el.getBoundingClientRect();
+  const headerHeight = el.querySelector<HTMLElement>(".ant-table-thead")?.getBoundingClientRect().height ?? 0;
+  const paginationBox = el.querySelector<HTMLElement>(".ant-table-pagination")?.getBoundingClientRect();
+  // 分页器在容器内部，所以这一截是「容器底 − 分页器底」而不是反过来
+  const tailBelowPagination = paginationBox ? rect.bottom - paginationBox.bottom : 0;
+  const paginationHeight = paginationBox ? paginationBox.height : 0;
+
+  tableScrollY.value = Math.max(containerHeight - headerHeight - tailBelowPagination - paginationHeight, 200);
 }
 
-onMounted(recalcTableScrollY);
+// 首帧时 flex 布局还没落定，容器高度量出来是 0；等一帧再量
+onMounted(() => nextTick(recalcTableScrollY));
 // 窗口尺寸变化（工具栏换行会改变 top）、结果集变化（提示条出现/消失同理）后重测
 watch([windowWidth, windowHeight, tableItems], () => nextTick(recalcTableScrollY));
 
@@ -251,7 +274,46 @@ function onRowSelectionChange(_keys: any, rows: any[]) {
 // 回车/点击走 query → 上方 watch 触发 doSearch。
 // ============================================================================
 const searchKey = ref<string>("");
-const searchPlanKey = ref<string>("default");
+
+/**
+ * 记住上次选的搜索方案。落在 configStore.searchEntity.lastPlanKey（chrome.storage.local，
+ * 跨会话），原先是写死的 ref("default")，每次打开选项页都退回「默认搜索方案」。
+ *
+ * 用 computed 而不是 ref + 手动读写：persistWebExt 的 store 是**异步水合**的
+ * （AGENTS.md §3.4），ref 在水合完成前读到的是初值 "default"，此时任何一次写入
+ * 都会把用户真正的选择抹掉。派生是水合一到自动重算，不需要等。
+ */
+const searchPlanKey = computed({
+  get: () => {
+    const key = configStore.searchEntity.lastPlanKey || "default";
+    // 记住的方案可能已经被删掉或禁用（跨设备同步、手动清理配置都会发生）。
+    // 这类失效键必须就地回落，否则 SearchScopeSelect 的按钮会显示成方案 id 本身 ——
+    // getSearchSolutionName 找不到时是 `?? solutionId`（AGENTS.md §3.5 零容忍项），
+    // 而且搜索时会拿着一个不存在的方案去跑队列。
+    return isUsablePlanKey(key) ? key : "default";
+  },
+  set: (value) => {
+    configStore.searchEntity.lastPlanKey = value;
+    configStore.$save();
+  },
+});
+
+/** plan key 是否还有效：约定键恒真；方案 id 要求存在且启用；`site:` 要求还留着至少一个站点 */
+function isUsablePlanKey(key: string): boolean {
+  if (key === "default" || key === "all") return true;
+
+  if (key.startsWith("site:")) {
+    const ids = key
+      .slice("site:".length)
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (ids.length === 0) return false;
+    return metadataStore.getSortedAddedSites.some((site) => ids.includes(site.id));
+  }
+
+  return metadataStore.getSearchSolutions.some((solution) => solution.id === key && !!solution.enabled);
+}
 
 function startSearchEntity() {
   router.push({
@@ -365,7 +427,15 @@ const hiddenTagNamesText = computed({
 </script>
 
 <template>
-<div class="search-toolbar">
+<!-- 整页一个列向 flex：三段的 8px 间距交给 gap 统一给，结果卡片用 flex:1 吃掉剩余高度。
+     页面原先是多根节点，没有可设高度的根，`.content` 的 8px 内衬之下的高度没人占，
+     卡片下方就空出一大片灰底。 -->
+  <div class="search-page">
+  <!-- page-bar = 其它 9 个列表页工具条用的那一档白表面（style.css 里的全局类）：
+       白底 + 浅边框 + 圆角。复用它而不是在 .search-toolbar 里重写一份，
+       否则日后调白面板样式这里必然又分叉成两套。排布仍由 .search-toolbar 自己的
+       flex / gap 负责，两者声明的属性不重叠。 -->
+  <div class="search-toolbar page-bar">
   <SearchScopeSelect v-model="searchPlanKey" />
   <a-input-search
     v-model:value="searchKey"
@@ -385,7 +455,7 @@ const hiddenTagNamesText = computed({
     {{ t("SearchEntity.index.searchPlanSettings") }}
   </a-button>
 </div>
-  <a-alert type="info">
+  <a-alert type="info" class="search-alert">
     <template #message>
       <div class="d-flex align-center flex-wrap search-action-bar">
         <div class="flex-1-1-0">
@@ -449,7 +519,7 @@ const hiddenTagNamesText = computed({
     </template>
   </a-alert>
 
-  <a-card>
+  <a-card class="result-card">
     <template #title>
       <div class="d-flex align-center">
         <!-- 启动/暂停 搜索队列 -->
@@ -585,9 +655,10 @@ const hiddenTagNamesText = computed({
       </div>
     </template>
 
-    <div class="pt-2 pb-0">
+    <!-- 内衬由下面 .result-card 的 card body padding 统一给 8px，这里不再叠 pt-2/pb-0 -->
+    <div class="search-results">
       <!-- 站点筛选器、已选种子等提示信息 -->
-      <QuickFilterNotice :selected-torrents="tableSelectedRaw" />
+      <QuickFilterNotice class="site-filter-notice" :selected-torrents="tableSelectedRaw" />
 
       <div id="ptd-search-entity-table" ref="tableWrapper" class="search-entity-table table-stripe table-header-no-wrap">
         <a-table
@@ -695,6 +766,7 @@ const hiddenTagNamesText = computed({
   >
     <SetSearchSolutionPage />
   </a-modal>
+  </div>
 </template>
 
 <style scoped lang="scss">
@@ -736,12 +808,79 @@ const hiddenTagNamesText = computed({
 </style>
 
 <style scoped>
+/* 搜索页没有走 style.css 的 .page 网格骨架（它是唯一一个多段结构的页面：
+   搜索条 / 状态提示 / 结果卡片三段），所以块间距在这里自己定，
+   口径统一成 8px —— 与 .page 的 grid gap、.content 的 padding、.page-panel 的 padding 同一档。
+   原来这三段之间是 10px / 0px / 0px：搜索条离提示条差 2px 看不出来，
+   提示条和下面的卡片、站点筛选条和表格则是**完全贴死**（a-alert、a-card、a-tag 在
+   antdv-next 里都不带默认 margin，所以那两处真的是 0）。 */
+/* 整页列向布局：三段之间的 8px 全部交给 gap，不再各写各的 margin-bottom。
+   与 .page 骨架（grid gap: 8px + 1fr 面板行）同一套口径，只是这里结构不是「工具条 + 面板」
+   两行，而是 搜索条 / 状态提示 / 结果卡片 三段。 */
+.search-page {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
 .search-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  /* 不被下面的结果卡片挤扁（flex 子项默认可以被压小，而工具条里的控件高度固定） */
+  flex-shrink: 0;
+  /* .page-bar 的 padding 是 `0 8px` —— 上下本来就没有，靠别处给的行高把控件撑开：
+     列表页那边是 `.page` 网格的第一行 `minmax(48px, auto)`，工具条作为网格项自然拿到 48px，
+     控件居中后上下各留 8px。搜索页没有那层网格（它是列向 flex），行高没人给，
+     工具条会塌到控件本身的 32px，比别的页面矮一截。这里把那一档补回来。
+     窄窗口下控件换行变两行时，`min-height` 不会截断，仍由内容撑高。 */
+  min-height: 48px;
+}
+
+/* 站点筛选条与表格之间的 8px（组件根元素是 a-alert，自带 mb-0，
+   这里由父组件的 scoped 规则补上 —— scoped 会把父作用域 id 加到子组件根元素上，能命中）。
+   这条在卡片**内部**，不是 .search-page 的直接子元素，所以 gap 管不到。 */
+.site-filter-notice {
+  margin-bottom: 8px;
+}
+
+/* 结果卡片吃掉剩余高度。a-table 的 scroll.y 只是 max-height：没有结果时没有行可撑，
+   容器按内容收窄，卡片跟着塌下去，下方空出一大片灰底。让卡片自身撑满，
+   空白就只剩 .content 的 8px 内衬 —— 有结果、无结果两种状态一致。 */
+.result-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 卡片内衬同时收成 8px（antd 默认 24px，再叠分页器自带的 16px 上下 margin，
+   表格下方原本会空出近 40px），并让 body 变成可伸展的列容器。 */
+.result-card :deep(.ant-card-body) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px;
+}
+
+/* 卡片内那层容器与表格容器各占一段，表格吃剩下的（表格高度由 scroll.y 算，见
+   recalcTableScrollY），这样「暂无数据」时也是整块铺到底，而不是按内容收窄。 */
+.search-results,
+#ptd-search-entity-table {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 分页器只保留上边距 8px：下边距交给上面 card body 的 8px padding，
+   两条都留会重新在表格下方拼出一段空白（这正是原来那段空白的两处来源）。 */
+.result-card :deep(.ant-table-pagination) {
+  margin: 8px 0 0;
 }
 
 /* alert 内整行操作条换行后的行间距（元素自身间距靠 mx-2/ml-2，行间没人管） */

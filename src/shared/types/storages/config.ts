@@ -229,6 +229,10 @@ export interface IConfigPiniaStorageSchema {
     quickSiteFilter: boolean;
     // 是否在搜索框中展示热门推荐按钮
     showHotRecommendations: boolean;
+    // 搜索页顶部「搜索方案」上次的选择：方案 id、`all`、或 `site:a,b,c`。
+    // 读取侧（SearchEntity/Index.vue 的 searchPlanKey）会校验它是否还有效，
+    // 方案被删/被禁用、站点被移除时都回落到 `default`。
+    lastPlanKey: string;
   };
 
   // 配置同样在 searchEntity 页面（偷懒下）

@@ -147,7 +147,9 @@ function exportSiteHistoryData() {
   }
 
   const exportedSolutionBlob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-  saveAs(exportedSolutionBlob, `site-history-data-${siteId}.json`); // FIXME filename
+  // 文件名面向用户，不放内部 siteId（AGENTS.md §3.5）。取不到站点名时退回 "unknown"，
+  // 也不退回 id —— id 会落进用户下载目录里。
+  saveAs(exportedSolutionBlob, `site-history-data-${siteName.value || "unknown"}.json`);
 }
 
 /** 加载站点历史数据的在途标志：弹窗每次打开都重新取一次数据，没有它会有明显的空窗期 */

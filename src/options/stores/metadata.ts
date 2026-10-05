@@ -25,6 +25,7 @@ import {
   type ISearchSolutionMetadata,
 } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
+import { i18n } from "@/options/plugins/i18n.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 
@@ -278,8 +279,10 @@ export const useMetadataStore = defineStore("metadata", {
 
     getSearchSolutionName(state) {
       return (solutionId: TSolutionKey): string => {
+        // pinia getter 里没有组件实例，useI18n() 用不了；直接取全局 Composer。
+        // 引 i18n 单例对 content chunk 零增量 —— i18n-lite.ts 已经在引它了。
         if (solutionId === "all") {
-          return "全站"; // FIXME i18n
+          return i18n.t("SearchEntity.solutionAll");
         }
 
         return state.solutions[solutionId]?.name ?? solutionId;

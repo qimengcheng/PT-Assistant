@@ -263,9 +263,11 @@ function afterEnter() {
         <template v-else-if="column.key === 'action'">
           <div class="table-action">
             <!-- 查看原始记录 -->
-            <a-button type="text" size="small" :title="t('MyData.HistoryDataView.action.viewRaw')" @click="viewStoreData(record)">
-              <EyeOutlined />
-            </a-button>
+            <a-tooltip :title="t('MyData.HistoryDataView.action.viewRaw')">
+              <a-button type="text" size="small" @click="viewStoreData(record)">
+                <EyeOutlined />
+              </a-button>
+            </a-tooltip>
 
             <!-- 删除 -->
             <a-tooltip :title="t('common.remove')">

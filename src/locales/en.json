@@ -1252,6 +1252,7 @@
       "displayContent": "Display Content",
       "displaySiteSettings": "Display Site Settings",
       "faviconBlur": "Site Favicon Blur",
+      "resetBgColor": "Restore Default Background Color",
       "showTimeline": "Show individual site information (master switch)",
       "showTopSites": "Show champion and runner-up sites for each data type",
       "siteDisplay": "Site Display Component",

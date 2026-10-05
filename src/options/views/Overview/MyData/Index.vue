@@ -281,72 +281,74 @@ const showExportDialog = ref(false);
 <template>
   <a-alert :title="t('route.Overview.MyData')" type="info" :show-icon="true" class="mb-4" />
   <a-card variant="outlined">
-    <div class="my-data-toolbar">
-      <!-- 刷新，取消刷新 -->
-      <a-button type="primary" v-if="runtimeStore.isUserInfoFlush" @click="cancelFlushSiteLastUserInfo"><template #icon><StopOutlined /></template><span>{{ t('MyData.index.flushCancel') }}</span></a-button>
+    <template #title>
+      <a-flex align="center" gap="small" wrap>
+        <!-- 刷新，取消刷新 -->
+        <a-button type="primary" v-if="runtimeStore.isUserInfoFlush" @click="cancelFlushSiteLastUserInfo"><template #icon><StopOutlined /></template><span>{{ t('MyData.index.flushCancel') }}</span></a-button>
 
-      <a-button type="primary" v-else @click="multiFlush"><template #icon><SyncOutlined /></template><span>{{ t('MyData.index.flushSelectSite') }}</span></a-button>
+        <a-button type="primary" v-else @click="multiFlush"><template #icon><SyncOutlined /></template><span>{{ t('MyData.index.flushSelectSite') }}</span></a-button>
 
-      <a-button :disabled="tableSelected.length === 0" @click="multiOpen"><template #icon><ExportOutlined /></template><span>{{ t('MyData.index.multiOpen') }}</span></a-button>
+        <a-button :disabled="tableSelected.length === 0" @click="multiOpen"><template #icon><ExportOutlined /></template><span>{{ t('MyData.index.multiOpen') }}</span></a-button>
 
-      <a-divider type="vertical" class="mx-2" />
+        <a-divider type="vertical" class="mx-2" />
 
-      <a-button @click="viewTimeline"><template #icon><LineChartOutlined /></template><span>{{ t('MyData.index.viewTimeline') }}</span></a-button>
-      <a-button @click="viewStatistic"><template #icon><BarChartOutlined /></template><span>{{ t('MyData.index.viewStatistic') }}</span></a-button>
+        <a-button @click="viewTimeline"><template #icon><LineChartOutlined /></template><span>{{ t('MyData.index.viewTimeline') }}</span></a-button>
+        <a-button @click="viewStatistic"><template #icon><BarChartOutlined /></template><span>{{ t('MyData.index.viewStatistic') }}</span></a-button>
 
-      <a-divider type="vertical" class="mx-2" />
+        <a-divider type="vertical" class="mx-2" />
 
-      <!-- 导出按钮 -->
-      <a-button @click="showExportDialog = true"><template #icon><ExportOutlined /></template><span>{{ t('MyData.index.exportData') }}</span></a-button>
+        <!-- 导出按钮 -->
+        <a-button @click="showExportDialog = true"><template #icon><ExportOutlined /></template><span>{{ t('MyData.index.exportData') }}</span></a-button>
 
-      <a-divider type="vertical" class="mx-2" />
+        <a-divider type="vertical" class="mx-2" />
 
-      <!-- 表格设置面板：原 v-menu + v-list，antdv-next 没有 a-list，改用 a-popover + 普通 div -->
-      <a-popover trigger="click" placement="bottomLeft">
-        <template #default>
-          <a-button class="mr-1"><template #icon><SettingOutlined /></template><span>{{ t('MyData.index.setting') }}</span></a-button>
-        </template>
-        <template #content>
-          <div class="table-setting-panel">
-            <!-- 入站时间显示 -->
-            <div class="d-flex align-center mb-2">
-              <CalendarOutlined class="mr-2" />
-              <span class="text-label-large">{{ t("MyData.index.joinTimeFormat") }}</span>
-              <a-segmented
-                v-model:value="configStore.myDataTableControl.joinTimeFormat"
-                size="small"
-                :options="joinTimeFormatOptions"
-                @change="() => configStore.$save()"
-              />
+        <!-- 表格设置面板：原 v-menu + v-list，antdv-next 没有 a-list，改用 a-popover + 普通 div -->
+        <a-popover trigger="click" placement="bottomLeft">
+          <template #default>
+            <a-button class="mr-1"><template #icon><SettingOutlined /></template><span>{{ t('MyData.index.setting') }}</span></a-button>
+          </template>
+          <template #content>
+            <div class="table-setting-panel">
+              <!-- 入站时间显示 -->
+              <div class="d-flex align-center mb-2">
+                <CalendarOutlined class="mr-2" />
+                <span class="text-label-large">{{ t("MyData.index.joinTimeFormat") }}</span>
+                <a-segmented
+                  v-model:value="configStore.myDataTableControl.joinTimeFormat"
+                  size="small"
+                  :options="joinTimeFormatOptions"
+                  @change="() => configStore.$save()"
+                />
+              </div>
+
+              <a-divider class="my-2" />
+
+              <!-- 其他开关控制 -->
+              <div v-for="index in filteredTableBooleanControlKeys" :key="index" class="d-flex align-center mb-2">
+                <a-switch
+                  v-model:checked="configStore.myDataTableControl[index]"
+                  size="small"
+                  @change="() => configStore.$save()"
+                />
+                <span class="text-label-large ml-2">{{ t("MyData.index." + index) }}</span>
+              </div>
             </div>
+          </template>
+        </a-popover>
 
-            <a-divider class="my-2" />
+        <!-- 列显隐：原 v-combobox(multiple) → a-select(mode="multiple") -->
+        <a-select
+          v-model:value="selectedColumnKeys"
+          mode="multiple"
+          :options="columnSelectOptions"
+          size="small"
+          class="column-filter-select"
+          @click.stop
+        />
+      </a-flex>
+    </template>
 
-            <!-- 其他开关控制 -->
-            <div v-for="index in filteredTableBooleanControlKeys" :key="index" class="d-flex align-center mb-2">
-              <a-switch
-                v-model:checked="configStore.myDataTableControl[index]"
-                size="small"
-                @change="() => configStore.$save()"
-              />
-              <span class="text-label-large ml-2">{{ t("MyData.index." + index) }}</span>
-            </div>
-          </div>
-        </template>
-      </a-popover>
-
-      <!-- 列显隐：原 v-combobox(multiple) → a-select(mode="multiple") -->
-      <a-select
-        v-model:value="selectedColumnKeys"
-        mode="multiple"
-        :options="columnSelectOptions"
-        size="small"
-        class="column-filter-select"
-        @click.stop
-      />
-
-      <div class="flex-1-1-0" />
-
+    <template #extra>
       <!-- 搜索框：原 v-text-field + prepend-inner 里的 v-menu 筛选面板 -->
       <a-input
         v-model:value="tableWaitFilterRef"
@@ -432,7 +434,7 @@ const showExportDialog = ref(false);
           <SearchOutlined />
         </template>
       </a-input>
-    </div>
+    </template>
 
     <a-table
       :columns="tableColumns"
@@ -683,14 +685,6 @@ const showExportDialog = ref(false);
 </template>
 
 <style scoped lang="scss">
-.my-data-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px;
-}
-
 .table-setting-panel {
   min-width: 280px;
   max-height: 60vh;

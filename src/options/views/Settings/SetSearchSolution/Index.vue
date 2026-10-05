@@ -3,7 +3,7 @@
  * 搜索方案管理页（antdv-next 平移）。
  * 自定义搜索方案的增删改、启用/设默、JSON 导入导出；表格首行为固定的「全部站点」自动生成方案。
  */
-import { computed, ref, useTemplateRef } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { cloneDeep, omit } from "es-toolkit";
 import { saveAs } from "file-saver";
@@ -57,44 +57,38 @@ function editSearchSolution(toEditSolutionId: TSolutionKey) {
 
 type IExportedSearchSolution = Omit<ISearchSolutionMetadata, "id" | "enabled" | "createdAt" | "isDefault" | "sort">;
 
-const importFileInputRef = useTemplateRef<HTMLInputElement>("importFile");
-function triggerImportFile() {
-  importFileInputRef.value?.click();
-}
+/**
+ * a-upload 的 beforeUpload 直接收到 File（原来是隐藏 input 的 @change，要从 e.target.files 里捞）。
+ * 返回 false 表示不发请求；多选时每个文件回调一次，重复选同一文件由 a-upload 内部重置 input.value。
+ */
+function importSearchSolution(file: File) {
+  const r = new FileReader();
+  r.onload = (ev: any) => {
+    try {
+      const result = JSON.parse(ev.target.result) as IExportedSearchSolution[];
+      for (const solution of result) {
+        const importSolution = solution as ISearchSolutionMetadata;
 
-function importSearchSolution(e: Event) {
-  if (e.target instanceof HTMLInputElement && e.target.files && e.target.files.length > 0) {
-    for (const file of e.target.files) {
-      const r = new FileReader();
-      r.onload = (ev: any) => {
-        try {
-          const result = JSON.parse(ev.target.result) as IExportedSearchSolution[];
-          for (const solution of result) {
-            const importSolution = solution as ISearchSolutionMetadata;
+        if (importSolution.solutions && importSolution.solutions.length > 0) {
+          // 补全导出时移除的字段
+          importSolution.id = nanoid();
+          importSolution.enabled = false;
+          importSolution.createdAt = +new Date();
+          importSolution.isDefault = false;
+          importSolution.sort = 1;
 
-            if (importSolution.solutions && importSolution.solutions.length > 0) {
-              // 补全导出时移除的字段
-              importSolution.id = nanoid();
-              importSolution.enabled = false;
-              importSolution.createdAt = +new Date();
-              importSolution.isDefault = false;
-              importSolution.sort = 1;
-
-              metadataStore.addSearchSolution(importSolution);
-            }
-          }
-        } catch {
-          runtimeStore.showSnakebar("Invalid JSON format when import search solution", { color: "error" });
+          metadataStore.addSearchSolution(importSolution);
         }
-      };
-      r.onerror = () => {
-        runtimeStore.showSnakebar("Invalid JSON format when load import file", { color: "error" });
-      };
-      r.readAsText(file);
+      }
+    } catch {
+      runtimeStore.showSnakebar("Invalid JSON format when import search solution", { color: "error" });
     }
-    // 允许重复选择同一文件
-    e.target.value = "";
-  }
+  };
+  r.onerror = () => {
+    runtimeStore.showSnakebar("Invalid JSON format when load import file", { color: "error" });
+  };
+  r.readAsText(file);
+  return false;
 }
 
 function exportSearchSolutions(solutionIds: TSolutionKey[]) {
@@ -253,21 +247,15 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
         </a-input>
       </template>
 
-        <template #title>
+      <template #title>
         <a-flex align="center" gap="small" wrap>
           <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
           <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
-          <input
-            ref="importFile"
-            accept="application/json"
-            multiple
-            type="file"
-            style="display: none"
-            @change="importSearchSolution"
-          />
-          <a-button @click="triggerImportFile"><template #icon><ImportOutlined /></template><span>{{ t('common.import') }}</span></a-button>
+          <a-upload accept="application/json" multiple :show-upload-list="false" :before-upload="importSearchSolution">
+            <a-button><template #icon><ImportOutlined /></template><span>{{ t('common.import') }}</span></a-button>
+          </a-upload>
           <a-button :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span>{{ t('common.export') }}</span></a-button>
 
           <a-button disabled><template #icon><QuestionCircleOutlined /></template><span>{{ t('common.howToUse') }}</span></a-button>

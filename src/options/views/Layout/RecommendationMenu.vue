@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import PQueue from "p-queue";
 import { useI18n } from "vue-i18n";
 import { FireOutlined, ReloadOutlined, StarFilled } from "@antdv-next/icons";
+import { Empty } from "antdv-next";
 import type { ISocialRecommendationItem, TSocialRecommendationCategory } from "@ptd/social";
 
 import { sendMessage } from "@/messages.ts";
@@ -245,9 +246,12 @@ watch(isRecommendationMenuOpen, (isOpen) => {
               </div>
 
               <div class="hot-recommendation-list">
-                <div v-if="group.items.length === 0" class="hot-recommendation-empty">
-                  {{ t("layout.header.hotRecommendations.empty") }}
-                </div>
+                <a-empty
+                  v-if="group.items.length === 0"
+                  class="hot-recommendation-empty"
+                  :image="Empty.PRESENTED_IMAGE_SIMPLE"
+                  :description="t('layout.header.hotRecommendations.empty')"
+                />
 
                 <div
                   v-for="item in group.items"
@@ -351,12 +355,15 @@ watch(isRecommendationMenuOpen, (isOpen) => {
   border-radius: 6px;
 }
 
+// a-empty 默认大图会撑破 :lg="6" 的小栅格，模板里用的是 PRESENTED_IMAGE_SIMPLE。
+// min-height 保留原来手写的占位高度，使有无内容的分类列行高一致。
 .hot-recommendation-empty {
   min-height: 78px;
+  margin: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: rgba(0, 0, 0, 0.45);
   font-size: 0.875rem;
 }
 

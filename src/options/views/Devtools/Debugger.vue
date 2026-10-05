@@ -214,130 +214,117 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
   />
 
   <a-card size="small">
-    <table class="debugger-table">
-      <tbody>
-        <tr>
-          <th class="debugger-label">{{ t("Debugger.enableLibrary") }}</th>
-          <td>
-            <div class="debugger-row">
-              <a-button @click="enableLibrary">{{ t("common.enable") }}</a-button>
-              <span class="debugger-hint">{{ t("Debugger.libraryList") }}</span>
-            </div>
-          </td>
-        </tr>
+    <a-descriptions class="debugger-desc" :column="1" :colon="false">
+      <a-descriptions-item :label="t('Debugger.enableLibrary')">
+        <div class="debugger-row">
+          <a-button @click="enableLibrary">{{ t("common.enable") }}</a-button>
+          <span class="debugger-hint">{{ t("Debugger.libraryList") }}</span>
+        </div>
+      </a-descriptions-item>
 
-        <tr>
-          <th class="debugger-label">{{ t("Debugger.debugBuiltinSite") }}</th>
-          <td>
-            <div class="debugger-row">
-              <a-select
-                v-model:value="selectedSite"
-                class="debugger-select"
-                :options="siteIdOptions"
-                :placeholder="'site'"
-                show-search
-                allow-clear
-                option-filter-prop="label"
-              />
-              <a-checkbox v-model:checked="useCustomerConfig">{{ t("Debugger.mergeUserConfig") }}</a-checkbox>
-              <a-button :disabled="!selectedSite" @click="log(getSiteMetadata())">
-                {{ t("Debugger.outputSiteDefinition") }}
-              </a-button>
-              <a-button :disabled="!selectedSite" @click="log(getSiteConfig())">
-                {{ t("Debugger.outputUserConfig") }}
-              </a-button>
-              <a-button :disabled="!selectedSite" @click="log(getSiteInstance())">
-                {{ t("Debugger.outputSiteInstance") }}
-              </a-button>
-              <a-button :disabled="!selectedSite" @click="log(getSiteFavicon())">
-                {{ t("Debugger.outputFavicon") }}
-              </a-button>
-            </div>
-          </td>
-        </tr>
+      <a-descriptions-item :label="t('Debugger.debugBuiltinSite')">
+        <div class="debugger-row">
+          <a-select
+            v-model:value="selectedSite"
+            class="debugger-select"
+            :options="siteIdOptions"
+            :placeholder="'site'"
+            show-search
+            allow-clear
+            option-filter-prop="label"
+          />
+          <a-checkbox v-model:checked="useCustomerConfig">{{ t("Debugger.mergeUserConfig") }}</a-checkbox>
+          <a-button :disabled="!selectedSite" @click="log(getSiteMetadata())">
+            {{ t("Debugger.outputSiteDefinition") }}
+          </a-button>
+          <a-button :disabled="!selectedSite" @click="log(getSiteConfig())">
+            {{ t("Debugger.outputUserConfig") }}
+          </a-button>
+          <a-button :disabled="!selectedSite" @click="log(getSiteInstance())">
+            {{ t("Debugger.outputSiteInstance") }}
+          </a-button>
+          <a-button :disabled="!selectedSite" @click="log(getSiteFavicon())">
+            {{ t("Debugger.outputFavicon") }}
+          </a-button>
+        </div>
+      </a-descriptions-item>
 
-        <tr v-for="(server, serverType) in simpleServer" :key="serverType">
-          <th class="debugger-label">{{ t("Debugger.debug", { serverType }) }}</th>
-          <td>
-            <div class="debugger-row">
-              <a-select
-                v-model:value="simpleServer[serverType].selected"
-                class="debugger-select"
-                :options="serverOptions(serverType)"
-                :placeholder="serverType"
-                show-search
-                allow-clear
-                option-filter-prop="label"
-              />
-              <span class="debugger-hint">{{ t("Debugger.addServerFirst", { serverType }) }}</span>
-              <a-button
-                :disabled="!server.selected"
-                @click="
-                  // @ts-ignore
-                  log(metadataStore[server.piniaKey][server.selected])
-                "
-              >
-                {{ t("Debugger.outputConfig") }}
-              </a-button>
-              <a-button
-                :disabled="!server.selected"
-                @click="
-                  // @ts-ignore
-                  log(server.getFn(metadataStore[server.piniaKey][server.selected]))
-                "
-              >
-                {{ t("Debugger.outputInstance", { serverType }) }}
-              </a-button>
-            </div>
-          </td>
-        </tr>
+      <a-descriptions-item
+        v-for="(server, serverType) in simpleServer"
+        :key="serverType"
+        :label="t('Debugger.debug', { serverType })"
+      >
+        <div class="debugger-row">
+          <a-select
+            v-model:value="simpleServer[serverType].selected"
+            class="debugger-select"
+            :options="serverOptions(serverType)"
+            :placeholder="serverType"
+            show-search
+            allow-clear
+            option-filter-prop="label"
+          />
+          <span class="debugger-hint">{{ t("Debugger.addServerFirst", { serverType }) }}</span>
+          <a-button
+            :disabled="!server.selected"
+            @click="
+              // @ts-ignore
+              log(metadataStore[server.piniaKey][server.selected])
+            "
+          >
+            {{ t("Debugger.outputConfig") }}
+          </a-button>
+          <a-button
+            :disabled="!server.selected"
+            @click="
+              // @ts-ignore
+              log(server.getFn(metadataStore[server.piniaKey][server.selected]))
+            "
+          >
+            {{ t("Debugger.outputInstance", { serverType }) }}
+          </a-button>
+        </div>
+      </a-descriptions-item>
 
-        <tr>
-          <th class="debugger-label">{{ t("Debugger.debugPinia") }}</th>
-          <td>
-            <div class="debugger-row">
-              <a-select
-                v-model:value="selectedPiniaStore"
-                class="debugger-select"
-                :options="piniaStoreName"
-                placeholder="piniaStore"
-                show-search
-                allow-clear
-                option-filter-prop="label"
-              />
-              <a-button :disabled="!selectedPiniaStore" @click="log(getPiniaStore(selectedPiniaStore))">
-                {{ t("Debugger.outputPinia") }}
-              </a-button>
-            </div>
-          </td>
-        </tr>
+      <a-descriptions-item :label="t('Debugger.debugPinia')">
+        <div class="debugger-row">
+          <a-select
+            v-model:value="selectedPiniaStore"
+            class="debugger-select"
+            :options="piniaStoreName"
+            placeholder="piniaStore"
+            show-search
+            allow-clear
+            option-filter-prop="label"
+          />
+          <a-button :disabled="!selectedPiniaStore" @click="log(getPiniaStore(selectedPiniaStore))">
+            {{ t("Debugger.outputPinia") }}
+          </a-button>
+        </div>
+      </a-descriptions-item>
 
-        <tr>
-          <th class="debugger-label">{{ t("Debugger.pluginReset") }}</th>
-          <td>
-            <a-alert class="debugger-danger" type="error" show-icon :title="t('Debugger.dangerWarning')" />
-            <div class="debugger-reset">
-              <div v-for="item in resetItems" :key="item.title" class="debugger-reset-item">
-                <a-button danger @click="() => resetFnWrapper(item.resetFn)">{{ t("common.dialog.reset") }}</a-button>
-                <div class="debugger-reset-text">
-                  <div class="debugger-reset-title">{{ item.title }}</div>
-                  <div v-if="item.subTitle" class="debugger-reset-subtitle">{{ item.subTitle }}</div>
-                </div>
-                <a-select
-                  v-if="item.id === 'clearSiteData'"
-                  v-model:value="clearSiteTarget"
-                  class="debugger-reset-select"
-                  :options="siteSelectItems"
-                  :placeholder="t('Debugger.selectSite')"
-                  show-search
-                  option-filter-prop="label"
-                />
-              </div>
+      <a-descriptions-item :label="t('Debugger.pluginReset')">
+        <a-alert class="debugger-danger" type="error" show-icon :title="t('Debugger.dangerWarning')" />
+        <div class="debugger-reset">
+          <div v-for="item in resetItems" :key="item.title" class="debugger-reset-item">
+            <a-button danger @click="() => resetFnWrapper(item.resetFn)">{{ t("common.dialog.reset") }}</a-button>
+            <div class="debugger-reset-text">
+              <div class="debugger-reset-title">{{ item.title }}</div>
+              <div v-if="item.subTitle" class="debugger-reset-subtitle">{{ item.subTitle }}</div>
             </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            <a-select
+              v-if="item.id === 'clearSiteData'"
+              v-model:value="clearSiteTarget"
+              class="debugger-reset-select"
+              :options="siteSelectItems"
+              :placeholder="t('Debugger.selectSite')"
+              show-search
+              option-filter-prop="label"
+            />
+          </div>
+        </div>
+      </a-descriptions-item>
+    </a-descriptions>
   </a-card>
 </template>
 
@@ -346,20 +333,9 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
   margin-bottom: 10px;
 }
 
-.debugger-table {
-  width: 100%;
-  border-collapse: collapse;
-
-  th,
-  td {
-    padding: 12px;
-    text-align: left;
-    vertical-align: top;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  }
-}
-
-.debugger-label {
+// 原来手写 <table> 时标签列钉死 160px；a-descriptions 的 label 单元格默认按内容自适应，
+// 长内容行会把标签列挤宽，这里把宽度钉回去。
+.debugger-desc :deep(.ant-descriptions-item-label) {
   width: 160px;
   font-weight: 500;
 }

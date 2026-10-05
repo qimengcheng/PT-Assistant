@@ -247,8 +247,13 @@ async function multiFlush() {
   }
 }
 
-// 时间线 / 统计两个子页分别依赖 konva 与 echarts，WXT 版尚未平移（见 README Roadmap）。
-// 这里用 hasRoute 守卫而不是删按钮：将来补上路由后无需再改，按钮自动恢复可用。
+// 时间线 / 统计两个子页分别依赖 konva 与 echarts。
+//
+// ⚠️ 原注释写「WXT 版尚未平移（见 README Roadmap）」——**早已平移**：两页都已实际 import
+// （UserDataTimeline/Index.vue 的 konva/vue-konva、UserDataStatistic/Index.vue 的
+// echarts/vue-echarts），plugins/router.ts 也已注册同名路由，README Roadmap 早已标 [x]。
+// 所以下面两个 hasRoute 守卫**恒真**，:254 / :267 的「未平移」提示与 locales 里对应的两条文案
+// 都是死码。守卫本身留着无害（将来路由改名会真的拦住），但别再当成「功能没做」的证据。
 function viewTimeline() {
   if (!router.hasRoute("UserDataTimeline")) {
     runtimeStore.showSnakebar(t("MyData.index.timelineNotMigrated"), { color: "warning" });
@@ -279,9 +284,10 @@ const showExportDialog = ref(false);
 </script>
 
 <template>
-  <a-alert :title="t('route.Overview.MyData')" type="info" :show-icon="true" class="mb-4" />
-  <a-card variant="outlined">
-    <template #title>
+  <!-- 顶部那条 a-alert 页标题去掉了：左侧导航已经标出当前页，这里再占一条只是把表格往下推。
+       骨架（48px 工具条 + 白底面板）见 style.css 的 .page / .page-bar / .page-panel。 -->
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
         <!-- 刷新，取消刷新 -->
         <a-button type="primary" v-if="runtimeStore.isUserInfoFlush" @click="cancelFlushSiteLastUserInfo"><template #icon><StopOutlined /></template><span>{{ t('MyData.index.flushCancel') }}</span></a-button>
@@ -346,9 +352,8 @@ const showExportDialog = ref(false);
           @click.stop
         />
       </a-flex>
-    </template>
 
-    <template #extra>
+      <div class="page-bar-extra">
       <!-- 搜索框：原 v-text-field + prepend-inner 里的 v-menu 筛选面板 -->
       <a-input
         v-model:value="tableWaitFilterRef"
@@ -434,8 +439,10 @@ const showExportDialog = ref(false);
           <SearchOutlined />
         </template>
       </a-input>
-    </template>
+      </div>
+    </a-flex>
 
+    <div class="page-panel">
     <a-table
       :columns="tableColumns"
       :data-source="filteredTableData"
@@ -678,7 +685,8 @@ const showExportDialog = ref(false);
         </template>
       </template>
     </a-table>
-  </a-card>
+    </div>
+  </div>
 
   <HistoryDataViewDialog v-model="showHistoryDataViewDialog" :site-id="historyDataViewDialogSiteId!" />
   <ExportUserInfoDialog v-model="showExportDialog" :selected-site-ids="tableSelected" />

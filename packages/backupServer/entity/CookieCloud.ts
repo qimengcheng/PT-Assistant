@@ -10,8 +10,11 @@
  * 注意：
  *  1. CookieCloud 不支持历史记录，所以 list 方法只返回当前的情况
  *  2. CookieCloud 不支持删除记录，当调用 delete 时，我们会更新服务器数据为 { cookie_data: {} }
- *  3. 我们不向 CookieCloud 提供 local_storage_data，实际上 我们提交的数据格式为 { cookie_data, ptd_data, metadata }
- *     这样可以 在为其他需要 CookieCloud 支持的环境提供直接支持的同时，存储插件独有的数据
+ *  3. local_storage_data 照传（值为空对象），因为它是接口要求的字段；插件独有的数据放在 ptd_data 里。
+ *     实际提交格式见下方 ICookieCloudFile 与 fileData 的构造：
+ *     { cookie_data, local_storage_data(空), ptd_data, manifest }
+ *     注意：原注释写的 { cookie_data, ptd_data, metadata } 错了两个键 —— 既漏了 local_storage_data、
+ *     又把 manifest 写成了 metadata。照它对接服务端会错。
  *  4. 使用公用 CookieCloud 可能存在数据丢失、泄露的风险，同时 CookieCloud Server 也有备份文件大小的限制
  */
 

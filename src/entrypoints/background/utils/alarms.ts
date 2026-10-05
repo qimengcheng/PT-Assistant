@@ -2,7 +2,8 @@
  * 后台定时任务（平移自 PT-depiler background/utils/alarms.ts）。
  * - 自动刷新用户站点数据（支持每日时段、间隔与失败重试）
  * - 备份服务器按 backupInterval 自动备份
- * - 下载冷却结束后的种子重新推送（短等待直接 sleep，长等待走 alarms 一次任务）
+ * - 下载冷却结束后的种子重新推送（短等待直接 sleep；长等待排一个 now+30s 的一次性任务，
+ *   到点重下后由 offscreen/utils/download.ts 重算剩余间隔，不够就再排 30s —— 实为 30s 一轮轮询）
  */
 import { format } from "date-fns";
 import { defineJobScheduler } from "@webext-core/job-scheduler";

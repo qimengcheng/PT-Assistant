@@ -46,7 +46,12 @@ async function initSiteData(id: TSiteID, flush = false) {
 
   // getSiteUserConfig 走的是 state.sites[id] 这条本地快路径，而 metadata store 靠 chrome.storage
   // 异步水合：没水合完就调用，它判成「配置为空」转而发一次跨上下文消息兜底。
-  // 结果不止多一次往返 —— 兜底那条路径读的是另一个上下文的 store，同样可能在水合前读。
+  // 结果是白等一次 options 侧的 $onReady 才走兜底。
+  //
+  // ⚠️ 原注释接着说「兜底那条路径读的是另一个上下文的 store，同样可能在水合前读」——**不成立**：
+  // 兜底是 sendMessage("getSiteUserConfig") → offscreen/utils/site.ts → extStore.getItem，
+  // 那是直读 chrome.storage 的 SW 代理通道，不碰 pinia、没有水合概念，也不该给它补 $onReady
+  // （补了是白等）。真正的风险是另一回事：options 侧此刻的 $save 可能还没落盘。
   await metadataStore.$onReady();
 
   try {

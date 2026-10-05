@@ -55,13 +55,27 @@ export const searchQueue = new PQueue({ concurrency: 1 }); // 默认设置为 1�
 // 模块级别的 Set，用于跟踪已存在的搜索结果 ID，避免并发时的重复
 const globalExistingIds = new Set<string>();
 
-searchQueue.on("active", () => {
-  runtimeStore.mediaServerSearch.isSearching = true;
-  // 启动后，根据 configStore 的值，自动更新 searchQueue 的并发数
+/**
+ * 把配置里的并发数同步进队列（队列构造时是 1，配置默认是 8）。
+ *
+ * ⚠️ 只能在**投递任务之前**调用，不能放在 searchQueue 的事件回调里（原先写在 active 里）：
+ * p-queue 的 `concurrency` setter 会同步跑一遍 #processQueue()，而 active 事件是在
+ * #tryToStartAnother() 里、`job()` **之前**发出的 —— 那一刻刚出队的那个任务还没执行到它
+ * 自己的 pending++，队列里也可能只剩它自己，于是 setter 里的判定
+ * `size === 0 && pending === 0` 成立，**误发一次 idle**，把 active 刚置上的
+ * mediaServerSearch.isSearching = true 当场又打回 false。
+ * 表现：第一次搜索期间 isSearching 一直是 false（第二次搜索并发数已等于配置值，就正常了）。
+ * 同 SearchEntity/utils/search.ts 的 syncSearchQueueConcurrency。
+ */
+function syncSearchQueueConcurrency() {
   if (searchQueue.concurrency != configStore.mediaServerEntity.queueConcurrency) {
     searchQueue.concurrency = configStore.mediaServerEntity.queueConcurrency;
     void sendMessage("logger", { msg: `Search queue concurrency changed to: ${searchQueue.concurrency}` });
   }
+}
+
+searchQueue.on("active", () => {
+  runtimeStore.mediaServerSearch.isSearching = true;
 
   // 队列开始活跃时，更新全局 Set
   globalExistingIds.clear();
@@ -83,6 +97,9 @@ export async function doSearch(option: { searchKey?: string; loadMore?: boolean 
   }
 
   runtimeStore.mediaServerSearch.searchKey = searchKey;
+
+  // 并发数在投递任务之前同步，见 syncSearchQueueConcurrency 的说明
+  syncSearchQueueConcurrency();
 
   for (const mediaServerId of searchMediaServerIds.value) {
     // noinspection ES6MissingAwait

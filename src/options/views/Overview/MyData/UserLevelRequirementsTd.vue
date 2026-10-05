@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type Component } from "vue";
+import { computed, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { computedAsync } from "@vueuse/core";
 import { isEmpty } from "es-toolkit/compat";
@@ -95,6 +95,23 @@ const userLevelGroupIconMap: Record<TLevelGroupType, Component> = {
 const userLevelGroupIcon = computed(() => {
   return userLevelGroupIconMap[userLevelGroupType.value] || userLevelGroupIconMap.user;
 });
+
+const showAllLevels = ref(false);
+
+/** 开了「只显示普通用户等级要求」时，vip/manager 等级不进列表；用户本身就是 vip/manager 则不过滤 */
+const listedLevelRequirements = computed(() => {
+  const list = userLevelRequirements.value ?? [];
+  if (!configStore.myDataTableControl.onlyShowUserLevelRequirement || userLevelGroupType.value !== "user") {
+    return list;
+  }
+  return list.filter((r) => r.groupType !== "vip" && r.groupType !== "manager");
+});
+
+/** 收起态只留「你当前所在的那一级」，展开态给全表；同一份行模板复用，不再分两处写 */
+const visibleLevelRequirements = computed(() => {
+  if (showAllLevels.value) return listedLevelRequirements.value;
+  return listedLevelRequirements.value.filter((r) => r.id === userInfo.levelId);
+});
 </script>
 
 <template>
@@ -106,6 +123,8 @@ const userLevelGroupIcon = computed(() => {
       placement="bottomRight"
       :trigger="isMobile ? 'click' : 'hover'"
       :mouse-enter-delay="0.2"
+      color="#fff"
+      :styles="{ root: { maxWidth: 'none' }, container: { padding: 0 } }"
     >
       <template #default>
         <span>
@@ -144,59 +163,63 @@ const userLevelGroupIcon = computed(() => {
 
       <template #title>
         <div class="level-requirement-panel">
-          <!-- 计算剩余升级情况 -->
-          <template
+          <!-- 差值是算出来的、不在等级列表里，所以收起/展开两种形态下都固定在顶部 -->
+          <div
             v-if="
               configStore.myDataTableControl.showNextLevelInDialog &&
               userLevelGroupType === 'user' &&
               !isEmpty(nextLevelUnMet)
             "
+            class="level-requirement-row level-requirement-row--next"
           >
-            <div class="px-1 py-0 level-requirement-item">
-              <UserNextLevelUnMet :next-level-un-met="nextLevelUnMet" :user-info="userInfo" />
-            </div>
-          </template>
+            <UserNextLevelUnMet :next-level-un-met="nextLevelUnMet" :user-info="userInfo" icon-class="mr-1" />
+          </div>
 
-          <div v-if="userLevelRequirements.length > 0" class="text-body-small text-medium-emphasis mb-1">
+          <div v-if="showAllLevels" class="text-body-small text-medium-emphasis">
             {{ t("MyData.UserLevelRequirementsTd.levelList") }}
           </div>
 
-          <!-- 展示站点用户等级 -->
-          <template v-for="userLevel in userLevelRequirements" :key="userLevel.id">
-            <template
-              v-if="
-                configStore.myDataTableControl.onlyShowUserLevelRequirement
-                  ? (userLevel.groupType !== 'vip' && userLevel.groupType !== 'manager') ||
-                    userLevelGroupType !== 'user'
-                  : true
-              "
-            >
-              <div class="level-requirement-item px-1 py-0 d-flex align-center">
-                <component
-                  :is="userLevel.id <= (userInfo.levelId ?? -1) ? CheckOutlined : MinusCircleOutlined"
-                  class="level-icon mr-1"
-                  :style="{ color: userLevel.id <= (userInfo.levelId ?? -1) ? '#4caf50' : '#f44336' }"
-                />
+          <div
+            v-for="userLevel in visibleLevelRequirements"
+            :key="userLevel.id"
+            class="level-requirement-row"
+            :class="{ 'level-requirement-row--current': userLevel.id === userInfo.levelId }"
+          >
+            <component
+              :is="userLevel.id <= (userInfo.levelId ?? -1) ? CheckOutlined : MinusCircleOutlined"
+              class="level-icon"
+              :style="{ color: userLevel.id <= (userInfo.levelId ?? -1) ? '#4caf50' : '#f44336' }"
+            />
 
-                <div class="text-no-wrap">
-                  <span>{{ userLevel.name }}:&nbsp;</span>
-                  <!-- 展示用户等级要求时， interval 向 date 的转换应该基于 joinTime 计算 -->
-                  <UserLevelsComponent
-                    :user-info="userInfo"
-                    :level-requirement="userLevel"
-                    :useJoinTimeAsRef="true"
-                  />
-                </div>
+            <span class="level-requirement-name">
+              {{ userLevel.name }}:&nbsp;
+              <!-- 展示用户等级要求时， interval 向 date 的转换应该基于 joinTime 计算 -->
+              <UserLevelsComponent
+                :user-info="userInfo"
+                :level-requirement="userLevel"
+                :useJoinTimeAsRef="true"
+              />
+            </span>
 
-                <!-- 权限名可能很长：用 a-typography-text 的 ellipsis.tooltip 一步拿到
-                     「截断 + 悬停显示完整文案」，不再靠手写 text-ellipsis + 原生 :title -->
-                <a-typography-text class="ml-2" :ellipsis="{ tooltip: userLevel.privilege }">
-                  {{ userLevel.privilege }}
-                </a-typography-text>
-              </div>
-              <hr class="ma-1 level-requirement-divider" />
-            </template>
-          </template>
+            <!-- 权限名可能很长：用 a-typography-text 的 ellipsis.tooltip 一步拿到
+                 「截断 + 悬停显示完整文案」，不再靠手写 text-ellipsis + 原生 :title -->
+            <a-typography-text class="level-requirement-privilege" :ellipsis="{ tooltip: userLevel.privilege }">
+              {{ userLevel.privilege }}
+            </a-typography-text>
+          </div>
+
+          <button
+            v-if="listedLevelRequirements.length > 1"
+            type="button"
+            class="level-requirement-toggle"
+            @click="showAllLevels = !showAllLevels"
+          >
+            {{
+              showAllLevels
+                ? t("MyData.UserLevelRequirementsTd.collapseLevelList")
+                : t("MyData.UserLevelRequirementsTd.expandLevelList", { count: listedLevelRequirements.length })
+            }}
+          </button>
         </div>
       </template>
     </a-tooltip>
@@ -215,29 +238,86 @@ const userLevelGroupIcon = computed(() => {
   font-size: 14px; /* 原 <v-icon size="small"> */
 }
 
-/* 原 v-card max-height/max-width + content-class="bg-white pa-0" */
+/* 原 v-card max-height/max-width + content-class="bg-white pa-0"。
+   浮层本体已由 a-tooltip 的 color="#fff" 刷白（antdv-next 的 parseColor 会同步
+   改掉 container 背景、arrow 背景和按亮度反推的 overlay-color），所以这里不再
+   自带白底 —— 那圈「黑边包白块」就是旧写法留下的：卡片是白的，卡片外的
+   tooltip padding 和箭头仍是 colorBgSpotlight 近黑。
+
+   ⚠️ 面板宽度必须和 a-tooltip 上的 `styles.root.maxWidth: 'none'` 配套看。
+   antdv-next 把 `max-width: 250px` 挂在 .ant-tooltip 根节点上，而承载内容的
+   unique-container 是绝对定位、宽度走 shrink-to-fit，可用宽度仍被那 250px 限住。
+   迁移前这份浮层能撑到 ~500px，靠的是等级串上的 white-space:nowrap 把
+   min-content 顶过 250px 这个上限 —— 也就是说 nowrap 一旦去掉，宽度立刻塌回 250px，
+   整串要求会在 4W; / 50GB; / 1.05; 这种地方逐段折行。别只改这里。 */
 .level-requirement-panel {
-  background: #fff;
-  /* antdv-next 的浮层底色是 colorBgSpotlight（近黑），并把 color 设成浅色；
-     这个面板强制白底却不覆盖 color 时，浅色字就落在白底上 —— 白底白字，整块看不见。
-     显式压回深色，保住 Vuetify 时代「深色浮层里放一张白卡片」的观感。
-     没改成 a-popover：Popover 的浮层底色同样是 colorBgSpotlight，换组件解决不了，
-     照样得手动设色，还要额外处理 teleport 之后的样式作用域。 */
-  color: rgba(0, 0, 0, 0.88);
-  padding: 8px;
-  max-width: 800px;
-  max-height: 500px;
+  box-sizing: border-box; // 否则 padding 记在 max-width 之外，窄视口下浮层会伸出屏幕
+  color: rgba(0, 0, 0, 0.88); // parseColor 给的是纯黑，压回更柔和的正文色
+  padding: 6px 8px;
+  width: max-content;
+  /* 上限按内容给足，再用 100vw 兜住窄窗口 —— 浮层挂在 body 上，超视口的部分
+     会被 autoAdjustOverflow 移位后裁掉，那时用户看到的是「右边少了东西」而不是滚动条。 */
+  max-width: min(860px, calc(100vw - 40px));
+  max-height: 420px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.level-requirement-item {
+.level-requirement-row {
   display: flex;
-  align-items: center;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 2px;
+
+  & + & {
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .level-icon {
+    flex: 0 0 auto;
+    margin-top: 2px; // 行首图标对齐第一行文字，整块折行时不跟着飘到中间
+  }
+
+  &--next {
+    gap: 4px;
+  }
+
+  &--current {
+    background: rgba(22, 119, 255, 0.06);
+  }
 }
 
-.level-requirement-divider:last-child {
-  display: none;
+/* 等级串是这一行的主信息，必须整行读完，所以不给它 flex-shrink —— 一旦允许收缩，
+   它会和权限串按 basis 比例一起缩，实测在 860px 面板下正好折成两行。
+   宽度溢出由上面的 styles.root.maxWidth:'none' 解决，不是由这里折行解决。 */
+.level-requirement-name {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 收缩全部由权限串承担：它是次要信息，截断后悬停能看全文。
+   min-width:0 是 ellipsis 生效的前提（flex 子项默认最小尺寸按内容算）。 */
+.level-requirement-privilege {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.level-requirement-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px 2px 1px;
+  border: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: none;
+  color: #1677ff;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+
+  &:hover {
+    color: #4096ff;
+  }
 }
 </style>

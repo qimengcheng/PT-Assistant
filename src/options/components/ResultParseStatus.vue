@@ -43,8 +43,11 @@ const meta = computed<{ text: string; color?: string; title?: string }>(() => {
 </script>
 
 <template>
-  <!-- 这条曾经写 `bordered` prop：antdv-next 1.5.6 里它已退化成死属性（true/false
-       都渲染 filled），所以直接删掉、不影响外观；真要区分描边请改 variant="outlined" -->
+  <!-- 这条曾经写 `bordered` prop，已删。删的理由不是「死属性」—— 那个说法是错的：
+     antdv-next 1.5.6 的 Tag 确实声明了 bordered?: boolean（dist/tag/index.d.ts:37，
+     无 @deprecated），hooks/useColor.js:16 真读它，语义是**降级**：
+     bordered === false 时强制把 variant 压成 filled（默认值就是 true）。
+     也就是说它能「取消描边」，但永远造不出描边 —— 要描边请写 variant="outlined" -->
   <a-tag :color="meta.color" :title="meta.title" style="margin-inline-end: 0">
     {{ meta.text }}
   </a-tag>

@@ -30,8 +30,8 @@ const pkgVersion = (await import("./package.json", { with: { type: "json" } })).
  *     PTD_SESSION=qwenwork pnpm build     → dist-qwenwork/chrome-mv3
  *     PTD_SESSION=workbuddy pnpm dev      → dist-workbuddy/chrome-mv3
  *
- * 不设 PTD_SESSION 时仍是 WXT 默认的 `.output` —— CI（build.yml/release.yml）就没有并发会话，
- * 它按 `.output/*.zip` 取包，绝不能被这条改动影响。
+ * 不设 PTD_SESSION 时仍是 WXT 默认的 `.output` —— CI（单文件流水线 ci.yml 的 build job）
+ * 就没有并发会话，它按 `.output/*.zip` 取包，绝不能被这条改动影响。
  */
 const sessionTag = (process.env.PTD_SESSION ?? "").trim();
 

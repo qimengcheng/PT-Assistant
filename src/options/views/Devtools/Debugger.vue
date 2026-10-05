@@ -21,6 +21,7 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { sendMessage } from "@/messages.ts";
 import { clearFaviconCaches } from "@/options/components/SiteFavicon/utils.ts";
+import { clearArchive, clearSiteArchive } from "@/shared/userInfoArchive.ts";
 
 import { setupReplaceUnsafeHeader } from "~/extends/axios/replaceUnsafeHeader.ts";
 import { setupRetryWhenCloudflareBlock } from "~/extends/axios/retryWhenCloudflareBlock.ts";
@@ -144,15 +145,11 @@ const resetItems = computed<resetItem[]>(() => [
       if (clearSiteTarget.value === "all") {
         // 清空所有站点数据
         metadataStore.lastUserInfo = {};
-        await extStore.setItem("userInfo", {});
+        await clearArchive();
       } else {
         // 清空指定站点数据
         if (metadataStore.lastUserInfo[clearSiteTarget.value]) delete metadataStore.lastUserInfo[clearSiteTarget.value];
-        const userInfo = (await extStore.getItem("userInfo")) as Record<string, any>;
-        if (userInfo && userInfo[clearSiteTarget.value]) {
-          delete userInfo[clearSiteTarget.value];
-          await extStore.setItem("userInfo", userInfo);
-        }
+        await clearSiteArchive(clearSiteTarget.value);
       }
       await metadataStore.$save();
     },

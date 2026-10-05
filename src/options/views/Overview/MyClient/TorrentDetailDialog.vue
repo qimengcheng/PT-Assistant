@@ -406,12 +406,10 @@ function formatTimestamp(timestamp: number | undefined): string {
 
       <!-- 文件管理 -->
       <div v-else-if="activeTab === 'files'">
-        <div v-if="filesLoading" class="loading-box">
-          <a-spin />
-        </div>
         <a-table
-          v-else-if="files.length > 0"
+          v-if="filesLoading || files.length > 0"
           class="detail-table"
+          :loading="filesLoading"
           :columns="fileColumns"
           :data-source="files"
           :row-key="(record: CTorrentFile) => record.index"
@@ -438,12 +436,10 @@ function formatTimestamp(timestamp: number | undefined): string {
 
       <!-- Peers -->
       <div v-else-if="activeTab === 'peers'">
-        <div v-if="peersLoading" class="loading-box">
-          <a-spin />
-        </div>
         <a-table
-          v-else-if="peers.length > 0"
+          v-if="peersLoading || peers.length > 0"
           class="detail-table"
+          :loading="peersLoading"
           :columns="peerColumns"
           :data-source="peers"
           :row-key="(record: CTorrentPeer, index: number) => `${record.ip}-${index}`"
@@ -480,12 +476,10 @@ function formatTimestamp(timestamp: number | undefined): string {
           </a-button>
         </a-space>
 
-        <div v-if="trackersLoading" class="loading-box">
-          <a-spin />
-        </div>
         <a-table
-          v-else-if="trackers.length > 0"
+          v-if="trackersLoading || trackers.length > 0"
           class="detail-table"
+          :loading="trackersLoading"
           :columns="trackerColumns"
           :data-source="trackers"
           :row-key="(record: CTorrentTracker) => record.url"
@@ -525,12 +519,6 @@ function formatTimestamp(timestamp: number | undefined): string {
   align-items: center;
   gap: 8px;
   padding: 4px 0;
-}
-
-.loading-box {
-  display: flex;
-  justify-content: center;
-  padding: 24px 0;
 }
 
 // 原来手搓 <table> 时单元格统一用 text-body-small（12px）；a-table 默认跟随全局

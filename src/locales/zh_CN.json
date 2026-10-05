@@ -1252,6 +1252,7 @@
       "displayContent": "展示内容",
       "displaySiteSettings": "展示站点设置",
       "faviconBlur": "站点Favicon模糊度",
+      "resetBgColor": "恢复默认背景色",
       "showTimeline": "展示各个站点信息（总开关）",
       "showTopSites": "展示各类数据的冠军及亚军站点",
       "siteDisplay": "站点展示组件",

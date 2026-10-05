@@ -684,11 +684,11 @@ function saveControl() {
         <div class="user-statistic-field">
           <span class="user-statistic-field-label">{{ t("UserDataTimeline.controls.customBgColor") }}</span>
           <div class="user-statistic-field-control d-flex align-center">
-            <input
-              type="color"
-              class="timeline-color-input"
-              :value="control.backgroundColor"
-              @input="(e) => (control.backgroundColor = (e.target as HTMLInputElement).value)"
+            <a-color-picker
+              v-model:value="control.backgroundColor"
+              value-format="hex"
+              size="small"
+              class="mr-1"
             />
             <a-input
               size="small"
@@ -696,11 +696,13 @@ function saveControl() {
               class="flex-1-1-0 ml-1"
               @change="(e: any) => (control.backgroundColor = e.target.value)"
             />
-            <a-button type="text" size="small" :title="defaultTimelineBackgroundColor" class="ml-1" @click="control.backgroundColor = defaultTimelineBackgroundColor">
-              <template #icon>
-                <UndoOutlined />
-              </template>
-            </a-button>
+            <a-tooltip :title="t('UserDataTimeline.controls.resetBgColor')">
+              <a-button type="text" size="small" class="ml-1" @click="control.backgroundColor = defaultTimelineBackgroundColor">
+                <template #icon>
+                  <UndoOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
           </div>
         </div>
 
@@ -851,16 +853,6 @@ function saveControl() {
 .user-statistic-field-control {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.timeline-color-input {
-  width: 32px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  background: none;
-  cursor: pointer;
 }
 
 .timeline-slider-value {

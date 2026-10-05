@@ -217,12 +217,17 @@ const columns = computed(() => [
                 <ApiOutlined /> {{ t("common.test") }}
               </a-button>
             </a-tooltip>
-            <a-button size="small" type="text" @click="openEditDialog(record)">
-              <EditOutlined />
-            </a-button>
-            <a-button size="small" type="text" danger @click="confirmDelete(record)">
-              <DeleteOutlined />
-            </a-button>
+            <!-- 纯图标按钮必须挂 a-tooltip，否则悬停没有任何功能说明（与上面「测试」按钮一致） -->
+            <a-tooltip :title="t('common.edit')">
+              <a-button size="small" type="text" @click="openEditDialog(record)">
+                <EditOutlined />
+              </a-button>
+            </a-tooltip>
+            <a-tooltip :title="t('common.remove')">
+              <a-button size="small" type="text" danger @click="confirmDelete(record)">
+                <DeleteOutlined />
+              </a-button>
+            </a-tooltip>
           </a-space>
         </template>
       </template>

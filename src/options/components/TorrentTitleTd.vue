@@ -93,6 +93,17 @@ function canAdvanceSearch(site: TSupportSocialSite) {
 <template>
   <div class="t_main">
     <div class="t_row">
+      <!--
+        下面几处刻意继续用 CSS 的 text-truncate / text-ellipsis，而不是 antd 的
+        <a-typography-text :ellipsis>，原因有三条（别再当成待办改回去）：
+        ① 悬停提示已经在了 —— 主标题 :title="item.title"、副标题 :title="item.subTitle"、
+           社交卡标题 :title 都是原生 title。ellipsis 属性能提供的「截断 + 悬停全文」这里已齐全，
+           换过去行为上零增益，只是写法不同。
+        ② 本组件被 content 侧复用（content-script/app/components/AdvanceListModuleDialog.vue 导入它），
+           加 <a-typography-text> 就必须往 src/content-script/antd-lite.ts 注册 Typography，
+           而 Typography 子包约 19 KB（对照 FloatButton 实测 +47.8 KB 的先例），代价摊给每个 PT 站点。
+        ③ 第 138 行那个 <h3> 在 <a-popover> 的 #content 里，再嵌一层 tooltip 会叠成双层浮层。
+      -->
       <!-- 种子主标题信息 -->
       <span class="text-truncate flex-1-1-0">
         <a

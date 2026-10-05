@@ -296,6 +296,8 @@
       "title": "User History Data"
     },
     "UserLevelRequirementsTd": {
+      "collapseLevelList": "Collapse level list",
+      "expandLevelList": "Show all {count} levels",
       "levelList": "User Level List"
     },
     "exportDialog": {
@@ -317,6 +319,7 @@
       "title": "Export User Info"
     },
     "index": {
+      "columns": "Columns",
       "exportData": "Export",
       "filter": {
         "lastUpdateError": "Last update error",
@@ -372,6 +375,13 @@
     }
   },
   "SearchEntity": {
+    "scope": {
+      "planSection": "Search plans",
+      "siteSection": "Sites",
+      "selectedSites": "{0} site(s) selected",
+      "clearSites": "Clear selection",
+      "moreSites": "{0} and {1} other sites"
+    },
     "solutionAll": "All sites",
     "ActionTd": {
       "copyLink": "Copy Download Link",
@@ -499,7 +509,8 @@
       },
       "uploadAtFormatAsAlive": "Display Upload Time as Relative Time",
       "defaultSearchPlan": "Default search plan",
-      "searchKeywordPlaceholder": "Enter keywords to start searching"
+      "searchKeywordPlaceholder": "Enter keywords to start searching",
+      "searchPlanSettings": "Search Plan Settings"
     },
     "siteFilter": {
       "all": "All Site"
@@ -524,6 +535,8 @@
     }
   },
   "SentToDownloaderDialog": {
+    "customPathPlaceholder": "Enter a path manually, $torrent.title$ placeholders supported",
+    "defaultPath": "Downloader default path",
     "isSending": "Sending torrents to downloader {name} [{address}], please wait...",
     "label": "Torrent Label",
     "labelHint": "(If supported by the downloader)",
@@ -534,7 +547,6 @@
     "pauseOnAdd": "Pause on add by default",
     "placeholderInput": "Enter the value to replace <...> in {0}:",
     "savePath": "Save Path",
-    "savePathHint": "Leave empty to use the downloader's default path",
     "selectDownloader": "Select Downloader",
     "selectDownloaderFirst": "Please select a downloader first",
     "title": "Select downloader for {0} torrents"
@@ -1670,6 +1682,39 @@
     "title": "Site Definitions",
     "searchPlaceholder": "Search site id…",
     "loading": "Loading definition…",
-    "selectHint": "← Click a site on the left to view its on-demand definition metadata"
+    "selectHint": "← Click a site on the left to view its on-demand definition metadata",
+    "colId": "Site id",
+    "colField": "Field",
+    "colValue": "Value",
+    "itemCount": "{0} items",
+    "keyCount": "{0} keys",
+    "field": {
+      "id": "key, matches the file name under definitions/",
+      "version": "parser revision",
+      "name": "site name",
+      "aka": "alternative names",
+      "description": "description",
+      "tags": "tags",
+      "timezoneOffset": "timezone",
+      "collaborator": "collaborator",
+      "type": "site kind",
+      "schema": "parser template",
+      "urls": "site URLs",
+      "legacyUrls": "legacy URLs",
+      "favicon": "favicon",
+      "isDead": "site shut down",
+      "category": "category",
+      "requestDelay": "request delay (ms)",
+      "officialGroupPattern": "official group pattern",
+      "search": "search config",
+      "searchEntry": "search entries",
+      "list": "list page config",
+      "detail": "detail page config",
+      "download": "download config",
+      "noLoginAssert": "not-logged-in detection",
+      "userInfo": "user info config",
+      "levelRequirements": "user levels",
+      "userInputSettingMeta": "extra inputs"
+    }
   }
 }

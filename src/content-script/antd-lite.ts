@@ -38,9 +38,11 @@ import {
   Empty,
   Form,
   Image,
+  Input,
   Menu,
   Modal,
   Popover,
+  Radio,
   Row,
   Select,
   Skeleton,
@@ -68,9 +70,11 @@ const usedComponents = [
         // （被别的组件间接引用），之前只是没注册，模板里写 <a-empty> 会静默变原生标签。
   Form, // a-form / a-form-item
   Image, // a-image
+  Input, // a-input —— SentToDownloaderDialog 的「手动输入路径」输入框
   Menu, // a-menu / a-menu-item
   Modal, // a-modal
   Popover, // a-popover
+  Radio, // a-radio / a-radio-group —— SentToDownloaderDialog 的下载器、保存路径单选列表
   Row, // a-row
   Select, // a-select
   Skeleton, // a-skeleton-button

@@ -24,11 +24,11 @@ import { isEmpty } from "es-toolkit/compat";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
-import type { IPtppDumpUserInfo, IPtppUserInfo, TUserInfoStorageSchema } from "@/shared/types.ts";
+import type { IPtppDumpUserInfo, IPtppUserInfo } from "@/shared/types.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
-import { extStore } from "@/storage.ts";
+import { readAllArchive, replaceArchive } from "@/shared/userInfoArchive.ts";
 
 const showDialog = defineModel<boolean>();
 const { ptppUserData } = defineProps<{
@@ -159,8 +159,8 @@ async function doImportInternal() {
       await configStore.$save();
     }
 
-    // 读出目前所有的 userInfo
-    const userInfoStorage = ((await extStore.getItem("userInfo")) as TUserInfoStorageSchema) ?? {};
+    // 读出目前所有的 userInfo（按天存档已迁到 IndexedDB，见 @/shared/userInfoArchive）
+    const userInfoStorage = await readAllArchive();
 
     // 开始转换数据
     for (const [host, data] of Object.entries(ptppUserData)) {
@@ -187,7 +187,7 @@ async function doImportInternal() {
     }
 
     // 更新 userInfo
-    await extStore.setItem("userInfo", userInfoStorage);
+    await replaceArchive(userInfoStorage);
     await metadataStore.$save();
 
     runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.importSuccess"), { color: "success" });

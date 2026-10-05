@@ -5,11 +5,11 @@ import { EResultParseStatus, type ISiteUserConfig, type IUserInfo, type TSiteID 
 import { formatSize, simplifyNumber } from "@/options/utils.ts";
 import { useResetableRef } from "@/options/directives/useResetableRef.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
-import type { IStoredUserInfo, TUserInfoStorageSchema } from "@/shared/types.ts";
+import type { IStoredUserInfo } from "@/shared/types.ts";
 
 import { fixUserInfo, realFormatRatio } from "../utils/format.ts";
 import { allAddedSiteMetadata, type TOptionSiteMetadatas } from "../utils/siteMetadata.ts";
-import { extStore } from "@/storage.ts";
+import { readAllArchive } from "@/shared/userInfoArchive.ts";
 
 const metadataStore = useMetadataStore();
 
@@ -80,7 +80,7 @@ export function canThisSiteShow(siteId: TSiteID) {
 
 export async function loadFullData(): Promise<Record<TSiteID, IStoredUserInfo>> {
   const lastUserInfo: Record<TSiteID, IStoredUserInfo> = {};
-  const rawData = (await extStore.getItem("userInfo")) as TUserInfoStorageSchema;
+  const rawData = await readAllArchive();
 
   for (const siteId in metadataStore.sites) {
     const siteUserInfo = metadataStore.lastUserInfo[siteId] as IStoredUserInfo;

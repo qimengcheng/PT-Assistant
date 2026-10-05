@@ -1,15 +1,16 @@
 import PQueue from "p-queue";
 import { format } from "date-fns";
-import { isEmpty, unset } from "es-toolkit/compat";
+import { isEmpty } from "es-toolkit/compat";
 import type { IUserInfo } from "@ptd/site";
 import { EResultParseStatus } from "@ptd/site";
 
 import { onMessage, sendMessage } from "@/messages.ts";
-import type { IMetadataPiniaStorageSchema, IConfigPiniaStorageSchema, TUserInfoStorageSchema } from "@/shared/types.ts";
+import type { IMetadataPiniaStorageSchema, IConfigPiniaStorageSchema } from "@/shared/types.ts";
 
 import { logger } from "./logger.ts";
 import { getSiteInstance } from "./site.ts";
 import { extStore } from "@/storage.ts";
+import { deleteArchiveEntries, putArchiveEntry, readSiteArchive } from "@/shared/userInfoArchive.ts";
 
 const flushQueue = new PQueue({ concurrency: 1 }); // 默认设置为 1，避免并发搜索
 const setSiteLastUserInfoQueue = new PQueue({ concurrency: 1 }); // 专门用于 setSiteLastUserInfo 的队列
@@ -62,8 +63,7 @@ export async function getSiteUserInfoResult(siteId: string) {
       userInfo = await site.getUserInfoResult(userInfo);
     } else if (site.metadata.type === "private" && !site.isOnline && isEmpty(lastUserInfo)) {
       // 如果 private 站点不允许查询用户信息（），则尝试从 userInfo 中获取最近一次的用户信息（回退），以避免 metadata.lastUserInfo 为 undefined 的情况
-      const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
-      const userInfoSite = userInfoStore?.[siteId] ?? {};
+      const userInfoSite = await readSiteArchive(siteId);
 
       let maxDate = null;
       for (const date in userInfoSite) {
@@ -98,28 +98,18 @@ export async function setSiteLastUserInfo(userData: IUserInfo) {
     (metadataStore as IMetadataPiniaStorageSchema).lastUserInfo[site] = userData;
     await extStore.setItem("metadata", metadataStore);
 
-    // 存储用户信息到 userInfo 中（仅当获取成功时）
+    // 按天存档（仅当获取成功时）。
+    // 迁移前这里是「读整个 userInfo 键 → 改一条 → 写回整块」，刷完 23 个站点就是 23 次
+    // 全量读写，且成本随使用年限线性上涨（那份数据每天每站点只增不减）。
+    // 现在走 IndexedDB 复合主键 put，O(1)，不碰其他站点。
     if (userData.status === EResultParseStatus.success) {
-      const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
-      userInfoStore[site] ??= {};
-      const dateTime = format(userData.updateAt, "yyyy-MM-dd");
-      userInfoStore[site][dateTime] = userData;
-      await extStore.setItem("userInfo", userInfoStore);
+      await putArchiveEntry(site, format(userData.updateAt, "yyyy-MM-dd"), userData);
     }
   });
 }
 
 onMessage("setSiteLastUserInfo", async ({ data: userData }) => await setSiteLastUserInfo(userData));
 
-onMessage("getSiteUserInfo", async ({ data: siteId }) => {
-  const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
-  return userInfoStore?.[siteId] ?? {};
-});
+onMessage("getSiteUserInfo", async ({ data: siteId }) => await readSiteArchive(siteId));
 
-onMessage("removeSiteUserInfo", async ({ data: { siteId, date } }) => {
-  const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
-  for (const day of date) {
-    unset(userInfoStore, `${siteId}.${day}`);
-  }
-  await extStore.setItem("userInfo", userInfoStore!);
-});
+onMessage("removeSiteUserInfo", async ({ data: { siteId, date } }) => await deleteArchiveEntries(siteId, date));

@@ -19,7 +19,7 @@
 import { openDB, type IDBPDatabase } from "idb";
 import type { IPtdDBSchema, IPtdDBSchemaV1, IPtdDBSchemaV2 } from "./types.ts";
 
-export const ptdIndexDb = openDB<IPtdDBSchema>("ptd", 4, {
+export const ptdIndexDb = openDB<IPtdDBSchema>("ptd", 5, {
   upgrade(db, oldVersion) {
     if (oldVersion < 1) {
       const dbV1 = db as unknown as IDBPDatabase<IPtdDBSchemaV1>;
@@ -34,6 +34,10 @@ export const ptdIndexDb = openDB<IPtdDBSchema>("ptd", 4, {
     }
     if (oldVersion < 4) {
       db.createObjectStore("local_fingerprint");
+    }
+    if (oldVersion < 5) {
+      // 站点用户信息按天存档（取代 chrome.storage.local 的 `userInfo` 键，见类型定义处注释）
+      db.createObjectStore("user_info", { keyPath: ["site", "date"] });
     }
   },
 });

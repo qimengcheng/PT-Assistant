@@ -3,7 +3,7 @@ import { EResultParseStatus, type TSiteID } from "@ptd/site";
 
 import { type IStoredUserInfo, type TUserInfoStorageSchema } from "@/shared/types.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
-import { extStore } from "@/storage.ts";
+import { readAllArchive } from "@/shared/userInfoArchive.ts";
 
 export interface IUserDataStatistic {
   siteDateRange: Record<TSiteID, [string, string]>;
@@ -60,7 +60,7 @@ export async function loadFullData(): Promise<IUserDataStatistic> {
   // 与 MyData / UserDataTimeline 同一个根因，只是症状不同。
   await metadataStore.$onReady();
 
-  const rawData = (await extStore.getItem("userInfo")) as TUserInfoStorageSchema;
+  const rawData = await readAllArchive();
   const addedSiteIds = metadataStore.getAddedSiteIds;
 
   // 提前过滤已删除的站点数据，避免后续不必要的计算

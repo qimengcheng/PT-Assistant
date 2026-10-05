@@ -46,6 +46,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
 } from "antdv-next";
 import type { App as VueApp, Plugin } from "vue";
 
@@ -74,6 +75,7 @@ const usedComponents = [
   Switch, // a-switch
   Table, // a-table
   Tag, // a-tag
+  Tooltip, // a-tooltip —— SentToDownloaderDialog 的「更多选项」入口（options 组件被 content 复用）
 ] as const;
 
 /**

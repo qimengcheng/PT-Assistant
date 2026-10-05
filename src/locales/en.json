@@ -218,7 +218,9 @@
       "trackers": "Trackers",
       "trackerUnsupported": "This downloader does not support tracker management",
       "updateFilePriorityFailure": "Failed to update file priority",
-      "updateFilePrioritySuccess": "File priority updated"
+      "updateFilePrioritySuccess": "File priority updated",
+      "copyMagnetSuccess": "Magnet link copied to clipboard",
+      "copyFailed": "Copy failed"
     },
     "dialog": {
       "removeData": "Also remove data"
@@ -1365,7 +1367,13 @@
     "username": "Username",
     "version": "Version",
     "visit": "Visit",
-    "noData": "No Data"
+    "noData": "No Data",
+    "copied": "Copied",
+    "copyFailed": "Copy failed",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "filter": "Filter",
+    "more": "More"
   },
   "connectCheck": {
     "default": "Check Connect",

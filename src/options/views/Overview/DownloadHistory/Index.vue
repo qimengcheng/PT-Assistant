@@ -147,28 +147,30 @@ onUnmounted(() => {
 
 <template>
   <a-card size="small">
-    <template #title>
-      <a-flex align="center" gap="small">
+    <!-- 筛选框走 a-card 的 extra：它在卡片右上角固定，不随内容滚动，
+         也不需要靠 toolbar-spacer 去撑开标题行的右侧留白 -->
+    <template #extra>
+      <a-input
+        v-model:value="tableWaitFilterRef"
+        allow-clear
+        size="small"
+        class="toolbar-filter"
+        :placeholder="t('DownloadHistory.filterPlaceholder')"
+      >
+        <template #prefix>
+          <FilterOutlined class="filter-trigger" @click="showAdvanceFilterDialog = true" />
+        </template>
+        <template #suffix>
+          <SearchOutlined />
+        </template>
+      </a-input>
+    </template>
+
+        <template #title>
+      <a-flex align="center" gap="small" wrap>
         <a-button type="primary" :loading="isLoadingHistory" @click="() => throttleLoadDownloadHistory()"><template #icon><SyncOutlined /></template><span>{{ t('DownloadHistory.refresh') }}</span></a-button>
-        <a-divider type="vertical" class="mx-2" />
         <a-button :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span>{{ t('DownloadHistory.reDownload') }}</span></a-button>
         <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-        <a-flex flex="auto" justify="flex-end" align="center">
-          <a-input
-            v-model:value="tableWaitFilterRef"
-            allow-clear
-            size="small"
-            class="toolbar-filter"
-            :placeholder="t('DownloadHistory.filterPlaceholder')"
-          >
-            <template #prefix>
-              <FilterOutlined class="filter-trigger" @click="showAdvanceFilterDialog = true" />
-            </template>
-            <template #suffix>
-              <SearchOutlined />
-            </template>
-          </a-input>
-        </a-flex>
       </a-flex>
     </template>
 
@@ -269,7 +271,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
-/* 筛选框宽度上限：不是布局，交给 a-flex 也表达不了 */
 .toolbar-filter {
   max-width: 360px;
 }

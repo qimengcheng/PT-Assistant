@@ -592,15 +592,16 @@ async function createKeepUploadTask() {
   <a-modal v-model:open="showDialog" :title="t('SearchEntity.KeepUploadDialog.title')" :width="1024" :mask="{ closable: false }">
     <!-- 「怎么用」入口原先挂在 #title 插槽里，会和右上角相撞，移到内容区顶部 -->
     <div class="d-flex justify-end">
-      <a-button
-        type="text"
-        href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/keep-upload-task"
-        target="_blank"
-        rel="noopener noreferrer nofollow"
-        :title="t('common.howToUse')"
-      >
-        <template #icon><QuestionCircleOutlined /></template>
-      </a-button>
+      <a-tooltip :title="t('common.howToUse')">
+        <a-button
+          type="text"
+          href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/keep-upload-task"
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+        >
+          <template #icon><QuestionCircleOutlined /></template>
+        </a-button>
+      </a-tooltip>
     </div>
 
     <!-- 本地指纹索引：决定「哪些条目本地已经有了」，是辅种前的最后一道保守检查 -->
@@ -689,22 +690,23 @@ async function createKeepUploadTask() {
               <template #icon><SyncOutlined /></template>
             </a-button>
 
-            <a-button
-              type="text"
-              :loading="item.loading"
-              :title="item.status"
-            >
-              <template v-if="item.verified" #icon>
-                <CheckOutlined style="color: #52c41a" />
-              </template>
-              <template v-else #icon>
-                <CloseOutlined
-                  style="color: #ff4d4f"
-                  :title="t('SearchEntity.KeepUploadDialog.removeFromKeepUpload')"
-                  @click.stop="removeVerifiedItem(item.id)"
-                />
-              </template>
-            </a-button>
+            <a-tooltip :title="item.status">
+              <a-button
+                type="text"
+                :loading="item.loading"
+              >
+                <template v-if="item.verified" #icon>
+                  <CheckOutlined style="color: #52c41a" />
+                </template>
+                <template v-else #icon>
+                  <CloseOutlined
+                    style="color: #ff4d4f"
+                    :title="t('SearchEntity.KeepUploadDialog.removeFromKeepUpload')"
+                    @click.stop="removeVerifiedItem(item.id)"
+                  />
+                </template>
+              </a-button>
+            </a-tooltip>
           </div>
         </div>
         <a-divider v-if="index > 0" class="ml-4" />

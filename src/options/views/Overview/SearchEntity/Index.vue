@@ -428,23 +428,24 @@ const hiddenTagNamesText = computed({
           </template>
         </div>
 
-        <a-button
-          :title="t('SearchEntity.index.alert.searchStatus')"
-          class="ml-2 status-btn"
-          type="primary"
-          size="small"
-          @click="showSearchStatusDialog = true"
-        >
-          <template v-if="searchPlanStatus.success > 0">
-            <CheckOutlined class="mr-1" />{{ searchPlanStatus.success }}
-          </template>
-          <template v-if="searchPlanStatus.error > 0">
-            <AlertOutlined class="mr-1" style="color: #faad14" />{{ searchPlanStatus.error }}
-          </template>
-          <template v-if="searchPlanStatus.queued > 0">
-            <ClockCircleOutlined class="mr-1" style="color: #607d8b" />{{ searchPlanStatus.queued }}
-          </template>
-        </a-button>
+        <a-tooltip :title="t('SearchEntity.index.alert.searchStatus')">
+          <a-button
+            class="ml-2 status-btn"
+            type="primary"
+            size="small"
+            @click="showSearchStatusDialog = true"
+          >
+            <template v-if="searchPlanStatus.success > 0">
+              <CheckOutlined class="mr-1" />{{ searchPlanStatus.success }}
+            </template>
+            <template v-if="searchPlanStatus.error > 0">
+              <AlertOutlined class="mr-1" style="color: #faad14" />{{ searchPlanStatus.error }}
+            </template>
+            <template v-if="searchPlanStatus.queued > 0">
+              <ClockCircleOutlined class="mr-1" style="color: #607d8b" />{{ searchPlanStatus.queued }}
+            </template>
+          </a-button>
+        </a-tooltip>
       </div>
     </template>
   </a-alert>
@@ -472,15 +473,16 @@ const hiddenTagNamesText = computed({
           </a-button>
 
           <!-- 取消/重试 搜索队列 -->
-          <a-button
-            v-show="runtimeStore.search.isSearching"
-            :title="t('SearchEntity.index.action.cancel')"
-            type="text"
-            danger
-            @click="cancelSearchQueue"
-          >
-            <template #icon><CloseCircleOutlined /></template>
-          </a-button>
+          <a-tooltip :title="t('SearchEntity.index.action.cancel')">
+            <a-button
+              v-show="runtimeStore.search.isSearching"
+              type="text"
+              danger
+              @click="cancelSearchQueue"
+            >
+              <template #icon><CloseCircleOutlined /></template>
+            </a-button>
+          </a-tooltip>
           <a-button
             v-show="!runtimeStore.search.isSearching"
             :disabled="isSearchingParsed"
@@ -507,15 +509,16 @@ const hiddenTagNamesText = computed({
         <a-divider type="vertical" class="mx-2" />
 
         <!-- 创建搜索快照 -->
-        <a-button
-          :disabled="runtimeStore.search.isSearching || runtimeStore.search.searchResult.length === 0"
-          :title="t('SearchEntity.index.action.saveSnapshot')"
-          type="text"
-          style="color: #13c2c2"
-          @click="showSaveSnapshotDialog = true"
-        >
-          <template #icon><CameraOutlined /></template>
-        </a-button>
+        <a-tooltip :title="t('SearchEntity.index.action.saveSnapshot')">
+          <a-button
+            :disabled="runtimeStore.search.isSearching || runtimeStore.search.searchResult.length === 0"
+            type="text"
+            style="color: #13c2c2"
+            @click="showSaveSnapshotDialog = true"
+          >
+            <template #icon><CameraOutlined /></template>
+          </a-button>
+        </a-tooltip>
 
         <a-divider type="vertical" class="mx-2" />
 

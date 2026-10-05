@@ -248,9 +248,11 @@ function dialogLeave() {
 
               <div v-if="(downloader.suggestTags ?? []).length > 0" class="quick-send-item-extra" @click.stop>
                 <a-dropdown trigger="click">
-                  <a-button type="text" size="small">
-                    <template #icon><EllipsisOutlined /></template>
-                  </a-button>
+                  <a-tooltip :title="t('SentToDownloaderDialog.moreOptions')">
+                    <a-button type="text" size="small">
+                      <template #icon><EllipsisOutlined /></template>
+                    </a-button>
+                  </a-tooltip>
                   <template #popupRender>
                     <a-menu>
                       <a-menu-item

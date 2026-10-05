@@ -173,9 +173,11 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
             </a-popover>
           </template>
           <template #addonAfter>
-            <a-button type="primary" :loading="runtimeStore.mediaServerSearch.isSearching" @click="triggerSearch">
-              <template #icon><SearchOutlined /></template>
-            </a-button>
+            <a-tooltip :title="t('common.search')">
+              <a-button type="primary" :loading="runtimeStore.mediaServerSearch.isSearching" @click="triggerSearch">
+                <template #icon><SearchOutlined /></template>
+              </a-button>
+            </a-tooltip>
           </template>
         </a-input>
       </div>

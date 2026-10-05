@@ -2,24 +2,16 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  CalendarOutlined,
   CheckCircleFilled,
   CloseCircleFilled,
-  CopyOutlined,
-  DatabaseOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
-  FolderOpenOutlined,
   KeyOutlined,
-  LineChartOutlined,
   LinkOutlined,
   LockOutlined,
   QuestionCircleOutlined,
   SyncOutlined,
-  TagsOutlined,
 } from "@antdv-next/icons";
 
 import type { TableColumnsType } from "antdv-next";
@@ -34,6 +26,7 @@ import type {
 } from "@ptd/downloader";
 import { sendMessage } from "@/messages.ts";
 import { formatSize, formatDate } from "@/options/utils.ts";
+import { useRuntimeStore } from "@/options/stores/runtime.ts";
 
 import TorrentStateTd from "./TorrentStateTd.vue";
 
@@ -278,8 +271,20 @@ function onTabChange(value: string | null | undefined) {
   }
 }
 
-async function copyToClipboard(text: string) {
-  await navigator.clipboard.writeText(text);
+/**
+ * 磁力链接没有对应的 copyable 文本节点（它不对应界面上一段可见文案），仍需手写一次复制。
+ * 原先的 copyToClipboard 是裸的 navigator.clipboard.writeText，既没有失败提示，
+ * 也没告诉用户「复制的是磁力链接」—— 这里把两者都补上。
+ */
+async function copyMagnet() {
+  if (!torrent) return;
+  try {
+    await navigator.clipboard.writeText(magnetLink(torrent));
+    useRuntimeStore().showSnakebar(t("MyClient.detail.copyMagnetSuccess"), { color: "success" });
+  } catch (e) {
+    console.error("[PTD] copy magnet link failed", torrent.infoHash, e);
+    useRuntimeStore().showSnakebar(t("MyClient.detail.copyFailed"), { color: "error" });
+  }
 }
 
 function magnetLink(torrent: CTorrent): string {
@@ -322,7 +327,8 @@ function formatTimestamp(timestamp: number | undefined): string {
         <a-tab-pane key="raw" :tab="t('MyClient.action.viewRaw')" />
       </a-tabs>
 
-      <!-- 基本信息 -->
+      <!-- 基本信息：名称与 Hash 带复制按钮，单独一行；其余只读字段走 a-descriptions
+     （label 直接复用 MyClient.table.* 现有键，不新增 i18n）。 -->
       <div v-if="activeTab === 'info'">
         <div class="detail-row">
           <FileTextOutlined />
@@ -331,14 +337,24 @@ function formatTimestamp(timestamp: number | undefined): string {
 
         <div class="detail-row">
           <KeyOutlined />
-          <code class="text-body-small">{{ torrent.infoHash }}</code>
-          <a-tooltip :title="t('MyClient.detail.copyHash')">
-            <a-button type="text" size="small" @click="copyToClipboard(torrent.infoHash)">
-              <template #icon><CopyOutlined /></template>
-            </a-button>
-          </a-tooltip>
+          <!-- 用 a-typography-text 的 copyable 取代手写「clipboard API + a-tooltip + a-button」：
+               图标、文案、成功提示都由组件内部管，顺带补上原先缺失的复制失败提示 -->
+          <a-typography-text
+            code
+            class="text-body-small"
+            :copyable="{
+              text: torrent.infoHash,
+              tooltips: [t('MyClient.detail.copyHash'), t('common.copied')],
+            }"
+          >
+            {{ torrent.infoHash }}
+          </a-typography-text>
           <a-tooltip :title="t('MyClient.detail.copyMagnet')">
-            <a-button type="text" size="small" @click="copyToClipboard(magnetLink(torrent))">
+            <a-button
+              type="text"
+              size="small"
+              @click="copyMagnet"
+            >
               <template #icon><LinkOutlined /></template>
             </a-button>
           </a-tooltip>
@@ -346,59 +362,43 @@ function formatTimestamp(timestamp: number | undefined): string {
 
         <a-divider />
 
-        <a-row :gutter="12">
-          <a-col :span="12">
-            <div class="detail-row">
-              <LineChartOutlined />
-              <TorrentStateTd :item="torrent" />
-            </div>
-            <div class="detail-row">
-              <DatabaseOutlined />
-              <span>{{ torrent.progress.toFixed(2) }}%</span>
-            </div>
-            <div class="detail-row">
-              <DatabaseOutlined />
-              <span>{{ formatSize(torrent.totalSize) }}</span>
-            </div>
-          </a-col>
-          <a-col :span="12">
-            <div class="detail-row">
-              <ArrowUpOutlined style="color: #389e0d" />
-              <span>
-                {{ formatSpeed(torrent.uploadSpeed) }}
-                <span class="text-grey text-body-small ml-1">({{ formatTotal(torrent.totalUploaded) }})</span>
-              </span>
-            </div>
-            <div class="detail-row">
-              <ArrowDownOutlined style="color: #cf1322" />
-              <span>
-                {{ formatSpeed(torrent.downloadSpeed) }}
-                <span class="text-grey text-body-small ml-1">({{ formatTotal(torrent.totalDownloaded) }})</span>
-              </span>
-            </div>
-            <div class="detail-row">
-              <LineChartOutlined />
-              <span :class="torrent.ratio >= 1 ? 'text-green' : 'text-red'">
-                {{ torrent.ratio.toFixed(2) }}
-              </span>
-            </div>
-          </a-col>
-        </a-row>
-
-        <a-divider />
-
-        <div class="detail-row">
-          <FolderOpenOutlined />
-          <span class="text-body-small">{{ torrent.savePath }}</span>
-        </div>
-        <div class="detail-row">
-          <TagsOutlined />
-          <span>{{ torrent.label || "-" }}</span>
-        </div>
-        <div class="detail-row">
-          <CalendarOutlined />
-          <span>{{ formatDate(torrent.dateAdded * 1000) }}</span>
-        </div>
+        <a-descriptions bordered size="small" :column="{ xs: 1, sm: 2 }">
+          <a-descriptions-item :label="t('MyClient.table.status')">
+            <TorrentStateTd :item="torrent" />
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('MyClient.table.progress')">
+            {{ torrent.progress.toFixed(2) }}%
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('MyClient.table.size')">
+            {{ formatSize(torrent.totalSize) }}
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('MyClient.table.ratio')">
+            <span :class="torrent.ratio >= 1 ? 'text-green' : 'text-red'">
+              {{ torrent.ratio.toFixed(2) }}
+            </span>
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('MyClient.table.upSpeed')">
+            <span>
+              {{ formatSpeed(torrent.uploadSpeed) }}
+              <span class="text-grey text-body-small ml-1">({{ formatTotal(torrent.totalUploaded) }})</span>
+            </span>
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('MyClient.table.dlSpeed')">
+            <span>
+              {{ formatSpeed(torrent.downloadSpeed) }}
+              <span class="text-grey text-body-small ml-1">({{ formatTotal(torrent.totalDownloaded) }})</span>
+            </span>
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('MyClient.table.savePath')" :span="2">
+            <span class="text-body-small">{{ torrent.savePath }}</span>
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('SetDownloader.PathAndTag.tags.title')">
+            {{ torrent.label || "-" }}
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('MyClient.table.addedAt')">
+            {{ formatDate(torrent.dateAdded * 1000) }}
+          </a-descriptions-item>
+        </a-descriptions>
       </div>
 
       <!-- 原始数据 -->
@@ -500,14 +500,15 @@ function formatTimestamp(timestamp: number | undefined): string {
             <template v-else-if="column.key === 'leeches'">{{ record.leeches ?? "-" }}</template>
             <template v-else-if="column.key === 'lastAnnounce'">{{ formatTimestamp(record.lastAnnounce) }}</template>
             <template v-else-if="column.key === 'action'">
-              <a-button
-                type="text"
-                size="small"
-                :title="t('MyClient.detail.removeTracker')"
-                @click="removeTracker(record)"
-              >
-                <template #icon><DeleteOutlined /></template>
-              </a-button>
+              <a-tooltip :title="t('MyClient.detail.removeTracker')">
+                <a-button
+                  type="text"
+                  size="small"
+                  @click="removeTracker(record)"
+                >
+                  <template #icon><DeleteOutlined /></template>
+                </a-button>
+              </a-tooltip>
             </template>
           </template>
         </a-table>

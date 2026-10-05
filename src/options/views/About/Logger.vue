@@ -33,10 +33,18 @@ function showLogDataDialogHandler(item: ILoggerItem) {
   showLogDataDialog.value = true;
 }
 
+/** 后台消息在途标志：给 a-table 的 :loading 用。没它的话每秒轮询的那一瞬间表格会闪一下空态 */
+const isLoadingLogger = ref<boolean>(false);
+
 function loadLogger() {
-  sendMessage("getLogger", undefined).then((res) => {
-    logger.value = res;
-  });
+  isLoadingLogger.value = true;
+  sendMessage("getLogger", undefined)
+    .then((res) => {
+      logger.value = res;
+    })
+    .finally(() => {
+      isLoadingLogger.value = false;
+    });
 }
 
 // 原实现只在 onMounted 里 setInterval、从不 clearInterval：离开本页后仍每秒发一次消息，
@@ -60,6 +68,7 @@ onUnmounted(() => {
   <a-table
     :columns="columns"
     :data-source="logger"
+    :loading="isLoadingLogger"
     :pagination="{ pageSize: 50, showSizeChanger: true, size: 'small' }"
     row-key="id"
     size="small"

@@ -218,7 +218,9 @@
       "trackers": "Tracker 列表",
       "trackerUnsupported": "该下载器不支持 Tracker 管理",
       "updateFilePriorityFailure": "更新文件优先级失败",
-      "updateFilePrioritySuccess": "已更新文件优先级"
+      "updateFilePrioritySuccess": "已更新文件优先级",
+      "copyMagnetSuccess": "磁力链接已复制到剪贴板",
+      "copyFailed": "复制失败"
     },
     "dialog": {
       "removeData": "同时删除数据"
@@ -1365,7 +1367,13 @@
     "username": "用户名",
     "version": "版本",
     "visit": "访问",
-    "noData": "无数据"
+    "noData": "无数据",
+    "copied": "已复制",
+    "copyFailed": "复制失败",
+    "lock": "锁定",
+    "unlock": "解锁",
+    "filter": "筛选",
+    "more": "更多"
   },
   "connectCheck": {
     "default": "检查连接性",

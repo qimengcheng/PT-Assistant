@@ -388,7 +388,10 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 
     </a-table>
 
-    <a-alert v-if="!loading && tasks.length === 0" class="mt-2" type="info" show-icon :title="t('KeepUploadTask.emptyNotice')" />
+    <!-- 空态用 a-empty 而不是 a-alert：a-alert 是「提示/警告」语义，
+         这里要表达的是「暂无数据」，同项目其它三处（MediaServerEntity/Index.vue、
+         MyClient/ClientStatusDialog.vue、SetDownloader/SiteFilterDialog.vue）都用 a-empty -->
+    <a-empty v-if="!loading && tasks.length === 0" class="my-4" :description="t('KeepUploadTask.emptyNotice')" />
   </a-card>
 
   <a-alert

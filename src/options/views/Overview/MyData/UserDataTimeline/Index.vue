@@ -603,12 +603,15 @@ function saveControl() {
         <div class="user-statistic-field">
           <span class="user-statistic-field-label">{{ t("common.username") }}</span>
           <div class="user-statistic-field-control d-flex align-center">
-            <a-button type="text" size="small" @click="allowEdit.name = !allowEdit.name">
-              <template #icon>
-                <UnlockOutlined v-if="allowEdit.name" class="text-green" />
-                <LockOutlined v-else />
-              </template>
-            </a-button>
+            <!-- 文案随状态走：解锁图标 → 提示「锁定」；锁定图标 → 提示「解锁」 -->
+            <a-tooltip :title="allowEdit.name ? t('common.lock') : t('common.unlock')">
+              <a-button type="text" size="small" @click="allowEdit.name = !allowEdit.name">
+                <template #icon>
+                  <UnlockOutlined v-if="allowEdit.name" class="text-green" />
+                  <LockOutlined v-else />
+                </template>
+              </a-button>
+            </a-tooltip>
             <!-- AutoComplete 没有 `readonly` prop：不声明的属性会被透传到根 <div readonly>（SSR 实测），
                    压根没到内部 input，锁定状态下照样能打字。用 `disabled`。 -->
             <a-auto-complete
@@ -617,28 +620,32 @@ function saveControl() {
               :disabled="!allowEdit.name"
               class="flex-1-1-0"
             />
-            <a-button
-              type="text"
-              size="small"
-              :title="configStore.getUserNames.perfName"
-              @click="configStore.userName = configStore.getUserNames.perfName"
-            >
-              <template #icon>
-                <HistoryOutlined />
-              </template>
-            </a-button>
+            <a-tooltip :title="configStore.getUserNames.perfName">
+              <a-button
+                type="text"
+                size="small"
+                @click="configStore.userName = configStore.getUserNames.perfName"
+              >
+                <template #icon>
+                  <HistoryOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
           </div>
         </div>
 
         <div class="user-statistic-field">
           <span class="user-statistic-field-label">{{ t("UserDataTimeline.controls.timelineTitle") }}</span>
           <div class="user-statistic-field-control d-flex align-center">
-            <a-button type="text" size="small" @click="allowEdit.title = !allowEdit.title">
-              <template #icon>
-                <UnlockOutlined v-if="allowEdit.title" class="text-green" />
-                <LockOutlined v-else />
-              </template>
-            </a-button>
+            <!-- 文案随状态走：解锁图标 → 提示「锁定」；锁定图标 → 提示「解锁」 -->
+            <a-tooltip :title="allowEdit.title ? t('common.lock') : t('common.unlock')">
+              <a-button type="text" size="small" @click="allowEdit.title = !allowEdit.title">
+                <template #icon>
+                  <UnlockOutlined v-if="allowEdit.title" class="text-green" />
+                  <LockOutlined v-else />
+                </template>
+              </a-button>
+            </a-tooltip>
             <a-input
               :value="timelineData.title"
               :disabled="!control.showTimeline"

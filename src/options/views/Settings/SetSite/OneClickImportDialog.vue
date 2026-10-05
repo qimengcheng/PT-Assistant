@@ -225,10 +225,11 @@ async function dialogEnter() {
             />
             <SiteFavicon :site-id="site.id" :size="28" class="mr-2" flush-on-click />
             <div class="site-card-main">
-              <div class="text-ellipsis">
+              <!-- 站点名可能很长：ellipsis.tooltip 顺带补上原先缺的悬停提示 -->
+              <a-typography-text :ellipsis="{ tooltip: site.name ?? '' }">
                 <b>{{ site.name ?? "" }}</b>
                 <!-- 站点类型 -->
-              </div>
+              </a-typography-text>
               <a-tag :color="site.type === 'private' ? 'blue' : 'default'">
                 {{ site.schema ?? (site.type === "private" ? "AbstractPrivateSite" : "AbstractBittorrentSite") }}
               </a-tag>

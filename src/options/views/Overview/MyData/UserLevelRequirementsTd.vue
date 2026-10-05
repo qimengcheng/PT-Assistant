@@ -188,9 +188,11 @@ const userLevelGroupIcon = computed(() => {
                   />
                 </div>
 
-                <div class="text-ellipsis text-truncate ml-2" :title="userLevel.privilege">
+                <!-- 权限名可能很长：用 a-typography-text 的 ellipsis.tooltip 一步拿到
+                     「截断 + 悬停显示完整文案」，不再靠手写 text-ellipsis + 原生 :title -->
+                <a-typography-text class="ml-2" :ellipsis="{ tooltip: userLevel.privilege }">
                   {{ userLevel.privilege }}
-                </div>
+                </a-typography-text>
               </div>
               <hr class="ma-1 level-requirement-divider" />
             </template>

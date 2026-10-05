@@ -134,15 +134,16 @@ function openKeepUploadDialog() {
       <template #icon><SaveOutlined /></template>
     </a-button>
     <!-- 辅种检测 -->
-    <a-button
-      v-if="showKeepUploadBtn"
-      :disabled="torrentItems.length < 2"
-      type="text"
-      :title="t('SearchEntity.KeepUploadDialog.keepUpload')"
-      @click="openKeepUploadDialog"
-    >
-      <template #icon><BranchesOutlined /></template>
-    </a-button>
+    <a-tooltip :title="t('SearchEntity.KeepUploadDialog.keepUpload')">
+      <a-button
+        v-if="showKeepUploadBtn"
+        :disabled="torrentItems.length < 2"
+        type="text"
+        @click="openKeepUploadDialog"
+      >
+        <template #icon><BranchesOutlined /></template>
+      </a-button>
+    </a-tooltip>
   </a-space-compact>
 
   <!-- 在点击发送到远程服务器时，弹出选择下载器及其他自定义选项 -->

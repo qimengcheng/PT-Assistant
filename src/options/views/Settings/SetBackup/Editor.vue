@@ -304,18 +304,19 @@ async function checkConnect() {
           </div>
           <!-- 仅在启用了保留策略时展示摘要，避免未启用时出现无意义的提示文字 -->
           <span v-if="hasRetention" class="text-body-small retention-summary">{{ retentionSummary }}</span>
-          <a-button
-            v-if="hasRetention"
-            color="danger"
-            variant="text"
-            size="small"
-            :title="t('SetBackup.Editor.clearRetention')"
-            @click="clearRetention"
-          >
-            <template #icon>
-              <FilterOutlined />
-            </template>
-          </a-button>
+          <a-tooltip :title="t('SetBackup.Editor.clearRetention')">
+            <a-button
+              v-if="hasRetention"
+              color="danger"
+              variant="text"
+              size="small"
+              @click="clearRetention"
+            >
+              <template #icon>
+                <FilterOutlined />
+              </template>
+            </a-button>
+          </a-tooltip>
         </a-col>
 
         <a-col class="text-body-small text-medium-emphasis" :span="12">

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, shallowRef, watch } from "vue";
+import { reactive, ref, computed, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { toMerged } from "es-toolkit";
 import {
@@ -7,6 +7,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   EllipsisOutlined,
+  LinkOutlined,
 } from "@antdv-next/icons";
 
 import { type ITorrent } from "@ptd/site";
@@ -57,19 +58,102 @@ const addTorrentOptions = ref<Required<Omit<CAddTorrentOptions, "localDownloadOp
 const suggestFolders = computed(() => selectedDownloader.value?.suggestFolders ?? []);
 const suggestTags = computed(() => selectedDownloader.value?.suggestTags ?? []);
 
-// ⚠️ antdv-next 的 AutoComplete 传字符串数组（string[]）options 会渲染成空控件，这里统一对象化
-const suggestTagOptions = computed(() => suggestTags.value.map((v) => ({ value: v, label: v })));
+/**
+ * 分段按钮里的两个哨兵值，代表候选列表之外的两种状态：不指定（走下载器自己的默认值）、
+ * 手动输入。前缀 `::` 保证不会和真实路径/标签撞车，也不含 `$...$` / `<...>` 模板，
+ * 所以不会被 utils.ts 的动态替换分支误当成待展开的值。
+ */
+const CHOICE_DEFAULT = "::default::";
+const CHOICE_CUSTOM = "::custom::";
 
 /**
- * 保存路径用单选列表，两个哨兵值代表列表外的两种状态：
- * 不指定（交给下载器自己的默认目录）与手动输入。
- * 前缀 `::` 保证不会和真实路径撞车，也不含 `$...$` / `<...>` 模板，
- * 所以不会被 utils.ts 的动态替换分支误当成待展开的路径。
+ * 「分段按钮 + 不指定 + 手动输入」在保存路径和种子标签上是同一份逻辑，
+ * 只差绑哪个字段、候选从哪来，所以抽成工厂。
+ * 返回值过一层 reactive：裸对象上的 ref 属性在模板里不会自动解包，v-model 绑不上去。
  */
-const PATH_DEFAULT = "::default::";
-const PATH_CUSTOM = "::custom::";
-const savePathChoice = ref<string>(PATH_DEFAULT);
-const customSavePath = ref("");
+function createChoiceField(getValue: () => string, setValue: (v: string) => void, candidates: () => string[]) {
+  const choice = ref<string>(CHOICE_DEFAULT);
+  const custom = ref("");
+
+  /** 依据字段当前值反推该选中哪一项：空 → 不指定，命中候选 → 该项，否则 → 手动输入 */
+  function sync() {
+    const value = getValue();
+    if (!value) {
+      choice.value = CHOICE_DEFAULT;
+      custom.value = "";
+    } else if (candidates().includes(value)) {
+      choice.value = value;
+      custom.value = "";
+    } else {
+      choice.value = CHOICE_CUSTOM;
+      custom.value = value;
+    }
+  }
+
+  watch(choice, (next) => {
+    if (next === CHOICE_DEFAULT) setValue("");
+    else if (next === CHOICE_CUSTOM) setValue(custom.value);
+    else setValue(next);
+  });
+
+  // 手动输入模式下，输入框的内容就是最终值
+  watch(custom, (value) => {
+    if (choice.value === CHOICE_CUSTOM) setValue(value);
+  });
+
+  return reactive({ choice, custom, sync });
+}
+
+const savePathField = createChoiceField(
+  () => addTorrentOptions.value.savePath,
+  (v) => (addTorrentOptions.value.savePath = v),
+  () => suggestFolders.value,
+);
+const labelField = createChoiceField(
+  () => addTorrentOptions.value.label,
+  (v) => (addTorrentOptions.value.label = v),
+  () => suggestTags.value,
+);
+
+/** `category:` 前缀的推荐目录单独成组：这批是分类目录，和按盘符列出来的具体路径不是一类东西 */
+const CATEGORY_FOLDER_PREFIX = "category:";
+
+interface IChoiceItem {
+  value: string;
+  label: string;
+  /** 路径用等宽字体，标签不用 */
+  mono?: boolean;
+}
+interface IChoiceGroup {
+  /** 空串表示这一组不显示标题 */
+  title: string;
+  items: IChoiceItem[];
+}
+
+const toPathItem = (v: string): IChoiceItem => ({ value: v, label: v, mono: true });
+const toTagItem = (v: string): IChoiceItem => ({ value: v, label: v });
+
+const pathGroups = computed<IChoiceGroup[]>(() => {
+  const head: IChoiceItem = { value: CHOICE_DEFAULT, label: t("SentToDownloaderDialog.defaultPath") };
+  const tail: IChoiceItem = { value: CHOICE_CUSTOM, label: t("SentToDownloaderDialog.manualInput") };
+  const category = suggestFolders.value.filter((f) => f.startsWith(CATEGORY_FOLDER_PREFIX)).map(toPathItem);
+  const other = suggestFolders.value.filter((f) => !f.startsWith(CATEGORY_FOLDER_PREFIX)).map(toPathItem);
+
+  if (category.length === 0) {
+    return [{ title: "", items: [head, ...other, tail] }];
+  }
+  // 没有普通路径可列时不硬撑"其他路径"这个标题，那一组只剩首尾两个特殊项
+  return [
+    { title: t("SentToDownloaderDialog.categoryGroup"), items: category },
+    { title: other.length > 0 ? t("SentToDownloaderDialog.otherGroup") : "", items: [head, ...other, tail] },
+  ];
+});
+
+const labelItems = computed<IChoiceItem[]>(() => [
+  { value: CHOICE_DEFAULT, label: t("SentToDownloaderDialog.noLabel") },
+  ...suggestTags.value.map(toTagItem),
+  { value: CHOICE_CUSTOM, label: t("SentToDownloaderDialog.manualInput") },
+]);
 
 /** 高级设置面板默认展开：这里存的是 a-collapse 的 activeKey */
 const advancedActiveKeys = ref<string[]>(["advanced"]);
@@ -98,39 +182,17 @@ const selectedDownloaderId = computed<string | undefined>({
   },
 });
 
-const downloaderOptions = computed(() =>
-  sortedEnabledDownloadersBySite.value.map((d) => ({ value: d.id, label: downloaderTitle(d), raw: d })),
-);
+const downloaderOptions = computed(() => sortedEnabledDownloadersBySite.value.map((d) => ({ value: d.id, raw: d })));
 
 function onDownloaderChange() {
   restoreAddTorrentOptions(selectedDownloader.value ?? undefined);
 }
 
-/** 依据已定下的 savePath 反推单选态：空 → 默认路径，命中推荐目录 → 该项，否则 → 手动输入 */
-function syncSavePathChoice() {
-  const path = addTorrentOptions.value.savePath;
-  if (!path) {
-    savePathChoice.value = PATH_DEFAULT;
-    customSavePath.value = "";
-  } else if (suggestFolders.value.includes(path)) {
-    savePathChoice.value = path;
-    customSavePath.value = "";
-  } else {
-    savePathChoice.value = PATH_CUSTOM;
-    customSavePath.value = path;
-  }
+/** 字段值被程序改过（重置、合并上次的选择）之后，把两个分段按钮的选中态对齐回去 */
+function syncChoiceFields() {
+  savePathField.sync();
+  labelField.sync();
 }
-
-watch(savePathChoice, (choice) => {
-  if (choice === PATH_DEFAULT) addTorrentOptions.value.savePath = "";
-  else if (choice === PATH_CUSTOM) addTorrentOptions.value.savePath = customSavePath.value;
-  else addTorrentOptions.value.savePath = choice;
-});
-
-// 手动输入模式下，输入框的内容就是最终路径
-watch(customSavePath, (value) => {
-  if (savePathChoice.value === PATH_CUSTOM) addTorrentOptions.value.savePath = value;
-});
 
 function restoreAddTorrentOptions(downloader?: IDownloaderMetadata) {
   addTorrentOptions.value.localDownload = true;
@@ -138,7 +200,7 @@ function restoreAddTorrentOptions(downloader?: IDownloaderMetadata) {
   addTorrentOptions.value.savePath = "";
   addTorrentOptions.value.label = "";
   addTorrentOptions.value.advanceAddTorrentOptions = downloader?.advanceAddTorrentOptions ?? {};
-  syncSavePathChoice();
+  syncChoiceFields();
 }
 
 watch(selectedDownloader, (value) => {
@@ -189,7 +251,7 @@ function quickSendToDownloader(downloader: IDownloaderMetadata, path: string = "
   if (label) {
     addTorrentOptions.value.label = label;
   }
-  syncSavePathChoice();
+  syncChoiceFields();
 
   return sendToDownloader();
 }
@@ -208,7 +270,7 @@ function dialogEnter() {
     selectedDownloader.value = downloader;
     addTorrentOptions.value.savePath = metadataStore.defaultDownloader.folder ?? "";
     addTorrentOptions.value.label = metadataStore.defaultDownloader.tags ?? "";
-    syncSavePathChoice();
+    syncChoiceFields();
 
     // 直接调用发送函数
     sendToDownloader();
@@ -230,7 +292,7 @@ function dialogEnter() {
         addTorrentOptions.value,
         metadataStore.lastDownloader?.options ?? {},
       ) as Required<Omit<CAddTorrentOptions, "localDownloadOption">>;
-      syncSavePathChoice();
+      syncChoiceFields();
     }
   }
 }
@@ -334,8 +396,9 @@ function dialogLeave() {
         </a-alert>
 
         <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.selectDownloader')">
-          <!-- 下载器是固定列表且数量少，用分段按钮直出全部候选（带图标与类型），
-               不再套一层 Select 下拉：下拉要点开才能看见有哪些、当前选的是哪个。 -->
+          <!-- 下载器是固定列表且数量少，用分段按钮直出全部候选，
+               不再套一层 Select 下拉：下拉要点开才能看见有哪些、当前选的是哪个。
+               地址整串写进按钮会把那一段撑得极宽，收进名字后面那个图标的悬浮提示里。 -->
           <a-radio-group
             v-model:value="selectedDownloaderId"
             size="small"
@@ -346,7 +409,10 @@ function dialogLeave() {
             <a-radio-button v-for="opt in downloaderOptions" :key="opt.value" :value="opt.value">
               <span class="choice-with-icon">
                 <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.type" />
-                <span class="choice-text" :title="opt.label">{{ opt.label }}</span>
+                <span>{{ opt.raw.name }}</span>
+                <a-tooltip :title="opt.raw.address">
+                  <LinkOutlined class="choice-address-icon" />
+                </a-tooltip>
                 <a-tag color="blue">{{ opt.raw.type }}</a-tag>
               </span>
             </a-radio-button>
@@ -354,34 +420,38 @@ function dialogLeave() {
         </a-form-item>
 
         <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.savePath')">
-          <a-radio-group v-model:value="savePathChoice" size="small" button-style="solid" class="choice-group">
-            <a-radio-button :value="PATH_DEFAULT">{{ t("SentToDownloaderDialog.defaultPath") }}</a-radio-button>
-            <a-radio-button v-for="folder in suggestFolders" :key="folder" :value="folder">
-              <span class="choice-mono" :title="folder">{{ folder }}</span>
-            </a-radio-button>
-            <a-radio-button :value="PATH_CUSTOM">{{ t("SentToDownloaderDialog.customPath") }}</a-radio-button>
-          </a-radio-group>
+          <div v-for="(grp, gi) in pathGroups" :key="gi" class="choice-block">
+            <div v-if="grp.title" class="choice-group-title">{{ grp.title }}</div>
+            <!-- 每组是一个独立的 a-radio-group，但绑同一个值：选中项落在哪一组，
+                 另一组就整体不亮，跨组互斥由受控模式本身保证，不依赖原生 radio 的 name。 -->
+            <a-radio-group v-model:value="savePathField.choice" size="small" button-style="solid" class="choice-group">
+              <a-radio-button v-for="item in grp.items" :key="item.value" :value="item.value">
+                <span v-if="item.mono" class="choice-mono" :title="item.label">{{ item.label }}</span>
+                <template v-else>{{ item.label }}</template>
+              </a-radio-button>
+            </a-radio-group>
+          </div>
           <!-- 手输项单独占一行：嵌进按钮里会让那一段比别的宽出一截。
                占位符（$torrent.title$ / <...>）在发送时才展开，见 utils.ts。 -->
           <a-input
-            v-if="savePathChoice === PATH_CUSTOM"
-            v-model:value="customSavePath"
+            v-if="savePathField.choice === CHOICE_CUSTOM"
+            v-model:value="savePathField.custom"
             size="small"
             :placeholder="t('SentToDownloaderDialog.customPathPlaceholder')"
-            style="margin-top: 8px"
           />
         </a-form-item>
 
-        <a-form-item
-          v-if="downloaderOptions.length > 0"
-          :label="t('SentToDownloaderDialog.label')"
-          :extra="t('SentToDownloaderDialog.labelHint')"
-        >
-          <a-auto-complete
-            v-model:value="addTorrentOptions.label"
-            :options="suggestTagOptions"
+        <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.label')">
+          <a-radio-group v-model:value="labelField.choice" size="small" button-style="solid" class="choice-group">
+            <a-radio-button v-for="item in labelItems" :key="item.value" :value="item.value">
+              {{ item.label }}
+            </a-radio-button>
+          </a-radio-group>
+          <a-input
+            v-if="labelField.choice === CHOICE_CUSTOM"
+            v-model:value="labelField.custom"
+            size="small"
             :placeholder="t('SentToDownloaderDialog.labelHint')"
-            allow-clear
           />
         </a-form-item>
 
@@ -495,7 +565,6 @@ function dialogLeave() {
 
 .quick-send-item-title,
 .quick-send-item-subtitle,
-.choice-text,
 .choice-mono {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -509,11 +578,26 @@ function dialogLeave() {
   width: 100%;
 }
 
+.choice-block + .choice-block {
+  margin-top: 10px;
+}
+
+.choice-group-title {
+  margin-bottom: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
 .choice-with-icon {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: 420px;
+}
+
+// 只压透明度、不写死颜色：选中态是实心 primary 底 + 白字，
+// 写死深灰会在蓝底上糊掉，而 opacity 两种状态下都跟着文字色走
+.choice-address-icon {
+  opacity: 0.55;
 }
 
 .choice-mono {

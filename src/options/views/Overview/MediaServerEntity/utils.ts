@@ -3,7 +3,7 @@
  * 模块级单例：选中的服务器列表 + 串行 PQueue，结果按 url 全局去重后写入 runtimeStore.mediaServerSearch。
  */
 import PQueue from "p-queue";
-import { markRaw, ref } from "vue";
+import { computed, markRaw, ref } from "vue";
 import { omit } from "es-toolkit";
 import { filesize } from "filesize";
 import type { IMediaServerSearchOptions } from "@ptd/mediaServer";
@@ -27,9 +27,28 @@ export const formatSize = (size: number | string) => {
   }
 };
 
-export const searchMediaServerIds = ref<TMediaServerKey[]>(
-  metadataStore.getEnabledMediaServers.map((mediaServer) => mediaServer.id) ?? [],
-);
+/**
+ * 「参与搜索的服务器范围」。
+ *
+ * ⚠️ 原先是 `ref(metadataStore.getEnabledMediaServers.map(...))` —— **模块顶层同步求值**。
+ * 而 metadata store 是 persistWebExt（靠 chrome.storage 异步水合），模块被 import 那一刻
+ * mediaServers 还是 {}、getter 返回 []，于是这个 ref 被**永久钉成空数组**：冷启动进页面时
+ * doSearch 的循环一次都不跑，而且完全不报错、不进 vue-tsc。
+ * 后面那个 `?? []` 也是死代码 —— getter 恒返回数组，`.map()` 永远不会给出 nullish。
+ *
+ * 改成可写 computed（AGENTS 3.5 那条「优先派生」的正解）：
+ *   - getter 直接派生自 store，水合一到自动重算（同 Index.vue 里 enabledServerIds 的写法）；
+ *   - setter 把用户的选择记进 userSelection，只有用户真的动过选择框才覆盖派生值。
+ * 用户主动取消全选时 userSelection 是 []，不是 nullish，所以不会被 store 的水合覆盖回去。
+ */
+const userServerSelection = ref<TMediaServerKey[] | null>(null);
+
+export const searchMediaServerIds = computed<TMediaServerKey[]>({
+  get: () => userServerSelection.value ?? metadataStore.getEnabledMediaServers.map((mediaServer) => mediaServer.id),
+  set: (value) => {
+    userServerSelection.value = value;
+  },
+});
 
 export const searchQueue = new PQueue({ concurrency: 1 }); // 默认设置为 1，避免并发搜索
 

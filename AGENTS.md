@@ -289,6 +289,10 @@ v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所�
   就把这条 openDB 接进 SW，被 `smoke-background.mjs` 以 `indexedDB is not defined` 当场拦下 ——
   真浏览器里不会报这个错，所以这类问题只能靠跑产物来抓。
   共享库句柄一律走 `@/shared/indexdb` 的 `ptdIndexDb()`（懒开），别改回模块级 Promise。
+  懒开带来的两条不变量（失败不缓存 rejection / 成功必须复用）**静态扫不出来**，由
+  `scripts/check-indexdb-retry.mjs` 用行为断言钉住并挂在 CI；改那个函数前先跑它。
+  同理，那两行重置代码要写成函数体内的 `try/await/catch`，不要写成游离的 `.catch()` ——
+  后者看着像无用代码，会被顺手删掉。
 
 ### 3.3 i18n
 

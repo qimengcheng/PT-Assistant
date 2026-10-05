@@ -224,8 +224,11 @@ try {
     repointLink(loaded);
     const removed = pruneOldSessionDirs(outRoot);
     log(`已换指 ${LINK_NAME} → dist-${sessionTag}-${pkgVersion}/chrome-mv3${removed ? `，清掉 ${removed} 个本会话旧快照` : ""}`);
-    // 下面两行就是 AGENTS §2.2 要求报给用户的内容，直接抄
-    log(`验收加载路径：${loaded}`);
+    // 下面两行就是 AGENTS §2.2 要求报给用户的内容，直接抄。
+    // 报的是联接而不是真身：真身目录会被下一次同会话构建的 pruneOldSessionDirs 删掉，
+    // 用户若照真身路径去 Chrome 加载，扩展会在那一刻变成「找不到 manifest」。
+    // 真身路径上面那行「已换指」里已经有，要排查时顺着它看即可。
+    log(`验收加载路径：${LINK_PATH}`);
     log(`版本号：v${pkgVersion}`);
   }
 } finally {

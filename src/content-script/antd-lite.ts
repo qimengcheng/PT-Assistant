@@ -74,7 +74,7 @@ const usedComponents = [
   Menu, // a-menu / a-menu-item
   Modal, // a-modal
   Popover, // a-popover
-  Radio, // a-radio / a-radio-group —— SentToDownloaderDialog 的下载器、保存路径单选列表
+  Radio, // a-radio-group / a-radio-button —— SentToDownloaderDialog 的下载器、保存路径分段按钮
   Row, // a-row
   Select, // a-select
   Skeleton, // a-skeleton-button

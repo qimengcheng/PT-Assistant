@@ -535,6 +535,7 @@
     }
   },
   "SentToDownloaderDialog": {
+    "customPath": "手动输入",
     "customPathPlaceholder": "手动输入路径，支持 $torrent.title$ 等占位符",
     "defaultPath": "下载器默认路径",
     "isSending": "正在向下载器 {name} [{address}] 发送种子，请稍候...",

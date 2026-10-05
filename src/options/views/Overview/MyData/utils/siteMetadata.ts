@@ -1,4 +1,4 @@
-import { shallowReactive } from "vue";
+import { shallowReactive, toRaw } from "vue";
 
 import { definitionList, type ISiteMetadata, NO_IMAGE, type TSiteID } from "@ptd/site";
 
@@ -31,26 +31,31 @@ export const allAddedSiteMetadata = shallowReactive<TOptionSiteMetadatas>({});
  * 取数走 SiteFavicon 那份共享入口，不再自己 sendMessage：
  * 原实现在这里绕过前端缓存直发一条消息，而同一个站点在表格里又被 <SiteFavicon> 要了一遍，
  * 等于每个站点两条跨上下文请求。
+ *
+ * ⚠️ 回填时**只能就地改 entry 的字段，不能整体替换 key**。
+ * 原来这里写的是 `allAddedSiteMetadata[siteId] = { ...placeholder, faviconSrc, faviconElement }`，
+ * 注释理由是「shallowReactive 直接改属性不会触发更新，必须整体替换才能重渲染」——
+ * 但全仓没有任何模板绑定 faviconSrc / faviconElement：表格里的图标是 <SiteFavicon :site-id>
+ * 自己渲染的（走 SiteFavicon 那份共享缓存），统计图 :291 是 echarts tooltip formatter 里的
+ * 命令式取值，时间线 :125 是 konva 绘制时取 Image 对象。都不经过 Vue 的响应式渲染。
+ * 所以那次整体替换不但没必要，还是 v0.22.11 冻页事故的元凶：tableData 依赖
+ * allAddedSiteMetadata[siteId]，23 个图标陆续回填 = 23 次「整表重算 + 重渲染」，
+ * 叠上刷新期间的写入，主线程被占死成「此页面没有响应」。
  */
 async function fillFaviconAsync(siteId: TSiteID, placeholder: IExtendSiteMetadata) {
   try {
     const siteFaviconUrl = await getSiteFavicon(siteId);
     if (!siteFaviconUrl) return;
 
-    const siteFavicon = new Image();
+    const siteFavicon = placeholder.faviconElement;
     siteFavicon.src = siteFaviconUrl;
     siteFavicon.decode().catch(() => {
       siteFavicon.src = NO_IMAGE;
       siteFavicon.decode();
     });
 
-    // allAddedSiteMetadata 是 shallowReactive：直接改 entry 的属性不会触发更新，
-    // 必须整体替换该 key 才能让依赖它的模板重渲染。
-    allAddedSiteMetadata[siteId] = {
-      ...placeholder,
-      faviconSrc: siteFaviconUrl,
-      faviconElement: siteFavicon,
-    };
+    // 就地改：entry 的对象标识保持不变，依赖它的 computed 不会被重算
+    placeholder.faviconSrc = siteFaviconUrl;
   } catch (e) {
     // 保留占位图，不影响表格首屏
     console.error(`[PTD] 站点图标获取失败（保留占位图）: ${siteId}`, e);
@@ -63,7 +68,11 @@ export async function loadAllAddedSiteMetadata(sites?: string[]): Promise<TOptio
 
   await Promise.allSettled(
     loadSites.map(async (siteId) => {
-      if (allAddedSiteMetadata[siteId]) return;
+      // 用 toRaw 读：这个「已缓存就跳过」的判断不该建立响应式依赖。
+      // 本函数被 computedAsync（MyData 的 addedSiteIds）调用时，若在这里追踪到
+      // allAddedSiteMetadata，就会形成「computed 依赖了自己写的缓存」的自激边 ——
+      // 下面 :90 的写入会立刻把自己作废。
+      if (toRaw(allAddedSiteMetadata)[siteId]) return;
 
       try {
         // 以下都是本地数据（站点定义 + 本地配置），不触网，可以直接等

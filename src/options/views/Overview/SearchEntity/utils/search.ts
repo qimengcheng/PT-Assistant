@@ -28,13 +28,33 @@ const globalExistingIds = new Set<string>();
 
 export const searchQueue = new PQueue({ concurrency: 1 }); // 默认设置为 1，避免并发搜索
 
-searchQueue.on("active", () => {
-  runtimeStore.search.isSearching = true;
-  // 启动后，根据 configStore 的值，自动更新 searchQueue 的并发数
+/**
+ * 把配置里的并发数同步进队列（队列构造时是 1，配置默认是 5）。
+ *
+ * ⚠️ 只能在**投递任务之前**调用，绝不能放在 searchQueue 的事件回调里（原先写在 active 里）：
+ * p-queue 的 `concurrency` setter 会同步跑一遍 `#processQueue()`，而 active 事件是在
+ * `#tryToStartAnother()` 里、`job()` **之前**发出的 —— 那一刻刚出队的那个任务还没执行到它
+ * 自己的 `pending++`，队列里也可能只剩它自己（单站点方案，或队列里恰好只剩最后一个任务）。
+ * 于是 setter 里的判定 `size === 0 && pending === 0` 成立，**误发一次 idle**，
+ * 把 active 刚置上的 isSearching = true 当场又打回 false。
+ *
+ * 表现：整个第一次搜索期间 isSearching 都是 false —— 提示条不显示「搜索中」，而是直接显示
+ * 「共 0 条结果 + 计时」，表格也不转圈；第二次搜索时并发数已经等于配置值、不再进 setter，
+ * 那次误发的 idle 也就没有了，于是又「正常」了，即「第一次不会，第二次才会」。
+ * 同一处地雷的另一个触发口：在设置页改「同时搜索站点数」后回到搜索页搜第一次，同样不出「搜索中」。
+ *
+ * 放在这里（搜索开始前、队列多数情况下是空的）赋值是安全的：万一 setter 仍触发一次 idle，
+ * 此刻 isSearching 本来就是 false，紧接着 doSearch 才把它置 true。
+ */
+function syncSearchQueueConcurrency() {
   if (searchQueue.concurrency != configStore.searchEntity.queueConcurrency) {
     searchQueue.concurrency = configStore.searchEntity.queueConcurrency;
     console.debug("Search queue concurrency changed to: ", searchQueue.concurrency);
   }
+}
+
+searchQueue.on("active", () => {
+  runtimeStore.search.isSearching = true;
   // 队列开始活跃时，更新全局 Set
   globalExistingIds.clear();
   runtimeStore.search.searchResult.forEach((r) => globalExistingIds.add(r.uniqueId));
@@ -257,6 +277,9 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
       runtimeStore.showSnakebar("请至少添加一个站点进行搜索", { color: "error" });
       return;
     }
+
+    // 并发数在这里同步（此时还没有任务投递），见 syncSearchQueueConcurrency 的说明
+    syncSearchQueueConcurrency();
 
     runtimeStore.search.startAt = Date.now();
     runtimeStore.search.isSearching = true;

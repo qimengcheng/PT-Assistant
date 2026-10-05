@@ -372,6 +372,7 @@
     }
   },
   "SearchEntity": {
+    "solutionAll": "全站",
     "ActionTd": {
       "copyLink": "复制下载链接",
       "copyLinkFailed": "复制下载链接失败",
@@ -1246,6 +1247,7 @@
     "loadFailed": "统计数据加载失败"
   },
   "UserDataTimeline": {
+    "exportTitle": "这些年走过的路",
     "controls": {
       "components": "组件",
       "customBgColor": "自定义背景色",

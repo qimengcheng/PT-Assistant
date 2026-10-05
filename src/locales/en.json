@@ -372,6 +372,7 @@
     }
   },
   "SearchEntity": {
+    "solutionAll": "All sites",
     "ActionTd": {
       "copyLink": "Copy Download Link",
       "copyLinkFailed": "Failed to copy download link",
@@ -1246,6 +1247,7 @@
     "loadFailed": "Failed to load the statistics data"
   },
   "UserDataTimeline": {
+    "exportTitle": "The road traveled so far",
     "controls": {
       "components": "Components",
       "customBgColor": "Custom Background Color",

@@ -334,44 +334,41 @@ function dialogLeave() {
         </a-alert>
 
         <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.selectDownloader')">
-          <!-- 下载器是固定列表且数量少，用单选列表直出全部候选（带图标与类型），
+          <!-- 下载器是固定列表且数量少，用分段按钮直出全部候选（带图标与类型），
                不再套一层 Select 下拉：下拉要点开才能看见有哪些、当前选的是哪个。 -->
-          <a-radio-group v-model:value="selectedDownloaderId" class="choice-group" @change="onDownloaderChange">
-            <div v-for="opt in downloaderOptions" :key="opt.value" class="choice-row">
-              <a-radio :value="opt.value">
-                <span class="choice-with-icon">
-                  <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.type" />
-                  <span class="choice-text" :title="opt.label">{{ opt.label }}</span>
-                  <a-tag color="blue">{{ opt.raw.type }}</a-tag>
-                </span>
-              </a-radio>
-            </div>
+          <a-radio-group
+            v-model:value="selectedDownloaderId"
+            size="small"
+            class="choice-group"
+            @change="onDownloaderChange"
+          >
+            <a-radio-button v-for="opt in downloaderOptions" :key="opt.value" :value="opt.value">
+              <span class="choice-with-icon">
+                <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.type" />
+                <span class="choice-text" :title="opt.label">{{ opt.label }}</span>
+                <a-tag color="blue">{{ opt.raw.type }}</a-tag>
+              </span>
+            </a-radio-button>
           </a-radio-group>
         </a-form-item>
 
         <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.savePath')">
-          <a-radio-group v-model:value="savePathChoice" class="choice-group">
-            <div class="choice-row">
-              <a-radio :value="PATH_DEFAULT">{{ t("SentToDownloaderDialog.defaultPath") }}</a-radio>
-            </div>
-            <div v-for="folder in suggestFolders" :key="folder" class="choice-row">
-              <a-radio :value="folder">
-                <span class="choice-mono" :title="folder">{{ folder }}</span>
-              </a-radio>
-            </div>
-            <!-- 推荐目录可能为空、也可能不含这次想要的路径，所以留一个手输项。
-                 模板占位符（$torrent.title$ / <...>）在发送时才展开，见 utils.ts。 -->
-            <div class="choice-row">
-              <a-radio :value="PATH_CUSTOM">
-                <a-input
-                  v-model:value="customSavePath"
-                  size="small"
-                  class="choice-input"
-                  :placeholder="t('SentToDownloaderDialog.customPathPlaceholder')"
-                />
-              </a-radio>
-            </div>
+          <a-radio-group v-model:value="savePathChoice" size="small" class="choice-group">
+            <a-radio-button :value="PATH_DEFAULT">{{ t("SentToDownloaderDialog.defaultPath") }}</a-radio-button>
+            <a-radio-button v-for="folder in suggestFolders" :key="folder" :value="folder">
+              <span class="choice-mono" :title="folder">{{ folder }}</span>
+            </a-radio-button>
+            <a-radio-button :value="PATH_CUSTOM">{{ t("SentToDownloaderDialog.customPath") }}</a-radio-button>
           </a-radio-group>
+          <!-- 手输项单独占一行：嵌进按钮里会让那一段比别的宽出一截。
+               占位符（$torrent.title$ / <...>）在发送时才展开，见 utils.ts。 -->
+          <a-input
+            v-if="savePathChoice === PATH_CUSTOM"
+            v-model:value="customSavePath"
+            size="small"
+            :placeholder="t('SentToDownloaderDialog.customPathPlaceholder')"
+            style="margin-top: 8px"
+          />
         </a-form-item>
 
         <a-form-item
@@ -504,33 +501,22 @@ function dialogLeave() {
   white-space: nowrap;
 }
 
-// 单选列表：让每一项独占一行，而不是 antd 默认的横向紧挨着排
+// 分段按钮组：antd 的 group 默认 inline-block，候选一多就一路撑破弹窗右边界，
+// 改成 block + 100% 让它按行铺开
 .choice-group {
   display: block;
   width: 100%;
-}
-
-.choice-row {
-  display: flex;
-  align-items: center;
-  padding: 3px 0;
 }
 
 .choice-with-icon {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: 520px;
+  max-width: 420px;
 }
 
 .choice-mono {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 13px;
-}
-
-.choice-input {
-  width: 360px;
-  max-width: 100%;
 }
 
 // 两个开关并成一条，省掉 a-form-item 上下各一段的垂直留白

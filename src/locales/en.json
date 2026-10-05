@@ -535,6 +535,7 @@
     }
   },
   "SentToDownloaderDialog": {
+    "customPath": "Custom",
     "customPathPlaceholder": "Enter a path manually, $torrent.title$ placeholders supported",
     "defaultPath": "Downloader default path",
     "isSending": "Sending torrents to downloader {name} [{address}], please wait...",

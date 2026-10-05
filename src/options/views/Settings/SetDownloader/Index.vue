@@ -179,16 +179,10 @@ const columns = [
     <a-alert :title="t('route.Settings.SetDownloader')" type="info" show-icon style="margin-bottom: 12px" />
 
     <a-card>
-      <a-flex align="center" gap="small" wrap style="margin-bottom: 16px">
-        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
-
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-
-        <a-divider type="vertical" />
-
-        <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span>{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
-
-        <a-flex flex="auto" justify="flex-end" align="center" gap="small">
+      <!-- 搜索框与筛选下拉走 a-card 的 #extra：固定在卡片头部右侧，不随表格内容滚动。
+         原来是 .toolbar > .toolbar-right 两层 flex 容器靠 justify-content 推到最右。 -->
+      <template #extra>
+        <a-flex align="center" gap="small">
           <a-input
             v-model:value="searchText"
             :placeholder="t('common.search')"
@@ -199,9 +193,11 @@ const columns = [
           </a-input>
 
           <a-dropdown>
-            <a-button>
-              <template #icon><FilterOutlined /></template>
-            </a-button>
+            <a-tooltip :title="t('common.filter')">
+              <a-button>
+                <template #icon><FilterOutlined /></template>
+              </a-button>
+            </a-tooltip>
             <template #popupRender>
               <a-menu style="min-width: 200px">
                 <a-menu-item key="enabled">
@@ -237,7 +233,17 @@ const columns = [
             </template>
           </a-dropdown>
         </a-flex>
-      </a-flex>
+      </template>
+
+        <template #title>
+        <a-flex align="center" gap="small" wrap>
+          <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
+
+          <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+
+          <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span>{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
+        </a-flex>
+      </template>
 
       <a-table
         :columns="columns"
@@ -304,5 +310,12 @@ const columns = [
 <style scoped>
 .set-downloader {
   padding: 16px;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 </style>

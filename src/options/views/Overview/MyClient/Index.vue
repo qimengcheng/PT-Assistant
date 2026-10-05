@@ -400,7 +400,35 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
   </a-alert>
 
   <a-card size="small">
-    <a-flex align="center" :gap="4" style="padding: 8px 0">
+    <!-- 批量操作区走 a-card 的 title、搜索框与列选择器走 #extra：
+         extra 固定在卡片头部右侧，不随表格内容滚动，也不用靠 flex:1 撑留白 -->
+    <template #extra>
+      <a-flex align="center" gap="small" wrap>
+        <a-tooltip :title="t('MyClient.columnSelector')">
+          <a-select
+            v-model:value="selectedColumnKeys"
+            :options="columnOptions"
+            mode="multiple"
+            size="small"
+            allow-clear
+            style="max-width: 200px"
+          />
+        </a-tooltip>
+
+        <a-input
+          v-model:value="searchText"
+          :placeholder="t('MyClient.searchPlaceholder')"
+          allow-clear
+          size="small"
+          style="max-width: 300px"
+        >
+          <template #prefix><SearchOutlined /></template>
+        </a-input>
+      </a-flex>
+    </template>
+
+        <template #title>
+      <a-flex align="center" gap="small" wrap>
       <a-tooltip :title="t('MyClient.pushToDownloader.navBtn')">
         <a-button type="text" @click="showPushToDownloaderDialog = true">
           <template #icon><CloudUploadOutlined /></template>
@@ -479,33 +507,8 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
           </a-card>
         </template>
       </a-dropdown>
-
-      <a-divider type="vertical" />
-
-      <!-- column selector -->
-      <a-tooltip :title="t('MyClient.columnSelector')">
-        <a-select
-          v-model:value="selectedColumnKeys"
-          :options="columnOptions"
-          mode="multiple"
-          size="small"
-          allow-clear
-          style="max-width: 200px"
-        />
-      </a-tooltip>
-
-      <a-flex flex="auto" justify="flex-end" align="center">
-        <a-input
-          v-model:value="searchText"
-          :placeholder="t('MyClient.searchPlaceholder')"
-          allow-clear
-          size="small"
-          style="max-width: 300px"
-        >
-          <template #prefix><SearchOutlined /></template>
-        </a-input>
-      </a-flex>
-    </a-flex>
+          </a-flex>
+    </template>
 
     <a-table
       :columns="tableHeader"

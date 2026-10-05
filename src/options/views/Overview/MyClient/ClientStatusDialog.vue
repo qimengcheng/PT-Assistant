@@ -185,19 +185,20 @@ function onEnter() {
             </a-button>
           </a-tooltip>
 
-          <a-button
-            type="text"
-            size="small"
-            :href="d.address"
-            :title="t('MyClient.clientStatusDialog.openClient')"
-            rel="noopener noreferrer nofollow"
-            target="_blank"
-            @click.stop
-          >
-            <template #icon>
-              <ExportOutlined />
-            </template>
-          </a-button>
+          <a-tooltip :title="t('MyClient.clientStatusDialog.openClient')">
+            <a-button
+              type="text"
+              size="small"
+              :href="d.address"
+              rel="noopener noreferrer nofollow"
+              target="_blank"
+              @click.stop
+            >
+              <template #icon>
+                <ExportOutlined />
+              </template>
+            </a-button>
+          </a-tooltip>
         </div>
       </div>
 

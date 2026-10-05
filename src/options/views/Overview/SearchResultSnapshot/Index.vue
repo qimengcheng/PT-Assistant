@@ -108,23 +108,23 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
 
 <template>
   <a-card size="small">
-    <template #title>
-      <a-flex align="center" gap="small">
-        <a-button danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-        <a-flex flex="auto" justify="flex-end" align="center">
-          <a-input
-            v-model:value="tableWaitFilter"
-            allow-clear
-            size="small"
-            class="toolbar-filter"
-            :placeholder="t('SearchResultSnapshot.table.filterLabel')"
-          >
-            <template #prefix>
-              <SearchOutlined />
-            </template>
-          </a-input>
-        </a-flex>
-      </a-flex>
+    <!-- 筛选框走 a-card 的 extra：在卡片右上角固定，不随内容滚动 -->
+    <template #extra>
+      <a-input
+        v-model:value="tableWaitFilter"
+        allow-clear
+        size="small"
+        class="toolbar-filter"
+        :placeholder="t('SearchResultSnapshot.table.filterLabel')"
+      >
+        <template #prefix>
+          <SearchOutlined />
+        </template>
+      </a-input>
+    </template>
+
+        <template #title>
+      <a-button danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
     </template>
 
     <a-table
@@ -178,7 +178,6 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
 </template>
 
 <style scoped lang="scss">
-/* 筛选框宽度上限：不是布局，交给 a-flex 也表达不了 */
 .toolbar-filter {
   max-width: 320px;
 }

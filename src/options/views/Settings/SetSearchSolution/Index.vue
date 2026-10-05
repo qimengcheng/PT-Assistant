@@ -245,34 +245,34 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
     <a-alert :title="t('route.Settings.SetSearchSolution')" type="info" show-icon style="margin-bottom: 12px" />
 
     <a-card>
-      <a-flex align="center" gap="small" wrap style="margin-bottom: 16px">
-        <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
+      <!-- 搜索框走 a-card 的 #extra：固定在卡片头部右侧，不随表格内容滚动。
+           原来是 .toolbar > .toolbar-right 两层 flex 容器靠 margin-left:auto 推到最右。 -->
+      <template #extra>
+        <a-input v-model:value="tableFilter" allow-clear :placeholder="t('common.search')" style="width: 240px">
+          <template #prefix><SearchOutlined /></template>
+        </a-input>
+      </template>
 
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+        <template #title>
+        <a-flex align="center" gap="small" wrap>
+          <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-        <a-divider type="vertical" />
+          <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
-        <input
-          ref="importFile"
-          accept="application/json"
-          multiple
-          type="file"
-          style="display: none"
-          @change="importSearchSolution"
-        />
-        <a-button @click="triggerImportFile"><template #icon><ImportOutlined /></template><span>{{ t('common.import') }}</span></a-button>
-        <a-button :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span>{{ t('common.export') }}</span></a-button>
+          <input
+            ref="importFile"
+            accept="application/json"
+            multiple
+            type="file"
+            style="display: none"
+            @change="importSearchSolution"
+          />
+          <a-button @click="triggerImportFile"><template #icon><ImportOutlined /></template><span>{{ t('common.import') }}</span></a-button>
+          <a-button :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span>{{ t('common.export') }}</span></a-button>
 
-        <a-divider type="vertical" />
-
-        <a-button disabled><template #icon><QuestionCircleOutlined /></template><span>{{ t('common.howToUse') }}</span></a-button>
-
-        <a-flex flex="auto" justify="flex-end" align="center">
-          <a-input v-model:value="tableFilter" allow-clear :placeholder="t('common.search')" style="width: 240px">
-            <template #prefix><SearchOutlined /></template>
-          </a-input>
+          <a-button disabled><template #icon><QuestionCircleOutlined /></template><span>{{ t('common.howToUse') }}</span></a-button>
         </a-flex>
-      </a-flex>
+      </template>
 
       <a-table
         :columns="columns"
@@ -370,5 +370,15 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
 <style scoped>
 .set-search-solution {
   padding: 16px;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  margin-left: auto;
 }
 </style>

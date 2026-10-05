@@ -137,29 +137,31 @@ async function dialogLeave() {
 
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-button
-              type="text"
-              color="blue"
-              size="small"
-              :title="t('SetBackup.HistoryDialog.restore')"
-              @click="restoreBackup(record.path)"
-            >
-              <template #icon>
-                <CloudDownloadOutlined />
-              </template>
-            </a-button>
+            <a-tooltip :title="t('SetBackup.HistoryDialog.restore')">
+              <a-button
+                type="text"
+                color="blue"
+                size="small"
+                @click="restoreBackup(record.path)"
+              >
+                <template #icon>
+                  <CloudDownloadOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
 
-            <a-button
-              type="text"
-              color="danger"
-              size="small"
-              :title="t('common.remove')"
-              @click="deleteBackupHistory([record.path])"
-            >
-              <template #icon>
-                <DeleteOutlined />
-              </template>
-            </a-button>
+            <a-tooltip :title="t('common.remove')">
+              <a-button
+                type="text"
+                color="danger"
+                size="small"
+                @click="deleteBackupHistory([record.path])"
+              >
+                <template #icon>
+                  <DeleteOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
           </a-space>
         </template>
       </template>

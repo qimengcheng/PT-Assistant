@@ -652,24 +652,26 @@ const showExportDialog = ref(false);
         <!-- 操作 -->
         <template v-else-if="column.key === 'action'">
           <div class="table-action">
-            <a-button
-              type="text"
-              size="small"
-              :title="t('MyData.table.action.viewHistoryData')"
-              @click="viewHistoryData(record.site)"
-            >
-              <UnorderedListOutlined />
-            </a-button>
-            <a-button
-              type="text"
-              size="small"
-              :disabled="runtimeStore.userInfo.flushPlan[record.site]"
-              :loading="runtimeStore.userInfo.flushPlan[record.site]"
-              :title="t('MyData.table.action.flushData')"
-              @click="flushSiteLastUserInfo([record.site])"
-            >
-              <SyncOutlined />
-            </a-button>
+            <a-tooltip :title="t('MyData.table.action.viewHistoryData')">
+              <a-button
+                type="text"
+                size="small"
+                @click="viewHistoryData(record.site)"
+              >
+                <UnorderedListOutlined />
+              </a-button>
+            </a-tooltip>
+            <a-tooltip :title="t('MyData.table.action.flushData')">
+              <a-button
+                type="text"
+                size="small"
+                :disabled="runtimeStore.userInfo.flushPlan[record.site]"
+                :loading="runtimeStore.userInfo.flushPlan[record.site]"
+                @click="flushSiteLastUserInfo([record.site])"
+              >
+                <SyncOutlined />
+              </a-button>
+            </a-tooltip>
           </div>
         </template>
       </template>

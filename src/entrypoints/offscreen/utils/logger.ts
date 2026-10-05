@@ -65,7 +65,7 @@ export function logger(data: ILoggerItem) {
  * 把内存里那一批日志立刻写出去。
  *
  * ⚠️ 原注释写「页面卸载 / offscreen 即将销毁时调用」——**没有任何地方这么调**。
- * 全仓只有 getLogger 处理器（本文件 :79）一处调用，offscreen 目录里
+ * 全仓只有 getLogger 处理器（本文件末尾 onMessage("getLogger")）一处调用，offscreen 目录里
  * pagehide / beforeunload / visibilitychange 一个都没注册。
  * 后果：日志靠 scheduleFlush 的 500ms 定时器落盘，offscreen 被销毁时定时器随之丢弃，
  * 末批要等到用户**去查日志页**时才被补写。别以为「卸载瞬间那批已经落盘」。

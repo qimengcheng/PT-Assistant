@@ -9,8 +9,12 @@ stats.html
 # 构建产物的备份副本（调试期间留下的 dist-latest 系列，累计约 77MB）
 dist-latest/
 dist-latest_prev*/
-# 各 agent 会话独立的产物目录（PTD_SESSION=<标识> → dist-<标识>/）
+# 各 agent 会话独立的产物目录（PTD_SESSION=<标识> → dist-<标识>-<版本号>/）
 dist-*/
+# 用户验收用的唯一加载目录：指向某个 dist-<会话>-<版本>/chrome-mv3 的目录联接
+dist-verify
+# 构建互斥锁（scripts/build-verify.mjs），构建期间存在、结束即删
+.build-lock/
 .tmp-build/
 
 # 待删除文件缓冲（AGENTS.md §3.6：先移入这里，全部做完再统一删除）

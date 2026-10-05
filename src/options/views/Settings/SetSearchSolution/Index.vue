@@ -359,14 +359,4 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
 .set-search-solution {
   padding: 16px;
 }
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.toolbar-right {
-  margin-left: auto;
-}
 </style>

@@ -444,16 +444,8 @@ function keywordChecked(keyword: string) {
 </template>
 
 <style scoped lang="scss">
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-spacer {
-  flex: 1 1 0;
-}
-
+/* .toolbar / .toolbar-spacer 随 #title + #extra 改造一起失效，已删（无对应 DOM）。
+   .toolbar-filter 仍在用（#extra 里的筛选框宽度约束），名字保留避免无谓 churn。 */
 .toolbar-filter {
   max-width: 320px;
 }

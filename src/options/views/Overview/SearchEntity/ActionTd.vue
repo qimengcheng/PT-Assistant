@@ -93,46 +93,51 @@ function openKeepUploadDialog() {
 
 <template>
   <!-- v-btn-group variant="text" → a-space-compact（一组贴合排列的按钮） -->
+  <!-- 纯图标按钮统一用 a-tooltip 包裹：antd Button 没有 title prop，写 :title 只会
+       透传到原生 button，与本项目其余页面（MyClient/Index.vue 等）的 a-tooltip 风格不一致。 -->
   <a-space-compact :size="btnSize" class="table-action">
-    <a-button
-      v-if="metadataStore.defaultDownloader?.id"
-      :disabled="torrentItems.length == 0"
-      type="text"
-      :title="t('SearchEntity.ActionTd.sendToDefault')"
-      @click="() => sendToDownloader(true)"
-    >
-      <template #icon><DownloadOutlined /></template>
-    </a-button>
+    <a-tooltip v-if="metadataStore.defaultDownloader?.id" :title="t('SearchEntity.ActionTd.sendToDefault')">
+      <a-button
+        :disabled="torrentItems.length == 0"
+        type="text"
+        @click="() => sendToDownloader(true)"
+      >
+        <template #icon><DownloadOutlined /></template>
+      </a-button>
+    </a-tooltip>
 
     <!-- 下载到服务器 -->
-    <a-button
-      :disabled="torrentItems.length == 0"
-      type="text"
-      :title="t('SearchEntity.ActionTd.sendToDownloader')"
-      @click="() => sendToDownloader()"
-    >
-      <template #icon><CloudDownloadOutlined /></template>
-    </a-button>
+    <a-tooltip :title="t('SearchEntity.ActionTd.sendToDownloader')">
+      <a-button
+        :disabled="torrentItems.length == 0"
+        type="text"
+        @click="() => sendToDownloader()"
+      >
+        <template #icon><CloudDownloadOutlined /></template>
+      </a-button>
+    </a-tooltip>
     <!-- 复制下载链接 -->
-    <a-button
-      :disabled="torrentItems.length == 0"
-      :loading="copyTorrentDownloadLinkBtnStatus"
-      type="text"
-      :title="t('SearchEntity.ActionTd.copyLink')"
-      @click="() => copyTorrentDownloadLink()"
-    >
-      <template #icon><CopyOutlined /></template>
-    </a-button>
+    <a-tooltip :title="t('SearchEntity.ActionTd.copyLink')">
+      <a-button
+        :disabled="torrentItems.length == 0"
+        :loading="copyTorrentDownloadLinkBtnStatus"
+        type="text"
+        @click="() => copyTorrentDownloadLink()"
+      >
+        <template #icon><CopyOutlined /></template>
+      </a-button>
+    </a-tooltip>
     <!-- 下载种子文件到本地 -->
-    <a-button
-      :disabled="torrentItems.length == 0"
-      :loading="localDlTorrentDownloadLinkBtnStatus"
-      type="text"
-      :title="t('SearchEntity.ActionTd.localDownload')"
-      @click="() => localDlTorrentDownloadLink()"
-    >
-      <template #icon><SaveOutlined /></template>
-    </a-button>
+    <a-tooltip :title="t('SearchEntity.ActionTd.localDownload')">
+      <a-button
+        :disabled="torrentItems.length == 0"
+        :loading="localDlTorrentDownloadLinkBtnStatus"
+        type="text"
+        @click="() => localDlTorrentDownloadLink()"
+      >
+        <template #icon><SaveOutlined /></template>
+      </a-button>
+    </a-tooltip>
     <!-- 辅种检测 -->
     <a-tooltip :title="t('SearchEntity.KeepUploadDialog.keepUpload')">
       <a-button

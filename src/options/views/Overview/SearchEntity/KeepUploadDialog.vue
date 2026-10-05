@@ -634,9 +634,12 @@ async function createKeepUploadTask() {
 
           <div class="flex-1-1-0 text-truncate">
             <div class="list-item text-body-medium">
-              <a :href="item.data.link" target="_blank" rel="noopener noreferrer nofollow">
-                {{ item.data.title }}
-              </a>
+              <!-- 标题可能很长：ellipsis.tooltip 补上原先缺的悬停提示（原先只有截断、没有 :title） -->
+              <a-typography-text :ellipsis="{ tooltip: item.data.title }">
+                <a :href="item.data.link" target="_blank" rel="noopener noreferrer nofollow">
+                  {{ item.data.title }}
+                </a>
+              </a-typography-text>
             </div>
             <div class="text-body-small">
               {{ t("SearchEntity.KeepUploadDialog.size") }}{{ formatSize(item.data.size ?? 0) }},

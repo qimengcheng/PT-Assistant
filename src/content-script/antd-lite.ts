@@ -5,7 +5,7 @@
  * 全量 install 会遍历 `antdv-next/dist/components.js` 里全部 70 个可安装组件
  * （`app.use(component)`），一个都摇不掉 —— 结果 content-app 单个 chunk 4.3MB
  * （占全部产物 JS 的 65%），每个 PT 站点都要背这份 Vue + 全量 antd。
- * 巨型单文件还会触发 README 踩坑 §13 的 esbuild >512KB 写 Temp 被杀软句柄卡住。
+ * 巨型单文件还会触发 PLAYBOOK §13 的 esbuild >512KB 写 Temp 被杀软句柄卡住。
  *
  * 这份清单怎么来的（不是手拍的）：
  * 从 `src/entrypoints/content-app.ts` → `init.ts` 出发做完整 import 闭包

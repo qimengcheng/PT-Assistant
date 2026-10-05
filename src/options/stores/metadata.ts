@@ -285,6 +285,22 @@ export const useMetadataStore = defineStore("metadata", {
           return i18n.t("SearchEntity.solutionAll");
         }
 
+        /**
+         * `site:a,b,c` 是搜索页直接勾站点产生的作用域键（见 SearchScopeSelect.vue），
+         * 不在这里解析就会把 `m-18,m-24` 这类内部 id 显示到搜索提示条、快照名、
+         * 下载器模板变量里（AGENTS.md §3.5 零容忍项）。
+         */
+        if (solutionId.startsWith("site:")) {
+          const names = solutionId
+            .slice("site:".length)
+            .split(",")
+            .map((id) => id.trim())
+            .filter(Boolean)
+            .map((id) => state.siteNameMap[id] ?? id);
+          if (names.length <= 1) return names[0] ?? solutionId;
+          return i18n.t("SearchEntity.scope.moreSites", [names[0], names.length]);
+        }
+
         return state.solutions[solutionId]?.name ?? solutionId;
       };
     },

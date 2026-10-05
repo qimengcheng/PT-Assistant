@@ -153,19 +153,21 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
   </a-alert>
 
   <a-card class="set-backup">
-    <div class="table-toolbar">
-      <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
-      <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupServer(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+    <template #title>
+      <a-flex align="center" gap="small" wrap>
+        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupServer(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
-      <div class="toolbar-divider" />
+        <div class="toolbar-divider" />
 
-      <a-button :loading="doBackupStatus[localBackup]" @click="doBackup(localBackup)"><template #icon><DatabaseOutlined /></template><span>{{ t('SetBackup.localExport') }}</span></a-button>
-      <a-button @click="() => (showRestoreDialog = true)"><template #icon><ImportOutlined /></template><span>{{ t('SetBackup.localImport') }}</span></a-button>
+        <a-button :loading="doBackupStatus[localBackup]" @click="doBackup(localBackup)"><template #icon><DatabaseOutlined /></template><span>{{ t('SetBackup.localExport') }}</span></a-button>
+        <a-button @click="() => (showRestoreDialog = true)"><template #icon><ImportOutlined /></template><span>{{ t('SetBackup.localImport') }}</span></a-button>
+      </a-flex>
+    </template>
 
-      <div style="flex: 1" />
-
+    <template #extra>
       <a-input v-model:value="searchKey" allow-clear :placeholder="t('common.search')" size="small" style="width: 320px; max-width: 500px" />
-    </div>
+    </template>
 
     <a-table
       :columns="fullTableHeader"
@@ -293,14 +295,6 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 </template>
 
 <style scoped lang="scss">
-.table-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
 /* 竖向分隔线（原来是 <v-divider inset vertical>） */
 .toolbar-divider {
   width: 1px;

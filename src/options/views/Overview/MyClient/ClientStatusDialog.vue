@@ -97,11 +97,13 @@ function onEnter() {
   >
     <!-- 刷新按钮原先挂在 #title 插槽里，会和右上角关闭按钮重叠，移到内容区顶部 -->
     <div class="d-flex justify-end">
-      <a-button type="text" size="small" :title="t('MyClient.refresh')" @click="fetchAll">
-        <template #icon>
-          <ReloadOutlined />
-        </template>
-      </a-button>
+      <a-tooltip :title="t('MyClient.refresh')">
+        <a-button type="text" size="small" @click="fetchAll">
+          <template #icon>
+            <ReloadOutlined />
+          </template>
+        </a-button>
+      </a-tooltip>
     </div>
 
     <a-divider class="ma-0" />

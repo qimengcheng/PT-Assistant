@@ -374,9 +374,11 @@ function dialogLeave() {
 
     <template #footer>
       <div style="display: flex; align-items: center">
-        <a-button :title="t('SentToDownloaderDialog.moreOptions')" type="text" @click="quickSendToClient = !quickSendToClient">
-          <template #icon><AppstoreOutlined /></template>
-        </a-button>
+        <a-tooltip :title="t('SentToDownloaderDialog.moreOptions')">
+          <a-button type="text" @click="quickSendToClient = !quickSendToClient">
+            <template #icon><AppstoreOutlined /></template>
+          </a-button>
+        </a-tooltip>
 
         <div style="flex: 1"></div>
 

@@ -29,7 +29,16 @@ import type { IPtdDBSchema, IPtdDBSchemaV1, IPtdDBSchemaV2 } from "./types.ts";
 
 let opening: Promise<IDBPDatabase<IPtdDBSchema>> | null = null;
 
-function open(): Promise<IDBPDatabase<IPtdDBSchema>> {
+/**
+ * 取共享库句柄。首次调用才真的开库，之后复用同一个 promise。
+ *
+ * 「失败不缓存」必须写成控制流，不能挂在一条游离的 `.catch()` 上 —— 后者长得像无用代码，
+ * 被顺手删掉就静默退化成「本上下文永久拿到同一个 rejection」。
+ * 断言见 scripts/check-indexdb-retry.mjs（双向钉住：失败后必须重试、成功后必须复用）。
+ */
+export async function ptdIndexDb(): Promise<IDBPDatabase<IPtdDBSchema>> {
+  if (opening) return opening;
+
   const pending = openDB<IPtdDBSchema>("ptd", 5, {
     upgrade(db, oldVersion) {
       if (oldVersion < 1) {
@@ -54,17 +63,14 @@ function open(): Promise<IDBPDatabase<IPtdDBSchema>> {
   });
 
   opening = pending;
-  // 开库失败不能被永久缓存：一次 VersionError 或配额错误若留在那个已拒绝的 promise 上，
-  // 本上下文之后每次取库都拿到同一个 rejection，等于永久废掉 —— 所以清空，下次调用重试。
-  // 这里挂 catch 只是为了让它「有人处理过」；pending 本身照常向每个 awaiter 抛出。
-  pending.catch(() => {
+  try {
+    await pending;
+  } catch (error) {
+    // 一次 VersionError 或配额错误不能被永久缓存，否则本上下文之后每次取库都拿到同一个
+    // 已拒绝的 promise，等于永久废掉 —— 清空，下次调用重开。
+    // 比对 identity 再清：并发下可能已有别的调用抢先重开成功，不能把人家的好 promise 抹掉。
     if (opening === pending) opening = null;
-  });
-
-  return pending;
-}
-
-/** 取共享库句柄。首次调用才真的开库，之后复用同一个 promise */
-export function ptdIndexDb(): Promise<IDBPDatabase<IPtdDBSchema>> {
-  return opening ?? open();
+    throw error;
+  }
+  return opening;
 }

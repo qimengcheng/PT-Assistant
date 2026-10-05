@@ -20,6 +20,9 @@ dist-verify
 # 待删除文件缓冲（AGENTS.md §3.6：先移入这里，全部做完再统一删除）
 tobedeleted/
 
+# 一次性审查底稿：本地留存供追溯，按要求不入库
+comment-audit-2026-10-05.md
+
 # IDE
 .idea/
 .vscode/

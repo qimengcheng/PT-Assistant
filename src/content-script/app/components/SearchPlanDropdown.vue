@@ -61,11 +61,10 @@ function search(planId: string) {
     <DownOutlined style="cursor: pointer; color: #8c8c8c" @click.stop />
     <template #popupRender>
       <a-menu>
-        <a-menu-item
-          v-for="plan in searchPlans"
-          :key="`${itemId}|${plan.id}`"
-          @click.stop="search(plan.id)"
-        >
+        <!-- 不能加 .stop：@v-c/menu 回调 onClick 时传的是 info 对象不是原生事件，
+             stopPropagation() 会当场抛 TypeError，菜单项就永远点不动。
+             浮层在 shadowRoot 的 contentOverlay 里，不需要挡冒泡。 -->
+        <a-menu-item v-for="plan in searchPlans" :key="`${itemId}|${plan.id}`" @click="search(plan.id)">
           {{ plan.name }}
         </a-menu-item>
       </a-menu>

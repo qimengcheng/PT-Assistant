@@ -383,10 +383,16 @@ function dialogLeave() {
                   </a-tooltip>
                   <template #popupRender>
                     <a-menu>
+                      <!-- ⚠️ 这里不能写 @click.stop：@v-c/menu 回调 props.onClick 时传的是
+                           info 对象（{key, keyPath, item, domEvent}）而不是原生事件，
+                           .stop 会对它调 stopPropagation() → TypeError → handler 根本不执行，
+                           而且异常在它自己的 onItemClick 之前抛出，连下拉都不会关。
+                           浮层挂在 shadowRoot 的 contentOverlay 里、不在本行的 DOM 子树内，
+                           本来也不需要挡冒泡。 -->
                       <a-menu-item
                         v-for="tag in downloader.suggestTags"
                         :key="tag"
-                        @click.stop="() => quickSendToDownloader(downloader, path, tag)"
+                        @click="() => quickSendToDownloader(downloader, path, tag)"
                       >
                         {{ tag }}
                       </a-menu-item>

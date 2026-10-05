@@ -127,6 +127,23 @@ export default defineConfig({
         // 同理顶掉 `crypto` 的 browser-external stub（crypto-js 里那条 require 在浏览器是死分支，
         // 但打包器仍会静态产出 stub 文件），见 src/extends/browserNodeCrypto.ts。
         { find: /^crypto$/, replacement: path.resolve(rootDir, "src/extends/browserNodeCrypto.ts") },
+        /**
+         * `buffer` 同理，且这里两个后果都真实发生过（v0.22.38 实测）：
+         * 1. 不接管时 rolldown 按 external 处理它，内容是 `exports = {}` 的空 stub，于是
+         *    `packages/downloader/utils.ts` 的 `import { Buffer } from "buffer"` 拿到
+         *    undefined，`Buffer.from(...)` 抛 TypeError；
+         * 2. 该 stub 还会被产出为 `__vite-browser-external-*.js`，且**直接落在扩展根目录** ——
+         *    Chrome 拒载根目录下以 `_` 开头的文件，整个扩展直接装不上（同 browserPath.ts 那个坑）。
+         *
+         * 接到一个本地中转文件而不是直接指包入口：那样模块 id 仍是 "buffer"，产物文件名会
+         * 继续叫 `__vite-browser-external-*`，名字含义与实际内容不符（里面装的是真 buffer），
+         * 将来 rolldown 一旦改成真 externalize 就会静默失效。详见 src/extends/browserBuffer.ts。
+         *
+         * ⚠️ 这条 alias 覆盖不了「没有 import 语句的自由变量 Buffer」—— 那种它管不到
+         * （`urlencode`@2 的 `decode()` 里就有一行，见 packages/downloader/utils.ts 的
+         * decodePercentAscii 注释）。两处要分别处理。
+         */
+        { find: /^buffer$/, replacement: path.resolve(rootDir, "src/extends/browserBuffer.ts") },
         // 与 PT-depiler 保持一致的别名约定，site/social 包可以零修改平移
         { find: "@ptd", replacement: path.resolve(rootDir, "packages") },
         { find: "@", replacement: path.resolve(rootDir, "src") },

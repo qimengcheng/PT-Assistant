@@ -2,7 +2,6 @@ import { Buffer } from "buffer";
 import type { AxiosRequestConfig } from "axios";
 import parseTorrent, { type Instance as TorrentInstance, type ParsedFile } from "parse-torrent";
 import isValidFilename from "valid-filename";
-import { decode } from "urlencode";
 
 import { axios } from "./utils/adapter";
 
@@ -36,6 +35,58 @@ export interface ParsedTorrent {
 
 const utf8FilenameRegex = /filename\*=UTF-8''([\w%\-\.]+)(?:; ?|$)/i;
 const asciiFilenameRegex = /^filename=(["']?)(.*?[^\\])\1(?:; ?|$)/i;
+
+/**
+ * 解 `content-disposition` 里 `filename="…"` 那种 ASCII 声明的百分号编码文件名。
+ *
+ * ## 为什么不用 `urlencode` 的 `decode`
+ *
+ * `urlencode`@2 的 ESM 产物（`node_modules/urlencode/dist/esm/index.js` 的 `decode()`）在
+ * 非 UTF-8 分支里有一行**裸 `Buffer`**：
+ *
+ * ```js
+ * import iconv from 'iconv-lite';   // ← 顶部只 import 了 iconv
+ * const buf = Buffer.from(bytes);    // ← 假定 Buffer 是 Node 全局，没有任何 import
+ * ```
+ *
+ * 扩展环境没有 `Buffer` 全局，走到这行就是 `ReferenceError: Buffer is not defined`。
+ * 而 content-disposition 的解析是 `getRemoteTorrentFile()` 的必经步骤，**所有走本地中转的
+ * 下载器推送、以及「扩展方式」本地下载都会踩到**，且条件只是站点用 `filename="…"` 形态
+ * 返回文件名（中文名种子几乎都是这种形态）—— 表现为下载历史里这两类任务全挂。
+ *
+ * 三条常见的绕法都不成立，别再重试：
+ * - `resolve.alias` 指到 buffer 包：alias 只作用于**有 import 语句**的模块，这里是自由变量；
+ * - `define: { Buffer: … }`：纯文本替换、不建作用域绑定，只是把一个 ReferenceError 换成另一个；
+ * - 挂 `globalThis.Buffer`：纯副作用导入会被 rolldown 当成无导出被消费而 tree-shake。
+ *
+ * 原版 PT-depiler 靠 `vite-plugin-node-polyfills` 的 `globals: { Buffer: true }` 兜住，本仓
+ * 没有该插件。与其为这一个函数 fork 整个包 + 加一条模块解析插件，不如就地自实现。
+ *
+ * ## 与原行为的等价性
+ *
+ * 原路径是 `iconv.decode(Buffer.from(bytes), "ascii")`，按字节对齐即可：
+ * - `%XX` 取该字节；其余字符取 `charCodeAt` 并按 `Buffer.from` 的语义截断成 8 位（`& 0xff`）；
+ * - iconv-lite 的 `ascii` 是 **7-bit** 编码，`> 127` 的字节解成 `?`（它的 `defaultCharSingleByte`），
+ *   而不是 latin1 的原值直通。这条必须照抄，否则站点在 `filename="…"` 里塞 GBK 原始字节时行为会变。
+ *
+ * `filename*=UTF-8''…` 那条分支不需要这一步：`urlencode.decode(x)` 单参时内部就是
+ * `decodeURIComponent(x)`，直接用内置函数即可。
+ */
+function decodePercentAscii(str: string): string {
+  let out = "";
+  for (let i = 0; i < str.length; ) {
+    let byte: number;
+    if (str[i] === "%") {
+      byte = parseInt(str.substring(i + 1, i + 3), 16);
+      i += 3;
+    } else {
+      byte = str.charCodeAt(i) & 0xff;
+      i += 1;
+    }
+    out += byte < 0x80 ? String.fromCharCode(byte) : "?";
+  }
+  return out;
+}
 
 const magnetUriV1Pattern = /xt(?:\.1)?=urn:btih:(?<hash>[a-z0-9]{32}(?:[a-z0-9]{8})?)/i;
 const magnetUriV2Pattern = /xt(?:\.1)?=urn:btmh:1220(?<hash>[a-z0-9]{64})/i;
@@ -81,7 +132,7 @@ export async function getRemoteTorrentFile(options: AxiosRequestConfig = {}): Pr
   if (disposition && disposition.includes("filename")) {
     let dispositionName = "";
     if (utf8FilenameRegex.test(disposition)) {
-      dispositionName = decode(utf8FilenameRegex.exec(disposition)![1]);
+      dispositionName = decodeURIComponent(utf8FilenameRegex.exec(disposition)![1]);
     } else {
       // prevent ReDos attacks by anchoring the ascii regex to string start and
       // slicing off everything before 'filename='
@@ -90,7 +141,7 @@ export async function getRemoteTorrentFile(options: AxiosRequestConfig = {}): Pr
         const partialDisposition = disposition.slice(filenameStart);
         const matches = asciiFilenameRegex.exec(partialDisposition);
         if (matches != null && matches[2]) {
-          dispositionName = decode(matches[2], "ascii"); // 按照规范使用 ascii 转换
+          dispositionName = decodePercentAscii(matches[2]); // 按照规范使用 ascii 转换，见 decodePercentAscii 注释
         }
       }
     }

@@ -16,6 +16,16 @@ export interface IExtensionStorageSchema {
 
   metadata: IMetadataPiniaStorageSchema;
 
+  /**
+   * @deprecated 站点用户信息的按天存档已迁到 IndexedDB（`ptd` 库 `user_info` store，
+   * 复合主键 [site, date]），读写一律走 @/shared/userInfoArchive。
+   *
+   * 这个键**暂时必须保留**，有两个原因，删掉任一处都会出事：
+   * ① 迁移要读它（userInfoArchive.ensureMigrated 把旧数据搬进 IDB 后清空，但键本身还在）；
+   * ② 备份格式不变 —— backup.ts 的 storageKey 仍列着 "userInfo"，
+   *    旧备份包要能恢复、新备份包要能被旧版本读。
+   * 等新版本跑过一轮迁移、确认没有回滚需求后，再连同 backup.ts 的字段映射一起清理。
+   */
   userInfo: TUserInfoStorageSchema; // 用于存储用户信息
   searchResultSnapshot: TSearchResultSnapshotStorageSchema; // 用于存储搜索结果快照
   keepUploadTask: TKeepUploadTaskStorageSchema; // 用于存储辅种任务

@@ -5,8 +5,8 @@
  */
 import { isValid } from "date-fns";
 
-import { extStore } from "@/storage.ts";
 import type { IStoredUserInfo, TUserInfoStorageSchema } from "@/shared/types.ts";
+import { readAllArchive, replaceArchive } from "@/shared/userInfoArchive.ts";
 
 // 修复用户信息中的坏数据
 function fixStoredUserInfo(userInfo: Partial<IStoredUserInfo>): { fixed: IStoredUserInfo; hasChanges: boolean } {
@@ -56,7 +56,10 @@ function fixStoredUserInfo(userInfo: Partial<IStoredUserInfo>): { fixed: IStored
 // 修复所有存储的用户信息数据
 export async function fixAllStoredUserInfo(): Promise<void> {
   try {
-    const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
+    // 按天存档已从 chrome.storage.local 的 `userInfo` 键迁到 IndexedDB，读写统一走
+    // @/shared/userInfoArchive —— 不能在这里另开一套直连 extStore 的实现，
+    // 否则迁移后这条路径读到的是空对象，脏数据修复会静默变成空操作。
+    const userInfoStore = await readAllArchive();
 
     let hasChanges = false;
     const fixedUserInfoData = {} as TUserInfoStorageSchema;
@@ -77,7 +80,7 @@ export async function fixAllStoredUserInfo(): Promise<void> {
 
     // 只有当有变化时才更新存储
     if (hasChanges) {
-      await extStore.setItem("userInfo", fixedUserInfoData);
+      await replaceArchive(fixedUserInfoData);
       console.debug("[PTD] Fixed corrupted user info data");
     }
   } catch (error) {

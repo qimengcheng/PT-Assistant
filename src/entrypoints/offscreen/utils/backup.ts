@@ -19,6 +19,7 @@ import type {
 import { logger } from "./logger.ts";
 import { ptdIndexDb } from "../adapter/indexdb.ts";
 import { extStore } from "@/storage.ts";
+import { readAllArchive, replaceArchive } from "@/shared/userInfoArchive.ts";
 
 export const storageKey = [
   "config",
@@ -48,7 +49,10 @@ export async function createBackupData(backupFields: TBackupFields[] = []): Prom
   // 处理直接从 chrome.storage.local 读取的字段
   for (const field of storageKey) {
     if (backupFields.includes(field as TBackupFields)) {
-      backupData[field] = await extStore.getItem(field);
+      // `userInfo` 的按天存档已迁到 IndexedDB 的 user_info store，但**备份文件格式不变**
+      // （仍是 site → date → userInfo 的嵌套 Record）：这样旧备份包照样能恢复，
+      // 跨版本恢复也不需要判断对方是哪个版本写的。
+      backupData[field] = field === "userInfo" ? await readAllArchive() : await extStore.getItem(field);
     }
   }
 
@@ -205,7 +209,8 @@ export async function restoreBackupData(
       let fieldData = restoreData[field] as IExtensionStorageSchema[typeof field];
       if (fieldData) {
         if (field === "userInfo" && keepExistUserInfo) {
-          const userInfoStore = ((await extStore.getItem("userInfo")) ?? {}) as TUserInfoStorageSchema;
+          // 合并基准从 IndexedDB 取（见类型定义处：该存档已不再生成在 chrome.storage 的 userInfo 键里）
+          const userInfoStore = await readAllArchive();
           fieldData = toMerged(fieldData, userInfoStore);
         }
 
@@ -241,7 +246,13 @@ export async function restoreBackupData(
           }
         }
 
-        await extStore.setItem(field, fieldData);
+        if (field === "userInfo") {
+          // 覆盖式恢复：先 clear 再逐条 put，语义与迁移前的整键 setItem 一致
+          await replaceArchive(fieldData as unknown as TUserInfoStorageSchema);
+        } else {
+          // 上面的分支已把 field 收窄到不含 "userInfo"，但 fieldData 仍按全键联合声明，需同步收窄
+          await extStore.setItem(field, fieldData as IExtensionStorageSchema[typeof field]);
+        }
       }
     }
   }

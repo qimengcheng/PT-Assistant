@@ -150,6 +150,13 @@ jobs:
       - name: Check no imperative async-store reads in mount hooks
         run: node scripts/check-store-hydration.mjs
 
+      # 前五条是**静态扫描**，这条是**行为断言**：懒开的共享库有两条不变量，静态判不出来 ——
+      # 失败不能被缓存（否则一次 VersionError 让本上下文永久取不到库），
+      # 成功必须被复用（否则「修重试」会变成每次调用重开一个连接）。
+      # 守的就是 `if (opening === pending) opening = null` 这一行被当成无用代码删掉。
+      - name: Check lazy IndexedDB open retries on failure and caches on success
+        run: node scripts/check-indexdb-retry.mjs
+
       # 版本号守卫的**兜底**（主防线是本地 .githooks 里的 pre-commit / commit-msg：
       # CI 只在 push 时触发，本地连提 5 次它一次都不跑，等历史定型就晚了）。
       # 这里检查 HEAD 这一条：「提交消息版本号 == package.json」且「== 父提交最大 + 1」。

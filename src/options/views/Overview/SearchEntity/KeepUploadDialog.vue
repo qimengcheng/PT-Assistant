@@ -366,7 +366,11 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
       result.verified = true;
       result.verifiedBy = baseMatch.pieces === "match" ? "pieces" : "files";
     } else {
-      // 判不出来（比如两边都没算出指纹）时，才退回逐条比对文件清单
+      // 兜底：逐条比对文件清单。
+      // ⚠️ 原注释写「判不出来（比如两边都没算出指纹）时，**才**退回」——不对：
+      // 这里的 else 收的是 verdict !== "identical"，**包含 "different"**（即已确定不是同一份，
+      // 见 match.ts:146），而 legacyVerify 在长度一致且文件齐全时仍会返回 true、
+      // 把一个「已判定不同」的结果标成 verified。所以别把它读成「只在无结论时才走」。
       result.verified = legacyVerify(torrent, baseTorrentInfo);
       result.verifiedBy = "legacy";
     }

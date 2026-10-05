@@ -88,9 +88,13 @@ export async function getSiteInstance<TYPE extends "private" | "public">(
 }
 
 /**
- * 站点图标抓取队列：getFavicon 最坏要串行发 4 次 HTTP（首页 → manifest → /favicon.ico → 本体），
- * 且这些 axios 调用没有 timeout。若不加限制，一次性初始化几十个站点会同时打出几十个
- * 全页请求，互相争抢带宽、拖慢整个页面。这里限制并发并加超时兜底。
+ * 站点图标抓取队列：getFavicon 最坏要串行发 4 次 HTTP（首页 → manifest → /favicon.ico → 本体）。
+ * 不加限制的话，一次性初始化几十个站点会同时打出几十个全页请求，互相争抢带宽、拖慢整个页面。
+ * 这里限制并发，并加一道总时长兜底。
+ *
+ * ⚠️ 原注释说「这些 axios 调用没有 timeout」——**上游早已改掉**：packages/site/utils/favicon.ts
+ * 每个请求都显式带 timeout（FAVICON_TIMEOUT = 5e3，见其 :119/:140/:156/:202/:240）。
+ * 下面这个 8s Promise.race 现在只是**总时长上限**，不是「补缺失的单请求超时」。
  */
 const faviconQueue = new PQueue({ concurrency: 6 });
 const FAVICON_TIMEOUT = 8000;

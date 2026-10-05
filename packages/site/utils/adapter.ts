@@ -1,10 +1,13 @@
 /**
- * 此处为 @pkg/site 提供一些与平台相关的工具函数和适配器，
+ * 此处为 site 包提供一些与平台相关的工具函数和适配器，
  *
- * 在 pkg/site 中，难免使用一些与平台有关的工具，比如 使用 axios 进行网络请求，获取cookies
+ * 在 site 包中，难免使用一些与平台有关的工具，比如 使用 axios 进行网络请求，获取cookies
  * 此处为这些操作提供统一的出口
- * 来尽可能实现 pkg/site 的 schemas 和 definitions 实现与浏览器平台能解耦
+ * 来尽可能实现 site 包的 schemas 和 definitions 实现与浏览器平台能解耦
  * （其他地方只要修改此处的实现即可）
+ *
+ * ⚠️ 本仓的别名只有 `@ptd/*`（映射到 `packages/`，见 tsconfig.json 与 wxt.config.ts）；
+ * 原注释写的 `@pkg/site` / `pkg/site` 是上游仓库的叫法，**在本仓不存在**。
  *
  */
 
@@ -23,7 +26,7 @@ import type { IExtensionStorageSchema } from "@/storage.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types/storages/metadata.ts";
 import { extStore } from "@/storage.ts";
 
-// 默认允许 pkg/site 中的 axios 请求替换 unsafeHeader
+// 默认允许 site 包中的 axios 请求替换 unsafeHeader
 export const axios = setupRetryWhenCloudflareBlock(setupReplaceUnsafeHeader(axiosRaw));
 
 /**

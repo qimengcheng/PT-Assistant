@@ -477,7 +477,8 @@ async function downloadTorrentToLocalFile(
     }
   }
 
-  // 如果设置为 extension，直接使用 chrome.downloads 方法
+  // 如果设置为 browser，直接使用 chrome.downloads 方法
+  // （别和下面的 "extension" 混了 —— 那条分支才是走 chrome.tabs + SW 代理）
   if (localDownloadMethod === "browser" && ["GET", "POST"].includes(downloadMethod.toUpperCase())) {
     try {
       // 将 AxiosRequestConfig 转换为 chrome.downloads.DownloadOptions， 我们在这里只考虑 method, body, headers

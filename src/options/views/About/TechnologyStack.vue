@@ -1,7 +1,13 @@
 <script setup lang="ts">
 /**
  * 项目参考与引用页（antdv-next 平移）。
- * PT 助手历代项目时间线 + 当前 package.json 依赖清单（localStorage 缓存，异步补全 npm homepage）。
+ * PT 助手历代项目时间线 + 依赖清单（localStorage 缓存，异步补全 npm homepage）。
+ *
+ * ⚠️ 原注释说「**当前** package.json 依赖清单」——与实现不符，实际是个**只增不减的历史并集**：
+ *  - :49 用 `??=`，从 package.json 里删掉的依赖会永远留在表里，不会消失；
+ *  - :67 的 finally **无条件**写 version，查询失败的条目也被永久标记为「已同步」，
+ *    下一轮不再重查，「保留 npmjs 兜底链接」实际上是**永久停在兜底**。
+ * 所以这张表只会越积越多、也修不回来 —— 当成「看过的依赖的并集」，别当现状清单。
  */
 import axios from "axios";
 import { computed } from "vue";

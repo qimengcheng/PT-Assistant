@@ -55,7 +55,9 @@ export const clientMetaData: TorrentClientMetaData = {
     BypassCSRF: {
       allowed: false,
     },
-    // API 无文件级/peers/tracker 管理能力，保持不支持
+    // 文件级/peers/tracker **有意未接**（下面五项全 allowed: false，本文件一次都没调用）。
+    // 注意类型联合里其实声明了 Task.BT.File / Peer / Tracker —— 「API 没有这些端点」
+    // 与「我们决定不接」是两回事，别说成前者。
     FileList: {
       allowed: false,
     },
@@ -105,7 +107,9 @@ type SynoApiEndPointDownload =
 
 /**
  * Download Station API v2
- * @note: This API v2 is not documented, So don't use it for any reason
+ * @note This API v2 没有公开文档，但**本文件正在用**（Task.Statistic 等，见下）。
+ *       原注释写「don't use it for any reason」是上游平移时留下的，与实现直接矛盾 ——
+ *       照它把这一族端点当待清死代码会删掉正在跑的功能。
  */
 type SynoApiEndPointDownloadV2 =
   | "SYNO.DownloadStation2.BTSearch"

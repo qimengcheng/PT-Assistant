@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * 媒体库浏览页（antdv-next 平移）。
- * 跨媒体服务器搜索影片，CSS columns 瀑布流展示，悬停卡片查看详情/访问原页；
+ * 跨媒体服务器搜索影片，<a-masonry> 瀑布流展示（不是手写 CSS columns 了，见下方 :335 的交棒说明），
+ * 悬停卡片查看详情/访问原页；
  * 支持服务器范围多选、滚动自动加载更多（配置项）与手动加载更多。
  */
 import { computed, onMounted, onUnmounted, ref } from "vue";
@@ -285,7 +286,8 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
 
 <style scoped>
 .media-server-entity {
-  /* 不再加 padding：外壳 .content 已有 16px padding（style.css），叠加会比其他页多一圈空白 */
+  /* 不再加 padding：外壳 .content 自带 padding（style.css，改那里就行），
+     这里再叠一层会比其他页多一圈空白。数值不写进注释，免得改一次就过期一次。 */
 }
 .load-more-sentinel {
   height: 1px;

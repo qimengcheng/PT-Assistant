@@ -1,6 +1,9 @@
 /**
- * 此处为 @pkg/downloader 提供与平台相关的适配器（对齐 @pkg/site 的 utils/adapter 模式），
+ * 此处为 downloader 包提供与平台相关的适配器（对齐 site 包的 utils/adapter 模式），
  * 将 axios 的包装统一收口在 utils 层，各下载器实体从 `../utils` 导入即可，无需自行包装。
+ *
+ * ⚠️ 本仓的别名只有 `@ptd/*`（映射到 `packages/`，见 tsconfig.json 与 wxt.config.ts），
+ * 原注释写的 `@pkg/downloader` / `@pkg/site` **在本仓不存在** —— 照它去 import 或搜索会一无所获。
  */
 
 import axiosRaw from "axios";

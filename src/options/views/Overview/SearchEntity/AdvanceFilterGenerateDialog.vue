@@ -191,8 +191,10 @@ function formatSizeTooltip(value?: number) {
           @toggle="(v) => toggleKeywordStateFn('tags', String(v))"
         >
           <template #item="{ item: tag }">
-            <!-- 原本给 a-tag 传了 `bordered` 属性，antdv-next 1.5.6 下 true/false 都渲染 filled（死属性），
-                 已删，外观不变；确实要描边请写 variant="outlined" -->
+            <!-- 原本给 a-tag 传了 `bordered`，已删、默认外观不变。删的理由不是「死属性」——
+                 那个说法是错的：Tag 确实声明了 bordered?: boolean（无 @deprecated），
+                 hooks/useColor.js:16 真读它，语义是**降级**（false → 强制 filled）。
+                 它造不出描边；要描边请写 variant="outlined" -->
             <a-tag :color="tag.color" class="mr-1">
               <template v-if="preDefinedTorrentTagNameSet.includes(tag.name)" #icon>
                 <PushpinOutlined class="pin-icon" />

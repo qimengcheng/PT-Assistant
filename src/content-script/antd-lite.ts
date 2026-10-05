@@ -8,15 +8,17 @@
  * 巨型单文件还会触发 PLAYBOOK §13 的 esbuild >512KB 写 Temp 被杀软句柄卡住。
  *
  * 这份清单怎么来的（不是手拍的）：
- * 从 `src/entrypoints/content-app.ts` → `init.ts` 出发做完整 import 闭包
- * （76 个文件，含 content 复用的 options 组件 SentToDownloaderDialog / TorrentTitleTd 等），
+ * 从 `src/content-script/app/init.ts` 出发做完整 import 闭包
+ * （含 content 复用的 options 组件 SentToDownloaderDialog / TorrentTitleTd 等），
  * 抽出模板里出现的全部 `a-*` 标签，再用 Node 实跑每个组件的 `install()`
  * 得到「谁注册谁」的权威映射，做最小集合覆盖。
  *
- * 全量 install 共注册 139 个组件名，这里只装 20 个父组件 + StyleProvider，
- * 覆盖模板实际用到的 24 个组件（父组件的 install 会连带注册自己的子组件，
- * 例如 Menu → AMenuItem/ASubMenu/AMenuDivider，Table → ATableColumn/ATableSummary…，
- * 连带后实际注册 43 个名字）。下面的计数取自 2026-10-04 的校验脚本输出。
+ * 全量 install 共注册 139 个组件名（这个数是稳的），这里只装清单里的父组件 + StyleProvider，
+ * 覆盖模板实际用到的组件（父组件的 install 会连带注册自己的子组件，
+ * 例如 Menu → AMenuItem/ASubMenu/AMenuDivider，Table → ATableColumn/ATableSummary…）。
+ * ⚠️ **父组件数与实际注册名数别手抄** —— 它们随闭包变化，跑
+ * `node scripts/check-content-antd-lite.mjs` 的输出才是准的（AGENTS §3.4 同款要求）。
+ * 抄一次就过期一次。
  *
  * TODO(维护)：新增/删除 content 侧模板里的 `a-*` 标签时，必须同步这张表，并跑
  * `node scripts/check-content-antd-lite.mjs` 复核（它做依赖闭包 + 标签比对，FAIL 时非零退出）。

@@ -2,7 +2,8 @@
  * 右键菜单：划词搜索 / 豆瓣·IMDb 链接搜索 / 下载链接推送到下载器。
  * 平移自 PT-depiler background/utils/contextMenus.ts，适配点：
  * - extStorage → extStore（@webext-core/storage）
- * - openOptionsPage 本地实现（新项目无 base.ts）
+ * - openOptionsPage → 复用 ./base.ts 的同名导出（本文件原先自己抄了一份，
+ *   而且抄漏了它 :24-27 的 runtime.openOptionsPage 兜底 —— tabs.create 被拒时会静默无反应）
  * - chrome.i18n.getMessage → 中文字符串（新项目未铺 _locales）
  * - 搜索路由 /search-entity → /search；图标路径 icons/logo/128.png → icon/128.png
  *
@@ -28,6 +29,7 @@ import { type ITorrent } from "@ptd/site/types/torrent.ts";
 import { extStore } from "@/storage.ts";
 import { onMessage, sendMessage } from "@/messages.ts";
 import { type IDownloaderMetadata } from "@/shared/types/storages/metadata.ts";
+import { openOptionsPage } from "./base.ts";
 
 const contextMenusId = "PT-Assistant-Context-Menus";
 
@@ -130,19 +132,7 @@ onMessage("addContextMenu", async ({ data }) => addContextMenu(data));
 onMessage("removeContextMenu", async ({ data }) => removeContextMenu(data));
 onMessage("clearContextMenus", async () => clearContextMenus());
 
-/** 打开 options 页指定路由（带 query，经 urlencode 后拼到 hash 路由上） */
-function openOptionsPage(url?: string | { path: string; query?: Record<string, any> }) {
-  let target: string | undefined;
-  if (url && typeof url !== "string") {
-    const query = new URLSearchParams(
-      Object.entries(url.query ?? {}).map(([k, v]) => [k, String(v)]),
-    ).toString();
-    target = url.path + (query ? "?" + query : "");
-  }
-  target ??= "/";
-
-  chrome.tabs.create({ url: "/options.html#" + target }).catch();
-}
+/** 打开 options 页指定路由（带 query，经 urlencode 后拼到 hash 路由上）—— 复用 base.ts 的实现 */
 
 async function downloadLinkPush(
   link: string,

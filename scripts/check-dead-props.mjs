@@ -7,8 +7,15 @@
  * 而 antdv-next 的运行时是 `inheritAttrs` 默认行为：没声明的 prop 会被当普通 attr
  * 原样塞进根 DOM 元素，**不报错、不警告、生产环境完全静默**；没匹配的命名插槽则直接
  * 渲染成空。二者症状都是「写了等于没写」。
- * 典型就是 v0.20.3 修掉的 `a-tag :bordered`（Vue2/antd4 的 prop，antd5 早删了）、
- * `a-select` 的 options 用 `title` 键、`<a-collapse-panel #label>`（antdv-next 只有 `#header`）。
+ * 典型就是 v0.20.3 修掉的 `a-select` 的 options 用 `title` 键、
+ * `<a-collapse-panel #label>`（antdv-next 只有 `#header`）。
+ *
+ * ⚠️ **别把「已声明但语义弱」当成死属性** —— 本项目真犯过这个错。`a-tag :bordered` 曾被
+ * 一并算进「antd5 早删了」，但 antdv-next 1.5.6 的 Tag 确实声明了 `bordered?: boolean`
+ * 且**无 @deprecated**，`hooks/useColor.js:16` 真读它（`false` → 强制 filled）。
+ * 判据是「运行时 props 声明里有没有这一项」，不是「它好不好用」：
+ * bordered 造不出描边（那是 variant="outlined" 的事），可它确实是活的 prop。
+ * 把这种当死项删掉，等于用错误理由支持了一个恰好无害的改动 —— 下次照着做就会误删真属性。
  *
  * 判定依据不是文档，是**运行时 + 类型产物**：
  *   - 组件名与 props：在 Node 里实跑一次全量 `install`，读 `app._context.components`；

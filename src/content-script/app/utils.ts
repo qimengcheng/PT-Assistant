@@ -100,8 +100,10 @@ const translate: TTranslate = (key) => i18nInstance.global.t(key);
 /**
  * content 侧的确认框与输入框对话框。
  *
- * 复用 appDialog.ts 的实现，但 modal 换成**静态** Modal：content 拿不到 App 上下文
- * （App.vue 就是根组件，`<a-app>` 只能是它的后代，不能是它的祖先）。
+ * 复用 appDialog.ts 的实现，但 modal 换成**静态** Modal。拿不到 App 上下文的真正原因
+ * 不是「没有 `<a-app>` 祖先」—— App.vue:334 自己就渲染了 `<a-app>`，SentToDownloaderDialog
+ * 就挂在它里面用的 App 上下文版；而是下面这两个函数在**模块作用域**被调用，
+ * 没有当前组件实例，inject 无从谈起。
  * 静态方法默认挂 document.body，那里取不到扩展的任何样式，所以必须显式 getContainer
  * 指进 shadowRoot 内的浮层宿主。
  */

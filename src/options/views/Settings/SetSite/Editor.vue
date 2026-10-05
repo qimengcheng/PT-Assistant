@@ -44,6 +44,11 @@ let initToken = 0;
 async function initSiteData(id: TSiteID, flush = false) {
   const token = ++initToken;
 
+  // getSiteUserConfig 走的是 state.sites[id] 这条本地快路径，而 metadata store 靠 chrome.storage
+  // 异步水合：没水合完就调用，它判成「配置为空」转而发一次跨上下文消息兜底。
+  // 结果不止多一次往返 —— 兜底那条路径读的是另一个上下文的 store，同样可能在水合前读。
+  await metadataStore.$onReady();
+
   try {
     const [meta, userConfig] = await Promise.all([
       metadataStore.getSiteMetadata(id),

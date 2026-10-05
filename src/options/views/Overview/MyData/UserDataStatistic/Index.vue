@@ -434,6 +434,11 @@ function disabledDateOutsideData(current: { toDate: () => Date }) {
 
 onMounted(async () => {
   try {
+    // 这个页面读两份异步水合的数据：按天存档（loadFullData 内部等的是 metadata）和用户存的
+    // 统计偏好（config）。两个 store 各等各的 —— 只等 metadata 时下面 dateRange 那几行照样
+    // 可能读到初始值，表现为「上次选的是 30 天，冷启动打开却变成全部」。
+    await configStore.$onReady();
+
     rawDataRef.value = await loadFullData();
 
     // 加载所有站点的元数据

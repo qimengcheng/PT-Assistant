@@ -198,7 +198,7 @@ watch(isRecommendationMenuOpen, (isOpen) => {
 </script>
 
 <template>
-  <a-popover v-model:open="isRecommendationMenuOpen" trigger="click" placement="bottomRight">
+  <a-popover v-model:open="isRecommendationMenuOpen" trigger="click" placement="bottom">
     <a-button type="text" :disabled="disabled" :title="t('layout.header.hotRecommendations.title')">
       <template #icon>
         <FireOutlined />
@@ -305,9 +305,10 @@ watch(isRecommendationMenuOpen, (isOpen) => {
 </template>
 
 <style scoped lang="scss">
+// 宽度必须跟着视口走：面板比「按钮右侧剩余空间」宽时，antd 的 autoAdjustOverflow
+// 会把 placement 翻边并把末列推到视口外裁掉（固定 1120/1280 就是这么坏的）。
 .hot-recommendation-panel {
-  min-width: 1120px;
-  max-width: 1280px;
+  width: min(1120px, calc(100vw - 24px));
 }
 
 .hot-recommendation-header {

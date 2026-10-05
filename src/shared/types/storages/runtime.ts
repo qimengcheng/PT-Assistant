@@ -46,9 +46,14 @@ export interface ISearchData {
  * 全局提示条选项。原先是 Vuetify VSnackbar 的 props 子集，改为按 antdv-next 的
  * message API 收敛：`color` 决定提示类型，`timeout` 为 0 表示不自动关闭。
  * 全量提示条在 App.vue 里被转成 antd 的 message 调用。
+ *
+ * ⚠️ `timeout` 的单位是**秒**，不是毫秒 —— 它被原样转成 antd message 的 `duration`
+ * （`App.vue:117`），而 antd 的 duration 就是秒（默认 `DEFAULT_DURATION = 3`）。
+ * 早先四个调用点按毫秒习惯传了 8000，提示条实际会挂 8000 秒（约 2 小时 13 分）。
  */
 export interface SnackbarMessageOptions {
   color?: "success" | "info" | "warning" | "error";
+  /** 单位：秒。0 = 不自动关闭。 */
   timeout?: number;
   closable?: boolean;
   [key: string]: unknown;

@@ -206,7 +206,7 @@ async function loadTorrents() {
   if (targetIds.length === 0) {
     // 全被熔断时点刷新会"什么都没发生"，必须说清去哪恢复
     if (activeDownloaderIds.value.length > 0) {
-      runtimeStore.showSnakebar(t("MyClient.allSuspended"), { color: "warning", timeout: 8000 });
+      runtimeStore.showSnakebar(t("MyClient.allSuspended"), { color: "warning", timeout: 8 });
     }
     return;
   }

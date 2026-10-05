@@ -74,7 +74,7 @@ export function useClientRefresh() {
               name,
               message: error instanceof Error ? error.message : String(error),
             }),
-        { color: "error", timeout: 8000 },
+        { color: "error", timeout: 8 },
       );
     }
   }

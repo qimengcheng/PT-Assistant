@@ -158,7 +158,7 @@ async function doAutoImport() {
         success: importStatus.value.success.length,
         failed: importStatus.value.failed.length,
       }),
-      { color: "warning", timeout: 8000 },
+      { color: "warning", timeout: 8 },
     );
   } else {
     runtimeStore.showSnakebar(

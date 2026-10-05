@@ -288,14 +288,19 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 
         <template v-else-if="column.key === 'title'">
           <div>
-            <a
-              :href="record.items[0]?.link"
-              target="_blank"
-              rel="noopener noreferrer nofollow"
-              class="text-decoration-none text-truncate task-title"
-            >
-              {{ record.title }}
-            </a>
+            <!-- 标题可能很长：用 a-typography-text 的 ellipsis.tooltip 一步拿到「截断 + 悬停完整文案」。
+             原来是 <a class="text-truncate">，而 <a> 是 inline 元素，text-overflow 对 inline 不生效，
+             标题实际上从不截断，一直把表格单元格撑宽。 -->
+            <a-typography-text class="task-title" :ellipsis="{ tooltip: record.title }">
+              <a
+                :href="record.items[0]?.link"
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                class="text-decoration-none"
+              >
+                {{ record.title }}
+              </a>
+            </a-typography-text>
             <div class="text-body-small text-grey text-no-wrap">
               {{ t("KeepUploadTask.savePath") }}{{ record.downloadOptions?.clientName }} ->
               {{ record.downloadOptions?.savePath || t("KeepUploadTask.defaultPath") }}

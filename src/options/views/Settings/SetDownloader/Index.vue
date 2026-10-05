@@ -311,11 +311,4 @@ const columns = [
 .set-downloader {
   padding: 16px;
 }
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
 </style>

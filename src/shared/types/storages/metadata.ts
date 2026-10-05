@@ -127,7 +127,12 @@ export interface IMetadataPiniaStorageSchema {
   lastSearchFilter?: string;
 
   /**
-   * 此处仅存储站点最近一次的记录，如果需要获取历史记录，需要使用 storage 方法获取
+   * 此处仅存储站点最近一次的记录。
+   *
+   * ⚠️ **历史记录不在 storage 里** —— 原注释写「需要获取历史记录要用 storage 方法获取」，
+   * 那是指搬迁前的实现。历史早已进 IndexedDB：`shared/userInfoArchive.ts` 的
+   * `readSiteArchive` / `readAllArchive`。照原注释去 `extStore.getItem("userInfo")`
+   * 只会拿到 `{}`（那个键已标 @deprecated，迁移后被 userInfoArchive 清空）。
    */
   lastUserInfo: Record<TSiteKey, IStoredUserInfo>;
 

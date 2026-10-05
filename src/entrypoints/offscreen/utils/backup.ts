@@ -46,7 +46,8 @@ export async function createBackupData(backupFields: TBackupFields[] = []): Prom
     backupData.cookies = cookies;
   }
 
-  // 处理直接从 chrome.storage.local 读取的字段
+  // 处理直接从扩展存储读取的字段（走 extStore，不是 chrome.storage —— offscreen 里
+  // 根本没有 chrome.storage，extStore 在这个上下文会改走 SW 代理消息，见 storage.ts）
   for (const field of storageKey) {
     if (backupFields.includes(field as TBackupFields)) {
       // `userInfo` 的按天存档已迁到 IndexedDB 的 user_info store，但**备份文件格式不变**
@@ -203,7 +204,7 @@ export async function restoreBackupData(
     }
   }
 
-  // 恢复直接从 chrome.storage.local 读取的字段
+  // 恢复直接从扩展存储读取的字段（同上：extStore，在此上下文走 SW 代理）
   for (const field of storageKey.toReversed()) {
     if (restoreFields.includes(field as TBackupFields)) {
       let fieldData = restoreData[field] as IExtensionStorageSchema[typeof field];

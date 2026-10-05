@@ -142,11 +142,20 @@ export interface ILocalFingerprintIndex {
 /**
  * 匹配结论。
  *
+ * ⚠️ `absent` 与 `unavailable` 的含义**别照着字面猜**，两者的分界是
+ * 「本地有没有可比条目」，不是「能不能算出指纹」：
+ *
  * - `identical` 第 2 层命中：本地已有同一份数据（证据强，但仍建议抽样验 piece）
  * - `candidate`  只有第 1 层命中：疑似，绝不能直接采信
- * - `different`  第 2 层可比较但不匹配：确定不是同一份数据
- * - `absent`     本地没有任何可比对的指纹：不构成任何结论
- * - `unavailable`算不出指纹（缺数据 / 客户端不支持）
+ * - `different`  本地有可比条目、第 2 层可比较但不匹配：**确定不是**同一份数据
+ * - `absent`     本地**有**可比条目，但一条都没匹配上（且证据只到第 1 层：标题+大小）
+ *                 →「本地不存在这份数据」，既不能据此排除，也不构成确定结论
+ * - `unavailable`本地**一条可比条目都没有**（`comparedCount === 0`），或目标侧算不出指纹
+ *                 → 没有任何证据可用，辅不辅都只能交给人
+ *
+ * 判据见 match.ts 的 `comparableCount > 0 ? empty("absent") : empty("unavailable")`，
+ * 行为由 scripts/check-fingerprint.mjs 钉住（"找不到 → absent" /
+ * "本地无任何可比指纹 → unavailable" 两条断言）。改这里前先看那两条。
  */
 export type TFingerprintVerdict = "identical" | "candidate" | "different" | "absent" | "unavailable";
 
@@ -169,7 +178,11 @@ export type TFingerprintAction = "add" | "review" | "exclude";
 
 /** 动作依据（供 UI 展示与日志定位，不要直接展示给用户） */
 export type TFingerprintActionReason =
-  /** 本地没有任何可比对的指纹 —— 不构成排除依据，可以辅 */
+  /**
+   * 没有可用证据。**同一个 reason 配两种相反动作**，看 verdict 才能区分：
+   * - `absent`（本地有条目、只是没匹配上）→ `add`，本地不存在这份数据，可以辅
+   * - `unavailable`（本地一条可比条目都没有）→ `review`，没证据时不该自动辅种
+   */
   | "no-local-fingerprint"
   /** 第 2 层比对通过：本地已有这份数据，不必再辅 */
   | "local-identical"
@@ -189,8 +202,12 @@ export interface IFingerprintPolicyInput {
   existingSites?: string[];
   /**
    * piece 抽样未通过时的处理策略：
-   * - `review`（默认，保守）：视为需要人工确认，不自动排除
-   * - `trust-files`：相信第 2 层，直接按第 2 层结论走
+   * - `trust-files`（**代码实跑的默认值**）：相信第 2 层，直接按第 2 层结论走
+   * - `review`：视为需要人工确认，不自动排除
+   *
+   * ⚠️ 这里曾经写「review（默认，保守）」，与 decideFingerprintAction 里的
+   * `piecesPolicy = "trust-files"` 相反。默认值偏保守还是偏效率，属**产品策略**
+   * 尚未拍板；在定下来之前，本注释按代码的实际行为描述，别再写反。
    */
   piecesPolicy?: "review" | "trust-files";
 }

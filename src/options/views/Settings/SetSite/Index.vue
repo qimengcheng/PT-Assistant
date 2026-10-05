@@ -17,11 +17,11 @@ import type { TableColumnsType, TablePaginationConfig, TableSorterResult } from 
 
 import type { TSiteID } from "@ptd/site";
 
+import { sendMessage } from "@/messages.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
-import { flushSiteFavicon as flushFaviconStore, hasBundledIcon } from "@/options/components/SiteFavicon/utils.ts";
 
 import AddDialog from "./AddDialog.vue";
 import EditDialog from "./EditDialog.vue";
@@ -184,13 +184,6 @@ async function confirmDeleteSite(siteId: TSiteID) {
 }
 
 const isFaviconFlushing = ref(false);
-
-/**
- * 选中的站点里只要有一个「图标不是随扩展分发」的，批量刷新才有意义。
- * 随包图标在 getFavicon() 里优先于一切网络抓取，对它们 flush 是纯空操作。
- */
-const canFlushSelectedFavicon = computed(() => tableSelected.value.some((id) => !hasBundledIcon(id)));
-
 async function flushSiteFavicon(siteId: TSiteID | TSiteID[]) {
   // 模板按钮虽有 :loading 禁用，这里再兜一层，防止程序化连点产生重复刷新
   if (isFaviconFlushing.value) {
@@ -199,10 +192,9 @@ async function flushSiteFavicon(siteId: TSiteID | TSiteID[]) {
   isFaviconFlushing.value = true;
   try {
     const siteIds = Array.isArray(siteId) ? siteId : [siteId];
-    // 必须走 store 侧的 flushFaviconStore 而不是自己 sendMessage("getSiteFavicon", {flush:true})：
-    // 后者只让 offscreen 重抓重落库，既不清本页面内存缓存、也不回写，
-    // 而这一列图标是 <SiteFavicon> 渲染的 —— 用户点完只看到「刷新完成」提示，界面一个都不变。
-    await flushFaviconStore(siteIds);
+    for (const id of siteIds) {
+      await sendMessage("getSiteFavicon", { site: id, flush: true });
+    }
     runtimeStore.showSnakebar(t("SetSite.index.flushFaviconFinish"), { color: "success" });
   } catch (e) {
     // 旧实现只有 finally：刷新失败时用户只看到按钮停转，没有任何失败提示
@@ -238,23 +230,75 @@ function keywordChecked(keyword: string) {
 
 <template>
   <a-card size="small">
-    <template #title>
-      <a-flex align="center" gap="small">
+    <!-- 筛选框（含高级筛选 popover）整体走 a-card 的 extra：在卡片右上角固定，不随内容滚动。
+         这里不用 toolbar-spacer 撑留白了，extra 本身就在卡片头部右侧。 -->
+    <template #extra>
+      <a-input
+        v-model:value="tableWaitFilterRef"
+        allow-clear
+        size="small"
+        class="toolbar-filter"
+      >
+        <template #prefix>
+          <a-popover trigger="click" placement="bottomLeft">
+            <template #content>
+                <div class="filter-panel">
+                  <label
+                    v-for="keyword in booleanUserConfigKeywords"
+                    :key="keyword"
+                    class="filter-row"
+                  >
+                    <a-checkbox
+                      :checked="keywordChecked(keyword)"
+                      @change="
+                        (e: any) => {
+                          toggleUserConfigFilter(keyword, e.target.checked);
+                        }
+                      "
+                    >
+                      {{ t(`SetSite.common.${keyword}`) }}
+                    </a-checkbox>
+                  </label>
+
+                  <a-divider class="filter-divider" />
+
+                  <div class="filter-subtitle">{{ t("SetSite.common.groups") }}</div>
+                  <label v-for="(sites, group) in metadataStore.getSitesGroupData" :key="group" class="filter-row">
+                    <a-checkbox
+                      :checked="groupChecked(String(group))"
+                      @change="
+                        (e: any) => {
+                          toggleGroupFilter(String(group), e.target.checked);
+                        }
+                      "
+                    >
+                      {{ group }} ({{ sites.length }})
+                    </a-checkbox>
+                  </label>
+                </div>
+              </template>
+              <FilterOutlined class="filter-trigger" @click="buildFilterDictFn('')" />
+            </a-popover>
+          </template>
+          <template #suffix>
+            <SearchOutlined />
+          </template>
+        </a-input>
+    </template>
+
+        <template #title>
+      <a-flex align="center" gap="small" wrap>
         <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
         <a-button danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
-        <a-divider type="vertical" class="mx-2" />
-
         <a-button @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span>{{ t('SetSite.index.oneClickImport') }}</span></a-button>
 
-        <a-divider type="vertical" class="mx-2" />
-
         <a-button
-          :disabled="tableSelected.length === 0 || !canFlushSelectedFavicon"
+          :disabled="tableSelected.length === 0"
           :loading="isFaviconFlushing"
           size="small"
-          :title="tableSelected.length > 0 && !canFlushSelectedFavicon ? t('SetSite.index.table.flushFaviconBundled') : t('SetSite.index.table.flushFavicon')"
+          :title="t('SetSite.index.table.flushFavicon')"
           @click="() => flushSiteFavicon(tableSelected)"
         >
           <template #icon>
@@ -264,60 +308,6 @@ function keywordChecked(keyword: string) {
         </a-button>
 
         <a-button @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span>{{ t('SetSite.index.reBuildMap') }}</span></a-button>
-
-        <a-flex flex="auto" justify="flex-end" align="center">
-          <a-input
-            v-model:value="tableWaitFilterRef"
-            allow-clear
-            size="small"
-            class="toolbar-filter"
-          >
-            <template #prefix>
-              <a-popover trigger="click" placement="bottomLeft">
-                <template #content>
-                  <div class="filter-panel">
-                    <label
-                      v-for="keyword in booleanUserConfigKeywords"
-                      :key="keyword"
-                      class="filter-row"
-                    >
-                      <a-checkbox
-                        :checked="keywordChecked(keyword)"
-                        @change="
-                          (e: any) => {
-                            toggleUserConfigFilter(keyword, e.target.checked);
-                          }
-                        "
-                      >
-                        {{ t(`SetSite.common.${keyword}`) }}
-                      </a-checkbox>
-                    </label>
-
-                    <a-divider class="filter-divider" />
-
-                    <div class="filter-subtitle">{{ t("SetSite.common.groups") }}</div>
-                    <label v-for="(sites, group) in metadataStore.getSitesGroupData" :key="group" class="filter-row">
-                      <a-checkbox
-                        :checked="groupChecked(String(group))"
-                        @change="
-                          (e: any) => {
-                            toggleGroupFilter(String(group), e.target.checked);
-                          }
-                        "
-                      >
-                        {{ group }} ({{ sites.length }})
-                      </a-checkbox>
-                    </label>
-                  </div>
-                </template>
-                <FilterOutlined class="filter-trigger" @click="buildFilterDictFn('')" />
-              </a-popover>
-            </template>
-            <template #suffix>
-              <SearchOutlined />
-            </template>
-          </a-input>
-        </a-flex>
       </a-flex>
     </template>
 
@@ -419,11 +409,9 @@ function keywordChecked(keyword: string) {
               </template>
             </a-dropdown>
 
-            <a-tooltip
-              :title="hasBundledIcon(record.id) ? t('SetSite.index.table.flushFaviconBundled') : t('SetSite.index.table.flushFavicon')"
-            >
+            <a-tooltip :title="t('SetSite.index.table.flushFavicon')">
               <a-button
-                :disabled="record.metadata.isDead || hasBundledIcon(record.id)"
+                :disabled="record.metadata.isDead"
                 :loading="isFaviconFlushing"
                 size="small"
                 type="text"
@@ -456,7 +444,16 @@ function keywordChecked(keyword: string) {
 </template>
 
 <style scoped lang="scss">
-/* 筛选框宽度上限：不是布局，交给 a-flex 也表达不了 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-spacer {
+  flex: 1 1 0;
+}
+
 .toolbar-filter {
   max-width: 320px;
 }

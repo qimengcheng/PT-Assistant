@@ -150,12 +150,20 @@ function exportSiteHistoryData() {
   saveAs(exportedSolutionBlob, `site-history-data-${siteId}.json`); // FIXME filename
 }
 
+/** 加载站点历史数据的在途标志：弹窗每次打开都重新取一次数据，没有它会有明显的空窗期 */
+const isLoadingHistoryData = ref<boolean>(false);
+
 function afterEnter() {
   if (siteId) {
-    loadSiteHistoryData(siteId!).then((data) => {
-      siteHistoryData.value = data;
-      tableSelected.value = [];
-    });
+    isLoadingHistoryData.value = true;
+    loadSiteHistoryData(siteId!)
+      .then((data) => {
+        siteHistoryData.value = data;
+        tableSelected.value = [];
+      })
+      .finally(() => {
+        isLoadingHistoryData.value = false;
+      });
   }
 }
 </script>
@@ -175,6 +183,7 @@ function afterEnter() {
     <a-table
       :columns="tableColumns"
       :data-source="siteHistoryData"
+      :loading="isLoadingHistoryData"
       :row-key="(r: any) => r.date"
       :row-selection="tableRowSelection"
       :pagination="{ pageSize: 10 }"
@@ -259,16 +268,17 @@ function afterEnter() {
             </a-button>
 
             <!-- 删除 -->
-            <a-button
-              type="text"
-              size="small"
-              danger
-              :disabled="record.status == EResultParseStatus.success && record.date == currentDate"
-              :title="t('common.remove')"
-              @click="deleteSiteUserInfo([record.date])"
-            >
-              <DeleteOutlined />
-            </a-button>
+            <a-tooltip :title="t('common.remove')">
+              <a-button
+                type="text"
+                size="small"
+                danger
+                :disabled="record.status == EResultParseStatus.success && record.date == currentDate"
+                @click="deleteSiteUserInfo([record.date])"
+              >
+                <DeleteOutlined />
+              </a-button>
+            </a-tooltip>
           </div>
         </template>
       </template>

@@ -37,17 +37,16 @@ const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
     <a-row :gutter="[12, 12]" style="margin-bottom: 24px">
       <a-col :span="8">
         <a-card size="small">
-          <div class="card-label">{{ t("common.version") }}</div>
-          <div class="card-value">v{{ version }}</div>
+          <a-statistic :title="t('common.version')" :value="'v' + version" />
         </a-card>
       </a-col>
       <a-col :span="16">
         <a-card size="small">
-          <div class="card-label">{{ t("HomeView.siteDefinitionsCard") }}</div>
-          <div class="card-value">
-            {{ definitionCount }}
-            <small>{{ t("HomeView.siteDefinitionsUnit") }}</small>
-          </div>
+          <a-statistic
+            :title="t('HomeView.siteDefinitionsCard')"
+            :value="definitionCount"
+            :suffix="t('HomeView.siteDefinitionsUnit')"
+          />
         </a-card>
       </a-col>
     </a-row>

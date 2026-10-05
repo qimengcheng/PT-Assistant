@@ -64,6 +64,16 @@ const formRef = ref();
 const searchSolution = ref<ISearchSolution>({} as ISearchSolution);
 const searchSolutionEntryRequestConfig = ref<string>("");
 
+/**
+ * a-form 的 model。用 computed 包一层而不是在模板里写对象字面量：
+ * 字面量每次渲染都新建一个对象，Form 若在初始化时缓存了 model 引用，之后拿到的是过期对象。
+ * 同项目其它表单（SetBackup/Editor.vue、SetDownloader/Editor.vue）也都传稳定的对象。
+ */
+const formModel = computed(() => ({
+  name: searchSolution.value.name,
+  requestConfig: searchSolutionEntryRequestConfig.value,
+}));
+
 const rules = computed(() => ({
   name: [{ required: true, message: t("SetSearchSolution.CustomSolutionDialog.solutionName"), trigger: "blur" }],
   requestConfig: [
@@ -151,7 +161,7 @@ async function doSubmit() {
 
     <a-form
       ref="formRef"
-      :model="{ name: searchSolution.name, requestConfig: searchSolutionEntryRequestConfig }"
+      :model="formModel"
       :rules="rules"
       layout="vertical"
     >

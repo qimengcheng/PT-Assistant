@@ -226,54 +226,58 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-button
-              type="text"
-              color="green"
-              size="small"
-              :title="t('SetBackup.table.action.backupNow')"
-              :loading="doBackupStatus[record.id]"
-              @click="doBackup(record.id)"
-            >
-              <template #icon>
-                <CloudUploadOutlined />
-              </template>
-            </a-button>
+            <a-tooltip :title="t('SetBackup.table.action.backupNow')">
+              <a-button
+                type="text"
+                color="green"
+                size="small"
+                :loading="doBackupStatus[record.id]"
+                @click="doBackup(record.id)"
+              >
+                <template #icon>
+                  <CloudUploadOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
 
-            <a-button
-              type="text"
-              color="blue"
-              size="small"
-              :title="t('SetBackup.table.action.viewHistoryBackup')"
-              @click="showHistory(record.id)"
-            >
-              <template #icon>
-                <UnorderedListOutlined />
-              </template>
-            </a-button>
+            <a-tooltip :title="t('SetBackup.table.action.viewHistoryBackup')">
+              <a-button
+                type="text"
+                color="blue"
+                size="small"
+                @click="showHistory(record.id)"
+              >
+                <template #icon>
+                  <UnorderedListOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
 
-            <a-button
-              type="text"
-              color="blue"
-              size="small"
-              :title="t('common.edit')"
-              @click="editBackupServer(record.id)"
-            >
-              <template #icon>
-                <EditOutlined />
-              </template>
-            </a-button>
+            <a-tooltip :title="t('common.edit')">
+              <a-button
+                type="text"
+                color="blue"
+                size="small"
+                @click="editBackupServer(record.id)"
+              >
+                <template #icon>
+                  <EditOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
 
-            <a-button
-              type="text"
-              color="danger"
-              size="small"
-              :title="t('common.remove')"
-              @click="deleteBackupServer([record.id])"
-            >
-              <template #icon>
-                <DeleteOutlined />
-              </template>
-            </a-button>
+            <a-tooltip :title="t('common.remove')">
+              <a-button
+                type="text"
+                color="danger"
+                size="small"
+                @click="deleteBackupServer([record.id])"
+              >
+                <template #icon>
+                  <DeleteOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
           </a-space>
         </template>
       </template>

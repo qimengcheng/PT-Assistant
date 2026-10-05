@@ -372,6 +372,30 @@ function setShowChart(key: string, checked: boolean) {
 
 const dateRangeControl = computed(() => configStore.userStatisticControl.dateRange);
 
+/**
+ * 日期范围的预设项：近 N 天 + 全部。
+ * 「自定义」不进这里 —— 它选中后要弹 RangePicker 挑具体区间，是另一套交互，
+ * 仍然由旁边的按钮承载（见模板）。这里用 a-segmented 而不是 v-for 按钮，
+ * 是与 MyData/Index.vue 的 joinTimeFormat、PushToDownloaderDialog 的 inputMode 保持同一套写法。
+ */
+const dateRangePresetOptions = computed(() => [
+  ...[7, 30, 60, 90, 180].map((day) => ({ value: day, label: t("UserDataStatistic.dateRange.day", [day]) })),
+  { value: "all", label: t("UserDataStatistic.dateRange.all") },
+]);
+
+/** 当前是「自定义」时没有任何预设被选中，segmented 高亮不到项，留空字符串即可 */
+const dateRangePresetValue = computed(() =>
+  typeof dateRangeControl.value === "number" || dateRangeControl.value === "all" ? dateRangeControl.value : "",
+);
+
+function selectDateRangePreset(value: number | string) {
+  if (value === "all") {
+    selectDateRangeAll();
+    return;
+  }
+  selectDateRangeDays(Number(value));
+}
+
 function selectDateRangeDays(day: number) {
   configStore.userStatisticControl.dateRange = day;
   selectedDateRanges.value = setSubDate(day);
@@ -570,12 +594,15 @@ provide(THEME_KEY, echartsTheme);
         <div class="user-statistic-field">
           <span class="user-statistic-field-label">{{ t("common.username") }}</span>
           <div class="user-statistic-field-control d-flex align-center">
-            <a-button type="text" size="small" @click="allowEditName = !allowEditName">
-              <template #icon>
-                <UnlockOutlined v-if="allowEditName" class="text-green" />
-                <LockOutlined v-else />
-              </template>
-            </a-button>
+            <!-- 文案随状态走：解锁图标 → 提示「锁定」；锁定图标 → 提示「解锁」 -->
+            <a-tooltip :title="allowEditName ? t('common.lock') : t('common.unlock')">
+              <a-button type="text" size="small" @click="allowEditName = !allowEditName">
+                <template #icon>
+                  <UnlockOutlined v-if="allowEditName" class="text-green" />
+                  <LockOutlined v-else />
+                </template>
+              </a-button>
+            </a-tooltip>
             <!-- AutoComplete 没有 `readonly` prop：不声明的属性会被透传到根 <div readonly>（SSR 实测），
                    压根没到内部 input，锁定状态下照样能打字。用 `disabled`。 -->
             <a-auto-complete
@@ -609,16 +636,8 @@ provide(THEME_KEY, echartsTheme);
 
         <div class="user-statistic-field">
           <span class="user-statistic-field-label">{{ t("UserDataStatistic.chart.dateRange") }}</span>
-          <div class="user-statistic-field-control d-flex flex-wrap" style="gap: 8px">
-            <a-button
-              v-for="day in [7, 30, 60, 90, 180]"
-              :key="day"
-              size="small"
-              :type="dateRangeControl === day ? 'primary' : 'default'"
-              @click="selectDateRangeDays(day)"
-            >
-              {{ t("UserDataStatistic.dateRange.day", [day]) }}
-            </a-button>
+          <div class="user-statistic-field-control d-flex flex-wrap align-center" style="gap: 8px">
+            <a-segmented :value="dateRangePresetValue" :options="dateRangePresetOptions" @change="selectDateRangePreset" />
             <a-popover trigger="click" placement="bottomLeft">
               <a-button size="small" :type="dateRangeControl === 'custom' ? 'primary' : 'default'">
                 {{ t("UserDataStatistic.dateRange.custom") }}
@@ -631,13 +650,6 @@ provide(THEME_KEY, echartsTheme);
                 />
               </template>
             </a-popover>
-            <a-button
-              size="small"
-              :type="dateRangeControl === 'all' || dateRangeControl === 'custom' ? 'primary' : 'default'"
-              @click="selectDateRangeAll"
-            >
-              {{ t("UserDataStatistic.dateRange.all") }}
-            </a-button>
           </div>
         </div>
 

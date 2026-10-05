@@ -83,19 +83,20 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
   >
     <!-- wiki 入口原先挂在 #title 插槽里（富标题会和右上角相撞），移到内容区顶部 -->
     <div class="d-flex justify-end">
-      <a-button
-        size="small"
-        type="text"
-        color="green"
-        :title="t('layout.header.wiki')"
-        :href="`${REPO_URL}/wiki/config-site`"
-        rel="noopener noreferrer nofollow"
-        target="_blank"
-      >
-        <template #icon>
-          <QuestionCircleOutlined />
-        </template>
-      </a-button>
+      <a-tooltip :title="t('layout.header.wiki')">
+        <a-button
+          size="small"
+          type="text"
+          color="green"
+          :href="`${REPO_URL}/wiki/config-site`"
+          rel="noopener noreferrer nofollow"
+          target="_blank"
+        >
+          <template #icon>
+            <QuestionCircleOutlined />
+          </template>
+        </a-button>
+      </a-tooltip>
     </div>
 
     <!-- 选取可添加的站点 -->
@@ -132,9 +133,13 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
                   v{{ option.data.site.version }}
                 </a-tag>
               </div>
-              <div class="site-option-desc text-ellipsis" :title="option.data.site.description ?? ''">
+              <!-- 站点描述可能很长：ellipsis.tooltip 一步拿到截断 + 悬停完整文案 -->
+              <a-typography-text
+                class="site-option-desc"
+                :ellipsis="{ tooltip: option.data.site.description ?? '' }"
+              >
                 {{ option.data.site.description ?? "" }}
-              </div>
+              </a-typography-text>
             </div>
             <div class="site-option-tags">{{ option.data.site.tags?.join(", ") ?? "" }}</div>
           </div>

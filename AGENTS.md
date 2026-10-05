@@ -245,9 +245,11 @@ CI=true pnpm build                # 本地复现 CI 那条路径 → 默认 .out
 
 **每次让用户验收，必须同时给出：**
 
-1. **产物加载绝对路径**：`E:\DeepSeek Harness\ptassistant\PT-assistant-wxt\dist-verify\chrome-mv3`
+1. **产物加载绝对路径**：`E:\DeepSeek Harness\ptassistant\PT-assistant-wxt\dist-verify`
    —— **永远只有这一个**，用户只往 Chrome 里加载它一次；每次构建成功后它自动指向本次产物。
-2. **版本号**（从构建输出或 `dist-verify` 同级的 `BUILDINFO.json` 里读），并说明这份是谁在什么时候建的
+   注意 `dist-verify` 本身就是指向 `dist-<会话>-<版本>\chrome-mv3` 的 junction，
+   **后面不要再加 `\chrome-mv3`**（那是个不存在的路径，加了 Chrome 会报找不到 manifest）。
+2. **版本号**（从构建输出或 `dist-verify\BUILDINFO.json` 里读），并说明这份是谁在什么时候建的
 
 只说「改好了」而不给路径 = 未完成。
 

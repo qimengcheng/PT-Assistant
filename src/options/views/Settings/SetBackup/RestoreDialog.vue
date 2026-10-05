@@ -91,7 +91,12 @@ function loadRemoteBackupFile() {
 }
 
 function extractVersion(str: string = "") {
-  const regex = /v(\d+\.\d+\.\d+\.\d+)/;
+  // 至少三段（0.22.25），也接受旧备份里可能出现的四段（0.0.5.1147）。
+  // 写死四段会让本扩展自产的备份永远解析不出来 —— __EXT_VERSION__ 是三段
+  //（wxt.config.ts:107 注入 v${package.json version}），而 manifest.version
+  // 就是 `PT-Depiler (${__EXT_VERSION__})`，四段正则匹配为 null，
+  // compareVersion 便恒返回 null，下面的「高版本警告」永远不可能触发。
+  const regex = /v(\d+(?:\.\d+)+)/;
   const match = str.match(regex);
   return match ? match[1] : null;
 }
@@ -103,6 +108,9 @@ function extractVersion(str: string = "") {
  * inputV1 < inputV2 返回 -1
  * inputV1 = inputV2 返回 0
  * inputV1 > inputV2 返回 1
+ *
+ * ⚠️ 另有一条**没人处理的出口**：任一侧解析不出版本号时返回 null（不是 0）。
+ * 调用方若写 `== 1` 会把 null 当 false 静默吞掉；比对前先确认两侧都能解析。
  *
  */
 function compareVersion(inputV1?: string, inputV2?: string) {
@@ -143,7 +151,7 @@ function doRestore() {
   if (warnRestore) {
     runtimeStore.showSnakebar(
       t("SetBackup.RestoreDialog.versionWarning") + " (backup: " + restoreData.value.manifest.version + ")",
-      { color: "warning", timeout: 8000 },
+      { color: "warning", timeout: 8 },
     );
   }
 
@@ -205,7 +213,11 @@ function resetDialog() {
 }
 
 function goToPtppImport() {
-  router.push({ name: "SetBaseBackup" });
+  // 路由名只有 "SetBase"（plugins/router.ts:84），"SetBaseBackup" 从未存在过。
+  // vue-router 按 name 查不到 matcher 会**同步 throw**，连下面这行都执行不到
+  //（症状是弹窗关不掉，不只是"不开页"）。定位到备份 tab 靠 query.tab
+  // —— SetBase/Index.vue:34 读的正是它。
+  router.push({ name: "SetBase", query: { tab: "backup" } });
   showDialog.value = false;
 }
 

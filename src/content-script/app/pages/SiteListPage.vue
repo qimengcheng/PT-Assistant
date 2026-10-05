@@ -123,18 +123,30 @@ const parsedTorrents = shallowRef<ITorrent[]>([]);
 const showAdvanceListModuleDialog = ref<boolean>(false);
 
 function handleAdvanceListModule() {
-  parseListPage().then(({ torrents }) => {
-    if (torrents.length > 0) {
-      parsedTorrents.value = torrents;
-      showAdvanceListModuleDialog.value = true;
-    }
-  });
+  // 解析失败必须有兜底（同页另外三个入口都接了），否则错误被彻底吞掉，
+  // 表现是点了按钮毫无反应、连报错都没有。
+  parseListPage()
+    .then(({ torrents }) => {
+      if (torrents.length > 0) {
+        parsedTorrents.value = torrents;
+        showAdvanceListModuleDialog.value = true;
+      }
+    })
+    .catch((e) => {
+      console.error("[PTD] parse list page failed", e);
+      runtimeStore.showSnakebar(t("contentScript.parsePageFailed"), { color: "error" });
+    });
 }
 
 async function handleSearch() {
-  let keywords = (await parseListPage()).keywords;
-
-  doKeywordSearch(keywords);
+  // 同上：这里原先是裸 await，parseListPage 抛错会变成 unhandled rejection。
+  try {
+    const { keywords } = await parseListPage();
+    doKeywordSearch(keywords);
+  } catch (e) {
+    console.error("[PTD] parse list page failed", e);
+    runtimeStore.showSnakebar(t("contentScript.parsePageFailed"), { color: "error" });
+  }
 }
 </script>
 

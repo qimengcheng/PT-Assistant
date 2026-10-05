@@ -339,6 +339,7 @@ function dialogLeave() {
           <a-radio-group
             v-model:value="selectedDownloaderId"
             size="small"
+            button-style="solid"
             class="choice-group"
             @change="onDownloaderChange"
           >
@@ -353,7 +354,7 @@ function dialogLeave() {
         </a-form-item>
 
         <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.savePath')">
-          <a-radio-group v-model:value="savePathChoice" size="small" class="choice-group">
+          <a-radio-group v-model:value="savePathChoice" size="small" button-style="solid" class="choice-group">
             <a-radio-button :value="PATH_DEFAULT">{{ t("SentToDownloaderDialog.defaultPath") }}</a-radio-button>
             <a-radio-button v-for="folder in suggestFolders" :key="folder" :value="folder">
               <span class="choice-mono" :title="folder">{{ folder }}</span>

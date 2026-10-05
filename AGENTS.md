@@ -207,14 +207,25 @@ PTD_SESSION=qwenwork pnpm build     # → dist-qwenwork/chrome-mv3
 WXT 0.21.4 的 `wxt build` **没有 `--output` 参数**（可用项只有 root/config/mode/browser/
 filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里的
 `outDir: sessionTag ? 'dist-' + tag : '.output'` 实现，值取自环境变量 `PTD_SESSION`。
-**不设该变量时仍是默认 `.output`** —— CI（build.yml / release.yml）依赖这个默认值取
+**不设该变量时仍是默认 `.output`** —— CI（`ci.yml` 的 build job）依赖这个默认值取
 `.output/*.zip`，别让 CI 带上 PTD_SESSION。
 
 ### 2.4 Firefox 产物由 CI 构建
 
-`.github/workflows/build.yml` 会同时打三个包（Chrome / Firefox / sources），
-`release.yml` 据此发 GitHub Release，并可推到 Chrome Web Store 与 Firefox Add-ons。
+**只有一个 workflow：`.github/workflows/ci.yml`**，三个 job 串起来 `verify → build → release`。
+（旧文档写的 `build.yml` / `release.yml` 两个文件都不存在，v0.22.13 那轮订正漏掉了这处。）
+
+- `verify`：`pnpm compile` + 四条静态防线 + `check-version.mjs --committed`。
+- `build`：`wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
+  `PT-Assistant-<version>-{chrome,firefox,sources}.zip` 三个包，外加 `smoke-background.mjs`。
+- `release`：`ncipollo/release-action` 按 `package.json` 的 version 打 `v<version>` tag 并挂上
+  三个产物，随后是 Publish to Chrome Web Store / Publish to Firefox Add-ons 两步。
+
 **本地只跑 Chrome 构建即可**，不要为了 Firefox 产物在本地重复构建。
+
+**一次 push 只会被打一个 tag**：workflow 检出的是这次 push 的 tip commit，所以把多个版本号
+攒在一次 push 里，只有最顶那版会拿到 tag 和 Release，下面的全部静默漏掉。实测踩过：
+v0.22.7 / .8 / .9 / .10 攒在一次 push 里，远端只多了 v0.22.11。所以**每个版本号单独 push**。
 
 ---
 

@@ -39,7 +39,10 @@ async function doSetupOffscreenDocument(): Promise<void> {
     await chrome.offscreen.createDocument({
       url: offscreenUrl,
       reasons: [chrome.offscreen.Reason.DOM_PARSER],
-      justification: "Allow DOM_PARSER, CLIPBOARD, BLOBS in background.",
+      // ⚠️ justification 里提的 CLIPBOARD / BLOBS 与上面实际声明的 reasons 不一致：
+      // 本仓 offscreen 侧没有任何 clipboard 调用，createObjectURL 只出现在 backup.ts。
+      // Chrome 商店审核会同时看这两项，文案别写没申请的理由。
+      justification: "Allow DOM_PARSER in background.",
     });
   } catch (e) {
     await chrome.offscreen.closeDocument().catch(() => {});

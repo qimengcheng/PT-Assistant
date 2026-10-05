@@ -59,7 +59,10 @@ export interface DownloaderBaseConfig {
   advanceAddTorrentOptions?: Record<string, any>;
 }
 
-// 强制要求填写用户名和密码
+// 这里只是**声明**字段，运行期没有校验：设置页 Editor.vue 的 required 只覆盖
+// name / sortIndex / address，username 与 password 连 :rules 都没有。
+// 而且并非所有下载器都要填 —— qBittorrent 的 API Key 模式（isApiKeyAuth）明确要求
+// **用户名留空**，把密码填成以 qbt_ 开头的 API key。
 export interface TorrentClientConfig extends DownloaderBaseConfig {
   username: string;
   password: string;

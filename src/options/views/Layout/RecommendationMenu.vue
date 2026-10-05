@@ -161,7 +161,7 @@ function searchRecommendation(item: ISocialRecommendationItem) {
 }
 
 /**
- * 地区 → a-tag 的语义色。国内/海外用 blue / cyan 区分，比原来两套手写色值
+ * 地区 → a-tag 的语义色。国内/海外用 blue / cyan 区分（⚠️ 与实现不符：实际返回的是 orange / blue，全文件没有 cyan），比原来两套手写色值
  * （#8a3b12 on #fff0d5 / #0f5c68 on #dff6f8）更贴近组件库的色板，
  * 也不会在暗色主题下和文字对比度失配 —— 原来那套是纯手写 hex，不随主题走。
  */

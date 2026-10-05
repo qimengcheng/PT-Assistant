@@ -8,7 +8,9 @@
  *   注意：
  *     - 这两个权限是互斥的
  *     - 如果给予 drive.appdata 权限，那么会备份到 Application Folder 的根目录下（因为这个目录用户读取不了）
- *       如果给予 drive 权限， 那么则会在 我的云端硬盘（My Drive）下新建一个 名为 `PTPP Backup` 的目录，并将文件备份到该目录中
+ *       如果给予 drive 权限， 那么则会在 我的云端硬盘（My Drive）下新建一个 名为 `PTD Backup` 的目录，并将文件备份到该目录中
+  *       （目录名以 :99 的 rootFolderName 为准；原注释写的 `PTPP Backup` 是旧项目名，
+  *         迁移过来的用户按它去找目录会误判「备份丢了」）
  *
  * 使用方法：
  * 1. 申请 client_id 和 client_secret， 方法见：https://rclone.org/drive/#making-your-own-client-id

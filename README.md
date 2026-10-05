@@ -132,7 +132,8 @@ pnpm version:check  # 校验 HEAD 那条的版本号 == package.json == 父提�
 交付验收流程：本仓库常有**多个 agent 会话并行改同一棵工作树**，`wxt` 每次构建又会先清空输出目录，
 所以真身按会话隔离在 `dist-<会话标识>-<版本号>/chrome-mv3`（agent 必须带 `PTD_SESSION=<自己的标识>`；
 人不带就落进 `owner` 这个桶，见上面的命令表）；构建脚本随后把 **`dist-verify`** 这个目录联接换指到
-本次产物 —— 浏览器里**只加载 `dist-verify\chrome-mv3` 这一个路径**（Chrome 未打包扩展的 id 按加载路径算，
+本次产物 —— 浏览器里**只加载 `dist-verify` 这一个路径**（联接本身就指到 `chrome-mv3` 了，
+后面不要再加一层，那是个不存在的路径；Chrome 未打包扩展的 id 按加载路径算，
 换目录等于换个新扩展、配置全丢）。改完代码重新 build，再去 `chrome://extensions` 点重载即可，不用换加载路径。
 `pnpm build` / `pnpm zip` 都先取 `.build-lock/` 互斥锁；三层机制的成因见 PLAYBOOK §14，规矩见 AGENTS.md §2.2。
 

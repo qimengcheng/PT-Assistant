@@ -42,7 +42,7 @@ function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
       // 这条是**每个下载中的种子每 1 秒**跑一次的轮询，N 个任务就是每秒 N 次跨上下文往返，
       // 而且 background 的 service worker 会被它反复唤醒。下载历史是扩展同源页面本就能直接
       // 打开的 IndexedDB（同一份 store 定义在 @/shared/indexdb，见那里的注释）。
-      const history = await (await ptdIndexDb).get("download_history", downloadHistoryId);
+      const history = await (await ptdIndexDb()).get("download_history", downloadHistoryId);
 
       // 记录可能已被用户删掉。原先走消息那条路径，返回值被 handler 里的 `!` 断言蒙成有值，
       // 运行时靠读 undefined.downloadStatus 抛 TypeError 落到下面的 catch 才停轮询 ——
@@ -87,7 +87,7 @@ async function loadDownloadHistory() {
   try {
     // 同上：整表读一次就是一次 background → offscreen 的往返，还要把全量记录结构化克隆
     // **两趟**（offscreen→background→options）传回来。直连 store 只要一趟。
-    const history: ITorrentDownloadMetadata[] = await (await ptdIndexDb).getAll("download_history");
+    const history: ITorrentDownloadMetadata[] = await (await ptdIndexDb()).getAll("download_history");
 
     // 先在普通对象里把整表拼好，再一次性替换 shallowRef：
     // 旧写法先置 {} 再逐 key 赋值，shallowRef 对逐 key 变更不触发更新，

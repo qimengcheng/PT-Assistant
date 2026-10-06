@@ -391,20 +391,37 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
 否则线上是静默空白。
 
-CI 上挂在 `pnpm compile` 之后、构建之前的守卫共 8 条（本地改完也要跑，FAIL 非零退出）。
+CI 上挂在 `pnpm compile` 之后、构建之前的守卫共 8 条，本地一条命令全跑：
+
+```bash
+pnpm check:all                 # 不 fail-fast：8 条全跑完再汇总，任一条非零则该命令非零
+node scripts/check-all.mjs     # 同样内容，绕开 pnpm（见下方警告）
+```
+
+> ⚠️ **改过 `package.json` 之后，`pnpm <script>` 可能挂死**：pnpm 12 会在 package.json
+> 变更后的首次脚本运行前重新校验锁文件（本机 462 条，走网络），注册表连不上时它只留一个
+> `? Verifying lockfile against supply-chain policies...` 转圈、**不超时也不报错**。
+> 实测同一状态下 `pnpm check:all` 卡满 240s 无输出，而 `node scripts/check-all.mjs` 14.4s 跑完。
+> 构建同理——卡住时直接 `node scripts/build-verify.mjs`（仍是 §2.1 指定的那个入口，只是不经 pnpm）。
+
+**清单不手抄**：`scripts/check-all.mjs` 是去 `scripts/` 目录现取 `check-*.mjs` 的，
+新增一条守卫自动进聚合（它排除了自身与 `check-version.mjs` —— 后者读暂存区版本号、
+属于 `.githooks` 的职责，混进来会让结果取决于「此刻暂存了什么」）。
+所以本文件不再维护逐条命令列表；各条防什么看下面的编号说明，或看失败时打印的详情。
+
 前六条是**静态扫描**，后两条是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
 不需要 loader、不引入新依赖）：
 
-```bash
-node scripts/check-antd-tags.mjs          # 全仓扫「antdv-next 里不存在的 a-* 标签」
-node scripts/check-content-antd-lite.mjs  # content 按需清单是否覆盖其依赖闭包用到的每个标签
-node scripts/check-locale-keys.mjs        # 每个字面 t("a.b.c") 在 zh/en 两侧都可解析、两份键集合对称
-node scripts/check-dead-props.mjs         # 传给 a-* 的属性 / 插槽里，哪些是该组件根本不认的死项
-node scripts/check-store-hydration.mjs    # 挂载钩子里命令式读「异步水合的 store」的地方
-node scripts/check-sw-graph.mjs           # SW / content 引导的 import 图（§3.2 那三条铁律）
-node scripts/check-indexdb-retry.mjs      # 共享库懒开的两条不变量：失败不缓存、成功必复用
-node scripts/check-fingerprint.mjs        # 种子指纹三层逻辑自检（含「本该不同」的用例）
-```
+| # | 脚本 | 防的静默失效 |
+|---|---|---|
+| 1 | `check-antd-tags` | antdv-next 里不存在的 `a-*` 标签（内容静默丢失） |
+| 2 | `check-content-antd-lite` | content 按需清单没覆盖依赖闭包里的标签（线上静默空白） |
+| 3 | `check-locale-keys` | 字面 `t("a.b.c")` 在某侧解析不到（键路径被当文案渲染） |
+| 4 | `check-dead-props` | 传给 `a-*` 的死 prop / 死插槽（`inheritAttrs` 原样塞进 DOM） |
+| 5 | `check-store-hydration` | 挂载钩子里命令式读异步水合的 store（首屏静默空） |
+| 6 | `check-sw-graph` | SW / content 引导的 import 图（§3.2 那三条铁律） |
+| 7 | `check-indexdb-retry` | 共享库懒开的两条不变量：失败不缓存、成功必复用 |
+| 8 | `check-fingerprint` | 种子指纹三层逻辑自检（含「本该不同」的用例） |
 
 第六条守的是 §3.2：从两个无 DOM / 必须轻量 的上下文出发，静态 import 闭包不许走到 `sizzle`、
 不许命中 `@ptd/site` / `@ptd/social` 根入口，entrypoint 的 `import.meta.glob` 必须根绝对，

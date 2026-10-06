@@ -12,7 +12,7 @@
  * 比当场改麻烦得多。**能当场拦住的地方是本地 hook，不是 CI。**
  *
  * 三条断言（--staged 即「即将提交的内容」，--committed 即「已提交的 HEAD」）：
- *   1. 版本号连续：本次版本号 == 历史最大版本号 + 1   ← 这条直接抓住跳号
+ *   1. 版本号进位正确：feat 进次版本（x.Y+1.0），其余进修订号（x.y.Z+1）  ← 这条抓跳号
  *      （暂存版本号 == HEAD 自己那条时按 --amend 处理，基线换成 HEAD~1，见 checkStaged 处注释）
  *   2. 三处一致：package.json == commit message 里的版本号
  *   3. message 里的版本号必须存在且位于开头（前缀之后的第一段）
@@ -29,10 +29,16 @@
  *   node scripts/check-version.mjs --staged             # pre-commit 用
  *   node scripts/check-version.mjs --committed          # CI / 事后自检用
  *   node scripts/check-version.mjs --message-file <f>   # commit-msg 用，比对提交消息
- *   node scripts/check-version.mjs --next               # 只打印「下一个该用的版本号」，不校验
+ *   node scripts/check-version.mjs --next               # 只打印「下一个该用的修订号」，不校验
+ *   node scripts/check-version.mjs --next --type feat    # 按 feat 进位，打印次版本号
  *
- * --next 报的是「新开一条提交该用的号」。要 --amend 时不要用它 —— amend 沿用被改那条
- * 自己的版本号（HEAD 的 package.json），--next 会多给你一个。
+ * --next 报的是「新开一条提交该用的号」，进位档位由 --type 决定（默认按非 feat，即 +0.0.1）。
+ * 要 --amend 时不要用它 —— amend 沿用被改那条自己的版本号（HEAD 的 package.json），--next 会多给你一个。
+ *
+ * 为什么「按类型判进位」只能挂在 commit-msg 而不是 pre-commit：
+ * pre-commit 阶段提交消息还没成形（.githooks/commit-msg 顶部就写了这条），拿不到 feat 这个词，
+ * 所以它只能放宽成「修订号 +1 或 次版本 +1 都放行」，真正的档位比对放在能读到消息的
+ * commit-msg 和 CI 的 --committed 上 —— 两者都仍在提交当场，漏不到历史里。
  *
  * 退出码：0 通过；1 有问题（错误信息打到 stderr）。
  */
@@ -84,6 +90,25 @@ function parseMsgVersion(text) {
 const fmt = (v) => `v${v[0]}.${v[1]}.${v[2]}`;
 const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 const bumpPatch = (v) => [v[0], v[1], v[2] + 1];
+const bumpMinor = (v) => [v[0], v[1] + 1, 0];
+
+/**
+ * 从提交消息里取类型词：版本号右边第一个单词，`feat(搜索页)!: x` → feat。
+ * 取不到返回 ""，按修订号处理 —— 历史里还有 `v0.22.15 root` 这种不带类型词的写法，
+ * 认不出时宁可放行 +0.0.1，也不要拦住一条本意就是 fix 的提交。
+ * 同样先按「模型名的 ] 之后」锚定，避开前缀里带三段式数字的模型名。
+ */
+function parseMsgType(text) {
+  if (typeof text !== "string") return "";
+  const m =
+    /\]\s*v?\d+\.\d+\.\d+\s+([a-zA-Z][a-zA-Z-]*)/.exec(text) ||
+    /\bv?\d+\.\d+\.\d+\s+([a-zA-Z][a-zA-Z-]*)/.exec(text);
+  return m ? m[1].toLowerCase() : "";
+}
+
+/** 进位档位：feat 进次版本（patch 归零），其余（fix/refactor/docs/style/ci/…）进修订号。 */
+const isFeature = (type) => type === "feat";
+const expectedBump = (max, type) => (isFeature(type) ? bumpMinor(max) : bumpPatch(max));
 
 /** 全部提交（当前分支）里出现过的最大版本号 */
 function maxCommittedVersion(upto = "HEAD") {
@@ -127,7 +152,11 @@ const fail = (msg) => {
 // ---------------------------------------------------------------------------
 if (has("--next")) {
   const { max } = maxCommittedVersion();
-  console.log(max ? fmt(bumpPatch(max)) : "v0.1.0");
+  if (!max) {
+    console.log("v0.1.0");
+  } else {
+    console.log(fmt(expectedBump(max, val("--type") || "")));
+  }
   process.exit(0);
 }
 
@@ -163,6 +192,42 @@ if (has("--message-file")) {
     );
   } else {
     ok(`提交消息版本号 ${pkgVersion} 与 package.json 一致`);
+
+    /**
+     * 进位档位校验，amend 时跳过。
+     * 判据与 pre-commit 同一个：消息里的版本号 == HEAD 自己的版本号 ⇒ 认定这是在替换 HEAD。
+     * 必须跳过的原因是 AGENTS.md §1.6 硬约束 2「amend 只改消息和内容，绝不改版本号」——
+     * 此刻逼它按类型重算档位，等于当场要求造一个没人用过的号（改 feat 类型词去凑更糟，
+     * 那是为了让守卫闭嘴而撒谎）。
+     * 代价同 pre-commit：新开一条却重复用号在这里也会被放过，事后由 CI 的 --committed 认。
+     */
+    const headVer = parseMsgVersion((git("log", "-1", "--format=%s") ?? "").trim());
+    if (headVer && cmp(headVer, inMsg) === 0) {
+      console.log(
+        `  · 消息版本号与 HEAD 相同（${fmt(headVer)}），按 git commit --amend 处理：不校验进位档位。` +
+          `若这其实是一条新提交，说明你重复用了版本号（AGENTS.md §1.2）。`,
+      );
+    } else {
+      const { max } = maxCommittedVersion("HEAD");
+      if (!max) {
+        ok(`历史里还没有任何版本号，本次 ${fmt(inMsg)} 作为起点`);
+      } else {
+        const type = parseMsgType(subject);
+        const expected = expectedBump(max, type);
+        if (cmp(inMsg, expected) !== 0) {
+          fail(
+            `进位档位不对：历史最大是 ${fmt(max)}，本次类型词是「${type || "未识别，按修订号"}」，` +
+              `号写的是 ${fmt(inMsg)}，应当是 ${fmt(expected)}。\n` +
+              `    feat 进次版本（${fmt(bumpMinor(max))}），fix / refactor / docs / style / ci 等进修订号（${fmt(bumpPatch(max))}）。\n` +
+              `    改 package.json 和提交消息里的号，不要改类型词去凑数。`,
+          );
+        } else {
+          ok(
+            `进位档位正确：${fmt(max)} → ${fmt(inMsg)}（${isFeature(type) ? "feat 进次版本" : "进修订号"}）`,
+          );
+        }
+      }
+    }
   }
 }
 
@@ -208,16 +273,23 @@ if (checkStaged) {
     } else if (!max) {
       ok(`历史里还没有任何版本号，本次 ${stagedVersion} 作为起点`);
     } else {
-      const expected = bumpPatch(max);
-      if (cmp(stagedVer, expected) !== 0) {
+      /**
+       * 这里只校验「是不是相邻的下一档」，不校验档位本身对不对。
+       * 因为此刻提交消息还没成形，拿不到 feat 这个类型词 —— 档位由 commit-msg 那一段负责，
+       * 它同样在提交当场，不会漏到历史里。
+       */
+      const candidates = [bumpPatch(max), bumpMinor(max)];
+      const legal = candidates.some((c) => cmp(stagedVer, c) === 0);
+      if (!legal) {
         fail(
           `版本号跳号：历史最大是 ${fmt(max)}，本次提交写的是 ${stagedVersion}，` +
-            `按「一次工作一个版本号」应当是 ${fmt(expected)}。\n` +
+            `按「一次工作一个版本号」应当是 ${fmt(candidates[0])}（修订号）或 ${fmt(candidates[1])}（feat 进次版本）。\n` +
             `    确认一下是不是把别的会话预 bump 的数当成了「已用过的版本」。\n` +
-            `    不确定该用哪个号就查：git log --format=%s -20`,
+            `    不确定该用哪个号就查：node scripts/check-version.mjs --next --type <feat|fix>`,
         );
       } else {
-        ok(`版本号连续：${fmt(max)} → ${stagedVersion}`);
+        const which = cmp(stagedVer, bumpMinor(max)) === 0 ? "feat 档（次版本）" : "修订号档";
+        ok(`版本号相邻：${fmt(max)} → ${stagedVersion}（${which}，档位由 commit-msg 按类型词复核）`);
       }
     }
   }
@@ -238,12 +310,14 @@ if (checkCommitted && !checkStaged) {
   else if (!pkgVersion) fail("HEAD 的 package.json 里读不到 version");
   else if (pkgVersion !== fmt(inMsg).slice(1)) {
     fail(`HEAD 三处不一致：package.json=${pkgVersion}，提交消息=${fmt(inMsg)}`);
-  } else if (max && cmp(inMsg, bumpPatch(max)) !== 0) {
+  } else if (max && cmp(inMsg, expectedBump(max, parseMsgType(subject))) !== 0) {
     fail(
-      `HEAD 版本号跳号：其父提交最大是 ${fmt(max)}，HEAD 是 ${fmt(inMsg)}，应当是 ${fmt(bumpPatch(max))}`,
+      `HEAD 版本号进位不对：其父提交最大是 ${fmt(max)}，HEAD 是 ${fmt(inMsg)}，` +
+        `类型词「${parseMsgType(subject) || "未识别，按修订号"}」应当是 ${fmt(expectedBump(max, parseMsgType(subject)))}` +
+        `（feat 进次版本，其余进修订号）`,
     );
   } else {
-    ok(`HEAD 版本号 ${fmt(inMsg)} 连续且三处一致`);
+    ok(`HEAD 版本号 ${fmt(inMsg)} 进位正确且三处一致`);
   }
 }
 

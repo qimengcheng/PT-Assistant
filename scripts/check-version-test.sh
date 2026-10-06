@@ -6,6 +6,7 @@
 # - 「新开一条却重复用号」会**真的**往历史里留下一个重复号，排在 amend 用例前面的话，
 #   后面 amend 的基线（HEAD~1）里仍留着同号，于是报「跳号」——那是历史本身不合法。
 # - 「--amend 改号」会把被改那条的号变成死号（见末尾的已知局限），同样会毒化后续用例。
+# - 档位用例（feat/fix）依赖「前一条是什么号」，中间插号会把断言变成巧合通过。
 set -u
 SRC=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 REPO=/tmp/vt3
@@ -38,28 +39,38 @@ ta() { # --amend HEAD：<用例> <期望> <消息> <版本号>
 ci() { # 事后校验 HEAD：<期望> <说明>
   out=$(node scripts/check-version.mjs --committed 2>&1); report $? "$1" "$2" "$out"
 }
+nx() { # --next：<期望输出> <附加参数> <说明>
+  got=$(node scripts/check-version.mjs --next $2)
+  [ "$got" = "$1" ] && { n=$((n+1)); pass=$((pass+1)); echo "  ok   $n $3 = $got"; } \
+                    || { n=$((n+1)); failn=$((failn+1)); echo "  BAD  $n $3 = $got，期望 $1"; }
+}
 
 echo "--- 提交瞬间（pre-commit + commit-msg）---"
-t  "首条提交，历史无版本号"              PASS "[A]-[M] v0.22.15 root" 0.22.15
-t  "正常推进 N+1"                        PASS "[A]-[M] v0.22.16 feat" 0.22.16
-ta "--amend 沿用同号（改前被误拦）"      PASS "[A]-[M] v0.22.16 feat amended" 0.22.16
-ta "--amend 时首行没有版本号"            FAIL "[A]-[M] feat no version" 0.22.16
-ta "--amend 首行模型名含三段式数字"      PASS "[OpenCode]-[Space Bunny Alpha 1.0.0] v0.22.16 anchored" 0.22.16
-t  "真跳号"                              FAIL "[A]-[M] v0.22.99 jump" 0.22.99
-t  "回退用旧号"                          FAIL "[A]-[M] v0.22.15 back" 0.22.15
-t  "正文含其他版本号，不参与判定"        PASS "[A]-[M] v0.22.17 feat
+t  "首条提交，历史无版本号"              PASS "[A]-[M] v0.5.0 fix root" 0.5.0
+t  "fix 进修订号 N+1"                    PASS "[A]-[M] v0.5.1 fix(x): y" 0.5.1
+t  "refactor 也算修订号"                 PASS "[A]-[M] v0.5.2 refactor: 拆组件" 0.5.2
+t  "feat 进次版本，修订号归零"           PASS "[A]-[M] v0.6.0 feat: 新页面" 0.6.0
+t  "feat 却写修订号（硬拦）"             FAIL "[A]-[M] v0.6.1 feat: 又一个新页面" 0.6.1
+t  "fix 却写次版本（硬拦）"              FAIL "[A]-[M] v0.7.0 fix: 顺手改错号" 0.7.0
+t  "类型词认不出时按修订号放行"          PASS "[A]-[M] v0.6.1 root" 0.6.1
+ta "--amend 改成 feat 措辞也不逼你换号"  PASS "[A]-[M] v0.6.1 feat amended" 0.6.1
+ta "--amend 时首行没有版本号"            FAIL "[A]-[M] feat no version" 0.6.1
+ta "--amend 首行模型名含三段式数字"      PASS "[OpenCode]-[Space Bunny Alpha 1.0.0] v0.6.1 anchored" 0.6.1
+t  "真跳号"                              FAIL "[A]-[M] v0.6.99 jump" 0.6.99
+t  "回退用旧号"                          FAIL "[A]-[M] v0.5.1 back" 0.5.1
+t  "正文含其他版本号，不参与判定"        PASS "[A]-[M] v0.7.0 feat
 
-修掉 v0.22.11 引出的回归，并兼容 v0.9.9 的旧格式。" 0.22.17
-ci PASS "HEAD 连续且三处一致"
+修掉 v0.6.0 引出的回归，并兼容 v0.9.9 的旧格式。" 0.7.0
+ci PASS "HEAD 进位正确且三处一致"
+t  "消息号与 package.json 不一致"        FAIL "[A]-[M] v0.8.0 fix" 0.7.1
 
 echo "--- 本地放过的重复用号，由 CI 兜住 ---"
-t  "新开一条却重复用号（本地放过）"      PASS "[A]-[M] v0.22.17 dup-real" 0.22.17
+t  "新开一条却重复用号（本地放过）"      PASS "[A]-[M] v0.7.0 dup-real" 0.7.0
 ci FAIL "事后 --committed 认出重复用号"
 
 echo "--- --next ---"
-nx=$(node scripts/check-version.mjs --next)
-[ "$nx" = "v0.22.18" ] && { n=$((n+1)); pass=$((pass+1)); echo "  ok   $n --next = $nx"; } \
-                       || { n=$((n+1)); failn=$((failn+1)); echo "  BAD  $n --next = $nx，期望 v0.22.18"; }
+nx "v0.7.1" ""            "--next 默认给修订号"
+nx "v0.8.0" "--type feat" "--next --type feat 给次版本"
 
 echo "--- 已知局限：--amend 顺手改号会造出死号 ---"
 # 单独开一个干净仓库演示：本仓库历史已被上面的用例搅过，看不出「号没了」。
@@ -72,7 +83,7 @@ git add -A >/dev/null 2>&1; out=$(git commit -q -m "[A]-[M] v0.5.0 one" 2>&1); r
 printf '{"name":"x","version":"0.5.1"}\n' > package.json; echo b >> f.txt
 git add -A >/dev/null 2>&1; out=$(git commit -q -m "[A]-[M] v0.5.1 two" 2>&1); report $? PASS "铺垫：推进到 v0.5.1" "$out"
 # 把 v0.5.1 那条 amend 成 v0.5.2 —— pre-commit 只看「staged 是否等于 HEAD 的号」，
-# 这里不相等，走普通分支，expected = max(历史)+1 = 0.5.2，于是放过；0.5.1 从此成为死号。
+# 这里不相等，走普通分支，candidates = max(历史)+1 = 0.5.2，于是放过；0.5.1 从此成为死号。
 printf '{"name":"x","version":"0.5.2"}\n' > package.json; echo c >> f.txt
 git add -A >/dev/null 2>&1; out=$(git commit -q --amend -m "[A]-[M] v0.5.2 amended away" 2>&1); report $? PASS "amend 改号，本地放过（拦不住）" "$out"
 out=$(node scripts/check-version.mjs --committed 2>&1); report $? FAIL "缺口在 tip 时，CI 认得出" "$out"

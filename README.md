@@ -47,8 +47,8 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 
 | 机制 | 位置 | 作用 |
 |---|---|---|
-| 提交消息守卫 | `.githooks/commit-msg` → `check-version.mjs --message-file` | **只查**标题里的 `vX.Y.Z` 与暂存的 `package.json` 一致；`[agent名]-[模型名]` 前缀是 AGENTS.md §1.1 的约定，没有任何脚本强制它 |
-| 版本号连续性 | `scripts/check-version.mjs` | 提交时拦住跳号；CI 用 `--committed` 兜底（clone 出的仓库没有本地 hook，`--no-verify` 也能绕过） |
+| 提交消息守卫 | `.githooks/commit-msg` → `check-version.mjs --message-file` | 查标题里的 `vX.Y.Z` 与暂存的 `package.json` 一致，并按标题类型词**定档**（`feat` 必须进次版本，其余进修订号）；`[agent名]-[模型名]` 前缀是 AGENTS.md §1.1 的约定，没有任何脚本强制它 |
+| 版本号进位 | `scripts/check-version.mjs` | `pre-commit` 拦跳号（两档都放行，因为它这时拿不到提交消息）、`commit-msg` 钉档位、CI 用 `--committed` 兜底（clone 出的仓库没有本地 hook，`--no-verify` 也能绕过）。规则见 AGENTS.md §1.2，成因见 PLAYBOOK §30 |
 | 防线 ① | `scripts/check-antd-tags.mjs` | 全仓扫描写错的 `a-*` 标签（antdv-next 没有的组件写错不报错，只是静默丢内容） |
 | 防线 ② | `scripts/check-content-antd-lite.mjs` | content 侧 antd 按需注册的覆盖度比对 |
 | 防线 ③ | `scripts/check-locale-keys.mjs` | i18n 键在 zh/en 两侧都能解析（取不到时 vue-i18n 不报错，而是把键路径渲染到界面） |
@@ -56,7 +56,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 防线 ⑤ | `scripts/check-store-hydration.mjs` | 挂载钩子里命令式读「`persistWebExt` 异步水合的 store」的地方（水合前那些字段是初始值，界面静默空着，不报错也不进 tsc） |
 | 防线 ⑥（行为断言） | `scripts/check-indexdb-retry.mjs` | 懒开共享库的两条不变量：开库失败不能被缓存、成功后必须复用同一句柄。静态扫不出来，靠它钉（手写最小 IDB 桩，不引 fake-indexeddb） |
 | 防线 ⑦（行为断言） | `scripts/check-fingerprint.mjs` | 种子指纹三层逻辑的纯函数断言（误判「本地已有」会让 qBittorrent 重下、直接打负分享率） |
-| 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑 18 项断言，验守卫自己的判定边界（amend 放行 / 跳号拦住 / 模型名带数字不抢位）。改 `check-version.mjs` 前必跑 |
+| 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（feat 写修订号拦住 / fix 写次版本拦住 / amend 放行 / 跳号拦住 / 模型名带数字不抢位；条数看脚本末尾输出）。改 `check-version.mjs` 前必跑 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
 
@@ -120,12 +120,13 @@ PTD_SESSION=<会话标识> pnpm dev    # 开发模式（产物 → dist-<会话�
 pnpm dev            # 裸 dev 不经构建脚本，仍是 .output，且不碰 dist-verify
 pnpm zip            # 打包 zip（Chrome 产物 + Firefox 强制要求的 -sources.zip）
 pnpm compile        # vue-tsc 类型检查
-pnpm version:next   # 算出下一个该用的版本号（check-version.mjs --next）
-pnpm version:check  # 校验 HEAD 那条的版本号 == package.json == 父提交 +1
+pnpm version:next   # 下一个该用的号，修订号档（等价 check-version.mjs --next）
+node scripts/check-version.mjs --next --type feat   # 下一个该用的号，feat 档（次版本 +1，修订号归零）
+pnpm version:check  # 校验 HEAD 那条：版本号 == package.json，且档位配标题类型词
 ```
 
 > `pnpm version:next` / `version:check` 背后是 `scripts/check-version.mjs`，
-> **它同时是 `.githooks/` 的 pre-commit / commit-msg 钩子**。
+> **它同时是 `.githooks/` 的 pre-commit / commit-msg 钩子**（`pre-commit` 只判相邻档、`commit-msg` 按类型词钉档位）。
 > clone 出的仓库没有本地 hook，需 `git config core.hooksPath .githooks` 手动启用；
 > CI 侧的 `verify` job 是兜底，两者互不替代。
 

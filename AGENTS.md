@@ -36,6 +36,24 @@ PT-Plugin-Plus / PT-depiler 的**重写版**：旧版是 Vue 3 + Vuetify 4 + vit
 - CI 与 Release 以 `package.json` 为唯一真源，commit 里的 `vX.Y.Z` 是给人看的；
   两者不一致时以 `package.json` 为准，但那就说明提交漏了东西。
 
+#### 进位档位：feat 进次版本，其余进修订号
+
+| 提交类型（版本号后面那个词） | 进哪一档 | 例：历史最大 `v0.22.47` |
+|---|---|---|
+| `feat`（新增功能） | **次版本 +1，修订号归零** | `v0.23.0` |
+| `fix` / `refactor` / `docs` / `style` / `perf` / `test` / `build` / `ci` / `i18n` | **修订号 +1** | `v0.22.48` |
+| 类型词认不出（`v0.22.48 修了个东西` 这种） | 按修订号放行，不拦 | `v0.22.48` |
+
+- **硬拦**：`feat` 写修订号、`fix` 写次版本，都会被 `commit-msg` 当场拒掉。
+  **不要改类型词去凑数** —— 类型词是给 Release 页分组用的真话，不是给守卫对齐的旋钮。
+- 一次 feat 进次版本（如表中 `v0.23.0`）之后，**上一个**次版本余下的修订号就刻意作废了，
+  那不是死号、不要去补；这与 §1.6「amend 顺手改号造出死号」是两回事。
+- 混合改动（既加功能又修 bug）按**主要意图**选档，本仓库一次工作只对应一个版本号（上一条硬规则）。
+- 「认不出」也包括中文起头的早期写法（`v0.13.0 平移 Layout 三件套`）—— 它只会按修订号放行。
+  所以**新功能要进次版本就必须把 `feat` 写在版本号右边**，光靠描述里那句「新增」不算。
+- 档位比对读的是**首行的类型词**，所以 §1.1 的格式（前缀 + 版本号 + 类型词）不是排版偏好，
+  是这条判据能工作的前提。
+
 #### 版本号只能从 git log 推导，不要看工作区
 
 **本节最容易违反的一条。** 工作区 `package.json` 的值是「当前工作进度」的信号，不是「已发布版本」，
@@ -50,7 +68,8 @@ PT-Plugin-Plus / PT-depiler 的**重写版**：旧版是 Vue 3 + Vuetify 4 + vit
 选号直接用工具，不要手算，也不要拿工作区的值 +1：
 
 ```bash
-node scripts/check-version.mjs --next     # 输出下一个该用的版本号，例如 v0.22.0
+node scripts/check-version.mjs --next                # 修订号档，例如 v0.22.48
+node scripts/check-version.mjs --next --type feat    # 次版本档，例如 v0.23.0
 ```
 
 #### 本地 hook 是主防线，CI 只是兜底
@@ -59,20 +78,25 @@ node scripts/check-version.mjs --next     # 输出下一个该用的版本号，
 
 | 钩子 | 查什么 |
 |---|---|
-| `pre-commit` | 暂存的 `package.json` 版本号 == git 历史最大 + 1（抓跳号）；版本号与 HEAD 相同时按 `--amend` 处理，基线换成 `HEAD~1` |
-| `commit-msg` | **首行**按 `] v` 锚出的版本号 == 暂存的 `package.json`（抓三处不一致） |
+| `pre-commit` | 暂存的 `package.json` 版本号是不是历史最大**相邻的下一档**（修订号 +1 或次版本 +1 都放行，抓跳号）；版本号与 HEAD 相同时按 `--amend` 处理，基线换成 `HEAD~1` |
+| `commit-msg` | **首行**按 `] v` 锚出的版本号 == 暂存的 `package.json`（抓三处不一致），并按首行类型词**定档**（feat 必须次版本、其余必须修订号） |
 
-**每条边界都是实测出来的，不是推的**：`sh scripts/check-version-test.sh` 跑 18 项断言
-（临时仓库里装真 hook），含「amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位」。
+**每条边界都是实测出来的，不是推的**：`sh scripts/check-version-test.sh` 在临时仓库里装真 hook
+跑断言（条数看它自己末尾的输出，别往这里抄），含「feat 写修订号拦住 / fix 写次版本拦住 /
+amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位」。
 **改 `check-version.mjs` 的判据必须先跑它** —— 这条守卫本身没人守，就是它连续两次误拦 / 漏放的原因。
 
 两个钩子的判据都有**结构性够不着的地方**，写提交前得知道：
 
+- `pre-commit` **看不到提交消息**（消息这时还没成形，见 `.githooks/commit-msg` 顶部注释），
+  所以它判不出这次是 feat 还是 fix，只能两档都放行；**真正把档位钉死的是 `commit-msg`**，
+  仍然在提交当场，漏不进历史。也因此 `pre-commit` 报「版本号相邻」不等于档位对。
 - `pre-commit` 判不出「这次是 amend 还是新开一条」。git 不向 hook 暴露任何指示 `--amend`
   的 `GIT_*` 变量，而此刻 `.git/COMMIT_EDITMSG` 里躺的是**上一条**提交留下的旧内容 ——
   实测两条路都堵。所以退一步用版本号本身作信号：暂存号 == HEAD 自己的号就认定为 amend。
   代价是「新开一条却重复用号」当场放过，这条由 CI 事后认（`--committed` 拿 `HEAD~1` 作基线，
-  事后历史里 amend 与重复用号可区分）。
+  事后历史里 amend 与重复用号可区分）。`commit-msg` 的档位校验用同一个信号跳过 amend，
+  否则就违反 §1.6「amend 不许改版本号」。
 - `--amend` 时**顺手改号**会把被改那条的号变成死号，两个钩子和 CI 都拦不住：那一刻
   暂存号 == HEAD 的号 + 1，与一次完全正常的提交无法区分。等下一条提交压上去，缺口就进了
   历史中段，而 `--committed` 只校验 HEAD 一条，中段缺口是盲区（实测见 PLAYBOOK §21）。
@@ -95,7 +119,7 @@ hook，且 `--no-verify` 能绕过。
 
 ```bash
 # 提交前自检（不想等 hook 拦，也可以手动先跑）
-node scripts/check-version.mjs --next      # 该用哪个号
+node scripts/check-version.mjs --next --type fix    # 该用哪个号（feat 换成 --type feat）
 git show --stat HEAD | head -3
 git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version"
 ```
@@ -111,12 +135,15 @@ git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'u
 **所以 bump 版本号时务必把 `package.json` 一起 `git add`** —— 它是多会话共享热点，最容易漏，
 一漏 CI 读到的版本就和提交说明不一致（PLAYBOOK §20）。
 
-跳号同理：本地 `pre-commit` 会当场拦住，提交后还要再核对一次连续性：
+档位与跳号同理：本地 `pre-commit` 拦跳号、`commit-msg` 拦错档，提交后还要再核对一次：
 
 ```bash
-node scripts/check-version.mjs --committed   # HEAD 那条：消息版本号 == package.json == 父提交 + 1
-git log -10 --format=%s                      # 肉眼扫有没有缺口
+node scripts/check-version.mjs --committed   # HEAD 那条：消息版本号 == package.json，且档位配类型词
+git log -10 --format=%s                      # 扫两处：有没有跨档跳号；feat 是不是真进了次版本
 ```
+
+**扫历史时别把「feat 归零」当成缺口**：`v0.22.47 → v0.23.0` 中间那些修订号是刻意作废的（§1.2），
+要看的是「相邻两条之间有没有既不是 +1 修订号也不是 +1 次版本的跳法」。
 
 ### 1.4 多 agent 并行下的 git 纪律
 
@@ -188,6 +215,9 @@ git commit --amend -m '<合并后的完整消息>'
    用过的死号，而那一刻的暂存状态与一次正常提交无法区分，`pre-commit` / `commit-msg` / CI
    三条都拦不住（CI 的 `--committed` 只校验 HEAD 一条，等下一条提交压上去，缺口进了历史中段
    就彻底看不见）。要换号就是新开一条提交，不是 amend。
+   **合进上一条时（§1.6 的用法）也不许换档**：把 `fix` 改写成 `feat` 让消息看着更贴切是可以的，
+   但号得留着原来的 —— `commit-msg` 认出同号就按 amend 跳过档位校验，正是为了不逼你在此刻造死号。
+   真做成了新功能，就新开一条 `feat` 进次版本。
 3. **不再需要 `--no-verify`。** `pre-commit` 认得 amend 了：暂存版本号 == HEAD 自己的版本号时，
    基线取 `HEAD~1` 而不是 `HEAD`（见 §1.2）。在此之前这条流程只能靠绕钩子走，那等于把它
    从受保护变成不受保护（演变过程见 PLAYBOOK §21）。
@@ -305,22 +335,32 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 
 ### 3.2 service worker（background）铁律
 
+前三条由 `scripts/check-sw-graph.mjs` 在**构建期硬拦**（本地手跑 / CI 已挂），违反时它会点出上游
+文件与完整链路，**不需要背**；改那两个入口、或给它们加导入之后跑一次即可。
+
 - `defineBackground({ type: "module" })` **必须**。classic SW 不支持 `import()`，WXT 会把
   340 个站点定义 + sizzle 全部内联进 background.js，sizzle 顶层访问 `window` → SW 启动即崩、
   消息监听器注册不上、前端表现为「消息永远无响应」。
-- **禁止 `import { xxx } from "@ptd/site"`**（根入口）。它会拉进 eager 链
-  （→ utils → @ptd/social → sizzle）导致上面那个崩溃。只需要站点数量时用
-  `import.meta.glob("/packages/site/definitions/*.ts")` 取**键**（注意必须是项目根绝对 pattern，
-  相对 pattern 在 entrypoint 虚拟模块里会静默匹配出空 map）。只要类型就 `import type`。
-- `@ptd/site/types/base.ts` 无任何 import，是安全的（可运行时取 `EResultParseStatus` 枚举）。
-- **SW 的导入图里不许有「导入即执行」的浏览器 API 调用。** 模块级写 `export const db = openDB(...)`
-  等于「谁 import 谁开库」，哪怕它一次都不碰。上一条那个崩溃是同一类：崩溃点在顶层，
-  而 background 只是**恰好 import 到了**。真浏览器里不报这类错，只能靠跑产物抓（PLAYBOOK §25）。
+- **SW / content 引导的静态 import 闭包里不许出现 `sizzle`。** 它的 UMD 工厂在模块顶层就访问
+  `window`，而 MV3 SW 无 window。实测发生路径是 `@ptd/site` 根入口 → `packages/site/utils.ts`
+  桶 → `utils/filter.ts` → `@ptd/social` → anidb/douban → sizzle。
+- 所以**禁止从这两个上下文 `import { xxx } from "@ptd/site"` / `"@ptd/social"`**（根入口 = barrel，
+  一个 `export * from "./utils"` 就把整片工具链拖进来）。只需要站点数量时用
+  `import.meta.glob("/packages/site/definitions/*.ts")` 取**键**（pattern 必须项目根绝对，
+  相对路径在 entrypoint 虚拟模块里会**静默匹配出空 map**，v0.4.0 的 `definitionCount=0` 根因）。
+  只要类型就 `import type`。
+
+静态图之所以**判得准**，前提是 tsconfig 开了 `verbatimModuleSyntax`：纯类型导入必须写成
+`import type`，Vite 才整条擦除。注意 `import { type A, B } from "x"` 里 B 是活值，整条模块仍会加载。
+
+- **守卫够不着、仍需人看的两点**：① 模块级「导入即执行」的浏览器 API 调用，如果不在通往 sizzle
+  的路径上，静态图判不出，仍靠 `scripts/smoke-background.mjs` 真跑产物兜底（PLAYBOOK §25）。
+  典型是模块级写 `export const db = openDB(...)` —— 等于「谁 import 谁开库」，哪怕它一次都不碰。
   共享库句柄一律走 `@/shared/indexdb` 的 `ptdIndexDb()`（懒开），别改回模块级 Promise。
-  懒开带来的两条不变量（失败不缓存 rejection / 成功必须复用）**静态扫不出来**，由
-  `scripts/check-indexdb-retry.mjs` 用行为断言钉住并挂在 CI；改那个函数前先跑它。
-  同理，那两行重置代码要写成函数体内的 `try/await/catch`，不要写成游离的 `.catch()` ——
-  后者看着像无用代码，会被顺手删掉。
+  懒开带来的两条不变量（失败不缓存 rejection / 成功必须复用）由 `check-indexdb-retry.mjs`
+  用行为断言钉住；改那个函数前先跑它。同理那两行重置代码要写成函数体内的 `try/await/catch`，
+  不要写成游离的 `.catch()` —— 后者看着像无用代码，会被顺手删掉。
+  ② `@ptd/site/types/base.ts` 无任何 import，是安全的（可运行时取 `EResultParseStatus` 枚举）。
 
 ### 3.3 i18n
 
@@ -351,8 +391,8 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
 否则线上是静默空白。
 
-CI 上挂在 `pnpm compile` 之后、构建之前的守卫共 7 条（本地改完也要跑，FAIL 非零退出）。
-前五条是**静态扫描**，后两条是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
+CI 上挂在 `pnpm compile` 之后、构建之前的守卫共 8 条（本地改完也要跑，FAIL 非零退出）。
+前六条是**静态扫描**，后两条是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
 不需要 loader、不引入新依赖）：
 
 ```bash
@@ -361,9 +401,18 @@ node scripts/check-content-antd-lite.mjs  # content 按需清单是否覆盖其�
 node scripts/check-locale-keys.mjs        # 每个字面 t("a.b.c") 在 zh/en 两侧都可解析、两份键集合对称
 node scripts/check-dead-props.mjs         # 传给 a-* 的属性 / 插槽里，哪些是该组件根本不认的死项
 node scripts/check-store-hydration.mjs    # 挂载钩子里命令式读「异步水合的 store」的地方
+node scripts/check-sw-graph.mjs           # SW / content 引导的 import 图（§3.2 那三条铁律）
 node scripts/check-indexdb-retry.mjs      # 共享库懒开的两条不变量：失败不缓存、成功必复用
 node scripts/check-fingerprint.mjs        # 种子指纹三层逻辑自检（含「本该不同」的用例）
 ```
+
+第六条守的是 §3.2：从两个无 DOM / 必须轻量 的上下文出发，静态 import 闭包不许走到 `sizzle`、
+不许命中 `@ptd/site` / `@ptd/social` 根入口，entrypoint 的 `import.meta.glob` 必须根绝对，
+`defineBackground` 必须显式 `type: "module"`。它跟 `smoke-background.mjs` 是同一问题的前后两道：
+这条在源码阶段点出上游文件和完整链路，那条真跑产物、抓静态图够不着的部分。
+**它自带 `--selftest`（9 条断言），改判据前必须先跑** —— 这个仓库的守卫已经错过两次
+「判据被注释里的反例喂成假 PASS」（实测 `type: 'module'` 写在注释里就能骗过 D 条），
+而 `check-version.mjs` 的判据更是连续两次误拦 / 漏放。
 
 第三条防的是 vue-i18n 的静默失效：键取不到时**不抛异常、不进 vue-tsc、不进构建**，而是把键路径
 本身当文案渲染到界面上（内部标识符进 UI 是 §3.5 的零容忍项，它上线时扫出的真问题见 PLAYBOOK §28）。

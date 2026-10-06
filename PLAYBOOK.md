@@ -310,7 +310,8 @@ offscreen 文档是有 `storage` 权限的扩展页，content script 也有 stor
 **根因**：不是算错，是**参照物选错**。工作区 `package.json` 的值是「当前工作进度」的信号，
 不是「已发布版本」；真相源只有 `git log`。
 
-**现在的做法**：选号一律 `node scripts/check-version.mjs --next`，不手算、不拿工作区的值 +1（AGENTS.md §1.2）。
+**现在的做法**：选号一律 `node scripts/check-version.mjs --next --type <feat|fix>`
+（档位规则见 AGENTS.md §1.2 与本文 §30），不手算、不拿工作区的值 +1（AGENTS.md §1.2）。
 
 ### 20. commit 标了版本号，但 package.json 漏提交
 
@@ -334,8 +335,8 @@ offscreen 文档是有 `storage` 权限的扩展页，content script 也有 stor
    `commit-msg` 只锚首行、不扫正文，引用别的版本号绝对安全。
 
 > 这三条边界都是实测出来的，不是推的。改 `check-version.mjs` 的判据前必须跑
-> `sh scripts/check-version-test.sh`（18 项断言，临时仓库里装真 hook）—— 这条守卫自己没人守，
-> 就是它连续两次误拦 / 漏放的原因。
+> `sh scripts/check-version-test.sh`（临时仓库里装真 hook，断言条数看它自己末尾的输出，别往文档里抄）——
+> 这条守卫自己没人守，就是它连续两次误拦 / 漏放的原因。
 
 ### 22. 多会话共用工作树：HEAD 会被别人抢先推进
 
@@ -420,6 +421,32 @@ v0.20.0 整站接入 i18n 时，`check-locale-keys.mjs` 扫出 `ExportUserInfoDi
 
 **现在的做法**：盘点迁移进度除了 diff 文件清单，**必须 grep 路由表 + grep 组件的实际引用点**，
 排查手法见 AGENTS.md §4。
+
+### 30. 「feat 进次版本」这条口头规矩，是被自己写的守卫冻住的（v0.23.0）
+
+**现象**：用户定过「fix 进 +0.0.1、新增功能进 +0.1.0」。这条规矩在 v0.22.0 之前**确实是实际做法**——
+历史里 21 次次版本进位，13 次写着 `feat`，剩下 8 次（`v0.2.0` ~ `v0.13.0`）是早期中文起头、
+还没引入类型词的写法（同一条规矩的另一种表达）。但 v0.22.0 之后 48 条提交**次版本进位 0 次**，
+其中 5 条明明写着 `feat`。看着像 agent 偷懒，实际是没人进得了位。
+
+**根因**（两层，缺一都不成立）：
+
+1. **规矩从没写进文档。** AGENTS.md §1.2 只有「必须带版本号 / 一次工作一个号 / 三处一致 / 连续 +1」，
+   `minor`、`次版本`、`语义化` 在仓库所有 `*.md` 里零命中。跨会话共享的约定，没写就是没有。
+2. **更硬的一层：守卫把 minor 变成了结构性禁止。** `check-version.mjs` 的期望值只算了 `bumpPatch`，
+   「历史最大 + 1」是唯一合法值，于是 `v0.22.47 → v0.23.0` 会被当场报**版本号跳号**。
+   想进位只剩 `--no-verify`，而 §21 的结论明令禁止绕钩子。**守卫上线那天，就是这条规矩失效那天。**
+
+**为什么拖了 48 条才被发现**：`scripts/check-version.mjs` 和 CI 里那句 `--committed` 从 v0.1.0 骨架就在，
+但 CI 只校验**这次 push 的 tip**（见 §23「一次 push 只打一个 tag」同源），中间的 minor 进位它根本看不见；
+真正每条都拦的是 v0.22.0（5e5bf9c，10-04）新加的 `.githooks/pre-commit` —— 而那两条 hook 自己的提交
+`v0.21.3 → v0.22.0` 在旧判据下正是一次「跳号」，能进去只因为当时本地 hook 还不存在。
+
+**现在的做法**：档位规则写进 AGENTS.md §1.2（`feat` 进次版本、其余进修订号，**硬拦**）。
+判据分工是被 `pre-commit` 拿不到提交消息这件事决定的：它只能校验「是不是相邻档」（两档都放行），
+档位由 `commit-msg` 按首行类型词钉死（同样在提交当场），CI 的 `--committed` 事后复核；
+选号一律 `--next --type feat|fix`。`commit-msg` 的档位校验必须与 `pre-commit` 用同一个 amend 信号跳过 amend，
+否则就撞上 AGENTS.md §1.6「amend 不许改版本号」—— 这条已写进用例。
 
 ---
 

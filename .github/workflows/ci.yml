@@ -189,6 +189,14 @@ jobs:
       - name: Check version number and its bump level
         run: node scripts/check-version.mjs --committed
 
+      # 版本号守卫自己的回归测试：在临时仓库里装真 hook 跑断言（条数看脚本自己末尾的输出）。
+      # 它不在 pnpm check:all 的聚合里 —— 那个只收 scripts/check-*.mjs，且刻意排除
+      # check-version.mjs（它读暂存区的版本号，结果取决于此刻暂存了什么）。
+      # 挂在这里而不是 verify 的理由与上面那条一致：同属「版本号」这条线，且这时 node/git 都已就位。
+      # 为什么值得占 CI 一分钟：这条守卫的判据已经错过两次「误拦 / 漏放」，而它自己没人守。
+      - name: Version guard self-test (real hooks in throwaway repos)
+        run: sh scripts/check-version-test.sh
+
       # 用 WXT 自带的 `wxt zip` 而不是系统 zip：
       # 1) 不依赖 runner 是否预装 zip；2) 同时产出 -sources.zip，
       #    那是 Firefox Add-ons 强制要求的源码包；3) 本地已逐条验证过产物命名。

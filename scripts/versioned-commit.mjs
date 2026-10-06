@@ -59,6 +59,25 @@ if (typeof rawMessage !== "string") {
   );
 }
 
+// 「除了版本号什么都没暂存」会留下一条只改 package.json 一行的提交。真犯过一次：文档改了却没
+// git add，包装命令照样把号推进并提交 —— 「一个版本号对应一组完整、已定型的改动」是 §1.2 的硬规则，
+// 而这里比裸 git commit 更容易犯，因为它自己就会暂存 package.json，git 那条「no changes」兜不住。
+// --amend 跳过：改消息的 amend 本来就不该有新暂存内容（§1.6）。
+if (!argv.includes("--amend") && !argv.includes("--allow-empty")) {
+  const stagedOthers = (git("diff", "--cached", "--name-only") ?? "")
+    .split("\n")
+    .filter(Boolean)
+    .filter((f) => f !== "package.json");
+  if (stagedOthers.length === 0) {
+    console.error(
+      "暂存区里除了 package.json 什么都没有，这条提交只会推进版本号。\n" +
+        "    先 git add <你改的文件>（逐文件点名，别 git add -A，见 AGENTS.md §1.4），版本号这次不动，\n" +
+        "    重跑同一条命令它会按同样的基线重算。故意只要版本号一条就显式加 --allow-empty。",
+    );
+    process.exit(1);
+  }
+}
+
 // 占位符怎么认、--amend 能不能用，判据全在 check-version.mjs 里（findNextSlot / --resolve）。
 // 这里不重复一份正则：两处各写一遍迟早会漂开，漂开的代价是「包放过、脚本拦」这种没人能解释的组合。
 const checker = join(top, "scripts", "check-version.mjs");

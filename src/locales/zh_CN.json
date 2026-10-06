@@ -1205,16 +1205,7 @@
     }
   },
   "SpecialThank": {
-    "contributor": "协作者",
-    "issue": "反馈",
-    "langContributor": "语言@:SpecialThank.contributor",
-    "preWorkContributor": "前期工作@:SpecialThank.contributor",
-    "sortByName": "列表按字母排序",
-    "thankNote": [
-      "在项目的开发和测试中，他们给予了很多帮助和支持（或开发，或测试，或发💊，或建议，或鼓励，或鞭策），在此表示感谢。",
-      "列表中未能一一列出所有给予帮助的同学，也对他们表示感谢，如有遗漏敬请谅解。",
-      "同时一并感谢这些："
-    ]
+    "thankNote": "感谢以下 AI 编程智能体在本项目的开发与迁移中提供的帮助，如有遗漏敬请谅解。"
   },
   "TechnologyStack": {
     "dependency": "项目依赖",

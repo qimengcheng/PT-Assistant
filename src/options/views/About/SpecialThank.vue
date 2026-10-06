@@ -1,95 +1,59 @@
 <script setup lang="ts">
 /**
- * 特别感谢页（antdv-next 平移）。
- * 感谢语、语言贡献者表、前期工作贡献者名单（按字母排序）。
+ * 特别感谢页：展示参与本项目开发的 AI 编程智能体的官方 logo。
+ * 图片直连各家官网/CDN（不落库），取不到时退化成只显示名称。
  */
+import { reactive } from "vue";
 import { useI18n } from "vue-i18n";
-import { UserOutlined } from "@antdv-next/icons";
 
-import { definedLangMetaData } from "@/options/plugins/i18n.ts";
-import { REPO_URL } from "~/helper.ts";
+const { t } = useI18n();
 
-const { rt, tm, t } = useI18n();
-
-// 旧版名单保持不变，仅展示时按字母排序
-const sortedPeople = [
-  "Rhilip (R酱)",
-  "ted423",
-  "luckiestone",
-  "sabersalv",
-  "bimzcy (白鸽男孩)",
-  "DXV5 (贝壳)",
-  "An",
-  "Abel袁",
-  "Мало",
-  "tongyifan (杯杯杯杯具)",
-  "the chosen one (三哥)",
-  "橙子",
-  "frank777777777 (杀死那个异教徒)",
-].sort((a, b) => a.localeCompare(b));
-
-const langColumns = [
-  { title: "Code", dataIndex: "value", key: "value", width: 120 },
-  { title: t("common.language"), dataIndex: "title", key: "title" },
-  { title: t("SpecialThank.contributor"), key: "authors" },
+const agents = [
+  { name: "Qoder", logo: "https://qoder.com.cn/favIcon.svg" },
+  {
+    name: "TraeCode",
+    logo: "https://lf16-web-neutral.traecdn.ai/obj/trae-ai-static/trae_website/favicon.png",
+  },
+  { name: "OpenCode", logo: "https://opencode.ai/apple-touch-icon-v3.png" },
+  {
+    name: "WorkBuddy",
+    logo: "https://download.codebuddy.ai/web/workbuddy/f5bce0c03cdc17fa28d25634fb48d2791c297da3/assets/logo.svg",
+  },
+  { name: "DeepSeek Harness", logo: "https://www.deepseek.com/harness/favicon.svg" },
+  { name: "DeepSeek", logo: "https://www.deepseek.com/favicon.ico" },
+  {
+    name: "千问办公",
+    logo: "https://img.alicdn.com/imgextra/i1/O1CN016pjfTq1KjC2STpeei_!!6000000001199-55-tps-24-24.svg",
+  },
+  {
+    name: "千问",
+    logo: "https://img.alicdn.com/imgextra/i4/O1CN01OXv3EM1FN8t9W4P79_!!6000000000474-2-tps-80-80.png",
+  },
+  { name: "智谱", logo: "https://www.zhipuai.cn/favicon.png" },
+  { name: "OpenRouter", logo: "https://openrouter.ai/favicon/glyph.png" },
 ];
 
-// tm 返回的是翻译消息描述符数组，用 rt 解析成最终字符串
-const thankNotes = (): string[] => (tm("SpecialThank.thankNote") as unknown as string[]).map((i) => rt(i));
+const logoFailed = reactive<Record<string, boolean>>({});
 </script>
 
 <template>
   <div class="special-thank">
-    <a-alert type="info" show-icon class="thank-alert">
-      <template #message>
-        <div>
-          <p v-for="(note, idx) in thankNotes()" :key="idx" class="thank-line">{{ note }}</p>
-          <p class="thank-links">
-            {{ t("SpecialThank.contributor") }}:
-            <a :href="`${REPO_URL}/graphs/contributors`" rel="noopener noreferrer nofollow" target="_blank">
-              {{ REPO_URL }}/graphs/contributors
-            </a>
-            <br />
-            {{ t("SpecialThank.issue") }}:
-            <a :href="`${REPO_URL}/issues`" rel="noopener noreferrer nofollow" target="_blank">
-              {{ REPO_URL }}/issues
-            </a>
-          </p>
-        </div>
-      </template>
-    </a-alert>
+    <a-alert :title="t('SpecialThank.thankNote')" type="info" show-icon class="thank-alert" />
 
-    <a-card :title="t('SpecialThank.langContributor')" class="block-card">
-      <a-table
-        :columns="langColumns"
-        :data-source="[...definedLangMetaData]"
-        :pagination="false"
-        row-key="value"
-        size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'authors'">
-            {{ record.authors.join(", ") }}
-          </template>
-        </template>
-      </a-table>
-    </a-card>
-
-    <a-card class="block-card">
-      <template #title>
-        {{ t("SpecialThank.preWorkContributor") }} ({{ t("SpecialThank.sortByName") }})
-      </template>
-      <a-row :gutter="[16, 12]">
-        <a-col v-for="people in sortedPeople" :key="people" :xs="24" :sm="12" :md="8" :lg="6">
-          <div class="people-item">
-            <a-avatar class="people-avatar">
-              <template #icon><UserOutlined /></template>
-            </a-avatar>
-            <span>{{ people }}</span>
-          </div>
-        </a-col>
-      </a-row>
-    </a-card>
+    <div class="agent-wall">
+      <div v-for="agent in agents" :key="agent.name" class="agent-tile">
+        <img
+          v-if="!logoFailed[agent.name]"
+          :alt="agent.name"
+          :src="agent.logo"
+          class="agent-logo"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          @error="logoFailed[agent.name] = true"
+        />
+        <span class="agent-name">{{ agent.name }}</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -98,23 +62,30 @@ const thankNotes = (): string[] => (tm("SpecialThank.thankNote") as unknown as s
   padding: 16px;
 }
 .thank-alert {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
-.thank-line {
-  margin: 0 0 4px;
+.agent-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
 }
-.thank-links {
-  margin: 8px 0 0;
-}
-.block-card {
-  margin-top: 12px;
-}
-.people-item {
+.agent-tile {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 18px 12px 14px;
+  background: #fff;
+  border: 1px solid rgba(5, 5, 5, 0.06);
+  border-radius: 8px;
 }
-.people-avatar {
-  flex: 0 0 auto;
+.agent-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+.agent-name {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.72);
 }
 </style>

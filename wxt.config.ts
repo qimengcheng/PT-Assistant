@@ -98,6 +98,25 @@ export default defineConfig({
      * 产物根目录下的其它 chunk（site/social 等被 app 间接依赖的）用 `*.js` 兜住。
      *
      * 用通配避免依赖拓扑变化后漏配（refs: PT-depiler issue #1467）。
+     *
+     * ⚠️ **`*.js` 不是偷懒的兜底，删不得、也收窄不了**（曾有人提议改成
+     * `chunks/*` + `content-app*`，那是一份会把扩展弄坏的处方，别再提）：
+     *
+     *  1. `content-app.js` 落在产物**根目录**，它 `import("./NexusPHP-<hash>.js")` 拉的是
+     *     **同级**文件 —— 实测根级 379 个 .js 全是这类被 app 间接依赖的 chunk，每一个都必须
+     *     web-accessible。而 `chunks/` 下那 571 个 content-app 引用数为 0（只被扩展页面
+     *     options / offscreen / background 用到，那些是同源扩展页、本来就不需要 WAR）。
+     *     所以「收窄到 chunks/*」正好把必需的那批删掉、把不需要的那批加上。
+     *  2. 改成枚举具体文件名也不行：名字带内容哈希，每次构建都变，等于把 379 个文件名的
+     *     正确性押在「每次发版手工同步」上 —— 这才是真正的漏配来源。
+     *
+     * 安全性上这条也不是短板：`content-app*.js` 的 matches 已经覆盖所有 http/https 页面，
+     * 任意网页本来就能 fetch 到它并据此判定装了本扩展，`*.js` 有没有额外多露一片
+     * （通配符是否跨路径分隔符，本次未能证实 —— Chrome 文档两条获取路径都断了；
+     * 但结论不依赖这个未知量）都不改变这个事实。而暴露的这些文件里**没有秘密**：
+     * 站点定义是公开源码，`password` / `ApiKey` / `Secret` 的命中全是表单字段名与站点名
+     * （如 `e.append("password", this.config.password)`，凭据值只在运行期用户配置里），
+     * 字面量赋值凭据的扫描为空。
      */
     web_accessible_resources: [
       {

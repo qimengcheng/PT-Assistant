@@ -169,15 +169,9 @@ importers:
 
   .:
     dependencies:
-      '@ant-design/icons-vue':
-        specifier: ^7.0.1
-        version: 7.0.1(vue@3.5.43(typescript@6.0.3))
       '@antdv-next/icons':
         specifier: 1.1.2
         version: 1.1.2(vue@3.5.43(typescript@6.0.3))
-      '@types/parse-torrent':
-        specifier: ^11.0.1
-        version: 11.0.1
       '@vueuse/core':
         specifier: ^15.0.0
         version: 15.0.0(vue@3.5.43(typescript@6.0.3))
@@ -293,6 +287,9 @@ importers:
       '@types/node':
         specifier: ^26.6.3
         version: 26.6.3
+      '@types/parse-torrent':
+        specifier: ^11.0.1
+        version: 11.0.1
       '@types/sizzle':
         specifier: ^2.3.10
         version: 2.3.10
@@ -333,9 +330,6 @@ packages:
   '@aklinker1/zero-zip@1.0.1':
     resolution: {integrity: sha512-07a596Bd1QO0bi3tIyt2xruq6vKk7hCUt9enHBwggvipB0iiycoJ9/CqzN6UFawaKbOi6NBfMlUxUXzIOZ7Dsg==}
 
-  '@ant-design/colors@6.0.0':
-    resolution: {integrity: sha512-qAZRvPzfdWHtfameEGP2Qvuf838NhergR35o+EuVyB5XvSA98xod5r4utvi4TJ3ywmevm290g9nsCG5MryrdWQ==}
-
   '@ant-design/colors@7.2.1':
     resolution: {integrity: sha512-lCHDcEzieu4GA3n8ELeZ5VQ8pKQAWcGGLRTQ50aQM2iqPpq2evTxER84jfdPvsPAtEcZ7m44NI45edFMo8oOYQ==}
 
@@ -352,11 +346,6 @@ packages:
 
   '@ant-design/icons-svg@4.6.0':
     resolution: {integrity: sha512-PRomU725ABMf/lnQp5HiB7my1kjEbFY0D10N4lXYxK6TIB1gKjIVD5MRThpDaezLgw1D774J8eOeeDB0M6wHrQ==}
-
-  '@ant-design/icons-vue@7.0.1':
-    resolution: {integrity: sha512-eCqY2unfZK6Fe02AwFlDHLfoyEFreP6rBwAZMIJ1LugmfMiVgwWDYlp1YsRugaPtICYOabV1iWxXdP12u9U43Q==}
-    peerDependencies:
-      vue: '>=3.0.3'
 
   '@antdv-next/cssinjs@1.0.7':
     resolution: {integrity: sha512-d5YOl60UOSLNWlarm+fT1ZZNiThB9mu+JDU32+U5FOeNWYIr34TI+TKs9PbgUOyK+qASSsqfzw5cFN+pIpd7SQ==}
@@ -391,10 +380,6 @@ packages:
 
   '@buttercup/fetch@0.2.1':
     resolution: {integrity: sha512-sCgECOx8wiqY8NN1xN22BqqKzXYIG2AicNLlakOAI4f0WgyLVUbAigMf8CZhBtJxdudTcB1gD5lciqi44jwJvg==}
-
-  '@ctrl/tinycolor@3.6.1':
-    resolution: {integrity: sha512-SITSV6aIXsuVNV3f3O0f2n/cgyEDWoSqtZMYiAmcsYHydcKrOz3gUxB/iXd/Qf08+IZX4KpgNbvUdMBmWz+kcA==}
-    engines: {node: '>=10'}
 
   '@emotion/hash@0.8.0':
     resolution: {integrity: sha512-kBJtf7PH6aWwZ6fka3zQ0p6SBYzx4fl1LoZXE2RrnYST9Xljm7WfKJrU4g/Xr3Beg72MLrp1AWNUmuYJTL7Cow==}
@@ -2470,10 +2455,6 @@ snapshots:
 
   '@aklinker1/zero-zip@1.0.1': {}
 
-  '@ant-design/colors@6.0.0':
-    dependencies:
-      '@ctrl/tinycolor': 3.6.1
-
   '@ant-design/colors@7.2.1':
     dependencies:
       '@ant-design/fast-color': 2.0.6
@@ -2489,12 +2470,6 @@ snapshots:
   '@ant-design/fast-color@3.0.1': {}
 
   '@ant-design/icons-svg@4.6.0': {}
-
-  '@ant-design/icons-vue@7.0.1(vue@3.5.43(typescript@6.0.3))':
-    dependencies:
-      '@ant-design/colors': 6.0.0
-      '@ant-design/icons-svg': 4.6.0
-      vue: 3.5.43(typescript@6.0.3)
 
   '@antdv-next/cssinjs@1.0.7(vue@3.5.43(typescript@6.0.3))':
     dependencies:
@@ -2530,8 +2505,6 @@ snapshots:
   '@buttercup/fetch@0.2.1':
     optionalDependencies:
       node-fetch: 3.3.2
-
-  '@ctrl/tinycolor@3.6.1': {}
 
   '@emotion/hash@0.8.0': {}
 

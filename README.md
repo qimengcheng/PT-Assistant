@@ -48,7 +48,8 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 机制 | 位置 | 作用 |
 |---|---|---|
 | 提交消息守卫 | `.githooks/commit-msg` → `check-version.mjs --message-file` | 查标题里的 `vX.Y.Z` 与暂存的 `package.json` 一致，并按标题类型词**定档**（`feat` 必须进次版本，其余进修订号）；`[agent名]-[模型名]` 前缀是 AGENTS.md §1.1 的约定，没有任何脚本强制它 |
-| 版本号进位 | `scripts/check-version.mjs` | `pre-commit` 拦跳号（两档都放行，因为它这时拿不到提交消息）、`commit-msg` 钉档位、CI 用 `--committed` 兜底（clone 出的仓库没有本地 hook，`--no-verify` 也能绕过）。规则见 AGENTS.md §1.2，成因见 PLAYBOOK §30 |
+| 版本号进位 | `scripts/check-version.mjs` | `pre-commit` 拦跳号（两档都放行，因为它这时拿不到提交消息）、`prepare-commit-msg` 拦没展开的 `@next`、`commit-msg` 钉档位、CI 用 `--committed` 兜底（clone 出的仓库没有本地 hook，`--no-verify` 也能绕过）。规则见 AGENTS.md §1.2，成因见 PLAYBOOK §30 |
+| 提交时自动算号 | `scripts/versioned-commit.mjs` → `check-version.mjs --resolve` | `git commit` 的包装：首行写 `@next` 就按类型词算出号、写 `package.json` 并只暂存这一个路径，再把展开后的消息交给 git。**没做成纯 hook** 是实测出来的（git 2.45.1）：`pre-commit` 改索引进得了提交对象，但那时看不到这次的消息；`prepare-commit-msg` 看得到消息，改的索引却进不去（tree 用更早读进内存的那份快照）——算号两半分别只有前后两个阶段拿得到，所以放在调 git 之前 |
 | 防线 ① | `scripts/check-antd-tags.mjs` | 全仓扫描写错的 `a-*` 标签（antdv-next 没有的组件写错不报错，只是静默丢内容） |
 | 防线 ② | `scripts/check-content-antd-lite.mjs` | content 侧 antd 按需注册的覆盖度比对 |
 | 防线 ③ | `scripts/check-locale-keys.mjs` | i18n 键在 zh/en 两侧都能解析（取不到时 vue-i18n 不报错，而是把键路径渲染到界面） |
@@ -123,10 +124,18 @@ pnpm compile        # vue-tsc 类型检查
 pnpm version:next   # 下一个该用的号，修订号档（等价 check-version.mjs --next）
 node scripts/check-version.mjs --next --type feat   # 下一个该用的号，feat 档（次版本 +1，修订号归零）
 pnpm version:check  # 校验 HEAD 那条：版本号 == package.json，且档位配标题类型词
+node scripts/versioned-commit.mjs -m "[agent名]-[模型名] @next feat: 描述"  # 提交，版本号由脚本算并写入
 ```
 
+> `versioned-commit.mjs` 是 `git commit` 的包装：首行版本号该在的位置写 `@next`，它按类型词算出号 →
+> 写 `package.json` 并只暂存这一个路径 → 用展开后的消息调 `git commit`。判据与钩子共用
+> `check-version.mjs --resolve` 这一份。写成显式 `vX.Y.Z` 时它不算号，只补漏掉的 `git add`；
+> `--amend` 配 `@next` 直接拒收（AGENTS.md §1.6：amend 不许改版本号）。
+> 为什么不是钩子一把做完，见下面表格里 `prepare-commit-msg` 那一行。
+
 > `pnpm version:next` / `version:check` 背后是 `scripts/check-version.mjs`，
-> **它同时是 `.githooks/` 的 pre-commit / commit-msg 钩子**（`pre-commit` 只判相邻档、`commit-msg` 按类型词钉档位）。
+> **它同时是 `.githooks/` 的三个钩子**（`pre-commit` 只判相邻档、`prepare-commit-msg` 拒收没展开的
+> `@next`、`commit-msg` 按类型词钉档位）。
 > clone 出的仓库没有本地 hook，需 `git config core.hooksPath .githooks` 手动启用；
 > CI 侧的 `verify` job 是兜底，两者互不替代。
 

@@ -1,0 +1,17 @@
+#!/bin/sh
+# 守卫：首行还躺着没展开的 @next 就当场拒收。
+#
+# 为什么这个钩子不代替你把号写好（实测 git 2.45.1，断言见 scripts/check-version-test.sh）：
+# pre-commit 里改 package.json 再 git add，改动**会**进提交对象；到了 prepare-commit-msg，
+# 索引虽然变了（git show :package.json 认），提交对象却**不认** —— tree 用的是更早读进内存的那份快照。
+# 偏偏类型词（feat / fix）只有在这里才拿得到，pre-commit 阶段 .git/COMMIT_EDITMSG 里
+# 躺的还是上一条提交留下的旧内容。两头一夹，算号只能放在调 git 之前：
+#
+#   node scripts/versioned-commit.mjs -m "[agent名]-[模型名] @next feat: 描述"
+#
+# 忘了走那条命令时，本钩子负责让它在提交当场停下，而不是留下「消息里有占位符、
+# package.json 还是旧号」这种一半状态（显式号照常由 pre-commit / commit-msg 校验）。
+#
+# 启用方式见 pre-commit 的注释：git config core.hooksPath .githooks
+exec node "$(git rev-parse --show-toplevel)/scripts/check-version.mjs" \
+  --guard --message-file "$1"

@@ -7,6 +7,7 @@ import {
   ArrowUpOutlined,
   CloudUploadOutlined,
   ClockCircleOutlined,
+  ColumnWidthOutlined,
   DeleteOutlined,
   EyeOutlined,
   FieldTimeOutlined,
@@ -197,7 +198,33 @@ const selectedColumnKeys = computed<string[]>({
   },
 });
 
-const columnOptions = computed(() => fullTableHeader.value.map((item) => ({ value: item.key, label: item.title })));
+/**
+ * 列显隐面板：工具条只留一个「自定义列」按钮，点开 modal 用 3 列开关逐个切。
+ * 原先那是一个 mode="multiple" 的 a-select，10 个列名摊成 tag 把右上角撑成一整块。
+ * 切换即时写入 configStore（沿用旧多选框语义），所以没有草稿态、也不需要「确定」。
+ */
+type ColumnItem = { key: string; label: string; fixed: boolean };
+
+const showColumnDialog = ref<boolean>(false);
+
+const columnItems = computed<ColumnItem[]>(() =>
+  fullTableHeader.value.map((item) => ({ key: item.key, label: item.title, fixed: !!item.props?.disabled })),
+);
+
+/**
+ * 固定列（`props.disabled`：下载器、种子名称、操作）永远会显示 —— tableHeader 的过滤条件是
+ * `props.disabled || 已选`。所以它们的开关显示成「开且不可改」，而不是拨了没反应。
+ */
+const fixedColumnKeys = computed(() => fullTableHeader.value.filter((i) => i.props?.disabled).map((i) => i.key));
+
+const columnVisible = (key: string) => selectedColumnKeys.value.includes(key) || fixedColumnKeys.value.includes(key);
+
+const toggleColumn = (key: string, on: boolean) => {
+  const next = new Set(selectedColumnKeys.value);
+  if (on) next.add(key);
+  else next.delete(key);
+  selectedColumnKeys.value = [...next];
+};
 
 // ── data loading ──────────────────────────────────────────────────────────
 /** Manual full refresh: fetch all active downloaders, skipping the circuit-broken ones. */
@@ -379,60 +406,10 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
 </script>
 
 <template>
-  <a-alert type="info" show-icon>
-    <template #message>{{ t("route.Overview.MyClient") }}</template>
-    <template #action>
-      <a-tag
-        v-if="selectedDownloaderIds.length === 1"
-        color="blue"
-        style="margin-right: 8px"
-        closable
-        @close="clearDownloaderFilter"
-      >
-        <img class="client-tag-icon" :src="clientIcon(selectedDownloaderIds[0])" alt="" />
-        {{ clientName(selectedDownloaderIds[0]) }}
-      </a-tag>
-
-      <a-button size="small" type="primary" :title="t('MyClient.clientStatusDialog.openBtn')" @click="showClientStatusDialog = true">
-        <template #icon><ThunderboltOutlined /></template>
-        {{ allTorrents.length }}
-        <ArrowUpOutlined style="color: #389e0d" />
-        {{ formatSize(totalUpSpeed) }}/s
-        <ArrowDownOutlined style="color: #cf1322" />
-        {{ formatSize(totalDlSpeed) }}/s
-      </a-button>
-    </template>
-  </a-alert>
-
-  <a-card size="small">
-    <!-- 批量操作区走 a-card 的 title、搜索框与列选择器走 #extra：
-         extra 固定在卡片头部右侧，不随表格内容滚动，也不用靠 flex:1 撑留白 -->
-    <template #extra>
-      <a-flex align="center" gap="small" wrap>
-        <a-tooltip :title="t('MyClient.columnSelector')">
-          <a-select
-            v-model:value="selectedColumnKeys"
-            :options="columnOptions"
-            mode="multiple"
-            size="small"
-            allow-clear
-            style="max-width: 200px"
-          />
-        </a-tooltip>
-
-        <a-input
-          v-model:value="searchText"
-          :placeholder="t('MyClient.searchPlaceholder')"
-          allow-clear
-          size="small"
-          style="max-width: 300px"
-        >
-          <template #prefix><SearchOutlined /></template>
-        </a-input>
-      </a-flex>
-    </template>
-
-        <template #title>
+  <!-- 顶部那条 a-alert 去掉了：左侧导航已经标出当前页。它 #action 里的两件事没丢 ——
+       下载器筛选标签与状态按钮一起并进工具条右端。骨架见 style.css 的 .page。 -->
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
       <a-tooltip :title="t('MyClient.pushToDownloader.navBtn')">
         <a-button type="text" @click="showPushToDownloaderDialog = true">
@@ -512,9 +489,42 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
           </a-card>
         </template>
       </a-dropdown>
-          </a-flex>
-    </template>
+      </a-flex>
 
+      <!-- 工具条右端：下载器筛选标签 + 状态按钮（原 a-alert 的 #action）、自定义列、搜索框 -->
+      <a-flex align="center" gap="small" wrap class="page-bar-extra">
+        <a-tag v-if="selectedDownloaderIds.length === 1" color="blue" closable @close="clearDownloaderFilter">
+          <img class="client-tag-icon" :src="clientIcon(selectedDownloaderIds[0])" alt="" />
+          {{ clientName(selectedDownloaderIds[0]) }}
+        </a-tag>
+
+        <a-button size="small" type="primary" :title="t('MyClient.clientStatusDialog.openBtn')" @click="showClientStatusDialog = true">
+          <template #icon><ThunderboltOutlined /></template>
+          {{ allTorrents.length }}
+          <ArrowUpOutlined style="color: #389e0d" />
+          {{ formatSize(totalUpSpeed) }}/s
+          <ArrowDownOutlined style="color: #cf1322" />
+          {{ formatSize(totalDlSpeed) }}/s
+        </a-button>
+
+        <a-button size="small" @click="showColumnDialog = true">
+          <template #icon><ColumnWidthOutlined /></template>
+          <span>{{ t("MyClient.columnSelector") }}</span>
+        </a-button>
+
+        <a-input
+          v-model:value="searchText"
+          :placeholder="t('MyClient.searchPlaceholder')"
+          allow-clear
+          size="small"
+          style="width: 300px"
+        >
+          <template #prefix><SearchOutlined /></template>
+        </a-input>
+      </a-flex>
+    </a-flex>
+
+    <div class="page-panel">
     <a-table
       :columns="tableHeader"
       :data-source="filteredTorrents"
@@ -680,7 +690,26 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
         </template>
       </template>
     </a-table>
-  </a-card>
+    </div>
+  </div>
+
+  <!-- 列显隐面板：3 列开关（a-row / a-col，:span="8" 一份三列）。
+       切换即时生效，所以 :footer="null" 不要「确定/取消」；
+       标题走 :title 属性（项目硬规定：不用 #title 插槽、不往标题栏塞控件）。 -->
+  <a-modal v-model:open="showColumnDialog" :title="t('MyClient.columnSelector')" :width="520" :footer="null">
+    <a-row :gutter="[16, 12]">
+      <a-col v-for="item in columnItems" :key="item.key" :span="8">
+        <a-flex align="center" gap="small">
+          <a-switch
+            :checked="columnVisible(item.key)"
+            :disabled="item.fixed"
+            @change="(on: boolean) => toggleColumn(item.key, on)"
+          />
+          <span>{{ item.label }}</span>
+        </a-flex>
+      </a-col>
+    </a-row>
+  </a-modal>
 
   <DeleteDialog
     v-model="showDeleteDialog"

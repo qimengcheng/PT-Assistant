@@ -52,18 +52,22 @@ body {
   flex-wrap: wrap;
 }
 
-/* ===== 外层壳：左侧导航 + 内容区 ===== */
+/* ===== 外层壳：a-layout + a-layout-sider + a-layout-content =====
+   壳本身的 flex 方向、撑满、侧栏宽度与底色都由组件负责（含 Sider 的 a-layout 会自动
+   拿到 ant-layout-has-sider → 横向排列），这里只留组件给不了的东西：整页高度、分隔线、
+   侧栏内部的三段式排布、内容区的滚动与内边距。 */
 .shell {
-  display: flex;
   height: 100vh;
 }
 
 .nav {
-  width: 220px;
+  border-right: 1px solid var(--pt-color-border);
+}
+
+/* Sider 会把 children 包进这一层，`.nav` 上的 flex 列布局必须落到它身上才生效。 */
+.nav .ant-layout-sider-children {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--pt-color-border);
-  background: #fff;
 }
 
 .brand {
@@ -165,14 +169,100 @@ body {
   color: var(--pt-color-danger);
 }
 
+/* 内容区外面还套了一层 a-layout（右侧那一列），它和 .content 一样是横向 flex 里的子项，
+   所以 min-width: 0 必须**两层都给** —— 只给 .content 归零，撑破视口的仍然是中间这层。
+   （PLAYBOOK §12 那条宽表格溢出，多了一层 DOM 之后形状不变。） */
+.body {
+  min-width: 0;
+}
+
 .content {
-  flex: 1;
-  /* flex 子项默认 min-width:auto，宽表格会把整页撑出视口；
-     归零后由表格自身的 scroll.x 负责横向滚动 */
+  /* flex: auto 由 .ant-layout-content 提供，这里只补组件不管的三件事。
+     padding 取 8px 与 .page 网格的 gap 对齐（外层留白和行间距同一档）。 */
   min-width: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 8px;
   background: var(--pt-color-bg-content);
+}
+
+/* ===== 列表页骨架：48px 工具条 + 内容面板 =====
+   形状来自用户的参照实现（.menumain / .menu / .mainpanel）：单列网格、两行「工具条 + 面板」、
+   8px 间距，灰底上放**两块白表面** —— 工具条那一行自己也是白面板，不是把按钮摊在灰底上。
+   滚动交给面板自己（`overflow: auto` + `overscroll-behavior: contain`，不往外层串），
+   所以 `.page` 用 height 而不是 min-height：1fr 那一行必须有确定高度才滚得起来。
+   第一行是 `minmax(48px, auto)` 而不是死 48px：工具条里的 a-flex 带 wrap，窄窗口下会换成
+   两行，写死 48px 时第二行不会撑高白面板，而是直接溢出去压在下面的面板上。 */
+.page {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(48px, auto) 1fr;
+  gap: 8px;
+  height: 100%;
+}
+
+/* 工具条那一行：排布交给 a-flex（align/gap/wrap），这里只管表面与不被长按钮串撑破 */
+.page-bar {
+  min-width: 0;
+  padding: 0 8px;
+  background: #fff;
+  border: 1px solid var(--pt-color-border-light);
+  border-radius: 6px;
+}
+
+/* 工具条右端那一组（筛选/搜索框）：靠右独立成组，窄窗口下随 wrap 一起换行。
+   用法统一成一个约定：右端只有一个控件时，class 直接挂在那个控件上（SetBackup、SetSite）；
+   有多个控件时才套一层容器（MyData、MyClient、DownloadHistory）。不要两种写法混着来。 */
+.page-bar-extra {
+  margin-left: auto;
+  min-width: 0;
+}
+
+.page-panel {
+  min-width: 0;
+  min-height: 0;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--pt-color-border-light);
+  border-radius: 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* 站点定义页重写时连带删掉了它那一整块全局样式，但下面这两组仍被别的视图用 class="" 引用：
+   .hint → SetBase/Index.vue、SetSite/EditSearchEntryList.vue
+   .site-list → SetSearchSolution/EditDialog.vue
+   所以留在全局；要清理得先把这三处改成组件内样式。 */
+.hint {
+  color: var(--pt-color-text-secondary);
+  padding-top: 40px;
+  text-align: center;
+}
+
+.hint.error {
+  color: var(--pt-color-danger);
+}
+
+.site-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  padding: 4px 0;
+}
+
+.site-list li {
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+.site-list li:hover {
+  background: var(--pt-color-bg-hover);
+}
+
+.site-list li.active {
+  background: var(--pt-color-bg-selected);
+  font-weight: 600;
 }
 
 /* ===== 首页 ===== */
@@ -258,128 +348,6 @@ body {
   background: var(--pt-color-disabled-bg);
   color: var(--pt-color-disabled);
   font-size: 11px;
-}
-
-/* ===== 站点定义（开发调试视图） =====
-   高度用 100% 而不是 100vh：本页嵌在 .content（flex 撑满 100vh、自带 padding 与
-   overflow-y:auto）里，写 100vh 会比内容框高出一屏 → 外层一条、内层又一条双滚动条。 */
-.layout {
-  display: flex;
-  height: 100%;
-  min-height: 480px;
-}
-
-.layout .defs {
-  width: 260px;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--pt-color-border);
-  background: #fff;
-}
-
-.layout .defs header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 14px 14px 10px;
-}
-
-.layout .defs h1 {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.count {
-  color: var(--pt-color-text-secondary);
-  font-size: 12px;
-}
-
-.search {
-  margin: 0 14px 10px;
-  padding: 7px 10px;
-  border: 1px solid var(--pt-color-border);
-  border-radius: 6px;
-  outline: none;
-}
-
-.search:focus {
-  border-color: var(--pt-color-primary);
-}
-
-.site-list {
-  flex: 1;
-  overflow-y: auto;
-  list-style: none;
-  padding: 4px 0;
-}
-
-.site-list li {
-  padding: 6px 14px;
-  cursor: pointer;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px;
-}
-
-.site-list li:hover {
-  background: var(--pt-color-bg-hover);
-}
-
-.site-list li.active {
-  background: var(--pt-color-bg-selected);
-  font-weight: 600;
-}
-
-.defs-detail {
-  flex: 1;
-  padding: 24px 32px;
-  overflow-y: auto;
-}
-
-.defs-detail h2 {
-  margin-bottom: 16px;
-  font-size: 18px;
-}
-
-.hint {
-  color: var(--pt-color-text-secondary);
-  padding-top: 40px;
-  text-align: center;
-}
-
-.hint.error {
-  color: var(--pt-color-danger);
-}
-
-.detail {
-  border-collapse: collapse;
-}
-
-.detail th {
-  text-align: left;
-  padding: 8px 16px 8px 0;
-  color: var(--pt-color-text-secondary);
-  vertical-align: top;
-  white-space: nowrap;
-}
-
-.detail td {
-  padding: 8px 0;
-}
-
-.tag {
-  display: inline-block;
-  margin: 0 6px 4px 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--pt-color-bg-selected);
-  color: var(--pt-color-primary-text);
-  font-size: 12px;
-}
-
-.url {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px;
-  margin-bottom: 4px;
 }
 
 /* ===== 弹窗标题的语义色 =====

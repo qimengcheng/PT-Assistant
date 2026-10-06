@@ -118,67 +118,17 @@ jobs:
       - name: Type check (vue-tsc)
         run: pnpm compile
 
-      # 两条都是「静态比对注册名表」的防线，不依赖构建产物，放在构建前尽早失败：
-      # 1) 全仓扫描写错的 a-* 标签（antdv-next 没有 a-list/a-step，写错不会报错，
-      #    只是把整块内容静默丢掉 —— 带命名插槽时原生元素分支根本不渲染 children）；
-      # 2) content 侧 antd 是按需注册（src/content-script/antd-lite.ts），漏注册同样静默。
-      - name: Check antd tag usage
-        run: node scripts/check-antd-tags.mjs
-
-      - name: Check content-script antd coverage
-        run: node scripts/check-content-antd-lite.mjs
-
-      # 第三条静态防线：vue-i18n 拿不到键时不抛异常、不进 vue-tsc、不进构建，
-      # 而是把键路径本身当文案渲染到界面上（内部标识符进 UI 是 §3.5 的零容忍项）。
-      - name: Check i18n keys resolve in both locales
-        run: node scripts/check-locale-keys.mjs
-
-      # 第四条静态防线：传给 a-* 组件的死 prop / 死插槽。
-      # vue-tsc 抓不到（a-* 的类型来自 GlobalComponents 声明，允许任意 attr），
-      # 而 antdv-next 运行时是 inheritAttrs 默认行为 —— 没声明的 prop 被当普通 attr
-      # 塞进根 DOM，不报错、不警告、生产环境完全静默；没匹配的命名插槽渲染成空。
-      # 判据是运行时实跑 install() 拿到的注册表与 dist 下的 .d.ts，不抄文档。
-      - name: Check dead props and slots on a-* components
-        run: node scripts/check-dead-props.mjs
-
-      # 第五条静态防线：挂载钩子里命令式读取「靠 persistWebExt 异步水合」的 store 字段。
-      # chrome.storage 取数是异步的，水合完成前那些字段是**初始值**（不是 undefined），
-      # 所以这类写法不报错、不进 vue-tsc、不进构建，只是界面静默空着或按默认值走。
-      # 「我的数据」页等 5 秒多才出表就是这么来的：为了绕开这个竞态手搓了 5 秒 debounce，
-      # 症状被掩盖、代价摊给了所有人。store 清单由扫源码得出（persistWebExt 为 true 的那些），
-      # 不抄文档；runtime store 走 sessionStorage 同步水合，自动排除在外。
-      - name: Check no imperative async-store reads in mount hooks
-        run: node scripts/check-store-hydration.mjs
-
-      # 第六条静态防线：service worker / content 引导的 import 图。把 AGENTS.md §3.2 那三条
-      # 「违反了不报错、只在运行时崩或静默空着」的约定从文档变成硬拦：
-      #   A 静态闭包不许走到 sizzle（UMD 工厂顶层访问 window，MV3 SW 无 window → 启动即崩）；
-      #   B 不许从这两个上下文 import @ptd/site / @ptd/social 根入口（barrel 会把整片工具链拖进来，
-      #     实测 A 的发生路径就是 @ptd/site → utils → @ptd/social）；
-      #   C entrypoint 的 import.meta.glob 必须用根绝对 pattern（相对会静默匹配出空 map）；
-      #   D defineBackground 必须显式 type: "module"（classic SW 会把 340 站点 + sizzle 全内联）。
-      # 判据能静态成立的前提是 tsconfig 的 verbatimModuleSyntax：纯类型导入必须写 import type，
-      # Vite 才整条擦除，所以「这条边在不在运行时图上」可判。
-      # 它是下方 smoke-background.mjs 的前置线：那条真跑产物、抓的是运行期才暴露的部分，
-      # 但报错位置在产物里；这条在源码阶段就把链路和上游文件点名，定位成本低一个量级。
-      - name: Check SW and content-bootstrap import graph
-        run: node scripts/check-sw-graph.mjs
-
-      # 前面六条是**静态扫描**，这条是**行为断言**：懒开的共享库有两条不变量，静态判不出来 ——
-      # 失败不能被缓存（否则一次 VersionError 让本上下文永久取不到库），
-      # 成功必须被复用（否则「修重试」会变成每次调用重开一个连接）。
-      # 守的就是 `if (opening === pending) opening = null` 这一行被当成无用代码删掉。
-      - name: Check lazy IndexedDB open retries on failure and caches on success
-        run: node scripts/check-indexdb-retry.mjs
-
-      # 种子指纹三层逻辑的自检。指纹算错的代价是**不对称且不可逆**的：误判「本地已有」
-      # 会让 qBittorrent 校验失败重新下载，PT 站更直接把分享率打到负数。
-      # 这套纯函数断言（含「本该不同」的用例：单文件 vs 多文件、根目录不同、目录层级不同）
-      # 在此之前一直是手动跑的 —— 守卫没进 CI，就等于靠人记得跑，而人总会忘。
-      # 与 check-indexdb-retry.mjs 同属「行为断言」：都直接 import src/ 下的源码，
-      # 不依赖构建产物、不需要 loader、不引入新依赖。
-      - name: Check torrent fingerprint self-test
-        run: node scripts/check-fingerprint.mjs
+      # 全部静态/行为守卫一次跑完。**清单不在这里手抄** —— check-all.mjs 去 scripts/ 目录现取
+      # check-*.mjs（只排除它自身与 check-version.mjs，理由写在它头注释里），所以新增一条守卫
+      # 会自动同时进本地 `pnpm check:all` 和这里。此前这里是 8 条 step 各抄一遍，与聚合器
+      # 各说一套：新守卫进得来本地、进不来 CI，而消灭手抄正是聚合器存在的唯一理由。
+      # 不 fail-fast 反而比 8 个独立 step 信息多：一次看全所有失败，而不是只红第一个。
+      # 每条防什么、边界在哪：AGENTS.md §3.4 的表与 README「工程化体系」。
+      # ⚠️ 目录现取 = 不懂顺序。这一步在构建之前，将来若有守卫需要构建产物（dist/），
+      #    它会被自动收进来在这里假报错 —— 那时给它单独一步排到 Build and package 之后，
+      #    并把它加进 check-all.mjs 的 EXCLUDED。
+      - name: Guards (check-*.mjs, list collected from scripts/)
+        run: node scripts/check-all.mjs
 
       # 版本号守卫的**兜底**（主防线是本地 .githooks 里的 pre-commit / commit-msg：
       # CI 只在 push 时触发，本地连提 5 次它一次都不跑，等历史定型就晚了）。

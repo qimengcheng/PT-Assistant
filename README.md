@@ -43,8 +43,9 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 `.github/workflows/ci.yml` 是单文件流水线（push / PR / 手动触发），
 由 `.githooks/` 的本地 hook 与 CI 各守一半。守卫共 **8 条**（① ~ ⑥ 静态扫描，⑦ ⑧ 行为断言，
 条数以 `node scripts/check-all.mjs` 现取为准 —— 它扫 `scripts/` 目录，新增一条自动进聚合），
-都挂在 `build` job 的 `pnpm compile` 之后（`verify` job 只管提交标题那三条硬规则：前缀 / 版本号 / 与 `package.json` 一致）；
-本地改完也要跑，FAIL 非零退出。
+**CI 的 `build` job 调的就是这一条聚合命令**（在 `pnpm compile` 之后，不再逐条挂 step，
+所以「本地有、CI 没有」这种漂移从结构上没了；`verify` job 只管提交标题那三条硬规则：
+前缀 / 版本号 / 与 `package.json` 一致）；本地改完也要跑，FAIL 非零退出。
 每条的成因与「报干净 ≠ 真干净」的边界见 AGENTS.md §3.4 与 PLAYBOOK。机制清单：
 
 | 机制 | 位置 | 作用 |

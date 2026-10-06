@@ -107,26 +107,32 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
 </script>
 
 <template>
-  <a-card size="small">
-    <!-- 筛选框走 a-card 的 extra：在卡片右上角固定，不随内容滚动 -->
-    <template #extra>
-      <a-input
-        v-model:value="tableWaitFilter"
-        allow-clear
-        size="small"
-        class="toolbar-filter"
-        :placeholder="t('SearchResultSnapshot.table.filterLabel')"
-      >
-        <template #prefix>
-          <SearchOutlined />
-        </template>
-      </a-input>
-    </template>
+  <!-- 骨架（48px 工具条 + 白底面板）见 style.css 的 .page / .page-bar / .page-panel。
+       原先删除按钮挂在卡片 #title、筛选框挂在 #extra：卡片头的垂直 padding 实测是 0，
+       size="small" 下头高只有 38px，32px 的按钮塞进去只剩上下各 3px —— 整条贴到窗口顶。 -->
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
+      <a-flex align="center" gap="small" wrap>
+        <a-button danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+      </a-flex>
 
-        <template #title>
-      <a-button danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-    </template>
+      <div class="page-bar-extra">
+        <a-input
+          v-model:value="tableWaitFilter"
+          allow-clear
+          size="small"
+          class="toolbar-filter"
+          :placeholder="t('SearchResultSnapshot.table.filterLabel')"
+        >
+          <template #prefix>
+            <SearchOutlined />
+          </template>
+        </a-input>
+      </div>
+    </a-flex>
 
+    <!-- 面板只给表格一块白底表面；表格自己的 scroll.y 仍管内部滚动 -->
+    <div class="page-panel">
     <a-table
       :columns="columns"
       :data-source="filteredItems"
@@ -171,7 +177,8 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
         </template>
       </template>
     </a-table>
-  </a-card>
+    </div>
+  </div>
 
   <EditNameDialog v-model="showEditNameDialog" :edit-id="toEditId!" />
   <DeleteDialog v-model="showDeleteDialog" :to-delete-ids="toDeleteIds" :confirm-delete="confirmDeleteSearchSnapshot" />

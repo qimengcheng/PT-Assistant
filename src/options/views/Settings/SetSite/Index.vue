@@ -229,16 +229,41 @@ function keywordChecked(keyword: string) {
 </script>
 
 <template>
-  <a-card size="small">
-    <!-- 筛选框（含高级筛选 popover）整体走 a-card 的 extra：在卡片右上角固定，不随内容滚动。
-         这里不用 toolbar-spacer 撑留白了，extra 本身就在卡片头部右侧。 -->
-    <template #extra>
-      <a-input
-        v-model:value="tableWaitFilterRef"
-        allow-clear
-        size="small"
-        class="toolbar-filter"
+  <!-- 这页是整页工作台（工具条 + 全宽表格），不是「一张信息卡」，所以不用 a-card。
+       原先按钮条挂在卡片 #title、筛选框挂在 #extra：卡片头的垂直 padding 实测是 0
+       （`padding: 0 headerPadding`，高度只靠 min-height），size="small" 下头高 38px，
+       塞进 32px 的按钮只剩上下各 3px —— 整条贴到窗口顶。
+       现在用 .page 网格：48px 的工具条一行 + 白底面板一行，间距 8px（见 style.css）。 -->
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
+    <a-flex align="center" gap="small" wrap>
+      <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
+
+      <a-button danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+
+      <a-button @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span>{{ t('SetSite.index.oneClickImport') }}</span></a-button>
+
+      <a-button
+        :disabled="tableSelected.length === 0"
+        :loading="isFaviconFlushing"
+        :title="t('SetSite.index.table.flushFavicon')"
+        @click="() => flushSiteFavicon(tableSelected)"
       >
+        <template #icon>
+          <ReloadOutlined />
+        </template>
+        <span class="ml-1">{{ t("SetSite.index.table.flushFavicon") }}</span>
+      </a-button>
+
+      <a-button @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span>{{ t('SetSite.index.reBuildMap') }}</span></a-button>
+    </a-flex>
+
+    <a-input
+      v-model:value="tableWaitFilterRef"
+      allow-clear
+      size="small"
+      class="toolbar-filter page-bar-extra"
+    >
         <template #prefix>
           <a-popover trigger="click" placement="bottomLeft">
             <template #content>
@@ -283,34 +308,11 @@ function keywordChecked(keyword: string) {
           <template #suffix>
             <SearchOutlined />
           </template>
-        </a-input>
-    </template>
+    </a-input>
+    </a-flex>
 
-        <template #title>
-      <a-flex align="center" gap="small" wrap>
-        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
-
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-
-        <a-button @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span>{{ t('SetSite.index.oneClickImport') }}</span></a-button>
-
-        <a-button
-          :disabled="tableSelected.length === 0"
-          :loading="isFaviconFlushing"
-          size="small"
-          :title="t('SetSite.index.table.flushFavicon')"
-          @click="() => flushSiteFavicon(tableSelected)"
-        >
-          <template #icon>
-            <ReloadOutlined />
-          </template>
-          <span class="ml-1">{{ t("SetSite.index.table.flushFavicon") }}</span>
-        </a-button>
-
-        <a-button @click="showRebuildMapDialog = true"><template #icon><ToolOutlined /></template><span>{{ t('SetSite.index.reBuildMap') }}</span></a-button>
-      </a-flex>
-    </template>
-
+    <!-- 面板只负责给表格一块白底表面；表格自身的 scroll.y 仍管内部滚动 -->
+    <div class="page-panel">
     <a-table
       :columns="columns"
       :data-source="filteredItems"
@@ -434,7 +436,8 @@ function keywordChecked(keyword: string) {
         </template>
       </template>
     </a-table>
-  </a-card>
+    </div>
+  </div>
 
   <AddDialog v-model="showAddDialog" />
   <DeleteDialog v-model="showDeleteDialog" :to-delete-ids="toDeleteIds" :confirm-delete="confirmDeleteSite" />
@@ -444,8 +447,8 @@ function keywordChecked(keyword: string) {
 </template>
 
 <style scoped lang="scss">
-/* .toolbar / .toolbar-spacer 随 #title + #extra 改造一起失效，已删（无对应 DOM）。
-   .toolbar-filter 仍在用（#extra 里的筛选框宽度约束），名字保留避免无谓 churn。 */
+/* 工具条的间距用全局 .toolbar（style.css：margin-bottom + flex-wrap），这里不重复定义。
+   .toolbar-filter 只给筛选框限宽，免得它在窄窗口下把按钮条挤散。 */
 .toolbar-filter {
   max-width: 320px;
 }

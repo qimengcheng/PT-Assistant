@@ -130,8 +130,8 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
 <template>
   <a-config-provider :locale="antdLocale" :theme="{ token: { fontSize: 13 } }">
     <a-app>
-      <div class="shell">
-        <aside class="nav">
+      <a-layout class="shell">
+        <a-layout-sider :width="220" theme="light" class="nav">
           <header class="brand">
             <img src="/icon/128.png" alt="logo" class="logo" />
             <div>
@@ -161,16 +161,18 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
             <span v-else-if="backgroundOk === false" class="status bad">● {{ t("layout.nav.backgroundFailed") }}</span>
             <span v-else class="status">● {{ t("layout.nav.backgroundConnecting") }}</span>
           </footer>
-        </aside>
+        </a-layout-sider>
 
-        <main class="content">
-          <router-view v-slot="{ Component }">
-            <KeepAlive :include="cachedViewNames" :max="10">
-              <component :is="Component" />
-            </KeepAlive>
-          </router-view>
-        </main>
-      </div>
+        <a-layout class="body">
+          <a-layout-content class="content">
+            <router-view v-slot="{ Component }">
+              <KeepAlive :include="cachedViewNames" :max="10">
+                <component :is="Component" />
+              </KeepAlive>
+            </router-view>
+          </a-layout-content>
+        </a-layout>
+      </a-layout>
 
       <ReleaseNoteDialog v-model="showReleaseNoteDialog" />
     </a-app>

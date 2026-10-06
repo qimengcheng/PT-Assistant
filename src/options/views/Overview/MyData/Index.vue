@@ -11,6 +11,7 @@ import {
   ArrowUpOutlined,
   BarChartOutlined,
   CalendarOutlined,
+  ColumnWidthOutlined,
   DollarOutlined,
   ExclamationCircleOutlined,
   ExportOutlined,
@@ -102,13 +103,8 @@ const tableHeader = computed(() => {
   ) as ITableHeader[];
 });
 
-/** 列显隐下拉框的可选项：value 用 key，label 用 title（对应原 item-value="key"） */
-const columnSelectOptions = computed(() =>
-  fullTableHeader.map((header) => ({ value: header.key, label: header.title })),
-);
-
 /**
- * 列显隐多选框的 v-model 代理。
+ * 列显隐的 v-model 代理。
  * 原来 v-combobox 的 `v-model` 与 `@update:model-value` 都落到 configStore，
  * 这里统一在 setter 里调用 updateTableBehavior（它内部还负责 $save）。
  */
@@ -116,6 +112,35 @@ const selectedColumnKeys = computed({
   get: () => configStore.tableBehavior.MyData.columns ?? [],
   set: (value: string[]) => configStore.updateTableBehavior("MyData", "columns", value),
 });
+
+/**
+ * 列显隐面板：工具条只留一个按钮，点开 modal 用 3 列开关逐个切。
+ * 原先那是一个 mode="multiple" 的 a-select，12 个列名摊成 tag 能占满整条工具条。
+ * 切换即时写入 configStore —— 沿用旧多选框的行为，所以没有草稿态，也不需要「确定」。
+ */
+type ColumnItem = { key: string; label: string; fixed: boolean };
+
+const showColumnDialog = ref<boolean>(false);
+
+const columnItems = computed<ColumnItem[]>(() =>
+  fullTableHeader.map((header) => ({ key: header.key, label: header.title, fixed: !!header.props?.disabled })),
+);
+
+/**
+ * 固定列（`props.disabled`，例如「操作」）永远会显示 —— tableHeader 的过滤条件是
+ * `props.disabled || 已选`。所以它们的开关显示成「开且不可改」，
+ * 而不是留一个拨了没反应的开关。
+ */
+const fixedColumnKeys = computed(() => fullTableHeader.filter((h) => h.props?.disabled).map((h) => h.key));
+
+const columnVisible = (key: string) => selectedColumnKeys.value.includes(key) || fixedColumnKeys.value.includes(key);
+
+const toggleColumn = (key: string, on: boolean) => {
+  const next = new Set(selectedColumnKeys.value);
+  if (on) next.add(key);
+  else next.delete(key);
+  selectedColumnKeys.value = [...next];
+};
 
 /** 排序/分页行为统一收敛到 useTableBehavior（MyData 允许多列排序）；列生成走公共 toTableColumns */
 const { sortBy, pagination: tablePagination, handleTableChange } = useTableBehavior("MyData", {
@@ -342,15 +367,8 @@ const showExportDialog = ref(false);
           </template>
         </a-popover>
 
-        <!-- 列显隐：原 v-combobox(multiple) → a-select(mode="multiple") -->
-        <a-select
-          v-model:value="selectedColumnKeys"
-          mode="multiple"
-          :options="columnSelectOptions"
-          size="small"
-          class="column-filter-select"
-          @click.stop
-        />
+        <!-- 列显隐：勾选面板收进按钮 + modal，工具条不再摊一排 tag -->
+        <a-button @click="showColumnDialog = true"><template #icon><ColumnWidthOutlined /></template><span>{{ t("MyData.index.columns") }}</span></a-button>
       </a-flex>
 
       <div class="page-bar-extra">
@@ -688,6 +706,24 @@ const showExportDialog = ref(false);
     </div>
   </div>
 
+  <!-- 列显隐面板：3 列开关（a-row / a-col，:span="8" 一份三列）。
+       切换即时生效，所以 :footer="null" 不要「确定/取消」；
+       标题走 :title 属性（项目硬规定：不用 #title 插槽、不往标题栏塞控件）。 -->
+  <a-modal v-model:open="showColumnDialog" :title="t('MyData.index.columns')" :width="520" :footer="null">
+    <a-row :gutter="[16, 12]">
+      <a-col v-for="item in columnItems" :key="item.key" :span="8">
+        <a-flex align="center" gap="small">
+          <a-switch
+            :checked="columnVisible(item.key)"
+            :disabled="item.fixed"
+            @change="(on: boolean) => toggleColumn(item.key, on)"
+          />
+          <span>{{ item.label }}</span>
+        </a-flex>
+      </a-col>
+    </a-row>
+  </a-modal>
+
   <HistoryDataViewDialog v-model="showHistoryDataViewDialog" :site-id="historyDataViewDialogSiteId!" />
   <ExportUserInfoDialog v-model="showExportDialog" :selected-site-ids="tableSelected" />
 </template>
@@ -697,10 +733,6 @@ const showExportDialog = ref(false);
   min-width: 280px;
   max-height: 60vh;
   overflow-y: auto;
-}
-
-.column-filter-select {
-  max-width: 200px;
 }
 
 .my-data-search {

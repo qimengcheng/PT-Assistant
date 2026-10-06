@@ -146,34 +146,34 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <a-card size="small">
-    <!-- 筛选框走 a-card 的 extra：它在卡片右上角固定，不随内容滚动，
-         也不需要靠 toolbar-spacer 去撑开标题行的右侧留白 -->
-    <template #extra>
-      <a-input
-        v-model:value="tableWaitFilterRef"
-        allow-clear
-        size="small"
-        class="toolbar-filter"
-        :placeholder="t('DownloadHistory.filterPlaceholder')"
-      >
-        <template #prefix>
-          <FilterOutlined class="filter-trigger" @click="showAdvanceFilterDialog = true" />
-        </template>
-        <template #suffix>
-          <SearchOutlined />
-        </template>
-      </a-input>
-    </template>
-
-        <template #title>
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
         <a-button type="primary" :loading="isLoadingHistory" @click="() => throttleLoadDownloadHistory()"><template #icon><SyncOutlined /></template><span>{{ t('DownloadHistory.refresh') }}</span></a-button>
         <a-button :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span>{{ t('DownloadHistory.reDownload') }}</span></a-button>
         <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
       </a-flex>
-    </template>
 
+      <!-- 筛选框独立成右组：原来吃 a-card 的 extra 定位，换成网格骨架后要自己靠右 -->
+      <div class="page-bar-extra">
+        <a-input
+          v-model:value="tableWaitFilterRef"
+          allow-clear
+          size="small"
+          class="toolbar-filter"
+          :placeholder="t('DownloadHistory.filterPlaceholder')"
+        >
+          <template #prefix>
+            <FilterOutlined class="filter-trigger" @click="showAdvanceFilterDialog = true" />
+          </template>
+          <template #suffix>
+            <SearchOutlined />
+          </template>
+        </a-input>
+      </div>
+    </a-flex>
+
+    <div class="page-panel">
     <a-table
       :columns="columns"
       :data-source="filteredItems"
@@ -240,7 +240,8 @@ onUnmounted(() => {
         </template>
       </template>
     </a-table>
-  </a-card>
+    </div>
+  </div>
 
   <ReDownloadSelectDialog
     v-model="showReDownloadSelectDialog"

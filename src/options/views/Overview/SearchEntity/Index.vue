@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useBreakpoint } from "antdv-next";
-import { useWindowSize } from "@vueuse/core";
 import {
   AlertOutlined,
   CameraOutlined,
@@ -202,24 +201,22 @@ const tableSelectedRaw = shallowRef<ISearchResultTorrent[]>([]);
 // ============================================================================
 
 const tableWrapperRef = useTemplateRef<HTMLDivElement>("tableWrapper");
-const { width: windowWidth, height: windowHeight } = useWindowSize();
 const tableScrollY = ref(400);
 
 /**
- * 表体（scroll.y）高度 = 表格容器高度 − 表头 − 分页器 − 表格底部到容器底部那一截。
+ * 表体（scroll.y）高度 = 容器高 − 表头 − 分页器 − 分页器自己的 margin-top。
  *
- * 这个函数改过两次，两次都是同一类错：**拿会漂的量当基准、拿猜的数当减数**。
+ * 这个函数错过三次，每次都是「拿会漂的量当基准 / 拿猜的数当减数」，第三次最隐蔽：
+ * 它把「分页器底到容器底那一截」也减掉了，而那一截**就是 y 自己剩下的空白** ——
+ * 剩余 = 容器 − 表头 − 分页器 − 表体实高，代回去得 `新 y ≡ 当前表体实高`，
+ * 是个恒等式：量多少次都原样吐回当前值，永远收敛不到铺满；首批结果少时
+ * 表体实高等于内容高，y 还会缩到那个高度然后再也长不回来（表现就是
+ * 「下面空一大片，且空白高度跟第一次返回的结果条数有关」）。
  *
- * 一开始是 `视口高度 − 表格 top − 55 − 64 − 16`。`top` 取自 `getBoundingClientRect().top`，
- * 那是**视口**坐标，而 `.content` 自己就是滚动容器（overflow-y: auto）—— 页面往下一滚，
- * 同一个表格的 top 一直变小，`视口高度 − top` 越来越大，表格被算得越来越高，
- * 底部就顶出一段空白。中间又换成 `.content` 的 clientHeight，滚动时确实稳了，
- * 但 55 / 64 / 16 仍是当年目测的三个整数，卡片内衬一改就失准。
- *
- * 现在的基准是 `#ptd-search-entity-table` 自己的 clientHeight：容器已被
- * `.result-card` 的 flex:1 撑到剩余高度，这个值既不随滚动位置变，也不随表格内容变，
- * 所以不会有「表格变高 → 容器变高 → 再算一次」的循环。减数全部实测：
- * 表头高度、分页器高度、以及分页器底部到容器底部的那一截（含横向滚动条与间距）。
+ * 所以四个减数必须都不依赖 y：表头量 `.ant-table-header`（设了 scroll.y 后表头被拆成
+ * 独立一层，量它比量 thead 准），分页器量它自己，间距取它的 computed margin-top。
+ * 基准是容器 `clientHeight`：它由 `.search-page` 的 height:100% 一路 flex 下来，
+ * 不随表格内容变，所以这里不存在反馈回路，也就不需要防抖。
  */
 function recalcTableScrollY() {
   const el = tableWrapperRef.value;
@@ -228,20 +225,34 @@ function recalcTableScrollY() {
   const containerHeight = el.clientHeight;
   if (containerHeight <= 0) return;
 
-  const rect = el.getBoundingClientRect();
-  const headerHeight = el.querySelector<HTMLElement>(".ant-table-thead")?.getBoundingClientRect().height ?? 0;
-  const paginationBox = el.querySelector<HTMLElement>(".ant-table-pagination")?.getBoundingClientRect();
-  // 分页器在容器内部，所以这一截是「容器底 − 分页器底」而不是反过来
-  const tailBelowPagination = paginationBox ? rect.bottom - paginationBox.bottom : 0;
-  const paginationHeight = paginationBox ? paginationBox.height : 0;
+  const headerHeight =
+    el.querySelector<HTMLElement>(".ant-table-header")?.getBoundingClientRect().height ??
+    el.querySelector<HTMLElement>(".ant-table-thead")?.getBoundingClientRect().height ??
+    0;
+  const pagEl = el.querySelector<HTMLElement>(".ant-table-pagination");
+  const paginationHeight = pagEl ? pagEl.getBoundingClientRect().height : 0;
+  const paginationGap = pagEl ? parseFloat(getComputedStyle(pagEl).marginTop) || 0 : 0;
 
-  tableScrollY.value = Math.max(containerHeight - headerHeight - tailBelowPagination - paginationHeight, 200);
+  const next = Math.max(containerHeight - headerHeight - paginationHeight - paginationGap, 200);
+  if (next !== tableScrollY.value) tableScrollY.value = next;
 }
 
-// 首帧时 flex 布局还没落定，容器高度量出来是 0；等一帧再量
-onMounted(() => nextTick(recalcTableScrollY));
-// 窗口尺寸变化（工具栏换行会改变 top）、结果集变化（提示条出现/消失同理）后重测
-watch([windowWidth, windowHeight, tableItems], () => nextTick(recalcTableScrollY));
+/**
+ * 重测的触发条件。原先只有窗口尺寸与结果集，够不到真正会变的那几种：
+ * 工具条换行、提示条出现/消失、侧栏折叠 —— 这些都只改容器自身的高度。
+ * ResizeObserver 在 observe 时就会先投递一次观测，所以首帧那一量也归它管
+ * （量到 0 时函数自己早退，容器从 0 长开时它会再投一次）。
+ * 结果集仍要单独 watch：0 条时分页器根本不渲染，它的 24px + 8px 不在式子里。
+ */
+let tableResizeObserver: ResizeObserver | null = null;
+onMounted(() => {
+  const el = tableWrapperRef.value;
+  if (!el) return;
+  tableResizeObserver = new ResizeObserver(() => nextTick(recalcTableScrollY));
+  tableResizeObserver.observe(el);
+});
+onBeforeUnmount(() => tableResizeObserver?.disconnect());
+watch(tableItems, () => nextTick(recalcTableScrollY));
 
 /** a-table 的分页是受控的，v-data-table 原本把这块状态收在组件内部 */
 const tablePage = ref(1);

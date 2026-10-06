@@ -148,12 +148,10 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 </script>
 
 <template>
-  <a-alert type="info">
-    <template #title>{{ t("route.Settings.SetBackup") }}</template>
-  </a-alert>
-
-  <a-card class="set-backup">
-    <template #title>
+  <!-- 顶部那条 a-alert 只是页标题（左侧导航已经标出当前页），去掉了。
+       骨架见 style.css 的 .page / .page-bar / .page-bar-extra / .page-panel。 -->
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
         <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
         <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupServer(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
@@ -163,12 +161,18 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
         <a-button :loading="doBackupStatus[localBackup]" @click="doBackup(localBackup)"><template #icon><DatabaseOutlined /></template><span>{{ t('SetBackup.localExport') }}</span></a-button>
         <a-button @click="() => (showRestoreDialog = true)"><template #icon><ImportOutlined /></template><span>{{ t('SetBackup.localImport') }}</span></a-button>
       </a-flex>
-    </template>
 
-    <template #extra>
-      <a-input v-model:value="searchKey" allow-clear :placeholder="t('common.search')" size="small" style="width: 320px; max-width: 500px" />
-    </template>
+      <a-input
+        v-model:value="searchKey"
+        allow-clear
+        :placeholder="t('common.search')"
+        size="small"
+        class="page-bar-extra"
+        style="width: 320px; max-width: 500px"
+      />
+    </a-flex>
 
+    <div class="page-panel">
     <a-table
       :columns="fullTableHeader"
       :data-source="filteredBackupServers"
@@ -284,7 +288,8 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
         </template>
       </template>
     </a-table>
-  </a-card>
+    </div>
+  </div>
 
   <AddDialog v-model="showAddDialog" />
   <EditDialog v-model="showEditDialog" :client-id="toEditBackupServerId!" />

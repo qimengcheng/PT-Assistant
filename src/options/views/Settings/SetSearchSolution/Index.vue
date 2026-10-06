@@ -235,33 +235,39 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
 </script>
 
 <template>
-  <div class="set-search-solution">
-    <a-alert :title="t('route.Settings.SetSearchSolution')" type="info" show-icon style="margin-bottom: 12px" />
+  <!-- 顶部那条 a-alert 只是页标题（左侧导航已经标出当前页），去掉了。
+       外壳也不再是 a-card：卡片头的垂直 padding 实测是 0，size="small" 下头高只有 38px，
+       按钮整条贴到窗口顶。现在用 .page 骨架：48px 工具条一行 + 白底面板一行（见 style.css）。 -->
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
+      <a-flex align="center" gap="small" wrap>
+        <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-    <a-card>
-      <!-- 搜索框走 a-card 的 #extra：固定在卡片头部右侧，不随表格内容滚动。
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+
+        <a-upload accept="application/json" multiple :show-upload-list="false" :before-upload="importSearchSolution">
+          <a-button><template #icon><ImportOutlined /></template><span>{{ t('common.import') }}</span></a-button>
+        </a-upload>
+        <a-button :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span>{{ t('common.export') }}</span></a-button>
+
+        <a-button disabled><template #icon><QuestionCircleOutlined /></template><span>{{ t('common.howToUse') }}</span></a-button>
+      </a-flex>
+
+      <!-- 搜索框靠右：.page-bar-extra 负责 margin-left:auto，
            原来是 .toolbar > .toolbar-right 两层 flex 容器靠 margin-left:auto 推到最右。 -->
-      <template #extra>
-        <a-input v-model:value="tableFilter" allow-clear :placeholder="t('common.search')" style="width: 240px">
-          <template #prefix><SearchOutlined /></template>
-        </a-input>
-      </template>
+      <a-input
+        v-model:value="tableFilter"
+        allow-clear
+        :placeholder="t('common.search')"
+        class="page-bar-extra"
+        style="width: 240px"
+      >
+        <template #prefix><SearchOutlined /></template>
+      </a-input>
+    </a-flex>
 
-      <template #title>
-        <a-flex align="center" gap="small" wrap>
-          <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
-
-          <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-
-          <a-upload accept="application/json" multiple :show-upload-list="false" :before-upload="importSearchSolution">
-            <a-button><template #icon><ImportOutlined /></template><span>{{ t('common.import') }}</span></a-button>
-          </a-upload>
-          <a-button :disabled="tableSelected.length === 0" @click="() => exportSearchSolutions(tableSelected)"><template #icon><ExportOutlined /></template><span>{{ t('common.export') }}</span></a-button>
-
-          <a-button disabled><template #icon><QuestionCircleOutlined /></template><span>{{ t('common.howToUse') }}</span></a-button>
-        </a-flex>
-      </template>
-
+    <!-- 面板只负责给表格一块白底表面并接管内部滚动 -->
+    <div class="page-panel">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -344,19 +350,14 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
           </template>
         </template>
       </a-table>
-    </a-card>
-
-    <EditDialog v-model="showEditDialog" :solution-id="solutionId" />
-    <DeleteDialog
-      v-model="showDeleteDialog"
-      :to-delete-ids="toDeleteIds"
-      :confirm-delete="confirmDeleteSearchSolution"
-    />
+    </div>
   </div>
-</template>
 
-<style scoped>
-.set-search-solution {
-  padding: 16px;
-}
-</style>
+  <!-- 弹窗是 .page 的根级兄弟：a-modal 会 teleport 到 body，不占网格行 -->
+  <EditDialog v-model="showEditDialog" :solution-id="solutionId" />
+  <DeleteDialog
+    v-model="showDeleteDialog"
+    :to-delete-ids="toDeleteIds"
+    :confirm-delete="confirmDeleteSearchSolution"
+  />
+</template>

@@ -175,14 +175,22 @@ const columns = [
 </script>
 
 <template>
-  <div class="set-downloader">
-    <a-alert :title="t('route.Settings.SetDownloader')" type="info" show-icon style="margin-bottom: 12px" />
+  <!-- 顶部那条 a-alert 只是页标题（左侧导航已经标出当前页），去掉了。
+       外壳也不再是 a-card：卡片头的垂直 padding 实测是 0，size="small" 下头高只有 38px，
+       按钮整条贴到窗口顶。现在用 .page 骨架：48px 工具条一行 + 白底面板一行（见 style.css）。 -->
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
+      <a-flex align="center" gap="small" wrap>
+        <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-    <a-card>
-      <!-- 搜索框与筛选下拉走 a-card 的 #extra：固定在卡片头部右侧，不随表格内容滚动。
-         原来是 .toolbar > .toolbar-right 两层 flex 容器靠 justify-content 推到最右。 -->
-      <template #extra>
-        <a-flex align="center" gap="small">
+        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+
+        <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span>{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
+      </a-flex>
+
+      <!-- 搜索框与筛选下拉靠右：.page-bar-extra 负责 margin-left:auto，
+           原来是 .toolbar > .toolbar-right 两层 flex 容器靠 justify-content 推到最右。 -->
+      <a-flex align="center" gap="small" wrap class="page-bar-extra">
           <a-input
             v-model:value="searchText"
             :placeholder="t('common.search')"
@@ -232,19 +240,11 @@ const columns = [
               </a-menu>
             </template>
           </a-dropdown>
-        </a-flex>
-      </template>
+      </a-flex>
+    </a-flex>
 
-        <template #title>
-        <a-flex align="center" gap="small" wrap>
-          <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
-
-          <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-
-          <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span>{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
-        </a-flex>
-      </template>
-
+    <!-- 面板只负责给表格一块白底表面并接管内部滚动 -->
+    <div class="page-panel">
       <a-table
         :columns="columns"
         :data-source="filteredDownloaders"
@@ -296,19 +296,14 @@ const columns = [
           </template>
         </template>
       </a-table>
-    </a-card>
-
-    <AddDialog v-model="showAddDialog" />
-    <EditDialog v-model="showEditDialog" :client-id="toEditDownloaderId!" />
-    <DefaultDownloaderEditDialog v-model="showDefaultDownloaderEditDialog" />
-    <SiteFilterDialog v-model="showSiteFilterDialog" :client-id="toEditDownloaderId!" />
-    <PathAndTagSuggestDialog v-model="showPathAndTagSuggestDialog" :client-id="toEditDownloaderId!" />
-    <DeleteDialog v-model="showDeleteDialog" :to-delete-ids="toDeleteIds" :confirm-delete="confirmDeleteDownloader" />
+    </div>
   </div>
-</template>
 
-<style scoped>
-.set-downloader {
-  padding: 16px;
-}
-</style>
+  <!-- 弹窗一律是 .page 的根级兄弟：a-modal 会 teleport 到 body，不占网格行 -->
+  <AddDialog v-model="showAddDialog" />
+  <EditDialog v-model="showEditDialog" :client-id="toEditDownloaderId!" />
+  <DefaultDownloaderEditDialog v-model="showDefaultDownloaderEditDialog" />
+  <SiteFilterDialog v-model="showSiteFilterDialog" :client-id="toEditDownloaderId!" />
+  <PathAndTagSuggestDialog v-model="showPathAndTagSuggestDialog" :client-id="toEditDownloaderId!" />
+  <DeleteDialog v-model="showDeleteDialog" :to-delete-ids="toDeleteIds" :confirm-delete="confirmDeleteDownloader" />
+</template>

@@ -7,15 +7,22 @@
 #   后面 amend 的基线（HEAD~1）里仍留着同号，于是报「跳号」——那是历史本身不合法。
 # - 「--amend 改号」会把被改那条的号变成死号（见末尾的已知局限），同样会毒化后续用例。
 # - 档位用例（feat/fix）依赖「前一条是什么号」，中间插号会把断言变成巧合通过。
+# - @next 档单独开一个干净仓库（/tmp/vt5）跑：它每条都会真的推进版本号，
+#   混进主序列会让后面依赖「前一条是什么号」的断言变成巧合通过。
 set -u
 SRC=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
+
+mkrepo() { # 在 $1 建一个装好三条 hook 的临时仓库并切进去
+  rm -rf "$1" && mkdir -p "$1/scripts" "$1/.githooks" && cd "$1" || exit 1
+  cp "$SRC/scripts/check-version.mjs" scripts/
+  cp "$SRC/.githooks/pre-commit" "$SRC/.githooks/commit-msg" "$SRC/.githooks/prepare-commit-msg" .githooks/
+  git init -q -b main . >/dev/null
+  git config user.email t@t; git config user.name t; git config core.hooksPath .githooks
+  git config commit.gpgsign false
+}
+
 REPO=/tmp/vt3
-rm -rf $REPO && mkdir -p $REPO/scripts $REPO/.githooks && cd $REPO || exit 1
-cp "$SRC/scripts/check-version.mjs" scripts/
-cp "$SRC/.githooks/pre-commit" "$SRC/.githooks/commit-msg" .githooks/
-git init -q -b main . >/dev/null
-git config user.email t@t; git config user.name t; git config core.hooksPath .githooks
-git config commit.gpgsign false
+mkrepo $REPO
 
 n=0; pass=0; failn=0
 report() {
@@ -43,6 +50,61 @@ nx() { # --next：<期望输出> <附加参数> <说明>
   got=$(node scripts/check-version.mjs --next $2)
   [ "$got" = "$1" ] && { n=$((n+1)); pass=$((pass+1)); echo "  ok   $n $3 = $got"; } \
                     || { n=$((n+1)); failn=$((failn+1)); echo "  BAD  $n $3 = $got，期望 $1"; }
+}
+# 包装命令的入口（判据都在 check-version.mjs 里，这里只调它）
+VC="$SRC/scripts/versioned-commit.mjs"
+pkghead() { node -e 'const{execSync}=require("child_process");process.stdout.write(JSON.parse(execSync("git show HEAD:package.json",{encoding:"utf8"})).version)'; }
+pkgworktree() { node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync("package.json","utf8")).version)'; }
+# tz：<用例> <期望落库版本> <消息> [工作区 package.json 起始版本]
+# 走包装命令，而且故意只 git add payload.txt —— 算号、写 package.json、暂存必须全由脚本做完，
+# 否则这条测试还在测「人记得 add」那个老前提。
+tz() {
+  printf '{"name":"x","version":"%s"}\n' "${4:-0.0.0}" > package.json
+  echo "p$n" > payload.txt
+  git add -- payload.txt >/dev/null 2>&1
+  out=$(node "$VC" -m "$3" 2>&1); code=$?
+  if [ $code -ne 0 ]; then report $code PASS "$1" "$out"; return; fi
+  got=$(pkghead)
+  subj=$(git log -1 --format=%s)
+  dirty=$(git status --porcelain -- package.json)
+  case "$subj" in *"@next"*) left=bad ;; *) left=ok ;; esac
+  if [ "$got" = "$2" ] && [ "$left" = ok ] && [ -z "$dirty" ]; then
+    report 0 PASS "$1" ""
+  else
+    report 1 PASS "$1" "  落库版本=$got（期望 $2）/ 首行残留=$left / 未暂存的 package.json=[$dirty] / $out"
+  fi
+}
+# tf：<用例> <消息> [起始版本]：直接 git commit 却写了 @next（忘了走包装）→ 必须当场拒收，
+# 且不许留下「消息里有占位符、package.json 还是旧号」的半套状态
+tf() {
+  printf '{"name":"x","version":"%s"}\n' "${4:-0.0.0}" > package.json
+  echo "p$n" > payload.txt
+  git add -- payload.txt >/dev/null 2>&1
+  before=$(pkghead)
+  out=$(git commit -q -m "$2" 2>&1); code=$?
+  after=$(pkghead)
+  if [ $code -eq 0 ] || [ "$before" != "$after" ]; then
+    report 1 PASS "$1" "  code=$code 拒收前 HEAD 的号=$before 之后=$after / 首行=$(git log -1 --format=%s) / $out"
+  else
+    report 0 PASS "$1" ""
+  fi
+}
+# tv：<用例> <消息>：包装命令带 --amend 又写 @next → 必须拒收且不推进版本号（AGENTS.md §1.6 硬约束 2）
+# 工作区那份也要没被碰过：拒收发生在写文件之前，不能留下「号改了但没提交」的中间态。
+# 比的是它自己调用前后的工作区，不是 HEAD 的号 —— 前一条用例可能故意把工作区留在别值。
+tv() {
+  echo "p$n" > payload.txt
+  git add -- payload.txt >/dev/null 2>&1
+  before=$(pkghead)
+  wt_before=$(pkgworktree)
+  out=$(node "$VC" --amend -m "$2" 2>&1); code=$?
+  after=$(pkghead)
+  wt=$(pkgworktree)
+  if [ $code -ne 0 ] && [ "$before" = "$after" ] && [ "$wt_before" = "$wt" ]; then
+    report 0 PASS "$1" ""
+  else
+    report 1 PASS "$1" "  code=$code HEAD 的号=$before→$after 工作区=$wt_before→$wt / $out"
+  fi
 }
 
 echo "--- 提交瞬间（pre-commit + commit-msg）---"
@@ -72,12 +134,40 @@ echo "--- --next ---"
 nx "v0.7.1" ""            "--next 默认给修订号"
 nx "v0.8.0" "--type feat" "--next --type feat 给次版本"
 
+echo "--- @next 自动写入（scripts/versioned-commit.mjs + prepare-commit-msg 守卫）---"
+# 独立仓库：这里每条都真的推进版本号，且**故意不** git add package.json
+R3=/tmp/vt5
+mkrepo $R3
+t  "铺垫：手写号的首条 v0.5.0"                 PASS "[A]-[M] v0.5.0 fix seed" 0.5.0
+tz "@next+fix → 0.5.1 落库，package.json 由脚本写入并暂存" 0.5.1 "[A]-[M] @next fix: 自动修订号" 0.0.0
+tz "@next+feat → 进次版本 0.6.0"               0.6.0 "[A]-[M] @next feat: 自动次版本" 0.0.0
+tz "@next 但类型词认不出 → 按修订号 0.6.1"      0.6.1 "[A]-[M] @next root" 0.0.0
+ci PASS "自动写入后 HEAD 三处一致"
+tz "工作区被别的会话预 bump 成 9.9.9，@next 只信 git log" 0.6.2 "[A]-[M] @next fix: 不信工作区" 9.9.9
+tz "显式号走包装命令：漏 add 也照样落库"         0.6.3 "[A]-[M] v0.6.3 fix: 手写号也走包装" 0.6.3
+t  "正文里的 @next 不触发（只管首行）"          PASS "[A]-[M] v0.6.4 fix: 显式号
+
+提到 @next/nuxt 这个包也只当正文处理。" 0.6.4
+tz "前缀带三段式数字的模型名 + @next 仍能展开"  0.6.5 "[OpenCode]-[Space Bunny Alpha 1.0.0] @next fix: anchored" 0.0.0
+tf "直接 git commit 用 @next（忘了走包装）→ 守卫当场拒收" "[A]-[M] @next fix: 没走包装"
+tv "包装命令 + --amend + @next → 拒收且不推进版本号"  "[A]-[M] @next fix: 把 amend 当成新提交"
+tf "包名 @next/nuxt 不在版本号槽位 → 不展开，按无号拦下" "[A]-[M] @next/nuxt 里有 bug"
+tf "next@next 当普通词 → 不展开，按无号拦下"     "[A]-[M] 用 next@next 试了 fix: 无号"
+
+echo "  · 热点文件：package.json 有版本号以外的未暂存改动时必须出声（AGENTS.md §1.4）"
+printf '{"name":"x","extra":1,"version":"0.0.0"}\n' > package.json
+echo dirty >> payload.txt; git add -- payload.txt >/dev/null 2>&1
+out=$(node "$VC" -m "[A]-[M] @next fix: 带别的依赖改动" 2>&1); code=$?
+case "$out" in *"版本号以外的改动"*) warned=ok ;; *) warned=no ;; esac
+got=$(pkghead)
+[ $code -eq 0 ] && [ "$warned" = ok ] && [ "$got" = 0.6.6 ] \
+  && report 0 PASS "未暂存的其他改动 → 警告但仍然放行" "" \
+  || report 1 PASS "未暂存的其他改动 → 警告但仍然放行" "  code=$code warned=$warned 落库=$got / $out"
+
 echo "--- 已知局限：--amend 顺手改号会造出死号 ---"
 # 单独开一个干净仓库演示：本仓库历史已被上面的用例搅过，看不出「号没了」。
-R2=/tmp/vt4; rm -rf $R2; mkdir -p $R2/scripts $R2/.githooks; cd $R2
-cp "$SRC/scripts/check-version.mjs" scripts/; cp "$SRC/.githooks/pre-commit" "$SRC/.githooks/commit-msg" .githooks/
-git init -q -b main . >/dev/null
-git config user.email t@t; git config user.name t; git config core.hooksPath .githooks; git config commit.gpgsign false
+R2=/tmp/vt4
+mkrepo $R2
 printf '{"name":"x","version":"0.5.0"}\n' > package.json; echo a > f.txt
 git add -A >/dev/null 2>&1; out=$(git commit -q -m "[A]-[M] v0.5.0 one" 2>&1); report $? PASS "铺垫：首条 v0.5.0" "$out"
 printf '{"name":"x","version":"0.5.1"}\n' > package.json; echo b >> f.txt

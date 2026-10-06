@@ -72,21 +72,56 @@ node scripts/check-version.mjs --next                # 修订号档，例如 v0.
 node scripts/check-version.mjs --next --type feat    # 次版本档，例如 v0.23.0
 ```
 
+#### 更省事：用包装命令，让号不用人算也不用手动 add
+
+```bash
+node scripts/versioned-commit.mjs -m "[agent名]-[模型名] @next feat(搜索页): 描述"
+```
+
+参数照 `git commit` 原样写，只把首行版本号槽位上的号换成 `@next`。它按类型词从 `git log` 算出该用的号 →
+写 `package.json` → **只** `git add -- package.json` → 用展开后的消息调 `git commit`。
+于是本节「版本号只能从 git log 推导」和 §1.3「三处一致、别忘了 add」都不再需要人守。
+
+**必须用 `node scripts/...` 直接调，不要包成 `pnpm commit`**：§2.1 记的那条 pnpm 毛病正是
+「package.json 一变，下次 `pnpm <script>` 就先重新校验锁文件，连不上注册表时无限转圈」——
+而这条流程每次提交都会改 package.json，等于每一次都会踩。所以它故意没有 pnpm 别名。
+
+- 首行写的是显式 `vX.Y.Z` 时它不算号，但仍会把「工作区已经是这个号、只是忘了 add」补上暂存；
+  **号不一致时不改写** —— 场上同时有两个号是该由人决定的冲突，交给 `commit-msg` 报「两处不一致」。
+- 混合改动想清楚再写类型词：`@next` 不会替你判断这是 feat 还是 fix，它照你写的档位进位。
+- `@next` 只认版本号槽位（模型名的 `]` 之后，且后面不接 `[\w./@-]`），所以 `@next/nuxt`、`next@next`
+  这类 JS 生态里真会出现的字面量不会触发它；正文里的 `@next` 也不算（只管首行）。
+- 只有 `-m` / `--message` 传进来的消息会被展开。`-F <文件>`、编辑器、merge/squash 复用旧消息
+  这些形态原样交给 git，随后由 `prepare-commit-msg` 以「占位符没展开」拒收 —— 不会静默提交。
+
+**为什么不是 hook 一把做完**（实测 git 2.45.1，两条断言都在 `check-version-test.sh` 里）：
+`pre-commit` 里 `git add` 的东西**能**进提交对象，但那时提交消息还没成形，拿不到 feat 这个类型词；
+`prepare-commit-msg` 拿得到消息，此刻再 `git add` 却**进不去** —— tree 用的是更早读进内存的那份索引快照
+（索引本身变了，`git show :package.json` 认，提交对象不认）。算号要的两半分别只在两个阶段拿得到，
+所以只能放在调 git 之前做。`.githooks/prepare-commit-msg` 因此只当守卫：首行还有没展开的 `@next`
+就当场拒收，忘了走包装命令也不会留下「消息带占位符、package.json 还是旧号」的半套状态。
+
+包装命令还顺手补了一条 hook 结构上拿不到的防线：**它看得见自己的 argv，所以 `--amend` 配 `@next`
+能在写文件之前就拒收**（钩子判不出 amend，见上一条 §1.2；这正是 §1.6「amend 不许改版本号」
+唯一能在事前拦住的地方）。
+
 #### 本地 hook 是主防线，CI 只是兜底
 
-`.githooks/` 下两个钩子在**提交的瞬间**拦截，两条都跑 `scripts/check-version.mjs`：
+`.githooks/` 下三个钩子在**提交的瞬间**拦截，三条都跑 `scripts/check-version.mjs`：
 
 | 钩子 | 查什么 |
 |---|---|
 | `pre-commit` | 暂存的 `package.json` 版本号是不是历史最大**相邻的下一档**（修订号 +1 或次版本 +1 都放行，抓跳号）；版本号与 HEAD 相同时按 `--amend` 处理，基线换成 `HEAD~1` |
+| `prepare-commit-msg` | 首行还躺着没展开的 `@next` 就**拒收**（说明这次没走 `versioned-commit.mjs`）—— 这个阶段改索引已经进不了本次提交，所以只能拦，不能补 |
 | `commit-msg` | **首行**按 `] v` 锚出的版本号 == 暂存的 `package.json`（抓三处不一致），并按首行类型词**定档**（feat 必须次版本、其余必须修订号） |
 
 **每条边界都是实测出来的，不是推的**：`sh scripts/check-version-test.sh` 在临时仓库里装真 hook
 跑断言（条数看它自己末尾的输出，别往这里抄），含「feat 写修订号拦住 / fix 写次版本拦住 /
-amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位」。
+amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位 / `@next` 真落库且自动暂存 /
+包名里的 `@next` 不触发 / amend 配 `@next` 拒收」。
 **改 `check-version.mjs` 的判据必须先跑它** —— 这条守卫本身没人守，就是它连续两次误拦 / 漏放的原因。
 
-两个钩子的判据都有**结构性够不着的地方**，写提交前得知道：
+三个钩子的判据都有**结构性够不着的地方**，写提交前得知道：
 
 - `pre-commit` **看不到提交消息**（消息这时还没成形，见 `.githooks/commit-msg` 顶部注释），
   所以它判不出这次是 feat 还是 fix，只能两档都放行；**真正把档位钉死的是 `commit-msg`**，
@@ -97,10 +132,15 @@ amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位」。
   代价是「新开一条却重复用号」当场放过，这条由 CI 事后认（`--committed` 拿 `HEAD~1` 作基线，
   事后历史里 amend 与重复用号可区分）。`commit-msg` 的档位校验用同一个信号跳过 amend，
   否则就违反 §1.6「amend 不许改版本号」。
+  （再补一条实测：`prepare-commit-msg` 的第二个参数能认出 `-c/-C`、裸 `--amend` 开编辑器、merge
+  这三类，**唯独 `--amend -m` 与普通提交一模一样**（都是 `message`），所以「amend」在钩子这条路上
+  仍然只能猜；包装命令不吃这个参数，它直接读自己的 argv。）
 - `--amend` 时**顺手改号**会把被改那条的号变成死号，两个钩子和 CI 都拦不住：那一刻
   暂存号 == HEAD 的号 + 1，与一次完全正常的提交无法区分。等下一条提交压上去，缺口就进了
   历史中段，而 `--committed` 只校验 HEAD 一条，中段缺口是盲区（实测见 PLAYBOOK §21）。
   → **amend 只改消息和内容，不改版本号**，见 §1.6。
+  钩子拦不住的原因是 git 不把 `--amend` 告诉它们，但**包装命令看得见自己的 argv**：
+  `versioned-commit.mjs --amend` 配 `@next` 会在写文件之前就当场拒收，这条终于有了前置防线。
 - `commit-msg` **不扫正文**，提交消息里引用别的版本号绝对安全 —— 并不存在「正文别写版本号」
   这条规则，曾有误记往下传，别再传（PLAYBOOK §21）。
 - 首行的锚定规则是「模型名右方括号之后第一个 `vX.Y.Z`」，所以 `[OpenCode]-[Space Bunny Alpha 1.0.0] v0.22.16 …`
@@ -134,6 +174,7 @@ git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'u
 
 **所以 bump 版本号时务必把 `package.json` 一起 `git add`** —— 它是多会话共享热点，最容易漏，
 一漏 CI 读到的版本就和提交说明不一致（PLAYBOOK §20）。
+走 §1.2 那条 `versioned-commit.mjs` 时这一条不需要你记：它写 `package.json` 并只 add 这一个路径。
 
 档位与跳号同理：本地 `pre-commit` 拦跳号、`commit-msg` 拦错档，提交后还要再核对一次：
 
@@ -215,9 +256,14 @@ git commit --amend -m '<合并后的完整消息>'
    用过的死号，而那一刻的暂存状态与一次正常提交无法区分，`pre-commit` / `commit-msg` / CI
    三条都拦不住（CI 的 `--committed` 只校验 HEAD 一条，等下一条提交压上去，缺口进了历史中段
    就彻底看不见）。要换号就是新开一条提交，不是 amend。
+   走 §1.2 的包装命令时这条有事前防线：`versioned-commit.mjs --amend` 看到首行是 `@next`
+   会在动 package.json **之前**就拒收（包装脚本读得到自己的 argv，钩子读不到）。
    **合进上一条时（§1.6 的用法）也不许换档**：把 `fix` 改写成 `feat` 让消息看着更贴切是可以的，
    但号得留着原来的 —— `commit-msg` 认出同号就按 amend 跳过档位校验，正是为了不逼你在此刻造死号。
    真做成了新功能，就新开一条 `feat` 进次版本。
+   走 §1.2 的包装命令时这条有了前置防线：`versioned-commit.mjs --amend` 配 `@next` 会在
+   **写文件之前**当场拒收（包装脚本看得见自己的 argv，钩子看不见）；绕过包装命令直接
+   `git commit --amend -m "...@next..."`，则被 `prepare-commit-msg` 以「占位符没展开」拒收。
 3. **不再需要 `--no-verify`。** `pre-commit` 认得 amend 了：暂存版本号 == HEAD 自己的版本号时，
    基线取 `HEAD~1` 而不是 `HEAD`（见 §1.2）。在此之前这条流程只能靠绕钩子走，那等于把它
    从受保护变成不受保护（演变过程见 PLAYBOOK §21）。

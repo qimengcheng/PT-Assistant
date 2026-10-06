@@ -1,6 +1,6 @@
 {
   "name": "pt-assistant-wxt",
-  "version": "0.24.1",
+  "version": "0.24.2",
   "private": true,
   "type": "module",
   "description": "PT Assistant — PT-depiler 的 WXT + Vue 3 全新架构重写版（骨架）",
@@ -11,6 +11,7 @@
     "build:firefox": "node scripts/build-verify.mjs -b firefox",
     "zip": "node scripts/build-verify.mjs --wxt-cmd=zip",
     "compile": "vue-tsc --noEmit",
+    "check:all": "node scripts/check-all.mjs",
     "version:next": "node scripts/check-version.mjs --next",
     "version:check": "node scripts/check-version.mjs --committed",
     "postinstall": "wxt prepare"

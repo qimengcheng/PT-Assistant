@@ -4,10 +4,12 @@
  * 上区单选「方案」，下区多选「站点」——两条路写出的都是同一个 plan key：
  * 方案 id，或约定的 `site:a,b,c`（metadata.ts 的 getSearchSolution 已支持逗号多站点）。
  * 站点口径沿用上游 Topbar.vue:51-63：allowSearch && !isOffline && !isDead。
+ * 站点行的拖动排序与置顶写回全局 sortIndex（metadataStore.reorderSites），
+ * 所以站点管理页的 № 列、右键菜单顺序会跟着变 —— 顺序只有一份真源。
  */
-import { computed, ref, watch } from "vue";
+import { computed, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { CheckOutlined, DownOutlined, SearchOutlined } from "@antdv-next/icons";
+import { CheckOutlined, DownOutlined, HolderOutlined, PushpinOutlined, SearchOutlined } from "@antdv-next/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
@@ -59,7 +61,75 @@ const siteRows = computed(() => {
     .filter((row) => !kw || row.name.toLowerCase().includes(kw) || row.id.toLowerCase().includes(kw));
 });
 
-const siteColumns = computed(() => [{ title: t("common.site"), key: "site" }]);
+const siteColumns = computed(() => [
+  { title: t("common.site"), key: "site" },
+  { title: t("common.action"), key: "action", width: 56, align: "center" as const },
+]);
+
+// ===== 站点顺序：拖动 / 置顶都写回全局 sortIndex（见 metadataStore.reorderSites）=====
+const tableWrapRef = useTemplateRef<HTMLDivElement>("tableWrap");
+const dragSiteId = ref<string>("");
+let highlightedRow: HTMLElement | null = null;
+
+function visibleSiteIds(): string[] {
+  return siteRows.value.map((row) => row.id);
+}
+
+/** 高亮目标行只能命令式加 class：a-table 没有 customRow，行元素也不带本组件的 scope id */
+function findRowByKey(key: string): HTMLElement | null {
+  if (!key || !tableWrapRef.value) return null;
+  for (const row of Array.from(tableWrapRef.value.querySelectorAll("tr[data-row-key]"))) {
+    if (row.getAttribute("data-row-key") === key) return row as HTMLElement;
+  }
+  return null;
+}
+
+function highlightRow(key: string) {
+  const next = findRowByKey(key);
+  if (next === highlightedRow) return;
+  highlightedRow?.classList.remove("scope-row-drop-target");
+  highlightedRow = next;
+  next?.classList.add("scope-row-drop-target");
+}
+
+function rowKeyOf(event: DragEvent): string {
+  return (event.target as HTMLElement | null)?.closest?.("tr[data-row-key]")?.getAttribute("data-row-key") ?? "";
+}
+
+function onDragStartSite(siteId: string, event: DragEvent) {
+  dragSiteId.value = siteId;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", siteId);
+  }
+}
+
+function onDragOverSiteList(event: DragEvent) {
+  if (!dragSiteId.value) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  highlightRow(rowKeyOf(event));
+}
+
+function onDropSiteList(event: DragEvent) {
+  const sourceId = dragSiteId.value;
+  const targetId = rowKeyOf(event);
+  highlightRow("");
+  dragSiteId.value = "";
+  if (!sourceId || !targetId || sourceId === targetId) return;
+
+  const ids = visibleSiteIds();
+  const from = ids.indexOf(sourceId);
+  const to = ids.indexOf(targetId);
+  if (from < 0 || to < 0) return;
+  ids.splice(from, 1);
+  ids.splice(to, 0, sourceId);
+  void metadataStore.reorderSites(ids);
+}
+
+function pinSite(siteId: string) {
+  void metadataStore.reorderSites([siteId, ...visibleSiteIds().filter((id) => id !== siteId)]);
+}
 
 // ===== 上区：方案 =====
 const planItems = computed<Array<{ id: string; name: string; note?: string }>>(() => {
@@ -152,7 +222,13 @@ watch(searchPlanKey, (key) => (checkedSiteIds.value = key.startsWith("site:") ? 
 
         <!-- 不用 scroll.y：那会启用 rc-table 的固定表头双表结构，在弹层里测宽会和表体错位
              （勾选列宽度和内容列对不上）。滚动交给外层 div。 -->
-        <div class="search-scope-site-scroll">
+        <div
+          ref="tableWrap"
+          class="search-scope-site-scroll"
+          @dragover="onDragOverSiteList"
+          @drop="onDropSiteList"
+          @dragleave.self="highlightRow('')"
+        >
           <a-table
             :columns="siteColumns"
             :data-source="siteRows"
@@ -169,9 +245,26 @@ watch(searchPlanKey, (key) => (checkedSiteIds.value = key.startsWith("site:") ? 
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'site'">
                 <span class="search-scope-site-cell">
+                  <HolderOutlined
+                    :title="t('SearchEntity.scope.dragToSort')"
+                    class="search-scope-drag-handle"
+                    draggable="true"
+                    @dragstart="onDragStartSite(record.id, $event)"
+                    @dragend="dragSiteId = ''; highlightRow('')"
+                  />
                   <SiteFavicon :site-id="record.id" :size="16" />
                   <SiteName :site-id="record.id" tag="span" />
                 </span>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <a-button
+                  :title="t('SearchEntity.scope.pin')"
+                  size="small"
+                  type="text"
+                  @click="pinSite(record.id)"
+                >
+                  <template #icon><PushpinOutlined /></template>
+                </a-button>
               </template>
             </template>
           </a-table>
@@ -271,6 +364,21 @@ watch(searchPlanKey, (key) => (checkedSiteIds.value = key.startsWith("site:") ? 
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.search-scope-drag-handle {
+  color: rgba(0, 0, 0, 0.25);
+  cursor: grab;
+}
+
+.search-scope-drag-handle:hover {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 拖到哪一行：class 是命令式加在 a-table 渲染的 tr 上的，不带本组件 scope id，得 :deep；
+   antd 的行底色画在单元格上而不是 tr 上，所以命中的是 td */
+:deep(tr.scope-row-drop-target > td) {
+  background: #e6f4ff;
 }
 
 .search-scope-footer {

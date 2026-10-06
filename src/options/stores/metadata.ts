@@ -389,6 +389,40 @@ export const useMetadataStore = defineStore("metadata", {
       await this.$save();
     },
 
+    /**
+     * 按给定顺序重写站点 sortIndex（降序：越靠前值越大，与 getSortedAddedSites 的排法一致）。
+     *
+     * orderedIds 允许只是「可见子集」（搜索作用域面板里只列可搜站点），所以先把新顺序
+     * 映射回全量序列里那些可见站点原本占着的槽位，未列出的站点保持相对位置不动 ——
+     * 直接按子集重编号会把没显示出来的站点顺序打乱。
+     */
+    async reorderSites(orderedIds: string[]) {
+      const fullOrder = this.getSortedAddedSites.map((site) => site.id);
+      const knownIds = orderedIds.filter((id) => id in this.sites);
+      if (knownIds.length === 0) return;
+
+      const slots: number[] = [];
+      fullOrder.forEach((id, index) => {
+        if (knownIds.includes(id)) slots.push(index);
+      });
+      if (slots.length !== knownIds.length) return; // 刚被增删过，这次重排作废而不是写出半截顺序
+
+      const nextOrder = [...fullOrder];
+      knownIds.forEach((id, k) => (nextOrder[slots[k]] = id));
+
+      const total = nextOrder.length;
+      let changed = false;
+      nextOrder.forEach((id, index) => {
+        const sortIndex = total - index;
+        if (this.sites[id].sortIndex !== sortIndex) {
+          this.sites[id].sortIndex = sortIndex;
+          changed = true;
+        }
+      });
+
+      if (changed) await this.$save();
+    },
+
     async addSite(siteId: TSiteID, siteConfig: ISiteUserConfig, options?: { reBuildMap?: boolean }) {
       const { reBuildMap = true } = options ?? {};
 

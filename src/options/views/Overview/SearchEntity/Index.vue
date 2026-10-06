@@ -435,6 +435,16 @@ const hiddenTagNamesText = computed({
       .filter(Boolean);
   },
 });
+
+/**
+ * 状态按钮里那三段计数（成功/失败/排队）各自带 v-if，全 0 时按钮**内容空了但壳还在** ——
+ * 于是没搜索之前，提示条右端挂着一颗没有字、没有图标的蓝色胶囊（用户 2026-10-06 指的就是它）。
+ * 判据放在整颗按钮上：没有东西可报就不出现，而不是只把里面三段藏掉。
+ */
+const hasSearchStatus = computed<boolean>(() => {
+  const { success, error, queued } = searchPlanStatus.value;
+  return success + error + queued > 0;
+});
 </script>
 
 <template>
@@ -508,7 +518,7 @@ const hiddenTagNamesText = computed({
           </template>
         </div>
 
-        <a-tooltip :title="t('SearchEntity.index.alert.searchStatus')">
+        <a-tooltip v-if="hasSearchStatus" :title="t('SearchEntity.index.alert.searchStatus')">
           <a-button
             class="ml-2 status-btn"
             type="primary"
@@ -673,6 +683,7 @@ const hiddenTagNamesText = computed({
 
       <div id="ptd-search-entity-table" ref="tableWrapper" class="search-entity-table table-header-no-wrap">
         <a-table
+          bordered
           :columns="tableHeader"
           :data-source="tableItems"
           :loading="runtimeStore.search.isSearching"
@@ -792,16 +803,7 @@ const hiddenTagNamesText = computed({
 }
 
 #ptd-search-entity-table {
-  /* 滚动条平时透明不可见，鼠标悬停到表格区域（含拖拽滚动条时）才现形 */
-  :deep(.ant-table-body) {
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-  }
-
-  &:hover :deep(.ant-table-body) {
-    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
-  }
-
+  /* 滚动条「平时隐形、悬停现形」已经在 style.css 里全站铺过，这里不再逐页写一份 */
   :deep(td) {
     padding: 0 8px;
   }

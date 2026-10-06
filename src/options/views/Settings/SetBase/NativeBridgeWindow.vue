@@ -179,6 +179,7 @@ onMounted(() => {
 
       <div class="bridge-switch">
         <a-switch
+          size="small"
           :checked="status.enabled"
           :loading="loading"
           :disabled="!status.permissionGranted"

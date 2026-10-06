@@ -141,6 +141,7 @@ const rowSelection = computed(() => ({
     </div>
 
     <a-table
+      bordered
       :columns="tableHeaders"
       :data-source="torrentItems"
       :row-key="(record: ITorrent) => record.id"

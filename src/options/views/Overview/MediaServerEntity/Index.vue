@@ -18,7 +18,6 @@ import {
   HddOutlined,
   InfoCircleOutlined,
   PlaySquareOutlined,
-  SearchOutlined,
 } from "@antdv-next/icons";
 import { getMediaServerIcon, type IMediaServerItem } from "@ptd/mediaServer";
 
@@ -45,6 +44,30 @@ const hasMore = computed<boolean>(() =>
   isEmpty(runtimeStore.mediaServerSearch.searchStatus)
     ? true
     : Object.values(runtimeStore.mediaServerSearch.searchStatus).some((x) => x?.canLoadMore ?? true),
+);
+
+/**
+ * metadata store 靠 chrome.storage 异步水合，水合完成前 `getEnabledMediaServers` 是空数组 ——
+ * 那**不等于**「用户没有服务器」。所以「没有可搜目标」只在确认水合之后才成立，
+ * 否则冷启动首帧会把搜索框和加载更多闪一下禁用，还会把空态文案指向错的地方
+ * （AGENTS §3.4 防线⑤ 那一族：派生是对的做法，但派生的起点也得是真的）。
+ */
+const metadataHydrated = ref<boolean>(false);
+void metadataStore.$onReady(() => {
+  metadataHydrated.value = true;
+});
+
+/**
+ * 「参与搜索的服务器范围」为空时，搜索和加载更多都是**静默空转**：
+ * `doSearch` 是 `for (const id of searchMediaServerIds)`，一条都没有就一次请求都不发，
+ * 不报错、不出 spinner、也不弹 snakebar —— 界面表现就是「点了没反应」。
+ * 空下来的来路有三条，用户分不清是哪一条，所以这里不区分、统一把按钮禁掉并说清去哪补：
+ *   ① 压根没在「媒体服务器」页添加；
+ *   ② 添加了但「启用?」是关的（getter 只收 enabled 的）；
+ *   ③ 在搜索框前那个数据库弹层里把勾全取消了（那是用户主动选择，会盖过派生值）。
+ */
+const noSearchTarget = computed<boolean>(
+  () => metadataHydrated.value && searchMediaServerIds.value.length === 0,
 );
 
 function showItemInformation(item: IMediaServerItem) {
@@ -141,17 +164,21 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
 </script>
 
 <template>
-  <div class="media-server-entity">
+  <div class="media-server-entity page-fill">
     <a-alert :title="t('route.Overview.MediaServerEntity')" type="info" show-icon style="margin-bottom: 12px" />
 
-    <a-card>
+    <a-card class="page-fill-grow">
       <div class="search-row">
-        <a-input
+        <a-input-search
           v-model:value="search"
           allow-clear
           class="search-input"
+          :disabled="noSearchTarget"
+          :enter-button="t('common.search')"
+          :loading="runtimeStore.mediaServerSearch.isSearching"
           :placeholder="t('MediaServerEntity.searchPlaceholder')"
-          @press-enter="triggerSearch"
+          enterkeyhint="search"
+          @search="triggerSearch"
         >
           <template #addonBefore>
             <a-popover placement="bottomLeft" trigger="click">
@@ -178,14 +205,7 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
               </template>
             </a-popover>
           </template>
-          <template #addonAfter>
-            <a-tooltip :title="t('common.search')">
-              <a-button type="primary" :loading="runtimeStore.mediaServerSearch.isSearching" @click="triggerSearch">
-                <template #icon><SearchOutlined /></template>
-              </a-button>
-            </a-tooltip>
-          </template>
-        </a-input>
+        </a-input-search>
       </div>
 
       <!-- 搜索中：结果区给加载反馈；未搜索 / 空结果给不同空态文案 -->
@@ -261,7 +281,13 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
 
         <a-empty
           v-else
-          :description="hasSearchedOnce ? t('MediaServerEntity.noItems') : t('MediaServerEntity.noItemsBeforeSearch')"
+          :description="
+            noSearchTarget
+              ? t('MediaServerEntity.noServer')
+              : hasSearchedOnce
+                ? t('MediaServerEntity.noItems')
+                : t('MediaServerEntity.noItemsBeforeSearch')
+          "
           class="empty-state"
         />
       </a-spin>
@@ -271,7 +297,7 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
 
       <div class="load-more-row">
         <a-button
-          :disabled="!hasMore"
+          :disabled="!hasMore || noSearchTarget"
           :loading="runtimeStore.mediaServerSearch.isSearching"
           @click="triggerLoadMore"
         >

@@ -183,6 +183,7 @@ function afterEnter() {
     <a-divider class="ma-0" />
 
     <a-table
+      bordered
       :columns="tableColumns"
       :data-source="siteHistoryData"
       :loading="isLoadingHistoryData"

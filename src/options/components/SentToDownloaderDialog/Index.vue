@@ -553,7 +553,7 @@ function dialogLeave() {
                 :extra="opt.description"
                 :colon="false"
               >
-                <a-switch v-model:checked="addTorrentOptions.advanceAddTorrentOptions![opt.key]" />
+                <a-switch v-model:checked="addTorrentOptions.advanceAddTorrentOptions![opt.key]" size="small" />
               </a-form-item>
             </div>
           </a-collapse-panel>

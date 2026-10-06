@@ -23,7 +23,7 @@ const socialSites = [
           <a-input v-model:value="configStore.socialSiteInformation.ptGenEndpoint" placeholder="https://ptgen.example.com/" />
         </a-form-item>
         <a-form-item>
-          <a-switch v-model:checked="configStore.socialSiteInformation.preferPtGen" />
+          <a-switch v-model:checked="configStore.socialSiteInformation.preferPtGen" size="small" />
           <span class="label">{{ t("SetBase.SocialInformationWindow.preferPtGen") }}</span>
         </a-form-item>
       </div>

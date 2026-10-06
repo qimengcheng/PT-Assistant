@@ -230,6 +230,7 @@ watch(searchPlanKey, (key) => (checkedSiteIds.value = key.startsWith("site:") ? 
           @dragleave.self="highlightRow('')"
         >
           <a-table
+            bordered
             :columns="siteColumns"
             :data-source="siteRows"
             :pagination="false"

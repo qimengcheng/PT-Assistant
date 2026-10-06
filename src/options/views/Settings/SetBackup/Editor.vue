@@ -240,6 +240,7 @@ async function checkConnect() {
               v-model:value="clientConfig.config[metaField.key! as string]"
             />
             <a-switch
+              size="small"
               v-else-if="metaField.type === 'boolean'"
               v-model:checked="clientConfig.config[metaField.key! as string]"
             />

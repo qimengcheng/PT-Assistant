@@ -232,6 +232,7 @@ function saveClientConfig() {
           <template #message>{{ t("SetDownloader.PathAndTag.note.index") }}</template>
         </a-alert>
         <a-table
+          bordered
           :columns="noteColumns"
           :data-source="noteRows"
           :pagination="false"

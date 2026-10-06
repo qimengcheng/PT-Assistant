@@ -242,14 +242,14 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
   <div class="page">
     <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
-        <a-button type="primary" danger size="small" :disabled="selectedTasks.length === 0" @click="deleteSelectedTasks">
+        <a-button type="primary" danger :disabled="selectedTasks.length === 0" @click="deleteSelectedTasks">
           <template #icon>
             <DeleteOutlined />
           </template>
           <span class="ml-1">{{ t("common.remove") }}</span>
         </a-button>
 
-        <a-button type="primary" danger size="small" :disabled="tasks.length === 0" @click="clearAllTasks">
+        <a-button type="primary" danger :disabled="tasks.length === 0" @click="clearAllTasks">
           <template #icon>
             <DeleteOutlined />
           </template>
@@ -257,7 +257,6 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
         </a-button>
 
         <a-button
-          size="small"
           href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/keep-upload-task"
           target="_blank"
           rel="noopener noreferrer nofollow"
@@ -273,6 +272,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
     <!-- 面板只负责给表格一块白底表面；这页的表格没有 scroll.y，内部滚动就由面板接管 -->
     <div class="page-panel">
     <a-table
+      bordered
       :columns="columns"
       :data-source="tasks"
       :loading="loading"

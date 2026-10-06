@@ -130,6 +130,7 @@ const advanceOptions = computed(() => clientMeta.value?.advanceAddTorrentOptions
 
     <a-form-item v-if="clientMeta?.feature?.DefaultAutoStart?.allowed" :label="t('SetDownloader.editor.autoStart')">
       <a-switch
+        size="small"
         v-model:checked="clientConfig.feature!.DefaultAutoStart"
         :checked-children="t('SetDownloader.editor.switchOn')"
         :un-checked-children="t('SetDownloader.editor.switchOff')"
@@ -137,14 +138,14 @@ const advanceOptions = computed(() => clientMeta.value?.advanceAddTorrentOptions
     </a-form-item>
 
     <a-form-item v-if="clientMeta?.feature?.BypassCSRF?.allowed" :label="t('SetDownloader.editor.bypassCsrf')">
-      <a-switch v-model:checked="clientConfig.feature!.BypassCSRF" />
+      <a-switch v-model:checked="clientConfig.feature!.BypassCSRF" size="small" />
       <div class="form-tip">{{ t("SetDownloader.editor.bypassCsrfTip") }}</div>
     </a-form-item>
 
     <a-collapse v-if="advanceOptions.length > 0" bordered ghost>
       <a-collapse-panel :key="1" :header="t('common.advancedSettings')">
         <a-form-item v-for="opt in advanceOptions" :key="opt.key" :label="opt.name">
-          <a-switch v-model:checked="clientConfig.advanceAddTorrentOptions![opt.key]" />
+          <a-switch v-model:checked="clientConfig.advanceAddTorrentOptions![opt.key]" size="small" />
           <div v-if="opt.description" class="form-tip">{{ opt.description }}</div>
         </a-form-item>
       </a-collapse-panel>

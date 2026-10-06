@@ -17,7 +17,6 @@ import type { TableColumnsType, TablePaginationConfig, TableSorterResult } from 
 
 import type { TSiteID } from "@ptd/site";
 
-import { sendMessage } from "@/messages.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
@@ -29,6 +28,7 @@ import EditSearchEntryList from "./EditSearchEntryList.vue";
 import OneClickImportDialog from "./OneClickImportDialog.vue";
 import RebuildMapDialog from "./RebuildMapDialog.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import { flushSiteFavicon } from "@/options/components/SiteFavicon/utils.ts";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
 
 // 数据来源
@@ -137,12 +137,17 @@ const filteredItems = computed(() => {
 
 const tableSelected = ref<TSiteID[]>([]);
 
-const pagination = computed<TablePaginationConfig>(() => {
-  // 旧版（Vuetify）用 -1 表示「不分页」，这个约定被原样搬到了 config 默认值里。
-  // 但 antd Table 是前端分页，pageSize=-1 会让 slice(0, -1) 吃掉最后一行、
-  // 页数也算成负数。必须兜底成正整数 —— 与 SearchEntity 的处理保持一致。
+const pagination = computed<TablePaginationConfig | false>(() => {
+  // 本页默认档是 -1（`config.ts` 里存的就是它）：旧版 Vuetify 用 -1 表示「不分页、一次全展示」。
+  // 这个约定要保留，但**不能原样交给 antd** —— antd Table 是前端分页，pageSize=-1 会让
+  // slice(0, -1) 吃掉最后一行、页数也算成负数，所以必须换算（与 SearchEntity 的处理一致）。
   const raw = configStore.tableBehavior.SetSite?.itemsPerPage as unknown;
-  const pageSize = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : 10;
+  const chosen = typeof raw === "number" && Number.isFinite(raw) && raw > 0;
+  const pageSize = chosen ? raw : 50;
+  // 条目全放得下就不出分页条（用户 2026-10-06 定的口径：默认展示全部，超过 50 条才分页）。
+  // 但用户在尺寸选择器里挑过一档（存下的是正数）之后分页条要常驻 —— 否则挑一档大到放得下
+  // 全部，分页条连同尺寸选择器一起消失，就再也切不回小档了。
+  if (!chosen && filteredItems.value.length <= pageSize) return false;
   return {
     pageSize,
     showSizeChanger: true,
@@ -184,17 +189,18 @@ async function confirmDeleteSite(siteId: TSiteID) {
 }
 
 const isFaviconFlushing = ref(false);
-async function flushSiteFavicon(siteId: TSiteID | TSiteID[]) {
+async function refreshSiteFavicon(siteId: TSiteID | TSiteID[]) {
   // 模板按钮虽有 :loading 禁用，这里再兜一层，防止程序化连点产生重复刷新
   if (isFaviconFlushing.value) {
     return;
   }
   isFaviconFlushing.value = true;
   try {
-    const siteIds = Array.isArray(siteId) ? siteId : [siteId];
-    for (const id of siteIds) {
-      await sendMessage("getSiteFavicon", { site: id, flush: true });
-    }
+    // 必须走 SiteFavicon/utils.ts 里那份共享实现：它同时做「删 IndexedDB 条目 → 删本页面内存条目
+    // → 重取并写回内存」三件事。原来这里直接 sendMessage("getSiteFavicon", {flush:true})，
+    // 只让 offscreen 重抓了一遍，界面上那 20 个 <SiteFavicon> 读的还是内存里的旧值 ——
+    // 弹「刷新完成」而图标一个都不变，要 F5 才看得到结果。
+    await flushSiteFavicon(Array.isArray(siteId) ? siteId : [siteId]);
     runtimeStore.showSnakebar(t("SetSite.index.flushFaviconFinish"), { color: "success" });
   } catch (e) {
     // 旧实现只有 finally：刷新失败时用户只看到按钮停转，没有任何失败提示
@@ -247,7 +253,7 @@ function keywordChecked(keyword: string) {
         :disabled="tableSelected.length === 0"
         :loading="isFaviconFlushing"
         :title="t('SetSite.index.table.flushFavicon')"
-        @click="() => flushSiteFavicon(tableSelected)"
+        @click="() => refreshSiteFavicon(tableSelected)"
       >
         <template #icon>
           <ReloadOutlined />
@@ -261,7 +267,6 @@ function keywordChecked(keyword: string) {
     <a-input
       v-model:value="tableWaitFilterRef"
       allow-clear
-      size="small"
       class="toolbar-filter page-bar-extra"
     >
         <template #prefix>
@@ -311,9 +316,11 @@ function keywordChecked(keyword: string) {
     </a-input>
     </a-flex>
 
-    <!-- 面板只负责给表格一块白底表面；表格自身的 scroll.y 仍管内部滚动 -->
+    <!-- 面板是唯一的滚动容器：这张表不写 scroll.y（视口常数是目测的，外壳内衬一改就失准），
+         一次全展示时由 .page-panel 自己滚 -->
     <div class="page-panel">
     <a-table
+      bordered
       :columns="columns"
       :data-source="filteredItems"
       :loading="isLoadingAllAddedSites"
@@ -324,12 +331,14 @@ function keywordChecked(keyword: string) {
       }"
       row-key="id"
       size="small"
-      :scroll="{ y: 'calc(100vh - 300px)' }"
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'userConfig.sortIndex'">
-          <SiteFavicon :site-id="record.id" />
+          <!-- 24 而不是组件默认的 32：行高 = 内容高 + 上下内衬 8+8，32 会把行顶到 48px，
+               比表头（21 行高 + 16 = 37px）还高 11px。全站其它表格的图标是 16/18/24，
+               这一页是孤例，收齐到 24 后行高 40px，与表头基本平齐。 -->
+          <SiteFavicon :site-id="record.id" :size="24" />
         </template>
 
         <template v-else-if="column.key === 'name'">
@@ -417,7 +426,7 @@ function keywordChecked(keyword: string) {
                 :loading="isFaviconFlushing"
                 size="small"
                 type="text"
-                @click="() => flushSiteFavicon(record.id)"
+                @click="() => refreshSiteFavicon(record.id)"
               >
                 <template #icon>
                   <ReloadOutlined />

@@ -42,6 +42,57 @@ body {
   background: var(--pt-color-bg-body);
 }
 
+/* ===== 滚动条：细、无箭头、平时隐形，要滚了才现形 =====
+   Windows 上默认是经典滚动条 —— 17px 宽、带上下箭头按钮、整条灰轨道，嵌在白面板右边
+   非常扎眼（用户 2026-10-06 先否掉经典样式，又要求「默认隐藏、滚动时才显示」）。
+   两套写法都给：Chrome 121+ 里标准属性 `scrollbar-*` 优先于伪元素，老 Chrome / Edge
+   只认 `::-webkit-scrollbar-*`。两条路都是「轨道常驻占位、滑块平时透明」。
+   轨道一直占位是故意的：滑块现形/消失不该让内容横向跳一下。
+   「滚动时才显示」用的是 :hover —— 要滚这个容器，鼠标必然先悬停到它（:hover 会向祖先
+   传播，所以悬停在容器内任意子元素上都算）。代价：键盘 PageDown / 程序滚动时不会现形。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover,
+*:focus-within {
+  scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+
+:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.38);
+}
+
+/* 上下箭头按钮是经典滚动条最丑的那部分，直接不要 */
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* 工具栏与下方表格/内容的间距。多数页面的 .toolbar 定义在 scoped style 里且只写了
    gap / padding，没有 margin-bottom，这里统一补上；scoped 的特异性更高，
    但它们没声明 margin-bottom，所以本规则仍会生效。
@@ -109,7 +160,8 @@ body {
    1) 把默认 40px 行高压回原来的紧凑高度（17 个菜单项 + brand + 状态条，矮窗口下要放得下）；
    2) 让菜单背景透明，继承 .nav 的底色；
    3) 把 8px 12px 的内边距从 <li> 挪到里面的 router-link <a> 上（见下）。
-   选中/悬停底色、字号、字重都由组件的 token 提供，不再手写。 */
+   选中/悬停底色、字重都由组件的 token 提供；字号是故意手写的 —— 比全局 token 的 13px
+   大一档，导航是这一列的主要扫读对象，跟正文同字号显得太挤。 */
 .menu .ant-menu-inline {
   background: transparent;
 }
@@ -121,7 +173,15 @@ body {
      <a> 撑满整行才能让整条都是可点区域（原来 .menu-item 直接就是那个 <a>）。 */
   padding: 0 !important;
   line-height: normal;
-  font-size: 13px;
+  font-size: 14px;
+}
+
+/* a-menu 的图标尺寸走组件 token（iconSize = fontSize = 13px），不跟着上面那条 font-size
+   变；只放大文字会让图标相对小一圈，所以两样一起给到同一档。min-width 也一起改，
+   否则图标列宽还是 13px，各行的文字起点会差 1px。 */
+.menu .ant-menu-item .ant-menu-item-icon {
+  font-size: 14px;
+  min-width: 14px;
 }
 
 /* a-menu 把插槽包在 .ant-menu-title-content 里（inline 模式下是 flex 项），
@@ -206,7 +266,7 @@ body {
   padding: 0 8px;
   background: #fff;
   border: 1px solid var(--pt-color-border-light);
-  border-radius: 6px;
+  border-radius: 10px;
 }
 
 /* 工具条右端那一组（筛选/搜索框）：靠右独立成组，窄窗口下随 wrap 一起换行。
@@ -223,9 +283,41 @@ body {
   padding: 8px;
   background: #fff;
   border: 1px solid var(--pt-color-border-light);
-  border-radius: 6px;
+  border-radius: 10px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+/* ===== 非列表页的撑满机制 =====
+   用户 2026-10-06 定的口径：灰底（.content 的 --pt-color-bg-content）只允许作为白表面之间
+   那 8px 缝露出来，不允许出现「下半屏一整片灰」。内容不足一屏的页面靠这两条把主白表面
+   拉到视口底 —— 根挂 .page-fill，承载主体的那块表面挂 .page-fill-grow。
+   与上面的 .page 网格骨架不是一回事：那套是给「工具条 + 表格」的列表页用的固定两行。
+   这里不加 gap：这些页面各自已有 10~16px 的上下间距，再叠一层缝就成 20px 了。 */
+.page-fill {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.page-fill-grow {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 根本身就是一张 a-card、或该拉伸的那块就是一张 a-card 的页面：卡片当 flex 列，
+   吃剩余高度的是它自己的 body（body 是组件内部节点，全局规则能选到，
+   各页 scoped 里那几处 :deep(.ant-card-body) 就是为这件事写的）。 */
+.page-fill > .ant-card.page-fill-grow,
+.page-fill.ant-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-fill > .ant-card.page-fill-grow > .ant-card-body,
+.page-fill.ant-card > .ant-card-body {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* ===== 表格斑马纹：全站一条，不按页挂 class =====
@@ -237,6 +329,22 @@ body {
    免得「暂无数据」那一整行也被刷成灰底。 */
 .ant-table-tbody > tr.ant-table-row:nth-of-type(odd) {
   background: #fafafa;
+}
+
+/* ===== 表格圆角：全站一条，判据同样是"默认就有" =====
+   antd 自己只圆了顶边两角（table/style/radius.js 给 .ant-table 与 .ant-table-container
+   写 border-start-*-radius = borderRadiusLG 8px），底边两角一直是方的 —— 加上刚铺下去的
+   斑马纹，最后一行的灰底就在下面两个角上露成直角。
+   所以这里四角一起给 10px（与 .page-bar / .page-panel 同档），再用 overflow: clip 裁掉
+   里面的表头底色与行底色 —— clip 不像 hidden 会把 .ant-table-container 变成滚动容器，
+   固定列的 sticky 与横向滚动条都在它内部，不受影响。
+   选择器末尾那个重复的 .ant-table-container 不是笔误：antd 那条展开成
+   `.ant-table-wrapper .ant-table .ant-table-container`，是 0,3,0 特异度。cssinjs 的样式
+   以 prepend 方式插进 <head> 顶部（useStyleRegister 里 prepend: "queue"），同特异度我们
+   这侧的静态 CSS 反而赢，但差一档特异度就没了 —— 所以顶到 0,4,0，不动用 !important。 */
+.ant-table-wrapper .ant-table .ant-table-container.ant-table-container {
+  border-radius: 10px;
+  overflow: clip;
 }
 
 /* 站点定义页重写时连带删掉了它那一整块全局样式，但下面这两组仍被别的视图用 class="" 引用：
@@ -276,91 +384,6 @@ body {
   font-weight: 600;
 }
 
-/* ===== 首页 ===== */
-.home {
-  max-width: 640px;
-  padding: 32px 40px;
-}
-
-.home h2 {
-  font-size: 20px;
-  margin-bottom: 4px;
-}
-
-.home .sub {
-  color: var(--pt-color-text-secondary);
-  margin-bottom: 24px;
-}
-
-.card {
-  flex: 1;
-  padding: 16px;
-  background: #fff;
-  border: 1px solid var(--pt-color-border);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.home h3 {
-  font-size: 14px;
-  margin-bottom: 10px;
-}
-
-.modules {
-  list-style: none;
-  background: #fff;
-  border: 1px solid var(--pt-color-border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.modules li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-}
-
-.modules li + li {
-  border-top: 1px solid var(--pt-color-border-light);
-}
-
-.modules .pending {
-  color: var(--pt-color-text-secondary);
-}
-
-.dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  flex-shrink: 0;
-}
-
-.dot.ok {
-  background: var(--pt-color-success-bg);
-  color: var(--pt-color-success);
-}
-
-.dot.todo {
-  background: var(--pt-color-disabled-bg);
-  color: var(--pt-color-disabled);
-}
-
-.pending-tag {
-  margin-left: auto;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--pt-color-disabled-bg);
-  color: var(--pt-color-disabled);
-  font-size: 11px;
-}
-
 /* ===== 弹窗标题的语义色 =====
    modal 经 teleport 挂在 body 上，组件的 scoped 样式选不到 .ant-modal-title，
    所以带语义色的标题统一走 wrap-class-name + 这里的全局规则。 */
@@ -368,23 +391,21 @@ body {
   color: var(--pt-color-danger-strong);
 }
 
-/* ===== 按钮图标与文字的视觉对齐 =====
-   antdv-next 的 .ant-btn 是 inline-flex + align-items:center，这里只给图标一个随字号
-   等比的光学下沉量：汉字墨迹中心偏低、拉丁字形略高，纯几何居中会让中文按钮里图标显高、
-   英文按钮里图标显低。
+/* ===== 按钮图标与文字的对齐：这里刻意**不放**任何光学下沉量 =====
+   这里原来有一条 `.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon { transform: translateY(0.15em) }`，
+   理由写的是「汉字墨迹中心偏低，纯几何居中会让图标显高」。2026-10-06 拿辅种任务工具条的三颗按钮
+   量了截图（按按钮盒 90 设备像素 = 32 CSS 像素反推这张图的缩放）：
+     图标墨迹中心三颗**全都是 y=110.0**，而文字墨迹中心是 105.0~105.5 —— 图标比文字低 4.5~5 设备像素。
+     三颗图标（两同一不同、尺寸也不同）中心却分毫不差，说明这是一处**固定偏移**，不是各字形的差异；
+     场上唯一只给图标加纵向偏移的就是那条 translateY。去掉它即回到几何居中（antd 的 .ant-btn
+     本来就是 inline-flex + align-items:center），残差在 1 设备像素以内。
+   content 侧从来没有这条规则（app.css 里没有），两边观感一致 —— 又一处反证。
 
-   必须用 transform：.ant-btn-icon 是 display:inline-flex（button/style/index.js:31），
-   里面的 .anticon 是 flex item，vertical-align 对它无效（antd 自己写的
-   verticalAlign:"middle" 同样无效）——所以旧写法 `vertical-align:-0.15em` 其实是死属性。
-
-   ⚠️ 不要改成 align-items: baseline（v0.20.2 踩过、v0.20.6 撤掉）：按钮高度固定
+   ⚠️ 别改成 align-items: baseline（v0.20.2 踩过、v0.20.6 撤掉）：按钮高度固定
    （中号 32px）且 padding-block: 0，baseline 会把整行基线推到内容盒顶部，图标和文字
    **一起贴顶**（实测偏上约 10px）。当时以为只有纯文字按钮受影响、用
    `:has(> .ant-btn-icon)` 把图标+文字形态排除掉就行，实际是反过来的——受影响的正是
    被保留下来的那一批。 */
-.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon {
-  transform: translateY(0.15em);
-}
 
 /* ===== Modal：超长内容限高，标题与底部按钮保持可见 =====
    宽度不用在这里兜：antdv-next 的 .ant-modal 自带 max-width: calc(100vw - 32px)

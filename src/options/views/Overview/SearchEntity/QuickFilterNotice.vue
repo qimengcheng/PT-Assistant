@@ -139,7 +139,6 @@ function selectSite(siteId: string) {
 
 .site-filter-scroll {
   overflow-x: auto;
-  scrollbar-width: thin;
 }
 
 /**

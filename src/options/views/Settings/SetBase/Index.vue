@@ -40,13 +40,13 @@ watch(activeKey, (key) => {
 </script>
 
 <template>
-  <div class="set-base">
+  <div class="set-base page-fill">
     <div class="page-header">
       <h2>{{ t("SetBase.Index.pageTitle") }}</h2>
       <span class="hint">{{ t("SetBase.Index.saveHint") }}</span>
     </div>
 
-    <div class="set-base-body">
+    <div class="set-base-body page-fill-grow">
       <a-tabs v-model:activeKey="activeKey" type="card" size="small">
         <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label">
           <component :is="tab.component" />
@@ -58,17 +58,26 @@ watch(activeKey, (key) => {
 
 <style>
 /* SetBase 通用布局（非 scoped，供各子窗口复用）：
-   内容限宽、分组卡片化（灰底白卡）、开关两列排布 */
+   整页收进一块白表面、分组用分隔线区分、开关两列排布。
+   以前是「灰底上摊着几张白卡」，卡片只有 960 宽，右边和下面整片都是灰 —— 现在换成
+   与列表页 .page-panel 同档的一整块白面板（同 border / 同 10px 圆角）。 */
 .set-base .set-base-body {
+  padding: 8px 16px 16px;
+  background: #fff;
+  border: 1px solid var(--pt-color-border-light);
+  border-radius: 10px;
+}
+
+/* 面板铺满内容区（高度靠根上的 .page-fill + 本块的 .page-fill-grow 撑到视口底，
+   宽度上控件仍限 960：不然开关那两列会被拉到两千多 px 宽，一行里只剩左边一个 switch）。 */
+.set-base .ant-tabs {
   max-width: 960px;
 }
 
 .set-base .group {
   margin-bottom: 14px;
-  padding: 14px 18px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pt-color-border-light);
 }
 
 .set-base .group-title {

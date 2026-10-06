@@ -269,6 +269,7 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
     <!-- 面板只负责给表格一块白底表面并接管内部滚动 -->
     <div class="page-panel">
       <a-table
+        bordered
         :columns="columns"
         :data-source="tableData"
         :pagination="pagination"

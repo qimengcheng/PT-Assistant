@@ -115,6 +115,7 @@ async function dialogLeave() {
     <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="deleteBackupHistory(tableSelected)"><template #icon><DeleteOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
 
     <a-table
+      bordered
       :columns="tableHeaders"
       :data-source="backupHistory"
       :row-key="(record: IBackupFileInfo) => record.path"

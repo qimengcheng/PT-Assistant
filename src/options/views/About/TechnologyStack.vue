@@ -86,11 +86,14 @@ const tableDependencies = computed<ITData[]>(() => Object.values(technologyData.
 </script>
 
 <template>
-  <div class="technology-stack">
+  <div class="technology-stack page-fill">
     <a-alert :title="t('TechnologyStack.thankNote')" type="info" show-icon class="block-alert" />
 
     <a-card :title="t('TechnologyStack.ptppHistory')" class="block-card">
-      <a-timeline mode="left">
+      <!-- orientation="horizontal"：时间轴横向铺开，右侧才是最新一条（reverse 把数据里
+           「最新在前」翻成「时间往右流」，横向读才不别扭）。mode="left" 在这里已经没有意义
+           （组件把它映射成 start，而 start 本来就是默认值），所以去掉。 -->
+      <a-timeline orientation="horizontal" reverse class="ptpp-history">
         <a-timeline-item v-for="history in ptppHistory" :key="history.name" :color="history.color">
           <template #label>{{ history.time }}</template>
           <strong>{{ history.name }}</strong>
@@ -100,8 +103,9 @@ const tableDependencies = computed<ITData[]>(() => Object.values(technologyData.
       </a-timeline>
     </a-card>
 
-    <a-card :title="t('TechnologyStack.dependency')" class="block-card">
+    <a-card :title="t('TechnologyStack.dependency')" class="block-card page-fill-grow">
       <a-table
+        bordered
         :columns="columns"
         :data-source="tableDependencies"
         :pagination="{ pageSize: 50, showSizeChanger: true }"
@@ -119,13 +123,20 @@ const tableDependencies = computed<ITData[]>(() => Object.values(technologyData.
 </template>
 
 <style scoped>
+/* 页面自身不再补 padding：外层 .content 已经留了 8px，叠上来就是 24px，
+   与「灰只露 8px 缝」的口径不一致。 */
 .technology-stack {
-  padding: 16px;
+  padding: 0;
 }
 .block-alert {
   margin-bottom: 12px;
 }
 .block-card {
   margin-top: 12px;
+}
+/* 横向时间轴每列只分到 1/4 宽，而链接是一整串没有空格的文本、默认不断行，
+   窄窗口下会直接压到相邻列上。 */
+.ptpp-history :deep(a) {
+  overflow-wrap: anywhere;
 }
 </style>

@@ -249,6 +249,7 @@ function rowExpandable(record: IFieldRow) {
 
       <div ref="listBodyRef" class="site-defs-table">
         <a-table
+          bordered
           :columns="siteColumns"
           :data-source="siteRows"
           :pagination="false"
@@ -276,6 +277,7 @@ function rowExpandable(record: IFieldRow) {
 
         <div v-else ref="detailBodyRef" class="site-defs-table">
           <a-table
+            bordered
             v-if="fieldRows.length > 0"
             v-model:expanded-row-keys="expandedKeys"
             :columns="fieldColumns"

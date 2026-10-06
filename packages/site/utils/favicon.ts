@@ -116,36 +116,43 @@ const remoteBetterFaviconOrder = [
 async function getFaviconFromUrl(url: string): Promise<Blob> {
   const baseUrl = new URL(url);
 
-  const { data: doc } = await axios.get<Document>(url, { responseType: "document", timeout: FAVICON_TIMEOUT });
-
   const favicons: IParsedFavicon[] = [];
 
-  // 1. Parse from head
-  FAVICON_FROM_LINK.forEach((selector) => {
-    const element = doc.querySelector(selector) as HTMLLinkElement;
-    if (element) {
-      favicons.push({
-        href: element.href,
-        sizes: element.sizes?.toString() || "",
-        source: "link",
+  // 1 / 2. 从首页 HTML 的 <link> 与 manifest 里解析图标。
+  // ⚠️ 这一整趟是**尽力而为**，必须自己吞掉异常：首页拿不到（超时、CF 挑战、
+  // 用户填的旧地址已经死了、`responseType:"document"` 被拒）都不该连带把下面
+  // 那条 `/favicon.ico` 兜底一起废掉 —— 原实现这一句裸着 await，抛错就直接冒泡到
+  // 调用方，于是「站点根目录明明有图标、首页却抓不到」的站点永远空白。
+  try {
+    const { data: doc } = await axios.get<Document>(url, { responseType: "document", timeout: FAVICON_TIMEOUT });
+
+    FAVICON_FROM_LINK.forEach((selector) => {
+      const element = doc.querySelector(selector) as HTMLLinkElement;
+      if (element) {
+        favicons.push({
+          href: element.href,
+          sizes: element.sizes?.toString() || "",
+          source: "link",
+        });
+      }
+    });
+
+    const manifestElement = doc.querySelector('head link[rel="manifest" i]') as HTMLLinkElement;
+    if (manifestElement) {
+      const { data: manifest } = await axios.get<{
+        icons: Record<"sizes" | "src" | "type", string>[];
+      }>(manifestElement.href, { responseType: "json", timeout: FAVICON_TIMEOUT });
+
+      manifest.icons.forEach(({ sizes, src }) => {
+        favicons.push({
+          href: src,
+          sizes,
+          source: "manifest",
+        });
       });
     }
-  });
-
-  // 2. Parse from manifest
-  const manifestElement = doc.querySelector('head link[rel="manifest" i]') as HTMLLinkElement;
-  if (manifestElement) {
-    const { data: manifest } = await axios.get<{
-      icons: Record<"sizes" | "src" | "type", string>[];
-    }>(manifestElement.href, { responseType: "json", timeout: FAVICON_TIMEOUT });
-
-    manifest.icons.forEach(({ sizes, src }) => {
-      favicons.push({
-        href: src,
-        sizes,
-        source: "manifest",
-      });
-    });
+  } catch (e) {
+    console.warn(`[favicon] 首页解析失败，继续试 /favicon.ico: ${url}`, (e as Error)?.message ?? e);
   }
 
   // 3. Default /favicon.ico
@@ -155,7 +162,10 @@ async function getFaviconFromUrl(url: string): Promise<Blob> {
       responseType: "blob",
       timeout: FAVICON_TIMEOUT,
     });
-    if (faviconIco && faviconIco.data?.type === "image/x-icon") {
+    // 只认 image/*：这条是最后一条兜底，判据写死成 `=== "image/x-icon"` 会把
+    // 服务成 `image/vnd.microsoft.icon`（IE 时代的标准 MIME，nginx/CF 都会给）
+    // 或 `image/png` 的站点一起丢掉。反过来，text/html 的错误页仍然进不来。
+    if (faviconIco && faviconIco.data?.type?.startsWith("image/")) {
       favicons.push({
         href: "/favicon.ico",
         sizes: "",

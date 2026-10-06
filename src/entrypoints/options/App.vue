@@ -4,7 +4,6 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { message } from "antdv-next";
 import {
-  AppstoreOutlined,
   BarChartOutlined,
   CloudUploadOutlined,
   DatabaseOutlined,
@@ -84,7 +83,7 @@ const navItems = computed(() => [
   { path: "/set-downloader", label: t("layout.nav.downloader"), icon: DownloadOutlined },
   { path: "/set-media-server", label: t("layout.nav.mediaServer"), icon: PlayCircleOutlined },
   { path: "/set-base", label: t("layout.nav.basicSettings"), icon: SettingOutlined },
-  { path: "/technology-stack", label: t("layout.nav.techStack"), icon: AppstoreOutlined },
+  // 「技术栈」不再进左侧导航（2026-10-06），路由 /technology-stack 保留，需要时直链进入。
   { path: "/special-thank", label: t("route.About.SpecialThank"), icon: TeamOutlined },
   { path: "/logger", label: t("layout.nav.logger"), icon: FileSearchOutlined },
   { path: "/debug/site-definitions", label: t("layout.nav.siteDefinitions"), icon: FileTextOutlined, dev: true },
@@ -128,7 +127,33 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
 </script>
 
 <template>
-  <a-config-provider :locale="antdLocale" :theme="{ token: { fontSize: 13 } }">
+  <!-- Table.rowHoverBg：表格行悬停底色改成很淡的蓝（antd 默认是 colorFillAlterSolid≈#fafafa，
+       而斑马纹的奇数行底色就是 #fafafa —— 悬停在奇数行上等于没反应）。
+       #f0f7ff 比选中态 colorPrimaryBg #e6f4ff 浅一档，两态能分开。
+       Table.headerBg：表头底色。antd 默认同样是 colorFillAlterSolid≈#fafafa，跟斑马纹的奇数行
+       一个色 —— 表头和表体糊成一片，只有靠那条边框分隔。#eef2f7 是偏冷的蓝灰，和
+       --pt-color-bg-content(#f5f6f8) / --pt-color-border-light(#eaeef2) 同一家族，比它们深一档，
+       又能和白底偶数行、#fafafa 奇数行、#f0f7ff 悬停行四档都拉开。
+       headerSortHoverBg / headerSortActiveBg 必须跟着改：这两档默认是 colorFillContentSolid /
+       colorFillSecondarySolid（从白色容器算出来的**灰**实心色），底色换成蓝灰后它们会退色成
+       另一套色板，点一下排序表头就看见色差。所以按 #eef2f7 往深各取一档。
+       headerColor 没动：antd 默认 colorTextHeading(≈rgba(0,0,0,.88)) 在这个底色上对比足够。
+       content 侧同值另配一份（见 src/content-script/app/App.vue）：那边的样式注入在
+       shadow root 里，读不到这侧的 ConfigProvider。 -->
+  <a-config-provider
+    :locale="antdLocale"
+    :theme="{
+      token: { fontSize: 13 },
+      components: {
+        Table: {
+          rowHoverBg: '#f0f7ff',
+          headerBg: '#eef2f7',
+          headerSortHoverBg: '#e4ebf3',
+          headerSortActiveBg: '#dbe5f0',
+        },
+      },
+    }"
+  >
     <a-app>
       <a-layout class="shell">
         <a-layout-sider :width="220" theme="light" class="nav">

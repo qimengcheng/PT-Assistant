@@ -540,7 +540,8 @@ provide(THEME_KEY, echartsTheme);
 </script>
 
 <template>
-  <a-card variant="outlined">
+  <!-- 根卡挂 .page-fill：卡片自带白底，撑满一屏就不会在图表下面露出整片灰底 -->
+  <a-card variant="outlined" class="page-fill">
     <div class="user-statistic-layout">
       <div id="chartContainer" class="user-statistic-charts">
         <!-- 总上传、总下载、总积分 -->

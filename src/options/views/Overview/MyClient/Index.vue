@@ -498,7 +498,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
           {{ clientName(selectedDownloaderIds[0]) }}
         </a-tag>
 
-        <a-button size="small" type="primary" :title="t('MyClient.clientStatusDialog.openBtn')" @click="showClientStatusDialog = true">
+        <a-button type="primary" :title="t('MyClient.clientStatusDialog.openBtn')" @click="showClientStatusDialog = true">
           <template #icon><ThunderboltOutlined /></template>
           {{ allTorrents.length }}
           <ArrowUpOutlined style="color: #389e0d" />
@@ -507,7 +507,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
           {{ formatSize(totalDlSpeed) }}/s
         </a-button>
 
-        <a-button size="small" @click="showColumnDialog = true">
+        <a-button @click="showColumnDialog = true">
           <template #icon><ColumnWidthOutlined /></template>
           <span>{{ t("MyClient.columnSelector") }}</span>
         </a-button>
@@ -516,7 +516,6 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
           v-model:value="searchText"
           :placeholder="t('MyClient.searchPlaceholder')"
           allow-clear
-          size="small"
           style="width: 300px"
         >
           <template #prefix><SearchOutlined /></template>
@@ -526,6 +525,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
 
     <div class="page-panel">
     <a-table
+      bordered
       :columns="tableHeader"
       :data-source="filteredTorrents"
       :row-key="(record: CTorrent) => torrentKey(record)"
@@ -701,6 +701,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
       <a-col v-for="item in columnItems" :key="item.key" :span="8">
         <a-flex align="center" gap="small">
           <a-switch
+            size="small"
             :checked="columnVisible(item.key)"
             :disabled="item.fixed"
             @change="(on: boolean) => toggleColumn(item.key, on)"

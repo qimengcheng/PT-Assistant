@@ -407,6 +407,7 @@ function formatTimestamp(timestamp: number | undefined): string {
       <!-- 文件管理 -->
       <div v-else-if="activeTab === 'files'">
         <a-table
+          bordered
           v-if="filesLoading || files.length > 0"
           class="detail-table"
           :loading="filesLoading"
@@ -437,6 +438,7 @@ function formatTimestamp(timestamp: number | undefined): string {
       <!-- Peers -->
       <div v-else-if="activeTab === 'peers'">
         <a-table
+          bordered
           v-if="peersLoading || peers.length > 0"
           class="detail-table"
           :loading="peersLoading"
@@ -477,6 +479,7 @@ function formatTimestamp(timestamp: number | undefined): string {
         </a-space>
 
         <a-table
+          bordered
           v-if="trackersLoading || trackers.length > 0"
           class="detail-table"
           :loading="trackersLoading"

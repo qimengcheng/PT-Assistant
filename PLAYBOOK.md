@@ -41,6 +41,9 @@
 | 27 | 守卫边界 | 水合守卫首版把纯透传 getter 误报 |
 | 28 | i18n 守卫 | 上线即扫出引用了不存在的 `common.noData` |
 | 29 | 迁移盘点 | 「文件存在 ≠ 用户能看到」：路由一直挂着调试页 |
+| 30 | 版本号 | 口头规矩没写进文档，守卫又把 minor 判成跳号 —— 守卫上线那天规矩就失效了 |
+| 31 | 存储 | 失败值 NO_IMAGE 被当抓取结果落库，图标永久空白；三处判据统一成「失败不算命中」 |
+| 32 | store 水合 | `immediate: true` 的 watch 在挂载帧同步读未水合的 store：冷启动跳搜索页必弹「请至少添加一个站点」 |
 | 0 | 读史须知 | 版本重编号：`0.5.x` 已不存在，别按旧号找提交 |
 
 ## 读史须知：版本重编号（§0）
@@ -255,6 +258,33 @@ offscreen 文档是有 `storage` 权限的扩展页，content script 也有 stor
 
 ---
 
+### 31. 抓取失败被当成抓取结果存进缓存，图标就永久空了（2026-10-06）
+
+**现象**：我的数据页少数站点（截图指到「库非」）图标位置整格空白，其它站点正常。
+
+**根因（三层，逐层都在放大上一层）**：
+340 个站点定义里 **242 个有随包图标**（`public/icons/site/`，同步命中，永远不出错），
+剩下 **98 个**要走 offscreen 现抓。这条路上 `getSiteFavicon` 把**失败返回值 NO_IMAGE 一并
+`put` 进 IndexedDB 的 `favicon` 表**，而两侧读缓存都只判「有没有值」——
+于是首屏 20 行排队挤满 8s 总超时、站点当天连不上、DNS 失败，任何一次抖动都会把这个 1x1
+透明像素**永久**写成该站点的图标，之后每次读库都短路返回，一次重试机会都不留。
+NO_IMAGE 又是透明图，所以失败在界面上不可见：不是「裂图」也不是「占位块」，就是一片白。
+
+**改了什么**：三处判据统一成「NO_IMAGE 不算命中」—— offscreen 读缓存、offscreen 写缓存
+（失败干脆不落库）、options 的 `readFaviconFromIdb`（把历史遗留的那条当 miss，让老用户自愈）。
+内存里那一份 `faviconCache` **故意保留 NO_IMAGE 当命中**：它只活到本页面卸载，
+是防止「每次 mount 都重发一条消息」的限流阀，去掉就会变成请求风暴。
+
+**顺带修的第二起**：站点管理页的「刷新图标」按钮自己写了个同名 `flushSiteFavicon`，
+只 `sendMessage("getSiteFavicon", {flush:true})`，把 `SiteFavicon/utils.ts` 里那份共享实现
+（删库 → 删内存 → 重取写回内存，三条缺一不可）完全绕开了 —— 表现是弹「刷新完成」但图标一个都不变，
+得 F5。现在改调共享实现。
+
+**已知没做的**：失败的站点每次打开页面都会再抓一轮（现在没有"失败冷却"，只有内存里去重）。
+要不要给失败加 TTL 负缓存、以及空白要不要换成**看得见**的占位图，都还没定。
+
+---
+
 ## 五、多 agent 并行与交付
 
 ### 14. 多 agent 并行构建会互相擦产物（2026-10-03 实测两起）
@@ -403,6 +433,32 @@ offscreen 文档是有 `storage` 权限的扩展页，content script 也有 stor
 getter 到底读没读 `state` 静态判不出来 —— 首版把纯透传的 `getSiteMetadata` 误报成了一处，
 靠人工核对源码才排除。所以**这条守卫报出来的每一条都要回源码看一眼**，
 它的口径同样是「宁可漏报也不误报」（AGENTS.md §3.4）。
+
+### 32. 冷启动跳搜索页必弹「请至少添加一个站点」（2026-10-06）
+
+**现象**：在豆瓣页用插件的「快速搜索」点「搜索标题」跳到选项页，右上角红条提示
+「请至少添加一个站点进行搜索」，而站点管理里明明有几十个站点、允许搜索也都开着。
+
+**根因**：`content-script/app/utils.ts` 的 `doKeywordSearch` → `openOptionsPage` →
+`background/utils/base.ts` 的 `chrome.tabs.create("/options.html#/search-entity?…&flush=1")`
+—— 选项页是**新开**的。搜索页 `SearchEntity/Index.vue` 那个
+`watch(() => route.query, …, { immediate: true, deep: true })` 在组件 setup 的同一帧里就调
+`doSearch`，而 `persistWebExt` 的水合是 `chrome.storage.local.get` 一条异步链，此刻
+`metadataStore.sites` 还是初始值 `{}`。`stores/metadata.ts` 里
+`const addedSiteIds = Object.keys(state.sites)` 在第一个 `await` **之前**同步取快照 →
+展开出 0 个站点 → 弹那句提示。所以这不是偶发竞态，是**每次冷启动必中**
+（右键划词、omnibox 那两条同路入口一样）。
+
+**为什么守卫没拦**：`check-store-hydration` 的边界是「观察器 / 定时器 / 事件监听一律放过」
+（AGENTS.md §3.4），而 `immediate: true` 的 watch 回调恰恰是在挂载路径上**同步**执行的 ——
+它和 `onMounted(() => 读 store)` 是同一类问题，静态判据却把它当异步边界放掉了。
+跨文件（Index.vue 的 watcher → `utils/search.ts` 的 `doSearch` → store getter）也不在它追的 3 层里。
+
+**改了什么**：`doSearch` 在展开方案前 `await Promise.all([metadataStore.$onReady(), configStore.$onReady()])`。
+configStore 是同一条链上的另一个受害者：不等它，用户设的「同时搜索站点数」会被队列的默认 5 顶掉。
+
+**同类没查的**：其它 `immediate: true` 的 watch 里有没有同样的命令式读取，还没系统扫过
+（这条守卫同样看不见）。
 
 ### 28. i18n 守卫上线即扫出真问题
 

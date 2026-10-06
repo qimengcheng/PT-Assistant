@@ -17,7 +17,9 @@ import { ptdIndexDb } from "@/shared/indexdb.ts";
  *   3. 扩展 IndexedDB 的 `favicon` 表（offscreen 抓过一次就在，跨浏览器重启有效）
  *      —— options 与 offscreen 同属扩展 origin，**直接读库即可**，不必再 sendMessage。
  *      offscreen 存在的理由是它要有 DOM 才能解析网站 HTML 抓图标，读缓存不需要 DOM。
- *   4. 真 miss 才 sendMessage("getSiteFavicon")，由 offscreen 抓取并落库。
+ *      抓失败留下的 NO_IMAGE **不算命中**（见 readFaviconFromIdb），否则会一路短路回空白。
+ *   4. 真 miss 才 sendMessage("getSiteFavicon")，由 offscreen 抓取并落库
+ *      （offscreen 侧同样不把 NO_IMAGE 落库）。
  *
  * 改造前只有第 2、4 级，所以每次打开 options 页、每个站点都要付一次跨上下文往返
  * （第 3 级命中时还要把整张 base64 图从 offscreen 搬回来）。
@@ -62,7 +64,10 @@ const inflight = new Map<TSiteID, Promise<string>>();
 async function readFaviconFromIdb(siteId: TSiteID): Promise<string | null> {
   try {
     // store 一定存在：openDB 的 upgrade 是 @/shared/indexdb.ts 里唯一的一份定义
-    return ((await (await ptdIndexDb()).get("favicon", siteId)) as string | undefined) ?? null;
+    const cached = (await (await ptdIndexDb()).get("favicon", siteId)) as string | undefined;
+    // NO_IMAGE 不算命中：那是历史版本把抓取失败也落库留下的条目（现在 offscreen 侧已不再写失败值）。
+    // 当命中返回就等于让这一级永远短路回空白，第 4 级的重抓机会一次都拿不到。
+    return cached && cached !== NO_IMAGE ? cached : null;
   } catch (e) {
     // 读缓存失败不该影响主流程，降级去问 offscreen
     console.error(`[PTD] 读 favicon 缓存失败: ${siteId}`, e);

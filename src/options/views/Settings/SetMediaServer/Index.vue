@@ -77,12 +77,16 @@ async function checkConnect(): Promise<boolean> {
   }
 }
 
-function openAddDialog() {
+async function openAddDialog() {
   isEditMode.value = false;
   editingId.value = null;
-  const defaultConfig = getMediaServerDefaultConfig(entityList[0]);
+  // 必须 await：getMediaServerDefaultConfig 是 async（要动态 import 对应 entity 模块），
+  // 原来没等就展开 → `{...Promise}` 得到空对象，于是「新增」这条路的默认值一个都没进来：
+  // type 为空（认证字段区因此整块不渲染）、timeout 为空（存下去就没有请求超时，
+  // 卡住的服务器会一直占着并发槽）。
+  const defaultConfig = await getMediaServerDefaultConfig(entityList[0]);
   editingConfig.value = {
-    ...(defaultConfig as any),
+    ...defaultConfig,
     id: nanoid(),
     name: "",
     enabled: true,
@@ -178,60 +182,71 @@ const columns = computed(() => [
 </script>
 
 <template>
-  <div class="set-media-server">
-    <div class="page-header">
-      <h2>{{ t("SetMediaServer.index.title") }}</h2>
+  <div class="page">
+    <!-- class 必须挂在 a-flex 本体上（其余 9 个列表页都是这么写的）：`.page-bar` 自己没有
+         上下内衬，48px 的高度是 `.page` 网格给这个**网格项**的，靠 a-flex 的 align="center"
+         把 32px 的控件居到正中。外面再包一层 div 时，被撑到 48px 的是那层 div，
+         里面的 a-flex 只有内容高、贴在白带顶上 —— 标题和按钮就一起"顶到上面去了"。 -->
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
+      <h2 class="page-title">{{ t("SetMediaServer.index.title") }}</h2>
       <a-button type="primary" @click="openAddDialog">
-        <PlusOutlined /> {{ t("SetMediaServer.add.title") }}
+        <template #icon><PlusOutlined /></template>
+        <span>{{ t("SetMediaServer.add.title") }}</span>
       </a-button>
+    </a-flex>
+
+    <div class="page-panel">
+      <a-alert class="mb-3" type="info" show-icon
+        :title="t('SetMediaServer.index.description')" />
+
+      <a-table
+        bordered
+        :columns="columns"
+        :data-source="mediaServers"
+        :row-key="(r: any) => r.id"
+        :pagination="false"
+        :locale="{ emptyText: t('SetMediaServer.index.emptyTable') }"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'name'">
+            <span class="ms-name">{{ record.name }}</span>
+          </template>
+
+          <template v-else-if="column.key === 'type'">
+            <a-tag color="purple">{{ record.type }}</a-tag>
+          </template>
+
+          <template v-else-if="column.key === 'enabled'">
+            <a-switch size="small" :checked="record.enabled" @change="(v: any) => toggleEnabled(record, !!v)" />
+          </template>
+
+          <template v-else-if="column.key === 'action'">
+            <a-space>
+              <a-tooltip :title="t('SetMediaServer.index.testTooltip')">
+                <!-- 图标挂 #icon：挂默认插槽时 antd 的 loading 图标是插在按钮前面的、带宽度动画，
+                     一测试连接这颗按钮就变宽，把整列/整张表的列宽重排（与 MyData 操作列同一毛病） -->
+                <a-button size="small" :loading="testingIds[record.id]" @click="testConnection(record)">
+                  <template #icon><ApiOutlined /></template>
+                  {{ t("common.test") }}
+                </a-button>
+              </a-tooltip>
+              <!-- 纯图标按钮必须挂 a-tooltip，否则悬停没有任何功能说明（与上面「测试」按钮一致） -->
+              <a-tooltip :title="t('common.edit')">
+                <a-button size="small" type="text" @click="openEditDialog(record)">
+                  <EditOutlined />
+                </a-button>
+              </a-tooltip>
+              <a-tooltip :title="t('common.remove')">
+                <a-button size="small" type="primary" danger @click="confirmDelete(record)">
+                  <DeleteOutlined />
+                </a-button>
+              </a-tooltip>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
     </div>
-
-    <a-alert class="mb-3" type="info" show-icon
-      :title="t('SetMediaServer.index.description')" />
-
-    <a-table
-      :columns="columns"
-      :data-source="mediaServers"
-      :row-key="(r: any) => r.id"
-      :pagination="false"
-      :locale="{ emptyText: t('SetMediaServer.index.emptyTable') }"
-      size="small"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'name'">
-          <span class="ms-name">{{ record.name }}</span>
-        </template>
-
-        <template v-else-if="column.key === 'type'">
-          <a-tag color="purple">{{ record.type }}</a-tag>
-        </template>
-
-        <template v-else-if="column.key === 'enabled'">
-          <a-switch size="small" :checked="record.enabled" @change="(v: any) => toggleEnabled(record, !!v)" />
-        </template>
-
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-tooltip :title="t('SetMediaServer.index.testTooltip')">
-              <a-button size="small" :loading="testingIds[record.id]" @click="testConnection(record)">
-                <ApiOutlined /> {{ t("common.test") }}
-              </a-button>
-            </a-tooltip>
-            <!-- 纯图标按钮必须挂 a-tooltip，否则悬停没有任何功能说明（与上面「测试」按钮一致） -->
-            <a-tooltip :title="t('common.edit')">
-              <a-button size="small" type="text" @click="openEditDialog(record)">
-                <EditOutlined />
-              </a-button>
-            </a-tooltip>
-            <a-tooltip :title="t('common.remove')">
-              <a-button size="small" type="primary" danger @click="confirmDelete(record)">
-                <DeleteOutlined />
-              </a-button>
-            </a-tooltip>
-          </a-space>
-        </template>
-      </template>
-    </a-table>
 
     <a-modal
       v-model:open="showEditDialog"
@@ -283,11 +298,21 @@ const columns = computed(() => [
         </a-form-item>
 
         <a-form-item :label="t('SetMediaServer.index.timeout')">
-          <a-input-number v-model:value="editingConfig.timeout" :min="1" :max="600" style="width: 160px" />
+          <!-- 存的是毫秒（axios 直接吃这个值），界面按秒给，与 SetBase/SocialInformationWindow 同一做法。
+               原来这里把毫秒值直接绑在标着「秒」的框里：用户照字面填 30 就变成 30 毫秒，
+               每次请求必超时，而且失败提示看着像服务器坏了。 -->
+          <a-input-number
+            :value="(editingConfig.timeout ?? 5000) / 1000"
+            :min="1"
+            :max="600"
+            :step="1"
+            style="width: 160px"
+            @change="(v: any) => (editingConfig.timeout = Math.round((v ?? 5) * 1000))"
+          />
         </a-form-item>
 
         <a-form-item :label="t('common.enable')">
-          <a-switch v-model:checked="editingConfig.enabled" />
+          <a-switch v-model:checked="editingConfig.enabled" size="small" />
         </a-form-item>
 
         <!-- 连通性测试：上游 Editor.vue 里由 ConnectCheckButton 承担，这里补回同一能力 -->
@@ -302,14 +327,9 @@ const columns = computed(() => [
 </template>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.page-header h2 {
+/* 页标题：这页的工具条左端不是按钮组而是标题，所以它自己占一个样式。
+   表面/排布都交给全局 .page-bar + a-flex，这里只定字号。 */
+.page-title {
   margin: 0;
   font-size: 16px;
 }

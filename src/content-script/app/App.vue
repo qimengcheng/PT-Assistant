@@ -295,7 +295,23 @@ onBeforeUnmount(() => stopSnakebarWatch());
   <!-- 把 antd 的 CSS-in-JS 注入目标指向 shadow root，避免污染站点样式 -->
   <a-style-provider :container="shadowRoot">
     <!-- 浮层容器指向 shadowRoot 内的 #ptd-content-script-overlay，否则弹窗挂到 body 上拿不到样式 -->
-    <a-config-provider :get-popup-container="getPopupContainer">
+    <!-- rowHoverBg / headerBg / headerSort*Bg 与 options 侧 entrypoints/options/App.vue 同值
+         （很淡的蓝悬停 + 蓝灰表头，替代 antd 默认那两档 #fafafa —— 表头会和斑马纹奇数行同色）。
+         那边改这几个色值时这里要跟着改，两处的 ConfigProvider 互相读不到。
+         字号仍走 antd 默认，不跟着 options 的 fontSize:13 改。 -->
+    <a-config-provider
+      :get-popup-container="getPopupContainer"
+      :theme="{
+        components: {
+          Table: {
+            rowHoverBg: '#f0f7ff',
+            headerBg: '#eef2f7',
+            headerSortHoverBg: '#e4ebf3',
+            headerSortActiveBg: '#dbe5f0',
+          },
+        },
+      }"
+    >
       <div
         ref="el"
         :style="style"

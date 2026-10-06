@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-10-06",
+  "headSha": "588863b",
+  "versions": [
+    {
+      "version": "0.27.2",
+      "date": "2026-10-06",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "删除按钮收口成实心红、斑马纹改全站默认、3 处表头宽度补够"
+      ],
+      "improvedTotal": 1
+    },
+    {
+      "version": "0.27.1",
+      "date": "2026-10-06",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "表体高度被自己的公式冻住；并补完 8 个页面的列表骨架"
+      ],
+      "improvedTotal": 1
+    },
+    {
+      "version": "0.27.0",
+      "date": "2026-10-06",
+      "added": [
+        "换成智能体/模型/模型平台三栏贡献榜"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
+    {
+      "version": "0.26.0",
+      "date": "2026-10-06",
+      "added": [
+        "原名单换成 10 家 AI 智能体的在线 logo 墙"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
+    {
+      "version": "0.24.0",
+      "date": "2026-10-06",
+      "added": [
+        "作用域面板的站点支持拖动排序与置顶"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
+    {
+      "version": "0.22.49",
+      "date": "2026-10-06",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "搜索框的循环宽度让右组必然换行、第二行溢出压到面板"
+      ],
+      "improvedTotal": 1
+    },
+    {
+      "version": "0.22.48",
+      "date": "2026-10-05",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "第一次搜索不显示「搜索中」"
+      ],
+      "improvedTotal": 1
+    },
+    {
+      "version": "0.22.47",
+      "date": "2026-10-05",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "间距统一 8px、空态铺满、方案选择记忆"
+      ],
+      "improvedTotal": 1
+    }
+  ]
+}

@@ -65,40 +65,49 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <a-table
-    :columns="columns"
-    :data-source="logger"
-    :loading="isLoadingLogger"
-    :pagination="{ pageSize: 50, showSizeChanger: true, size: 'small' }"
-    row-key="id"
-    size="small"
-    :scroll="{ y: 'calc(100vh - 220px)' }"
-  >
-    <template #bodyCell="{ column, record }">
-      <template v-if="column.key === 'id'">
-        <code class="text-no-wrap">{{ record.id }}</code>
-      </template>
+  <!-- 原来 a-table 直接是根，白面高度=表头+行数，下面一整片是灰底。
+       这页没有工具条，所以不用两行制的 .page 骨架（那会多出一条 48px 空白面板），
+       改用 .page-fill + 一块吃满高度的 .page-panel。
+       顺带去掉 :scroll="{ y: 'calc(100vh - 220px)' }" —— 面板本身就是滚动容器，
+       再给表体钉一个目测常数等于两层滚动互相抢；代价是表头不再吸顶。 -->
+  <div class="page-fill">
+    <div class="page-panel page-fill-grow">
+      <a-table
+        bordered
+        :columns="columns"
+        :data-source="logger"
+        :loading="isLoadingLogger"
+        :pagination="{ pageSize: 50, showSizeChanger: true, size: 'small' }"
+        row-key="id"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'id'">
+            <code class="text-no-wrap">{{ record.id }}</code>
+          </template>
 
-      <template v-else-if="column.key === 'time'">
-        <span class="text-no-wrap">{{ formatDate(record.time ?? 0) }}</span>
-      </template>
+          <template v-else-if="column.key === 'time'">
+            <span class="text-no-wrap">{{ formatDate(record.time ?? 0) }}</span>
+          </template>
 
-      <template v-else-if="column.key === 'action'">
-        <a-tooltip :title="t('Logger.action.details')">
-          <a-button
-            size="small"
-            type="text"
-            :disabled="typeof record.data === 'undefined'"
-            @click="showLogDataDialogHandler(record)"
-          >
-            <template #icon>
-              <FileSearchOutlined />
-            </template>
-          </a-button>
-        </a-tooltip>
-      </template>
-    </template>
-  </a-table>
+          <template v-else-if="column.key === 'action'">
+            <a-tooltip :title="t('Logger.action.details')">
+              <a-button
+                size="small"
+                type="text"
+                :disabled="typeof record.data === 'undefined'"
+                @click="showLogDataDialogHandler(record)"
+              >
+                <template #icon>
+                  <FileSearchOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
+          </template>
+        </template>
+      </a-table>
+    </div>
+  </div>
 
   <a-modal v-model:open="showLogDataDialog" :title="t('Logger.action.details')" :width="800" :footer="null">
     <pre class="log-json">{{ JSON.stringify(logData, null, 2) }}</pre>

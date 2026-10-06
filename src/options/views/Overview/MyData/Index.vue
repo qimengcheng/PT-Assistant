@@ -94,7 +94,10 @@ const fullTableHeader = reactive([
   { title: t("MyData.table.joinTime"), key: "joinTime", align: "center" },
   { title: t("MyData.table.lastAccessAt"), key: "lastAccessAt", align: "center" }, // 默认不显示
   { title: t("MyData.table.updateAt"), key: "updateAt", align: "center" },
-  { title: t("common.action"), key: "action", align: "center", sortable: false, props: { disabled: true } },
+  // 操作列必须给确定宽度：这张表没有 fixed 列、`scroll.x: 'max-content'` 会让 rc-table 退回
+  // table-layout: auto（列宽跟着内容走），刷新时每行的 loading 一出现就把内容撑宽 →
+  // 整张表的列一起重排（肉眼可见地抖一下）。
+  { title: t("common.action"), key: "action", align: "center", width: 72, sortable: false, props: { disabled: true } },
 ] as ITableHeader[]);
 
 const tableHeader = computed(() => {
@@ -376,7 +379,6 @@ const showExportDialog = ref(false);
       <a-input
         v-model:value="tableWaitFilterRef"
         allow-clear
-        size="small"
         :placeholder="t('common.search')"
         class="my-data-search"
         @clear="buildFilterDictFn('')"
@@ -462,6 +464,7 @@ const showExportDialog = ref(false);
 
     <div class="page-panel">
     <a-table
+      bordered
       :columns="tableColumns"
       :data-source="filteredTableData"
       :loading="isTableLoading"
@@ -678,6 +681,11 @@ const showExportDialog = ref(false);
 
         <!-- 操作 -->
         <template v-else-if="column.key === 'action'">
+          <!-- 两个按钮的图标都必须走 #icon 插槽（与 SetSite、SearchEntity/ActionTd 同一写法）：
+               挂在默认插槽时 antd 的 loading 图标是**插在按钮前面**的，还带一段 width 0→N 的
+               过渡动画（button/DefaultLoadingIcon.js 的 existIcon 分支）—— 按钮变宽就把整张表
+               的列宽重排一遍；挂进 #icon 后 loading 是原地替换同一个 .ant-btn-icon，宽度不动。
+               顺带统一尺寸：默认插槽的图标不算 icon-only，内衬比 #icon 那档宽 4px。 -->
           <div class="table-action">
             <a-tooltip :title="t('MyData.table.action.viewHistoryData')">
               <a-button
@@ -685,7 +693,7 @@ const showExportDialog = ref(false);
                 size="small"
                 @click="viewHistoryData(record.site)"
               >
-                <UnorderedListOutlined />
+                <template #icon><UnorderedListOutlined /></template>
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('MyData.table.action.flushData')">
@@ -696,7 +704,7 @@ const showExportDialog = ref(false);
                 :loading="runtimeStore.userInfo.flushPlan[record.site]"
                 @click="flushSiteLastUserInfo([record.site])"
               >
-                <SyncOutlined />
+                <template #icon><SyncOutlined /></template>
               </a-button>
             </a-tooltip>
           </div>
@@ -714,6 +722,7 @@ const showExportDialog = ref(false);
       <a-col v-for="item in columnItems" :key="item.key" :span="8">
         <a-flex align="center" gap="small">
           <a-switch
+            size="small"
             :checked="columnVisible(item.key)"
             :disabled="item.fixed"
             @change="(on: boolean) => toggleColumn(item.key, on)"

@@ -79,16 +79,31 @@ const { t } = useI18n();
 const failed = ref<Record<string, boolean>>({});
 
 /**
+ * 排名口径：提交次数 / 代码量（手写新增行，口径见 `SpecialThank.caliber`）。
+ * 名次、进度条、右上角那个强调数字三者都跟着它走 —— 只换顺序不换条的话，
+ * 条长会和名次对不上，看着像排错了。
+ */
+const sortBy = ref<"commits" | "lines">("commits");
+const metricOf = (row: IRow) => (sortBy.value === "commits" ? row.commits : row.handAdd);
+const sortOptions = computed(() => [
+  { value: "commits", label: t("SpecialThank.sortByCommits") },
+  { value: "lines", label: t("SpecialThank.sortByLines") },
+]);
+
+/**
  * 两栏各自归一化画条：全局取最大值的话，62 次的模型会把 2 次的智能体压成看不见。
  * 标题与对侧标签都写成字面 t("…")，好让 check-locale-keys 真去解析它们。
  */
 const groups = computed(() => {
-  const build = (rows: IRow[], title: string, partnerLabel: string) => ({
-    title,
-    partnerLabel,
-    max: Math.max(...rows.map((row) => row.commits)),
-    rows,
-  });
+  const build = (source: IRow[], title: string, partnerLabel: string) => {
+    // 排序键并列时用另一个口径做次键（与生成脚本的口径一致），不然并列项每次渲染会换位置。
+    const rows = [...source].sort(
+      sortBy.value === "commits"
+        ? (a, b) => b.commits - a.commits || b.handAdd - a.handAdd
+        : (a, b) => b.handAdd - a.handAdd || b.commits - a.commits
+    );
+    return { title, partnerLabel, max: Math.max(...rows.map(metricOf)), rows };
+  };
   return {
     agents: build(stats.agents, t("SpecialThank.agents"), t("SpecialThank.usedModels")),
     models: build(stats.models, t("SpecialThank.models"), t("SpecialThank.usedBy")),
@@ -135,11 +150,14 @@ const spanLine = computed(() =>
 </script>
 
 <template>
-  <div class="special-thank">
+  <!-- 整页收进一块白表面（.page-panel 同列表页那一档），原来这里是灰底上摊一条条
+       小白卡，页面下半截全是灰。名次行随之改成「白底 + 行分隔线」，不再各自带边框。 -->
+  <div class="special-thank page-panel">
     <a-alert :title="t('SpecialThank.thankNote')" type="info" show-icon class="thank-alert" />
 
     <div class="span-bar">
       <span>{{ spanLine }}</span>
+      <a-segmented v-model:value="sortBy" :options="sortOptions" class="sort-control" />
       <span class="muted">
         {{ t("SpecialThank.asOf", { version: stats.headVersion, date: stats.span.lastDate }) }}
       </span>
@@ -170,12 +188,16 @@ const spanLine = computed(() =>
                 {{ brandOf(row.name).vendor }}
               </span>
               <span class="rank-commits">
-                {{ t("SpecialThank.commitsUnit", { n: fmt(row.commits) }) }}
+                {{
+                  sortBy === "commits"
+                    ? t("SpecialThank.commitsUnit", { n: fmt(row.commits) })
+                    : t("SpecialThank.codeUnit", { add: fmt(row.handAdd) })
+                }}
               </span>
             </div>
 
             <div class="rank-bar">
-              <i :style="{ width: share(row.commits, group.max) + '%' }" />
+              <i :style="{ width: share(metricOf(row), group.max) + '%' }" />
             </div>
 
             <div class="rank-metrics">
@@ -206,6 +228,8 @@ const spanLine = computed(() =>
 
 <style scoped>
 .special-thank {
+  /* 撑满一屏：内容不足一屏时也不给 .content 的灰底留出下半截 */
+  min-height: 100%;
   padding: 16px;
 }
 .thank-alert {
@@ -223,6 +247,13 @@ const spanLine = computed(() =>
   background: #fafafa;
   border: 1px solid rgba(5, 5, 5, 0.06);
   border-radius: 8px;
+}
+.sort-control {
+  /* 三条内容挤在一行：左边汇总、右边截止日期，排序按钮靠 auto 边距贴到右侧那组前面。
+     整行是 baseline 对齐（让两种字号的正文对齐），但这个控件是带内衬的方块，
+     按基线排会偏低，单独退回居中。 */
+  margin-left: auto;
+  align-self: center;
 }
 .group {
   margin-bottom: 20px;
@@ -246,13 +277,11 @@ const spanLine = computed(() =>
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 12px;
-  background: #fff;
-  border: 1px solid rgba(5, 5, 5, 0.06);
-  border-radius: 8px;
+  padding: 10px 0;
 }
+/* 白底上的行不再各自一圈边框（那是灰底时代用来把卡片从灰里拎出来的），改用分隔线 */
 .rank-row + .rank-row {
-  margin-top: 8px;
+  border-top: 1px solid var(--pt-color-border-light);
 }
 .rank-no {
   flex: 0 0 auto;

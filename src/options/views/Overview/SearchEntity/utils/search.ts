@@ -262,6 +262,14 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
   runtimeStore.search.searchPlanKey = searchPlanKey;
 
   try {
+    // 冷启动必须先等水合。从站点页「搜索标题」/右键划词/omnibox 跳进来时，选项页是
+    // `chrome.tabs.create` 新开的，搜索页那个 `watch(() => route.query, …, { immediate: true })`
+    // 会在 persistWebExt 的 `chrome.storage.local.get` 回来之前就跑到这里：
+    // 那时 `metadataStore.sites` 还是 `{}`，"default" 方案展开出 0 个站点，
+    // 于是弹「请至少添加一个站点进行搜索」—— 而用户其实加了几十个站点。
+    // configStore 同一趟：没等它就同步并发数，用户设的「同时搜索站点数」会被默认的 5 顶掉。
+    await Promise.all([metadataStore.$onReady(), configStore.$onReady()]);
+
     // Expand search plan
     const searchSolution = await metadataStore.getSearchSolution(runtimeStore.search.searchPlanKey);
 

@@ -146,6 +146,7 @@ const columns = [
     align: "center" as const,
     render: (_value: any, record: any) =>
       h(aSwitch, {
+        size: "small",
         checked: record.enabled,
         disabled: record.id === metadataStore.defaultDownloader?.id,
         "onUpdate:checked": (v: any) =>
@@ -246,6 +247,7 @@ const columns = [
     <!-- 面板只负责给表格一块白底表面并接管内部滚动 -->
     <div class="page-panel">
       <a-table
+        bordered
         :columns="columns"
         :data-source="filteredDownloaders"
         :pagination="pagination"

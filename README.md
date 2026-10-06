@@ -6,13 +6,14 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 
 功能平移已完成，工程化体系（CI 守卫 / 版本号守卫 / 自动发版）已上线。
 
-**三份文档各管一件事**，别在这里找经历：
+**文档各管一件事**，别在这里找经历：
 
 | 文件 | 内容 |
 |---|---|
 | `README.md`（本文） | **现状** —— 架构选型、目录、命令、CI 守卫清单、待办 |
 | `AGENTS.md` | **硬约定** —— git / 版本号 / 构建验收 / 代码规范，跨会话共享 |
 | `PLAYBOOK.md` | **经历** —— 踩过的坑、当时的止痛、根因、结论落在哪个配置或脚本上（本文各处 `§N` 指它） |
+| `docs/*.md` | **给使用者看的教程** —— 某一页功能怎么用、要什么前提、参数在哪调（如 `docs/media-library.md` 媒体库） |
 
 ## 架构决策（对比 PT-depiler）
 
@@ -64,6 +65,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `build` job 也挂着它 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
+| 界面数据快照 | `scripts/gen-recent-updates.mjs`、`scripts/gen-agent-stats.mjs` | 算一次、结果入库成 `src/options/data/*.json`，构建产物直接 import —— 不在运行时拉 GitHub Release（要多一条 host 权限、断网就空面板，而 Release 正文是给仓库读者看的 Markdown）。**发版前重跑一次**。首页「最近更新」只收**用户看得见**的条目：类型白名单 feat/fix/perf/style，加上内部范围黑名单（`feat(版本号守卫)` 是 feat，但用户看不见提交时算号这件事）；判据写在脚本头，`VERBOSE=1` 可逐条复核挡掉了什么 |
 
 > ⚠️ **防线 ② 依赖一个未声明的传递依赖**：`antdv-next@1.5.6` 内部用到
 > `@ant-design/fast-color`，它没写进 `package.json`，现在能跑全靠 `pnpm-workspace.yaml`

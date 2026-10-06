@@ -120,7 +120,6 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
         <a-input
           v-model:value="tableWaitFilter"
           allow-clear
-          size="small"
           class="toolbar-filter"
           :placeholder="t('SearchResultSnapshot.table.filterLabel')"
         >
@@ -134,6 +133,7 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
     <!-- 面板只给表格一块白底表面；表格自己的 scroll.y 仍管内部滚动 -->
     <div class="page-panel">
     <a-table
+      bordered
       :columns="columns"
       :data-source="filteredItems"
       :pagination="pagination"
@@ -143,7 +143,6 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
       }"
       row-key="id"
       size="small"
-      :scroll="{ y: 'calc(100vh - 300px)' }"
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">

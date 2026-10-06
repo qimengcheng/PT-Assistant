@@ -159,7 +159,6 @@ onUnmounted(() => {
         <a-input
           v-model:value="tableWaitFilterRef"
           allow-clear
-          size="small"
           class="toolbar-filter"
           :placeholder="t('DownloadHistory.filterPlaceholder')"
         >
@@ -175,6 +174,7 @@ onUnmounted(() => {
 
     <div class="page-panel">
     <a-table
+      bordered
       :columns="columns"
       :data-source="filteredItems"
       :loading="isLoadingHistory"
@@ -185,7 +185,6 @@ onUnmounted(() => {
       }"
       row-key="id"
       size="small"
-      :scroll="{ y: 'calc(100vh - 300px)' }"
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">

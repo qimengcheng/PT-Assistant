@@ -101,7 +101,11 @@ const FAVICON_TIMEOUT = 8000;
 
 export async function getSiteFavicon(site: TSiteID | getFaviconMetadata, flush: boolean = false): Promise<string> {
   const siteId = typeof site === "string" ? site : site.id;
-  let siteFavicon = (await (await ptdIndexDb()).get("favicon", siteId)) ?? false;
+  // ⚠️ NO_IMAGE 不算命中。库里可能躺着一次失败留下的那张 1x1 透明图：把它当有效值，
+  // 就等于把该站点的图标**永久**钉成空白 —— 首屏 20 行排队挤满 8s、站点当天连不上、
+  // DNS 失败都会写进这么一条，之后每次读缓存都短路返回，再也没有重试的机会。
+  const cached = (await (await ptdIndexDb()).get("favicon", siteId)) as string | undefined;
+  let siteFavicon = cached && cached !== NO_IMAGE ? cached : false;
   if (flush || !siteFavicon) {
     const siteInstance = await getSiteInstance(siteId);
     if (siteInstance) {
@@ -117,7 +121,14 @@ export async function getSiteFavicon(site: TSiteID | getFaviconMetadata, flush: 
         ]);
       });
 
-      await (await ptdIndexDb()).put("favicon", siteFavicon, siteId);
+      // 失败不落库：落库就是把「这次没连上」写成「这个站点没有图标」。
+      // 内存侧那一份由 SiteFavicon/utils.ts 的 faviconCache 管，只活到本页面卸载，
+      // 所以不重试的窗口最多一次页面生命周期，不会像落库那样把结果冻死。
+      if (siteFavicon && siteFavicon !== NO_IMAGE) {
+        await (await ptdIndexDb()).put("favicon", siteFavicon, siteId);
+      } else {
+        logger({ msg: `getSiteFavicon for ${siteId} 未取到图标，不写缓存（下次仍会重试）`, level: "warn" });
+      }
     }
   }
 

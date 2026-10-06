@@ -45,3 +45,53 @@
 .ant-table-tbody > tr.ant-table-row:nth-of-type(odd) {
   background: #fafafa;
 }
+
+/* 滚动条样式，与 options 侧 style.css 里那组同值同判据（shadow root 内的元素
+   选不到外面那份）：细、无箭头、轨道常驻占位，滑块平时透明、悬停到滚动区才现形。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover,
+*:focus-within {
+  scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+
+:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.38);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 表格圆角，与 options 侧 style.css 里那条同值同判据：antd 只圆顶边两角（8px），
+   底边两角要靠这里补齐再 overflow: clip 裁住行底色。选择器末尾重复的类是为了顶过
+   antd 那条 0,3,0 特异度（.ant-table-wrapper .ant-table .ant-table-container），
+   不用 !important。 */
+.ant-table-wrapper .ant-table .ant-table-container.ant-table-container {
+  border-radius: 10px;
+  overflow: clip;
+}

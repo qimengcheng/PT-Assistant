@@ -358,6 +358,7 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
 
       <div class="mt-3">
         <a-switch
+          size="small"
           :checked="restoreOptions.keepExistUserInfo"
           @change="(v: any) => (restoreOptions.keepExistUserInfo = !!v)"
         />

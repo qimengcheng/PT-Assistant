@@ -306,7 +306,9 @@ function saveControl() {
 </script>
 
 <template>
-  <a-card variant="outlined">
+  <!-- 根卡挂 .page-fill：卡片自带白底，撑满一屏就不会在画布下面露出整片灰底。
+       画布高度仍由 JS 量容器算（canvasHeight），这里只保证外面那层白面不留灰。 -->
+  <a-card variant="outlined" class="page-fill">
     <div class="timeline-layout">
       <div
         ref="canvasContainer"

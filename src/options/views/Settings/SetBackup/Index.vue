@@ -166,7 +166,6 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
         v-model:value="searchKey"
         allow-clear
         :placeholder="t('common.search')"
-        size="small"
         class="page-bar-extra"
         style="width: 320px; max-width: 500px"
       />
@@ -174,6 +173,7 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 
     <div class="page-panel">
     <a-table
+      bordered
       :columns="fullTableHeader"
       :data-source="filteredBackupServers"
       :row-key="(record: IBackupServerMetadata) => record.id"

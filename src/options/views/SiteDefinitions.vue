@@ -330,6 +330,17 @@ function rowExpandable(record: IFieldRow) {
   flex-direction: column;
 }
 
+/* 宽度：左卡固定 300px（340 个 id 最长也就十来个字符，再宽只是浪费），
+   右卡吃掉剩余宽度。 */
+.site-defs-list {
+  flex: 0 0 300px;
+}
+
+.site-defs-detail {
+  flex: 1;
+  min-width: 0;
+}
+
 .site-defs-list :deep(.ant-card-body),
 .site-defs-detail :deep(.ant-card-body) {
   display: flex;
@@ -348,15 +359,6 @@ function rowExpandable(record: IFieldRow) {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-}
-
-.site-defs-list {
-  flex: 0 0 300px;
-}
-
-.site-defs-detail {
-  flex: 1;
-  min-width: 0;
 }
 
 .site-defs-count {

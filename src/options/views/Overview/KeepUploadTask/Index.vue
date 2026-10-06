@@ -235,11 +235,13 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 </script>
 
 <template>
-  <a-alert class="mb-2" type="info" show-icon :title="t('KeepUploadTask.title')" />
-
-  <a-card size="small">
-    <template #title>
-      <a-space>
+  <!-- 顶部那条 a-alert 页标题去掉了：左侧导航已经标出当前页，再占一条只是把表格往下推。
+       外壳也不再是 a-card：卡片头的垂直 padding 实测是 0（`padding: 0 headerPadding`，
+       高度只靠 min-height），size="small" 下头高 38px，32px 的按钮塞进去只剩上下各 3px ——
+       整条贴到窗口顶。现在用 .page 网格：48px 工具条一行 + 白底面板一行（见 style.css）。 -->
+  <div class="page">
+    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
+      <a-flex align="center" gap="small" wrap>
         <a-button danger size="small" :disabled="selectedTasks.length === 0" @click="deleteSelectedTasks">
           <template #icon>
             <DeleteOutlined />
@@ -265,9 +267,11 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           </template>
           <span class="ml-1">{{ t("common.howToUse") }}</span>
         </a-button>
-      </a-space>
-    </template>
+      </a-flex>
+    </a-flex>
 
+    <!-- 面板只负责给表格一块白底表面；这页的表格没有 scroll.y，内部滚动就由面板接管 -->
+    <div class="page-panel">
     <a-table
       :columns="columns"
       :data-source="tasks"
@@ -397,22 +401,20 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
          这里要表达的是「暂无数据」，同项目其它三处（MediaServerEntity/Index.vue、
          MyClient/ClientStatusDialog.vue、SetDownloader/SiteFilterDialog.vue）都用 a-empty -->
     <a-empty v-if="!loading && tasks.length === 0" class="my-4" :description="t('KeepUploadTask.emptyNotice')" />
-  </a-card>
 
-  <a-alert
-    class="mt-4"
-    type="warning"
-    show-icon
-    :title="t('KeepUploadTask.warning.title')"
-  >
-    <!-- a-alert 的 description 渲染为普通 div，字符串里的 \n 不会换行，
-         旧写法三条注意事项会被压成一行；改用插槽逐条渲染 -->
-    <template #description>
-      <div>1. {{ t('KeepUploadTask.warning.item1') }}</div>
-      <div>2. {{ t('KeepUploadTask.warning.item2') }}</div>
-      <div>3. {{ t('KeepUploadTask.warning.item3') }}</div>
-    </template>
-  </a-alert>
+    <!-- 这条警告是这一页的内容（辅种风险须知），不是页标题，所以留在面板里跟着表格一起滚：
+         .page 是「工具条 + 面板」两行的网格，多一个直接子项会被排进隐式第三行、把面板那一行挤窄。 -->
+    <a-alert class="mt-4" type="warning" show-icon :title="t('KeepUploadTask.warning.title')">
+      <!-- a-alert 的 description 渲染为普通 div，字符串里的 \n 不会换行，
+           旧写法三条注意事项会被压成一行；改用插槽逐条渲染 -->
+      <template #description>
+        <div>1. {{ t('KeepUploadTask.warning.item1') }}</div>
+        <div>2. {{ t('KeepUploadTask.warning.item2') }}</div>
+        <div>3. {{ t('KeepUploadTask.warning.item3') }}</div>
+      </template>
+    </a-alert>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">

@@ -380,6 +380,8 @@
       "siteSection": "站点",
       "selectedSites": "已选 {0} 个站点",
       "clearSites": "清空勾选",
+      "dragToSort": "拖动调整顺序",
+      "pin": "置顶",
       "moreSites": "{0} 等 {1} 个站点"
     },
     "solutionAll": "全站",

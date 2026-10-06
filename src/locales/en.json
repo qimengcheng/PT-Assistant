@@ -380,6 +380,8 @@
       "siteSection": "Sites",
       "selectedSites": "{0} site(s) selected",
       "clearSites": "Clear selection",
+      "dragToSort": "Drag to reorder",
+      "pin": "Pin to top",
       "moreSites": "{0} and {1} other sites"
     },
     "solutionAll": "All sites",

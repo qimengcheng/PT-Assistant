@@ -1,0 +1,284 @@
+{
+  "_comment": "本文件由 `node scripts/gen-agent-stats.mjs` 从 git 历史生成，请勿手改；提交历史变了就重跑。",
+  "generatedAt": "2026-10-06",
+  "headSha": "3d84f59",
+  "headVersion": "0.27.0",
+  "span": {
+    "commits": 132,
+    "matched": 132,
+    "feat": 23,
+    "firstDate": "2026-10-02",
+    "lastDate": "2026-10-06",
+    "versionFrom": "0.1.0",
+    "versionTo": "0.27.0"
+  },
+  "totals": {
+    "handAdd": 55833,
+    "handDel": 10158,
+    "bulkAdd": 90053
+  },
+  "agents": [
+    {
+      "name": "Qoder",
+      "commits": 45,
+      "feat": 10,
+      "handAdd": 6711,
+      "handDel": 2629,
+      "bulkAdd": 602,
+      "firstDate": "2026-10-03",
+      "lastDate": "2026-10-06",
+      "versionFrom": "0.19.1",
+      "versionTo": "0.27.0",
+      "partners": [
+        {
+          "name": "Qwen3.8-Flash",
+          "count": 45
+        }
+      ]
+    },
+    {
+      "name": "DeepSeek Harness",
+      "commits": 31,
+      "feat": 4,
+      "handAdd": 12984,
+      "handDel": 3567,
+      "bulkAdd": 1162,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-05",
+      "versionFrom": "0.4.3",
+      "versionTo": "0.22.48",
+      "partners": [
+        {
+          "name": "Space Bunny",
+          "count": 31
+        }
+      ]
+    },
+    {
+      "name": "WorkBuddy",
+      "commits": 23,
+      "feat": 5,
+      "handAdd": 22585,
+      "handDel": 1376,
+      "bulkAdd": 87573,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-03",
+      "versionFrom": "0.1.0",
+      "versionTo": "0.19.2",
+      "partners": [
+        {
+          "name": "GLM-5.3-Flash",
+          "count": 12
+        },
+        {
+          "name": "Space Bunny",
+          "count": 8
+        },
+        {
+          "name": "Hy4 preview",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "千问办公",
+      "commits": 18,
+      "feat": 1,
+      "handAdd": 6753,
+      "handDel": 582,
+      "bulkAdd": 3,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-06",
+      "versionFrom": "0.5.0",
+      "versionTo": "0.24.2",
+      "partners": [
+        {
+          "name": "Qwen3.8-Flash",
+          "count": 18
+        }
+      ]
+    },
+    {
+      "name": "TraeCode",
+      "commits": 12,
+      "feat": 3,
+      "handAdd": 6078,
+      "handDel": 1415,
+      "bulkAdd": 713,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-04",
+      "versionFrom": "0.10.0",
+      "versionTo": "0.20.2",
+      "partners": [
+        {
+          "name": "Seed-Evolving",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "name": "OpenCode",
+      "commits": 3,
+      "feat": 0,
+      "handAdd": 722,
+      "handDel": 589,
+      "bulkAdd": 0,
+      "firstDate": "2026-10-05",
+      "lastDate": "2026-10-06",
+      "versionFrom": "0.22.17",
+      "versionTo": "0.24.3",
+      "partners": [
+        {
+          "name": "Space Bunny",
+          "count": 3
+        }
+      ]
+    }
+  ],
+  "models": [
+    {
+      "name": "Qwen3.8-Flash",
+      "commits": 63,
+      "feat": 11,
+      "handAdd": 13464,
+      "handDel": 3211,
+      "bulkAdd": 605,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-06",
+      "versionFrom": "0.5.0",
+      "versionTo": "0.27.0",
+      "partners": [
+        {
+          "name": "Qoder",
+          "count": 45
+        },
+        {
+          "name": "千问办公",
+          "count": 18
+        }
+      ]
+    },
+    {
+      "name": "Space Bunny",
+      "commits": 42,
+      "feat": 7,
+      "handAdd": 14002,
+      "handDel": 4164,
+      "bulkAdd": 1162,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-06",
+      "versionFrom": "0.4.3",
+      "versionTo": "0.24.3",
+      "partners": [
+        {
+          "name": "DeepSeek Harness",
+          "count": 31
+        },
+        {
+          "name": "WorkBuddy",
+          "count": 8
+        },
+        {
+          "name": "OpenCode",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "GLM-5.3-Flash",
+      "commits": 12,
+      "feat": 2,
+      "handAdd": 21475,
+      "handDel": 893,
+      "bulkAdd": 87573,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-02",
+      "versionFrom": "0.1.0",
+      "versionTo": "0.12.1",
+      "partners": [
+        {
+          "name": "WorkBuddy",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "name": "Seed-Evolving",
+      "commits": 12,
+      "feat": 3,
+      "handAdd": 6078,
+      "handDel": 1415,
+      "bulkAdd": 713,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-04",
+      "versionFrom": "0.10.0",
+      "versionTo": "0.20.2",
+      "partners": [
+        {
+          "name": "TraeCode",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "name": "Hy4 preview",
+      "commits": 3,
+      "feat": 0,
+      "handAdd": 814,
+      "handDel": 475,
+      "bulkAdd": 0,
+      "firstDate": "2026-10-03",
+      "lastDate": "2026-10-03",
+      "versionFrom": "0.12.2",
+      "versionTo": "0.13.1",
+      "partners": [
+        {
+          "name": "WorkBuddy",
+          "count": 3
+        }
+      ]
+    }
+  ],
+  "platforms": [
+    {
+      "name": "OpenRouter",
+      "commits": 33,
+      "feat": 4,
+      "handAdd": 13694,
+      "handDel": 4146,
+      "bulkAdd": 1162,
+      "firstDate": "2026-10-02",
+      "lastDate": "2026-10-05",
+      "versionFrom": "0.4.3",
+      "versionTo": "0.22.48",
+      "partners": [
+        {
+          "name": "DeepSeek Harness",
+          "count": 31
+        },
+        {
+          "name": "OpenCode",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "name": "ZEN",
+      "commits": 1,
+      "feat": 0,
+      "handAdd": 12,
+      "handDel": 10,
+      "bulkAdd": 0,
+      "firstDate": "2026-10-06",
+      "lastDate": "2026-10-06",
+      "versionFrom": "0.24.3",
+      "versionTo": "0.24.3",
+      "partners": [
+        {
+          "name": "OpenCode",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

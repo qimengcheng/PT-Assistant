@@ -1205,7 +1205,19 @@
     }
   },
   "SpecialThank": {
-    "thankNote": "感谢以下 AI 编程智能体在本项目的开发与迁移中提供的帮助，如有遗漏敬请谅解。"
+    "agents": "智能体",
+    "asOf": "统计截至 v{version}（{date}）",
+    "bulk": "平移/生成 +{add}",
+    "caliber": "「代码量」只计本仓库新写与改动的行数，已剔除 pnpm-lock.yaml、public/** 站点图标与 packages/** 旧版平移代码；被剔除的量在右侧单列为「平移/生成」。数据是提交历史的快照，历史变了要重跑生成脚本。「模型平台」栏是把上面同一批提交按调用通道再记一次，不与前两栏相加。",
+    "commitsUnit": "{n} 次提交",
+    "feat": "新功能 {n}",
+    "lines": "手写 +{add} / −{del}",
+    "models": "模型",
+    "platforms": "模型平台",
+    "spanSummary": "共 {commits} 条提交 · {agents} 个智能体 · {models} 款模型 · 手写 +{add} / −{del} 行",
+    "thankNote": "感谢参与本项目开发的智能体与模型，按提交次数排序。",
+    "usedBy": "用过它的智能体：",
+    "usedModels": "用过它的模型："
   },
   "TechnologyStack": {
     "dependency": "项目依赖",

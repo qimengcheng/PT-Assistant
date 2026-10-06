@@ -55,6 +55,19 @@ nx() { # --next：<期望输出> <附加参数> <说明>
 VC="$SRC/scripts/versioned-commit.mjs"
 pkghead() { node -e 'const{execSync}=require("child_process");process.stdout.write(JSON.parse(execSync("git show HEAD:package.json",{encoding:"utf8"})).version)'; }
 pkgworktree() { node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync("package.json","utf8")).version)'; }
+# tm：<用例> <消息>：暂存区里除了 package.json 什么都没有 → 必须拒收，
+# 不许留下「只推进版本号」的空壳提交（包装命令自己会 add package.json，git 那条 no changes 兜不住）
+tm() {
+  git reset -q >/dev/null 2>&1
+  before=$(pkghead)
+  out=$(node "$VC" -m "$2" 2>&1); code=$?
+  after=$(pkghead)
+  if [ $code -ne 0 ] && [ "$before" = "$after" ]; then
+    report 0 PASS "$1" ""
+  else
+    report 1 PASS "$1" "  code=$code HEAD 的号=$before→$after（号被推进说明空壳提交真的落了）/ $out"
+  fi
+}
 # tz：<用例> <期望落库版本> <消息> [工作区 package.json 起始版本]
 # 走包装命令，而且故意只 git add payload.txt —— 算号、写 package.json、暂存必须全由脚本做完，
 # 否则这条测试还在测「人记得 add」那个老前提。
@@ -151,6 +164,7 @@ t  "正文里的 @next 不触发（只管首行）"          PASS "[A]-[M] v0.6.
 tz "前缀带三段式数字的模型名 + @next 仍能展开"  0.6.5 "[OpenCode]-[Space Bunny Alpha 1.0.0] @next fix: anchored" 0.0.0
 tf "直接 git commit 用 @next（忘了走包装）→ 守卫当场拒收" "[A]-[M] @next fix: 没走包装"
 tv "包装命令 + --amend + @next → 拒收且不推进版本号"  "[A]-[M] @next fix: 把 amend 当成新提交"
+tm "什么都没暂存就走包装 → 拒收，不留只改版本号的空壳提交" "[A]-[M] @next fix: 忘了 git add 自己的文件"
 tf "包名 @next/nuxt 不在版本号槽位 → 不展开，按无号拦下" "[A]-[M] @next/nuxt 里有 bug"
 tf "next@next 当普通词 → 不展开，按无号拦下"     "[A]-[M] 用 next@next 试了 fix: 无号"
 

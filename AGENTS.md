@@ -362,7 +362,8 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 
 - `verify`：只查**提交标题**那三条硬规则（`[agent名]-[模型名]` 前缀、含 `vX.Y.Z`、与 `package.json` 一致），
   不装依赖也不跑守卫（只 checkout，用 runner 自带的 node 读一下 version）—— 别把它当静态检查那一段。
-- `build`：`pnpm compile` → **全部守卫**（清单与条数以 `node scripts/check-all.mjs` 现取为准，见 §3.4）
+- `build`：`pnpm compile` → **一条 `node scripts/check-all.mjs`**（全部守卫，清单从 `scripts/` 现取，
+  与本地 `pnpm check:all` 同一个入口，见 §3.4）
   → `check-version.mjs --committed` → `check-version-test.sh`（版本号守卫自己的断言，
   它不在 `check-all` 的聚合里，所以单独挂一步）→ `wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
   `PT-Assistant-<version>-{chrome,firefox,sources}.zip` 三个包，外加 `smoke-background.mjs`。
@@ -441,7 +442,8 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 接线在 `src/content-script/app/init.ts`。**往 content 的模板加新 `a-*` 标签必须先补清单**，
 否则线上是静默空白。
 
-CI 上挂在 `pnpm compile` 之后、构建之前的守卫共 8 条，本地一条命令全跑：
+CI 与本地跑的是**同一条**聚合命令（`build` job 里 `pnpm compile` 之后、构建之前那一步就是
+`node scripts/check-all.mjs`，不再是逐条 step —— 手抄 8 条 step 时新守卫进得来本地却进不来 CI）：
 
 ```bash
 pnpm check:all                 # 不 fail-fast：8 条全跑完再汇总，任一条非零则该命令非零
@@ -458,6 +460,10 @@ node scripts/check-all.mjs     # 同样内容，绕开 pnpm（见下方警告）
 新增一条守卫自动进聚合（它排除了自身与 `check-version.mjs` —— 后者读暂存区版本号、
 属于 `.githooks` 的职责，混进来会让结果取决于「此刻暂存了什么」）。
 所以本文件不再维护逐条命令列表；各条防什么看下面的编号说明，或看失败时打印的详情。
+CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），于是「本地有、CI 没有」这种
+漂移从结构上没了。**但现取清单不懂顺序**：那一步在构建之前，将来若有守卫需要构建产物
+（`dist/`）才能判，它会被自动收进来在构建前假报错 —— 那种守卫要单独给一步排到
+`Build and package` 之后，并加进 `check-all.mjs` 的 `EXCLUDED`。
 
 前六条是**静态扫描**，后两条是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
 不需要 loader、不引入新依赖）：

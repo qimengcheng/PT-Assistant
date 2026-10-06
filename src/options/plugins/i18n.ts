@@ -5,7 +5,6 @@ export type TLangCode = "en" | "zh_CN";
 interface ILangMetaData {
   title: string;
   value: TLangCode;
-  authors: readonly string[];
 }
 
 /**
@@ -16,12 +15,10 @@ export const definedLangMetaData: readonly ILangMetaData[] = [
   {
     title: "English (Beta)",
     value: "en",
-    authors: ["ronggang", "Rhilip", "ylxb2016", "xiongqiwei", "jackson008"],
   },
   {
     title: "简体中文 Chinese (Simplified)",
     value: "zh_CN",
-    authors: ["栽培者", "Rhilip"],
   },
 ] as const;
 

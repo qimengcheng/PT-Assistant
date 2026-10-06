@@ -150,7 +150,21 @@ jobs:
       - name: Check no imperative async-store reads in mount hooks
         run: node scripts/check-store-hydration.mjs
 
-      # 前五条是**静态扫描**，这条是**行为断言**：懒开的共享库有两条不变量，静态判不出来 ——
+      # 第六条静态防线：service worker / content 引导的 import 图。把 AGENTS.md §3.2 那三条
+      # 「违反了不报错、只在运行时崩或静默空着」的约定从文档变成硬拦：
+      #   A 静态闭包不许走到 sizzle（UMD 工厂顶层访问 window，MV3 SW 无 window → 启动即崩）；
+      #   B 不许从这两个上下文 import @ptd/site / @ptd/social 根入口（barrel 会把整片工具链拖进来，
+      #     实测 A 的发生路径就是 @ptd/site → utils → @ptd/social）；
+      #   C entrypoint 的 import.meta.glob 必须用根绝对 pattern（相对会静默匹配出空 map）；
+      #   D defineBackground 必须显式 type: "module"（classic SW 会把 340 站点 + sizzle 全内联）。
+      # 判据能静态成立的前提是 tsconfig 的 verbatimModuleSyntax：纯类型导入必须写 import type，
+      # Vite 才整条擦除，所以「这条边在不在运行时图上」可判。
+      # 它是下方 smoke-background.mjs 的前置线：那条真跑产物、抓的是运行期才暴露的部分，
+      # 但报错位置在产物里；这条在源码阶段就把链路和上游文件点名，定位成本低一个量级。
+      - name: Check SW and content-bootstrap import graph
+        run: node scripts/check-sw-graph.mjs
+
+      # 前面六条是**静态扫描**，这条是**行为断言**：懒开的共享库有两条不变量，静态判不出来 ——
       # 失败不能被缓存（否则一次 VersionError 让本上下文永久取不到库），
       # 成功必须被复用（否则「修重试」会变成每次调用重开一个连接）。
       # 守的就是 `if (opening === pending) opening = null` 这一行被当成无用代码删掉。
@@ -168,9 +182,11 @@ jobs:
 
       # 版本号守卫的**兜底**（主防线是本地 .githooks 里的 pre-commit / commit-msg：
       # CI 只在 push 时触发，本地连提 5 次它一次都不跑，等历史定型就晚了）。
-      # 这里检查 HEAD 这一条：「提交消息版本号 == package.json」且「== 父提交最大 + 1」。
+      # 这里检查 HEAD 这一条：「提交消息版本号 == package.json」，且进位档位配标题类型词
+      # （feat 进次版本、其余进修订号 —— 规则见 AGENTS.md §1.2，成因见 PLAYBOOK §30）。
+      # CI 只校验这次 push 的 tip 那一条，所以它抓不到历史中段的错档，主防线仍在本地钩子。
       # clone 出来的仓库没有本地 hook，且 --no-verify 能绕过，所以 CI 必须再挂一份。
-      - name: Check version number is continuous and consistent
+      - name: Check version number and its bump level
         run: node scripts/check-version.mjs --committed
 
       # 用 WXT 自带的 `wxt zip` 而不是系统 zip：

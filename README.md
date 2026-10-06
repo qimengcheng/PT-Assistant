@@ -4,7 +4,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 
 版本号以 `package.json` 的 `version` 为唯一真源（本文不写死，写死就每个版本过期一次）。
 
-功能平移已完成，工程化体系（7 条 CI 守卫 / 版本号守卫 / 自动发版）已上线。
+功能平移已完成，工程化体系（CI 守卫 / 版本号守卫 / 自动发版）已上线。
 
 **三份文档各管一件事**，别在这里找经历：
 
@@ -28,7 +28,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 站点定义 | 340 个 definition，import.meta.glob 按需加载 | **原样平移，零修改**（packages/site） |
 | Buffer polyfill | 全局注入（background 464KB） | 不注入 |
 | i18n | vue-i18n 双语言全量注册（~118KB） | vue-i18n 双语言全量注册（默认语言静态 import，切换语言动态 import） |
-| 测试 | 无 | 类型检查 + 7 条 CI 守卫（5 静态扫描 + 2 行为断言）+ 产物 smoke test（ESLint / Vitest 尚未引入） |
+| 测试 | 无 | 类型检查 + CI 守卫（静态扫描 + 行为断言，条数见「工程化体系」）+ 产物 smoke test（ESLint / Vitest 尚未引入） |
 
 > **UI 栈是 antdv-next**，走 CSS-in-JS **运行时注入样式**，
 > 没有「构建期拆 CSS chunk + 动态 `<link>` 注入」那条链路 ——
@@ -41,8 +41,10 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 ## 工程化体系
 
 `.github/workflows/ci.yml` 是单文件流水线（push / PR / 手动触发），
-由 `.githooks/` 的本地 hook 与 CI 各守一半。守卫共 **7 条**（① ~ ⑤ 静态扫描，⑥ ⑦ 行为断言），
-都挂在 `verify` job 的 `pnpm compile` 之后；本地改完也要跑，FAIL 非零退出。
+由 `.githooks/` 的本地 hook 与 CI 各守一半。守卫共 **8 条**（① ~ ⑥ 静态扫描，⑦ ⑧ 行为断言，
+条数以 `node scripts/check-all.mjs` 现取为准 —— 它扫 `scripts/` 目录，新增一条自动进聚合），
+都挂在 `build` job 的 `pnpm compile` 之后（`verify` job 只管提交标题那三条硬规则：前缀 / 版本号 / 与 `package.json` 一致）；
+本地改完也要跑，FAIL 非零退出。
 每条的成因与「报干净 ≠ 真干净」的边界见 AGENTS.md §3.4 与 PLAYBOOK。机制清单：
 
 | 机制 | 位置 | 作用 |
@@ -55,9 +57,10 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 防线 ③ | `scripts/check-locale-keys.mjs` | i18n 键在 zh/en 两侧都能解析（取不到时 vue-i18n 不报错，而是把键路径渲染到界面） |
 | 防线 ④ | `scripts/check-dead-props.mjs` | 传给 `a-*` 的死 prop / 死插槽（`GlobalComponents` 声明允许任意 attr，vue-tsc 抓不到，运行时不报错） |
 | 防线 ⑤ | `scripts/check-store-hydration.mjs` | 挂载钩子里命令式读「`persistWebExt` 异步水合的 store」的地方（水合前那些字段是初始值，界面静默空着，不报错也不进 tsc） |
-| 防线 ⑥（行为断言） | `scripts/check-indexdb-retry.mjs` | 懒开共享库的两条不变量：开库失败不能被缓存、成功后必须复用同一句柄。静态扫不出来，靠它钉（手写最小 IDB 桩，不引 fake-indexeddb） |
-| 防线 ⑦（行为断言） | `scripts/check-fingerprint.mjs` | 种子指纹三层逻辑的纯函数断言（误判「本地已有」会让 qBittorrent 重下、直接打负分享率） |
-| 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（feat 写修订号拦住 / fix 写次版本拦住 / amend 放行 / 跳号拦住 / 模型名带数字不抢位；条数看脚本末尾输出）。改 `check-version.mjs` 前必跑 |
+| 防线 ⑥ | `scripts/check-sw-graph.mjs` | SW / content 引导的静态 import 闭包里不许出现 `sizzle`、不许命中 `@ptd/site` / `@ptd/social` 根入口，`import.meta.glob` 必须根绝对，`defineBackground` 必须显式 `type: "module"`（AGENTS.md §3.2 那三条铁律；违反是 SW 启动即崩、消息永远无响应） |
+| 防线 ⑦（行为断言） | `scripts/check-indexdb-retry.mjs` | 懒开共享库的两条不变量：开库失败不能被缓存、成功后必须复用同一句柄。静态扫不出来，靠它钉（手写最小 IDB 桩，不引 fake-indexeddb） |
+| 防线 ⑧（行为断言） | `scripts/check-fingerprint.mjs` | 种子指纹三层逻辑的纯函数断言（误判「本地已有」会让 qBittorrent 重下、直接打负分享率） |
+| 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `build` job 也挂着它 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
 
@@ -83,7 +86,7 @@ PT-assistant-wxt/
 │   ├── icons/mediaServer/  ← 4 个媒体服务器图标
 │   ├── icons/social/       ← 7 个社交站图标（TorrentTitleTd 用 /icons/social/${key}.png）
 │   └── lib/mdi/            ← Material Design Icons 子集字体（时间线 konva 字形用）
-├── scripts/           ← 7 条 CI 守卫 + 构建入口 build-verify.mjs + 发版辅助（见「工程化体系」）
+├── scripts/           ← CI 守卫 + 构建入口 build-verify.mjs + 版本号包装 versioned-commit.mjs + 发版辅助（见「工程化体系」）
 ├── src/
 │   ├── entrypoints/
 │   │   ├── background/    # MV3 module SW：cookies/DNR/alarms/消息路由

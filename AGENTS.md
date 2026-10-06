@@ -119,7 +119,8 @@ node scripts/versioned-commit.mjs -m "[agent名]-[模型名] @next feat(搜索�
 跑断言（条数看它自己末尾的输出，别往这里抄），含「feat 写修订号拦住 / fix 写次版本拦住 /
 amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位 / `@next` 真落库且自动暂存 /
 包名里的 `@next` 不触发 / amend 配 `@next` 拒收」。
-**改 `check-version.mjs` 的判据必须先跑它** —— 这条守卫本身没人守，就是它连续两次误拦 / 漏放的原因。
+**改 `check-version.mjs` 的判据必须先跑它** —— 这条守卫自己连续两次误拦 / 漏放，就是它没人守造成的。
+现在 CI 的 `build` job 也挂着它（§2.4），但**主防线仍在本地**：CI 只在 push 时跑，本地忘了跑就等于把判据改了没验。
 
 三个钩子的判据都有**结构性够不着的地方**，写提交前得知道：
 
@@ -359,8 +360,11 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 **只有一个 workflow：`.github/workflows/ci.yml`**，三个 job 串起来 `verify → build → release`。
 （没有 `build.yml` / `release.yml` 这两个文件，曾有文档写错，见 PLAYBOOK §24。）
 
-- `verify`：`pnpm compile` + 七条守卫 + `check-version.mjs --committed`。
-- `build`：`wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
+- `verify`：只查**提交标题**那三条硬规则（`[agent名]-[模型名]` 前缀、含 `vX.Y.Z`、与 `package.json` 一致），
+  不装依赖也不跑守卫（只 checkout，用 runner 自带的 node 读一下 version）—— 别把它当静态检查那一段。
+- `build`：`pnpm compile` → **全部守卫**（清单与条数以 `node scripts/check-all.mjs` 现取为准，见 §3.4）
+  → `check-version.mjs --committed` → `check-version-test.sh`（版本号守卫自己的断言，
+  它不在 `check-all` 的聚合里，所以单独挂一步）→ `wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
   `PT-Assistant-<version>-{chrome,firefox,sources}.zip` 三个包，外加 `smoke-background.mjs`。
 - `release`：`ncipollo/release-action` 按 `package.json` 的 version 打 `v<version>` tag 并挂上
   三个产物，随后是 Publish to Chrome Web Store / Publish to Firefox Add-ons 两步。

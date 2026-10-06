@@ -158,7 +158,7 @@ const fullTableHeader = computed(
       { title: t("MyClient.table.dlSpeed"), key: "downloadSpeed", align: "end", width: 100 },
       { title: t("MyClient.table.totalUploaded"), key: "totalUploaded", align: "end", width: 100 },
       { title: t("MyClient.table.totalDownloaded"), key: "totalDownloaded", align: "end", width: 100 },
-      { title: t("MyClient.table.ratio"), key: "ratio", align: "end", width: 60 },
+      { title: t("MyClient.table.ratio"), key: "ratio", align: "end", width: 80 },
       { title: t("MyClient.table.savePath"), key: "savePath", align: "start" },
       { title: t("MyClient.table.addedAt"), key: "dateAdded", align: "center", width: 160 },
       {
@@ -430,7 +430,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
         </a-button>
       </a-tooltip>
       <a-tooltip :title="t('MyClient.deleteSelected')">
-        <a-button type="text" danger :disabled="tableSelected.length === 0" @click="() => openDeleteDialog(tableSelected)">
+        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="() => openDeleteDialog(tableSelected)">
           <template #icon><DeleteOutlined /></template>
         </a-button>
       </a-tooltip>
@@ -539,7 +539,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
         total: filteredTorrents.length,
       }"
       size="small"
-      class="table-stripe table-header-no-wrap"
+      class="table-header-no-wrap"
       @change="handleTableChange"
     >
       <!-- client column -->
@@ -682,7 +682,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
             </a-tooltip>
 
             <a-tooltip :title="t('MyClient.action.delete')">
-              <a-button type="text" size="small" danger @click="() => openDeleteDialog([record])">
+              <a-button type="primary" size="small" danger @click="() => openDeleteDialog([record])">
                 <template #icon><DeleteOutlined /></template>
               </a-button>
             </a-tooltip>

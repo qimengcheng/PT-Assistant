@@ -154,7 +154,7 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
     <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
         <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupServer(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="deleteBackupServer(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
         <div class="toolbar-divider" />
 
@@ -179,7 +179,7 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
       :row-key="(record: IBackupServerMetadata) => record.id"
       :row-selection="rowSelection"
       :pagination="false"
-      class="table-stripe table-header-no-wrap"
+      class="table-header-no-wrap"
       size="small"
     >
       <template #bodyCell="{ column, record }">

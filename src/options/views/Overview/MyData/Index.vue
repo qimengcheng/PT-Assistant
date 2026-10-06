@@ -469,7 +469,7 @@ const showExportDialog = ref(false);
       :row-selection="tableRowSelection"
       :pagination="tablePagination"
       :scroll="{ x: 'max-content' }"
-      class="table-stripe table-header-no-wrap"
+      class="table-header-no-wrap"
       size="small"
       @change="handleTableChange"
     >

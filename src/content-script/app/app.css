@@ -37,3 +37,11 @@
   /* 与 .ptd-root 同级，靠 DOM 顺序（overlay 在后）压在悬浮球之上 */
   z-index: 9999999;
 }
+
+/* 表格斑马纹，与 options 侧 style.css 里那条同值同判据。
+   content 侧此前挂的是 class="table-stripe"，但那条规则只存在于
+   `src/entrypoints/options/vuetify-compat.css`（只有 options 的 main.ts 引入），
+   所以注入 UI 里那张表的 class 从来没生效过 —— 现在改成默认就有，class 也删了。 */
+.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) {
+  background: #fafafa;
+}

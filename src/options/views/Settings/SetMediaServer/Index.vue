@@ -224,7 +224,7 @@ const columns = computed(() => [
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('common.remove')">
-              <a-button size="small" type="text" danger @click="confirmDelete(record)">
+              <a-button size="small" type="primary" danger @click="confirmDelete(record)">
                 <DeleteOutlined />
               </a-button>
             </a-tooltip>

@@ -112,7 +112,7 @@ async function dialogLeave() {
     :after-close="dialogLeave"
   >
 
-    <a-button danger :disabled="tableSelected.length === 0" @click="deleteBackupHistory(tableSelected)"><template #icon><DeleteOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
+    <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="deleteBackupHistory(tableSelected)"><template #icon><DeleteOutlined /></template><span class="ml-1">{{ t('common.remove') }}</span></a-button>
 
     <a-table
       :columns="tableHeaders"
@@ -121,7 +121,7 @@ async function dialogLeave() {
       :row-selection="rowSelection"
       :loading="isLoading"
       :pagination="false"
-      class="table-stripe table-header-no-wrap"
+      class="table-header-no-wrap"
       size="small"
     >
       <template #bodyCell="{ column, record }">

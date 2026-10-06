@@ -671,7 +671,7 @@ const hiddenTagNamesText = computed({
       <!-- 站点筛选器、已选种子等提示信息 -->
       <QuickFilterNotice class="site-filter-notice" :selected-torrents="tableSelectedRaw" />
 
-      <div id="ptd-search-entity-table" ref="tableWrapper" class="search-entity-table table-stripe table-header-no-wrap">
+      <div id="ptd-search-entity-table" ref="tableWrapper" class="search-entity-table table-header-no-wrap">
         <a-table
           :columns="tableHeader"
           :data-source="tableItems"

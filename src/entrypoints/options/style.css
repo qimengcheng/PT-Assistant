@@ -228,6 +228,17 @@ body {
   overscroll-behavior: contain;
 }
 
+/* ===== 表格斑马纹：全站一条，不按页挂 class =====
+   原先是 compat 里的 `.table-stripe` + 每张表自己加 class，20 张表只有 8 张加了，
+   剩下 12 张没人会想起来补 —— 所以判据从"记得挂 class"改成"默认就有"。
+   底色落在 <tr> 而不是 <td>：antd 的 hover 与选中态都是给 <td> 上底色，
+   天然盖得住条纹，两边都不需要 !important（站点定义页的行高亮就是靠 td + !important）。
+   只认 tr.ant-table-row：空态占位行、展开行、测量行都拿不到这个类，
+   免得「暂无数据」那一整行也被刷成灰底。 */
+.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) {
+  background: #fafafa;
+}
+
 /* 站点定义页重写时连带删掉了它那一整块全局样式，但下面这两组仍被别的视图用 class="" 引用：
    .hint → SetBase/Index.vue、SetSite/EditSearchEntryList.vue
    .site-list → SetSearchSolution/EditDialog.vue

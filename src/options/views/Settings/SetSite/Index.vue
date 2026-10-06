@@ -106,7 +106,7 @@ const columns = computed<TableColumnsType<ISiteTableItem>>(() => {
       title: t("SetSite.common.allowQueryUserInfo"),
       key: "userConfig.allowQueryUserInfo",
       align: "center",
-      width: 110,
+      width: 120,
       sorter: (a, b) => Number(!!a.userConfig.allowQueryUserInfo) - Number(!!b.userConfig.allowQueryUserInfo),
       sortOrder: orderOf("userConfig.allowQueryUserInfo"),
     },
@@ -239,7 +239,7 @@ function keywordChecked(keyword: string) {
     <a-flex align="center" gap="small" wrap>
       <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-      <a-button danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+      <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="deleteSite(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
       <a-button @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span>{{ t('SetSite.index.oneClickImport') }}</span></a-button>
 
@@ -426,7 +426,7 @@ function keywordChecked(keyword: string) {
             </a-tooltip>
 
             <a-tooltip :title="t('common.remove')">
-              <a-button danger size="small" type="text" @click="() => deleteSite([record.id])">
+              <a-button danger size="small" type="primary" @click="() => deleteSite([record.id])">
                 <template #icon>
                   <DeleteOutlined />
                 </template>

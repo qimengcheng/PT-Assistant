@@ -190,7 +190,7 @@ function afterEnter() {
       :row-selection="tableRowSelection"
       :pagination="{ pageSize: 10 }"
       :scroll="{ x: 'max-content' }"
-      class="table-stripe table-header-no-wrap"
+      class="table-header-no-wrap"
       size="small"
     >
       <!-- -->
@@ -289,7 +289,7 @@ function afterEnter() {
 
       <template #footer>
         <div class="d-flex align-center">
-          <a-button type="primary" :disabled="tableSelected.length <= 0" @click="deleteSiteUserInfo(tableSelected)"><template #icon><DeleteOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+          <a-button danger type="primary" :disabled="tableSelected.length <= 0" @click="deleteSiteUserInfo(tableSelected)"><template #icon><DeleteOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
           <a-button type="primary" @click="exportSiteHistoryData"><template #icon><ExportOutlined /></template><span>{{ t('common.export') }}</span></a-button>
           <div class="flex-1-1-0" />
         </div>

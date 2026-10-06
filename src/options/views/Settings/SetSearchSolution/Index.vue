@@ -243,7 +243,7 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
       <a-flex align="center" gap="small" wrap>
         <a-button type="primary" @click="addSearchSolution"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="deleteSearchSolutions(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
         <a-upload accept="application/json" multiple :show-upload-list="false" :before-upload="importSearchSolution">
           <a-button><template #icon><ImportOutlined /></template><span>{{ t('common.import') }}</span></a-button>
@@ -341,7 +341,7 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
                   </a-button>
                 </a-tooltip>
                 <a-tooltip :title="t('common.remove')">
-                  <a-button type="text" danger size="small" @click="deleteSearchSolutions([record.id])">
+                  <a-button type="primary" danger size="small" @click="deleteSearchSolutions([record.id])">
                     <template #icon><DeleteOutlined /></template>
                   </a-button>
                 </a-tooltip>

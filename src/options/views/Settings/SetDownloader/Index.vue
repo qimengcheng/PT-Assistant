@@ -155,7 +155,7 @@ const columns = [
   {
     title: t("SetDownloader.index.table.autodl"),
     dataIndex: "feature.DefaultAutoStart",
-    width: 80,
+    width: 100,
     align: "center" as const,
     render: (_value: any, record: any) =>
       h(aSwitch, {
@@ -183,7 +183,7 @@ const columns = [
       <a-flex align="center" gap="small" wrap>
         <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
         <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span>{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
       </a-flex>

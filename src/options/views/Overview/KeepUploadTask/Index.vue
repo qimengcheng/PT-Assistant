@@ -242,14 +242,14 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
   <div class="page">
     <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
-        <a-button danger size="small" :disabled="selectedTasks.length === 0" @click="deleteSelectedTasks">
+        <a-button type="primary" danger size="small" :disabled="selectedTasks.length === 0" @click="deleteSelectedTasks">
           <template #icon>
             <DeleteOutlined />
           </template>
           <span class="ml-1">{{ t("common.remove") }}</span>
         </a-button>
 
-        <a-button danger size="small" :disabled="tasks.length === 0" @click="clearAllTasks">
+        <a-button type="primary" danger size="small" :disabled="tasks.length === 0" @click="clearAllTasks">
           <template #icon>
             <DeleteOutlined />
           </template>
@@ -356,7 +356,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('common.remove')">
-              <a-button danger size="small" type="text" @click="deleteTask(record)">
+              <a-button danger size="small" type="primary" @click="deleteTask(record)">
                 <template #icon>
                   <DeleteOutlined />
                 </template>

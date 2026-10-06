@@ -147,7 +147,7 @@ const rowSelection = computed(() => ({
       :row-selection="rowSelection"
       :pagination="false"
       size="small"
-      class="table-stripe table-header-no-wrap"
+      class="table-header-no-wrap"
       :scroll="{ y: windowHeight - 320 }"
     >
       <template #bodyCell="{ column, record }">

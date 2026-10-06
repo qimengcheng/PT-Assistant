@@ -113,7 +113,7 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
   <div class="page">
     <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
-        <a-button danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
       </a-flex>
 
       <div class="page-bar-extra">
@@ -167,7 +167,7 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('common.remove')">
-              <a-button danger size="small" type="text" @click="tryToDeleteSearchSnapshot([record.id])">
+              <a-button danger size="small" type="primary" @click="tryToDeleteSearchSnapshot([record.id])">
                 <template #icon>
                   <DeleteOutlined />
                 </template>

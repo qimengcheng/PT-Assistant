@@ -151,7 +151,7 @@ onUnmounted(() => {
       <a-flex align="center" gap="small" wrap>
         <a-button type="primary" :loading="isLoadingHistory" @click="() => throttleLoadDownloadHistory()"><template #icon><SyncOutlined /></template><span>{{ t('DownloadHistory.refresh') }}</span></a-button>
         <a-button :disabled="tableSelected.length === 0" @click="() => reDownloadTorrent(tableSelected)"><template #icon><DownloadOutlined /></template><span>{{ t('DownloadHistory.reDownload') }}</span></a-button>
-        <a-button danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="deleteDownloadHistory(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
       </a-flex>
 
       <!-- 筛选框独立成右组：原来吃 a-card 的 extra 定位，换成网格骨架后要自己靠右 -->
@@ -230,7 +230,7 @@ onUnmounted(() => {
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('common.remove')">
-              <a-button danger size="small" type="text" @click="() => deleteDownloadHistory([record.id!])">
+              <a-button danger size="small" type="primary" @click="() => deleteDownloadHistory([record.id!])">
                 <template #icon>
                   <DeleteOutlined />
                 </template>

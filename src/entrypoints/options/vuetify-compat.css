@@ -84,7 +84,7 @@
 .text-grey { color: #6b7280; }
 .text-disabled { color: #bfbfbf; }
 
-/* ---- 表格相关（原先挂在 v-data-table 的 class 上）---- */
-.table-stripe tbody tr:nth-of-type(odd) { background: #fafafa; }
+/* ---- 表格相关（原先挂在 v-data-table 的 class 上）----
+   .table-stripe 已删：斑马纹改成 style.css 里的全站一条规则，不再靠每页挂 class。 */
 .table-header-no-wrap th { white-space: nowrap; }
 .table-action { display: inline-flex; }

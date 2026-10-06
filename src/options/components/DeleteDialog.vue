@@ -68,7 +68,7 @@ async function dialogEnter() {
       <a-button type="text" @click="showDialog = false">
         <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
       </a-button>
-      <a-button danger :loading="isDeleting" type="text" @click="confirmDelete">
+      <a-button danger :loading="isDeleting" type="primary" @click="confirmDelete">
         <span class="ml-1">{{ t("common.dialog.ok") }}</span>
       </a-button>
     </template>

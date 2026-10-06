@@ -429,6 +429,10 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 | `a-list` 传 `:data-source="[]"` | 渲染内置「暂无数据」占位 | 不用 data-source，直接渲染子项 |
 | `<a-step>` 等注册表里不存在的 `a-*` 标签 | 被当原生未知元素，**内容静默丢失**（带对象插槽时整块空白） | antdv-next 全量 install 实测只有 139 个注册名，**没有** `AStep`/`AList`；Steps 只有 `:items` 数组写法。CI 的 check-antd-tags 会拦 |
 | 图标 `import * as Icons from "@antdv-next/icons"` | 1760 个图标模块**全进包** | 只具名导入用到的：`import { DeleteOutlined } from "@antdv-next/icons"` |
+| 删除类按钮只写 `danger`（红描边 + 红字） | 在白底工具条上跟背景融成一片，看着像没强调；用户 2026-10-06 明确要求改实心 | **删除/清空数据的按钮一律 `type="primary" danger`（实心红）**。判据：动作真是删数据才算 —— 取消、关闭、重置、清空输入框、撤销授权**不算**，它们保留 `danger` 描边或 `variant="text"`。全站 19 颗已按此收口（含表格行内的单条删除、`DeleteDialog` 的确认键、以及原本标成蓝色 primary 的「我的数据 → 历史数据」删除） |
+
+**这条故意没有守卫脚本**：判"是不是删除动作"要看 `@click` 的语义，静态扫只会把 `showDialog = false` 这类
+带 `danger` 的取消键一起误伤。新加删除按钮时按上表写，改错了靠肉眼验收。
 
 原子类兼容层：`src/entrypoints/options/vuetify-compat.css` 复刻的 Vuetify 原子类
 （`pa-0` `d-flex` `text-no-wrap` 等）**继续用、不用重写**，只换组件标签。

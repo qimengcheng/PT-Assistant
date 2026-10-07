@@ -187,7 +187,12 @@ function collectCtx() {
   }
 
   const commitDate = new Map();
-  const log = git(["log", "-z", "--reverse", "--date=iso-local", "--format=%ad\x1f%s"]);
+  const selfProblems = [];
+  let unparsed = 0;
+  // ⚠️ 必须 iso-strict，不能用 iso-local：iso-strict 打的是**作者当时那个偏移**
+  // （2026-10-07T15:21:55+08:00），iso-local 打的是**读的人**的时区 —— CI 的 runner 是 UTC，
+  // 于是 15:21:55 变成 07:21:55，v0.32.0 那次 build 就在这一条上红了（本地全绿）。
+  const log = git(["log", "-z", "--reverse", "--date=iso-strict", "--format=%ad\x1f%s"]);
   if (log === null) {
     notes.push("git log 不可用 → 跳过时间核对");
   } else {
@@ -195,9 +200,24 @@ function collectCtx() {
       if (!rec) continue;
       const [ad, subject = ""] = rec.split("\x1f");
       const m = /(?:^|\])\s*v?(\d+\.\d+\.\d+)\b/.exec(subject);
-      if (m && !commitDate.has(m[1])) commitDate.set(m[1], ad.replace(/ [+-]\d{4}$/, ""));
+      if (!m) continue;
+      const stamp = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/.exec(String(ad));
+      if (!stamp) {
+        unparsed++;
+        continue;
+      }
+      if (!commitDate.has(m[1])) commitDate.set(m[1], `${stamp[1]} ${stamp[2]}`);
     }
-    if (commitDate.size === 0) notes.push("这次克隆里没有带版本号的提交（浅克隆 depth 1 就是这样）→ 时间核对自动降级");
+    if (commitDate.size === 0) {
+      notes.push("这次克隆里没有带版本号的提交（浅克隆 depth 1 就是这样）→ 时间核对自动降级");
+    }
+    // 解析不出形状 = 脚本自己的问题（git 的日期格式变了、或 --date 参数被改坏）。
+    // 不能只跳过：那样它会变成一条永不报错的防线，正是本脚本反对的那种。
+    if (unparsed) {
+      selfProblems.push(
+        `git log 里 ${unparsed} 条带版本号的提交，取到的日期不是 YYYY-MM-DDTHH:MM:SS 的形状 —— 脚本自己的解析坏了，不是快照的问题`,
+      );
+    }
   }
 
   let pkgVersion = null;
@@ -207,7 +227,7 @@ function collectCtx() {
     notes.push("读不到 package.json → 跳过「最新一条不比现版本新」");
   }
 
-  return { ctx: { headEntries, commitDate, pkgVersion }, notes };
+  return { ctx: { headEntries, commitDate, pkgVersion }, notes, selfProblems };
 }
 
 /* ============================ selftest ======================= */
@@ -359,13 +379,14 @@ try {
   process.exit(1);
 }
 
-const { ctx, notes } = collectCtx();
+const { ctx, notes, selfProblems } = collectCtx();
 
 if (process.argv.includes("--selftest")) {
   selftest(doc, ctx);
 }
 
 const { problems, stats } = judge(doc, ctx);
+problems.unshift(...selfProblems);
 
 for (const n of notes) console.log(`（${n}）`);
 console.log(

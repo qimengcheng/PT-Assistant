@@ -586,11 +586,16 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
   所以 `date` 可以先照 `git log -1 --date=iso-local --format=%ad` 写死，再 amend 内容）。
 
 **`date` 是完整时间戳，从 git log 取，不许凭印象写**：格式 `YYYY-MM-DD HH:mm:ss`，
-值就是那条带这个版本号的提交的本地时间：
+值就是那条带这个版本号的提交的**作者当地**时间：
 
 ```bash
-git log --date=iso-local --format="%ad %s" | grep " v0.31.0 "   # 取前半段，丢掉 +0800
+git log -1 --date=iso-strict --format="%ad" <sha>   # 得到 2026-10-07T15:21:55+08:00
+# 取中间那一段写进 JSON（去掉 T 和尾部偏移），别的都别改
 ```
+
+**必须用 `iso-strict`，不能用 `iso-local`** —— `iso-local` 打的是**读的人**的时区，
+CI 的 runner 是 UTC，同一提交它会打 07:21:55（v0.32.0 那次 build 就是被这个判红的，
+本地九条守卫全绿）。`iso-strict` 打的是作者当时那个偏移，与机器时区无关。
 
 只写年月日不够：同一天连发五六个版本（当天各自 09:17 / 09:24 / 09:33…），
 光看日期分不出先后，用户想确认「我装的那份到底含不含某一条」时无从对号。

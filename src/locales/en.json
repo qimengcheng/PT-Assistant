@@ -127,11 +127,13 @@
       "title": "Media Details",
       "type": "Type: "
     },
+    "collapseManage": "Hide Server Management",
     "detail": "Details",
     "loadMore": "Load More",
+    "manageServers": "Manage Media Servers",
     "noItems": "No Items, use Search Input or Load More Button to Load",
     "noItemsBeforeSearch": "Enter a keyword to start searching",
-    "noServer": "No media server to search yet: add and enable one on the Media Servers page (Jellyfin / Emby / Plex / FNOS), or open the database icon at the left of the search box and tick the servers to include",
+    "noServer": "No media server to search yet: click \"Manage Media Servers\" above to add and enable one (Jellyfin / Emby / Plex / FNOS), or open the database icon at the left of the search box and tick the servers to include",
     "searchPlaceholder": "Search term"
   },
   "MyClient": {
@@ -1548,7 +1550,6 @@
       "backup": "Backup",
       "downloader": "Downloader",
       "myClient": "My Clients",
-      "mediaServer": "Media Server",
       "basicSettings": "Basic Settings",
       "techStack": "Tech Stack",
       "logger": "Runtime Log",

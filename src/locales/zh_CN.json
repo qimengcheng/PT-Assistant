@@ -127,11 +127,13 @@
       "title": "媒体详情",
       "type": "类型："
     },
+    "collapseManage": "收起服务器管理",
     "detail": "详情",
     "loadMore": "加载更多",
+    "manageServers": "管理媒体服务器",
     "noItems": "暂无内容，请使用搜索框或点击加载更多按钮",
     "noItemsBeforeSearch": "输入关键词开始搜索",
-    "noServer": "还没有可搜索的媒体服务器：先到左侧「媒体服务器」页添加并启用（Jellyfin / Emby / Plex / 飞牛影视），或点开搜索框左侧的数据库图标，勾选要参与的服务器",
+    "noServer": "还没有可搜索的媒体服务器：点上方「管理媒体服务器」添加并启用（Jellyfin / Emby / Plex / 飞牛影视），或点开搜索框左侧的数据库图标，勾选要参与的服务器",
     "searchPlaceholder": "搜索词"
   },
   "MyClient": {
@@ -1548,7 +1550,6 @@
       "backup": "数据备份",
       "downloader": "下载器",
       "myClient": "我的下载器",
-      "mediaServer": "媒体服务器",
       "basicSettings": "基础设置",
       "techStack": "技术栈",
       "logger": "运行日志",

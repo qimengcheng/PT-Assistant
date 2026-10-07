@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * 媒体服务器管理页（antdv-next 实现）。
- * 管理 EMBY / Jellyfin / Plex / fnOS 等媒体服务器连接，供搜索页联动媒体库检索。
- * 业务包 @ptd/mediaServer（v0.2.0 平移）、消息协议 getMediaServerSearchResult（v0.3.0 注册）。
+ * 媒体服务器管理面板（原 `Settings/SetMediaServer/Index.vue` 那一整页，v0.37.0 起
+ * 并进「媒体库」页，由页面上的「管理媒体服务器」按钮展开）。
+ * 管理 EMBY / Jellyfin / Plex / fnOS 等媒体服务器连接，供本页的媒体库检索使用。
  */
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -182,71 +182,64 @@ const columns = computed(() => [
 </script>
 
 <template>
-  <div class="page">
-    <!-- class 必须挂在 a-flex 本体上（其余 9 个列表页都是这么写的）：`.page-bar` 自己没有
-         上下内衬，48px 的高度是 `.page` 网格给这个**网格项**的，靠 a-flex 的 align="center"
-         把 32px 的控件居到正中。外面再包一层 div 时，被撑到 48px 的是那层 div，
-         里面的 a-flex 只有内容高、贴在白带顶上 —— 标题和按钮就一起"顶到上面去了"。 -->
-    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
-      <h2 class="page-title">{{ t("SetMediaServer.index.title") }}</h2>
+  <div class="server-manager">
+    <div class="manager-head">
+      <h3 class="manager-title">{{ t("SetMediaServer.index.title") }}</h3>
       <a-button type="primary" @click="openAddDialog">
         <template #icon><PlusOutlined /></template>
         <span>{{ t("SetMediaServer.add.title") }}</span>
       </a-button>
-    </a-flex>
-
-    <div class="page-panel">
-      <a-alert class="mb-3" type="info" show-icon
-        :title="t('SetMediaServer.index.description')" />
-
-      <a-table
-        bordered
-        :columns="columns"
-        :data-source="mediaServers"
-        :row-key="(r: any) => r.id"
-        :pagination="false"
-        :locale="{ emptyText: t('SetMediaServer.index.emptyTable') }"
-        size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'name'">
-            <span class="ms-name">{{ record.name }}</span>
-          </template>
-
-          <template v-else-if="column.key === 'type'">
-            <a-tag color="purple">{{ record.type }}</a-tag>
-          </template>
-
-          <template v-else-if="column.key === 'enabled'">
-            <a-switch size="small" :checked="record.enabled" @change="(v: any) => toggleEnabled(record, !!v)" />
-          </template>
-
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-tooltip :title="t('SetMediaServer.index.testTooltip')">
-                <!-- 图标挂 #icon：挂默认插槽时 antd 的 loading 图标是插在按钮前面的、带宽度动画，
-                     一测试连接这颗按钮就变宽，把整列/整张表的列宽重排（与 MyData 操作列同一毛病） -->
-                <a-button size="small" :loading="testingIds[record.id]" @click="testConnection(record)">
-                  <template #icon><ApiOutlined /></template>
-                  {{ t("common.test") }}
-                </a-button>
-              </a-tooltip>
-              <!-- 纯图标按钮必须挂 a-tooltip，否则悬停没有任何功能说明（与上面「测试」按钮一致） -->
-              <a-tooltip :title="t('common.edit')">
-                <a-button size="small" type="text" @click="openEditDialog(record)">
-                  <EditOutlined />
-                </a-button>
-              </a-tooltip>
-              <a-tooltip :title="t('common.remove')">
-                <a-button size="small" type="primary" danger @click="confirmDelete(record)">
-                  <DeleteOutlined />
-                </a-button>
-              </a-tooltip>
-            </a-space>
-          </template>
-        </template>
-      </a-table>
     </div>
+
+    <a-alert class="manager-desc" type="info" show-icon :title="t('SetMediaServer.index.description')" />
+
+    <a-table
+      bordered
+      :columns="columns"
+      :data-source="mediaServers"
+      :row-key="(r: any) => r.id"
+      :pagination="false"
+      :locale="{ emptyText: t('SetMediaServer.index.emptyTable') }"
+      size="small"
+    >
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'name'">
+          <span class="ms-name">{{ record.name }}</span>
+        </template>
+
+        <template v-else-if="column.key === 'type'">
+          <a-tag color="purple">{{ record.type }}</a-tag>
+        </template>
+
+        <template v-else-if="column.key === 'enabled'">
+          <a-switch size="small" :checked="record.enabled" @change="(v: any) => toggleEnabled(record, !!v)" />
+        </template>
+
+        <template v-else-if="column.key === 'action'">
+          <a-space>
+            <a-tooltip :title="t('SetMediaServer.index.testTooltip')">
+              <!-- 图标挂 #icon：挂默认插槽时 antd 的 loading 图标是插在按钮前面的、带宽度动画，
+                   一测试连接这颗按钮就变宽，把整列/整张表的列宽重排（与 MyData 操作列同一毛病） -->
+              <a-button size="small" :loading="testingIds[record.id]" @click="testConnection(record)">
+                <template #icon><ApiOutlined /></template>
+                {{ t("common.test") }}
+              </a-button>
+            </a-tooltip>
+            <!-- 纯图标按钮必须挂 a-tooltip，否则悬停没有任何功能说明（与上面「测试」按钮一致） -->
+            <a-tooltip :title="t('common.edit')">
+              <a-button size="small" type="text" @click="openEditDialog(record)">
+                <EditOutlined />
+              </a-button>
+            </a-tooltip>
+            <a-tooltip :title="t('common.remove')">
+              <a-button size="small" type="primary" danger @click="confirmDelete(record)">
+                <DeleteOutlined />
+              </a-button>
+            </a-tooltip>
+          </a-space>
+        </template>
+      </template>
+    </a-table>
 
     <a-modal
       v-model:open="showEditDialog"
@@ -327,22 +320,28 @@ const columns = computed(() => [
 </template>
 
 <style scoped>
-/* 页标题：这页的工具条左端不是按钮组而是标题，所以它自己占一个样式。
-   表面/排布都交给全局 .page-bar + a-flex，这里只定字号。 */
-.page-title {
+.manager-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.manager-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 
-.ms-name {
-  font-weight: 600;
-}
-
-.mb-3 {
-  margin-bottom: 12px;
+.manager-desc {
+  margin-bottom: 8px;
 }
 
 .mb-2 {
   margin-bottom: 8px;
+}
+
+.ms-name {
+  font-weight: 600;
 }
 </style>

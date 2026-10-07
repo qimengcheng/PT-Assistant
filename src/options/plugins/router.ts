@@ -101,11 +101,6 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("../views/Settings/SetDownloader/Index.vue"),
   },
   {
-    path: "/set-media-server",
-    name: "SetMediaServer",
-    component: () => import("../views/Settings/SetMediaServer/Index.vue"),
-  },
-  {
     path: "/set-backup",
     name: "SetBackup",
     component: () => import("../views/Settings/SetBackup/Index.vue"),

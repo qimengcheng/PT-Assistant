@@ -18,6 +18,7 @@ import {
   HddOutlined,
   InfoCircleOutlined,
   PlaySquareOutlined,
+  SettingOutlined,
 } from "@antdv-next/icons";
 import { getMediaServerIcon, type IMediaServerItem } from "@ptd/mediaServer";
 
@@ -26,6 +27,7 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 
 import ItemInformationDialog from "./ItemInformationDialog.vue";
+import ServerManager from "./ServerManager.vue";
 
 import { doSearch, formatSize, searchMediaServerIds } from "./utils.ts";
 
@@ -53,9 +55,21 @@ const hasMore = computed<boolean>(() =>
  * （AGENTS §3.4 防线⑤ 那一族：派生是对的做法，但派生的起点也得是真的）。
  */
 const metadataHydrated = ref<boolean>(false);
+
+/**
+ * 服务器管理面板。「媒体服务器」那一整页 v0.37.0 起并进这里，由工具条那颗按钮展开。
+ * 一台服务器都没有时自动展开：那种状态下浏览区必然是空的，功能入口不该还要人猜。
+ */
+const showServerManager = ref<boolean>(false);
+
 void metadataStore.$onReady(() => {
   metadataHydrated.value = true;
+  showServerManager.value = metadataStore.getMediaServers.length === 0;
 });
+
+const managerToggleLabel = computed(() =>
+  showServerManager.value ? t("MediaServerEntity.collapseManage") : t("MediaServerEntity.manageServers"),
+);
 
 /**
  * 「参与搜索的服务器范围」为空时，搜索和加载更多都是**静默空转**：
@@ -169,6 +183,11 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
 
     <a-card class="page-fill-grow">
       <div class="search-row">
+        <a-button class="manager-toggle" @click="showServerManager = !showServerManager">
+          <template #icon><SettingOutlined /></template>
+          {{ managerToggleLabel }}
+        </a-button>
+
         <a-input-search
           v-model:value="search"
           allow-clear
@@ -207,6 +226,8 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
           </template>
         </a-input-search>
       </div>
+
+      <ServerManager v-show="showServerManager" class="manager-block" />
 
       <!-- 搜索中：结果区给加载反馈；未搜索 / 空结果给不同空态文案 -->
       <a-spin :spinning="runtimeStore.mediaServerSearch.isSearching">
@@ -319,8 +340,17 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
 }
 .search-row {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 12px;
+}
+
+/* 管理面板展开时与结果区之间留一条分隔：它是"页中页"，不收口会和瀑布流糊在一起 */
+.manager-block {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--pt-color-border-light);
 }
 .search-input {
   max-width: 500px;

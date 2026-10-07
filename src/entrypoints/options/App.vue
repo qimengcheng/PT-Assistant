@@ -15,7 +15,6 @@ import {
   HistoryOutlined,
   HomeOutlined,
   InboxOutlined,
-  PlayCircleOutlined,
   PlaySquareOutlined,
   ReadOutlined,
   SearchOutlined,
@@ -84,7 +83,6 @@ const navItems = computed(() => {
     { path: "/media-server-entity", label: t("route.Overview.MediaServerEntity"), icon: PlaySquareOutlined },
     { path: "/set-backup", label: t("layout.nav.backup"), icon: CloudUploadOutlined },
     { path: "/set-downloader", label: t("layout.nav.downloader"), icon: DownloadOutlined },
-    { path: "/set-media-server", label: t("layout.nav.mediaServer"), icon: PlayCircleOutlined },
     { path: "/set-base", label: t("layout.nav.basicSettings"), icon: SettingOutlined },
     // 「技术栈」不再进左侧导航（2026-10-06），路由 /technology-stack 保留，需要时直链进入。
     { path: "/special-thank", label: t("route.About.SpecialThank"), icon: TeamOutlined },

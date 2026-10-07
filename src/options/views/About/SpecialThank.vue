@@ -192,18 +192,26 @@ const spanLine = computed(() =>
         <div v-for="(row, idx) in group.rows" :key="row.name" class="rank-row">
           <span class="rank-no">{{ idx + 1 }}</span>
 
-          <img
-            v-if="logoOf(row.name) && loaded[row.name]"
-            :alt="row.name"
-            :src="logoOf(row.name)"
-            class="rank-logo"
-            referrerpolicy="no-referrer"
-            @load="loaded[row.name] = true"
-            @error="failed[row.name] = true"
-          />
-          <!-- 没加载完 / 没有配图 / 图挂了，都先占同一格首字母徽章（36×36 定尺寸，换成图不会位移）。
-               原来这里带 loading="lazy"：模型平台那一栏在折叠线以下，要等滚到才发起请求，
-               海外源再叠 1~2s，就是「图标刷新很慢」的那一段。整页只有 12 张图，不值得懒。 -->
+          <!-- 有配图就先把 <img> 挂上、徽章盖在它上面。**loaded 绝不能进 v-if**：
+               它只能由这张图自己的 @load 置位，写进 v-if 就是图不进 DOM → 请求永不发起 →
+               永远停在徽章，v0.30.2 那次"慢图标不留空洞"就是这么把自己锁死的（台架实测：
+               连 0ms 命中的快源也一张都不出）。槽位固定 36×36，徽章换图不会推走右边的文字
+               （实测四种状态下 .rank-name 的 x 恒为 88）。 -->
+          <span v-if="logoOf(row.name) && !failed[row.name]" class="rank-logo-slot">
+            <img
+              :alt="row.name"
+              :src="logoOf(row.name)"
+              class="rank-logo rank-logo-fade"
+              :class="{ 'rank-logo-ready': loaded[row.name] }"
+              referrerpolicy="no-referrer"
+              @load="loaded[row.name] = true"
+              @error="failed[row.name] = true"
+            />
+            <span v-show="!loaded[row.name]" class="rank-logo rank-logo-text rank-logo-badge">
+              {{ initialsOf(row.name) }}
+            </span>
+          </span>
+          <!-- 没配图 / 图挂了：占同一格的首字母徽章，尺寸与上面那条完全一致 -->
           <span v-else class="rank-logo rank-logo-text">{{ initialsOf(row.name) }}</span>
 
           <div class="rank-main">
@@ -342,6 +350,26 @@ const spanLine = computed(() =>
   color: #1677ff;
   background: #f0f6ff;
   border-radius: 10px;
+}
+
+/* 徽章与图叠在同一格里：图先透明占位（它必须留在 DOM 里才会去请求），
+   到齐后 opacity 翻上来、徽章 v-show 掉 */
+.rank-logo-slot {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+}
+.rank-logo-badge {
+  position: absolute;
+  inset: 0;
+}
+.rank-logo-fade {
+  opacity: 0;
+}
+.rank-logo-ready {
+  opacity: 1;
 }
 .rank-main {
   flex: 1 1 auto;

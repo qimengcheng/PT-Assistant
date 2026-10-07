@@ -394,6 +394,31 @@ body {
   color: var(--pt-color-danger-strong);
 }
 
+/* ===== 表格里「图标 + 数字」的光学下沉 =====
+   台架 `.tmp-build/bench-icon`（vite 真渲染 a-table + 真 anticon；图标墨迹取 SVG getBBox、
+   数字墨迹取 canvas actualBoundingBox，两个中心直接相减，负数 = 图标偏高）：
+     flex 行（魔力/积分、做种数 H&R、上传下载箭头）现状 −0.6px；
+     行内流（最近访问时间的叹号、等级要求 tooltip 那串 .level-require-icon）现状 −0.35px；
+     用户 2026-10-07 的截图独立量到 0.8px（同一处，缩放反推取的近似值，同数量级）。
+   取 0.5px 是让两种语境的最坏残差最小（−0.1 / +0.15）；取 1px 会把行内流那批推到 +0.65，
+   比原来更歪。半像素对 SVG 图标没有"糊边"问题（矢量重栅格化，不像位图要贴像素）。
+
+   为什么下面那条按钮的规则刻意不挪、这里要挪：按钮里图标跟的是 13px 汉字（墨迹 12px 高，
+   与 12px 的图标几乎同高，台架实测差 0.2px），而这里跟的是数字 —— 数字墨迹只有 9px 高
+   （cap 高），在 21px 行高的单元格里墨迹带整体偏下，而 flex 的 align-items:center 对齐的是
+   **行盒中心**，于是图标看着偏高。
+
+   试过把数字的 line-height 压成 1：偏差仍是 −0.6（这个差值只跟字体度量与字号有关，
+   行高项在算式里自己消掉了），却把行高从 58.8 压到 51.8 —— 所以不动布局，只挪图标。
+
+   两条 class 都在各页 scoped 里重复定义（.cell-icon 三处、.level-require-icon 一处，
+   都写 font-size:14px，注释里标着「原 v-icon small」），class 名一致，所以这一条全局规则一次覆盖；
+   它们各自的 scoped 规则只管字号，不碰 transform，不会互相盖掉。 */
+.cell-icon,
+.level-require-icon {
+  transform: translateY(0.5px);
+}
+
 /* ===== 按钮图标与文字的对齐：这里刻意**不放**任何光学下沉量 =====
    这里原来有一条 `.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon { transform: translateY(0.15em) }`，
    理由写的是「汉字墨迹中心偏低，纯几何居中会让图标显高」。2026-10-06 拿辅种任务工具条的三颗按钮

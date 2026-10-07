@@ -424,7 +424,12 @@ function isDefaultDownloader(downloaderId: TDownloaderKey) {
   margin-left: auto;
 }
 
+/* 空态在面板里居中，与 style.css 那条「空表撑满面板」同一口径（用户 2026-10-07）。
+   min-height:100% 量的是面板内容盒 —— 面板高由 .page 网格 1fr 给定，是确定值，
+   所以这里不再需要把面板改成 flex。 */
 .dl-empty {
-  padding: 32px 0;
+  display: grid;
+  place-content: center;
+  min-height: 100%;
 }
 </style>

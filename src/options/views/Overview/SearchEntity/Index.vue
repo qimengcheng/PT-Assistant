@@ -723,7 +723,15 @@ const hasSearchStatus = computed<boolean>(() => {
       <!-- 站点筛选器、已选种子等提示信息 -->
       <QuickFilterNotice class="site-filter-notice" :selected-torrents="tableSelectedRaw" />
 
-      <div id="ptd-search-entity-table" ref="tableWrapper" class="search-entity-table table-header-no-wrap">
+      <!-- `--pt-table-body-h` 把这里已经实测好的表体高递给全局样式：空态那条规则要撑满
+           剩余高度，而这一页的表体是 scroll.y（rc-table 给它写的是内联 max-height），
+           全站那条 flex 链走不到它。判据只在空态生效，见 style.css 同名变量处。 -->
+      <div
+        id="ptd-search-entity-table"
+        ref="tableWrapper"
+        class="search-entity-table table-header-no-wrap"
+        :style="{ '--pt-table-body-h': `${tableScrollY}px` }"
+      >
         <a-table
           bordered
           :columns="tableHeader"

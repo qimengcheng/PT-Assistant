@@ -356,6 +356,58 @@ body {
   overflow: clip;
 }
 
+/* ===== 列表页空表：撑满面板剩余高度，占位提示居中 =====
+   用户 2026-10-07 口径：「表格没有数据的时候高度也要占满下面的空间，empty 的提示也要居中，
+   很多页面都有这个问题，都要改」。空表原本是内容高 —— 台架量过：表头 37.8 + 占位行 149.8
+   （那 149.8 = `.ant-empty-normal` 的 margin-block 32+32 + 图与字 69 + 单元格上下内衬 16），
+   而面板是网格/flex 给的确定高度，于是表格底下露出一大截没有格线的空白、提示贴在表头下面。
+
+   做法：面板当纵向 flex，只让表格那一支吃剩余高度，再把确定高度一层层传到 `<table>`。
+   表格的 height 是**最小高**，多余空间由行分摊；空态只有一行占位行 → 它自己长满，
+   而 `<td>` 的 vertical-align 默认就是 middle，提示于是自动垂直居中（水平本来就居中）。
+
+   三条边界，都是这台架上量出来的（`.tmp-build/bench-empty`）：
+   ① 撑高那一串挂在 `:has(.ant-table-empty)` 上 —— 有数据时（哪怕只有两行）一律不动：
+      实测 2 行时表体仍是内容高 114、下面留 204 空白，那是原本的样子，不是回归。
+   ② flex 项写 `flex: 1 0 auto` 而不是配 `min-height: 0`：8 行超过面板时它不被压缩
+      （实测 wrapper 341 > 面板 318，溢出 23 交给面板自己滚）；写 min-height:0 会让它先被压扁。
+   ③ 面板的 `:has(> .ant-table-wrapper)` 门是必须的：首页那两块面板、新手引导页面板里
+      装的不是表，不该被改成 flex；同面板里的说明条（媒体服务器页那条 alert）另给一条
+      `flex-shrink: 0`，否则表体很高时会把 alert 压扁而不是面板出滚动条。
+   搜索页不在这条口径里：它的表体高由页面实测算 `scroll.y`，走下面那条 `--pt-table-body-h`。 */
+.page-panel:has(> .ant-table-wrapper) {
+  display: flex;
+  flex-direction: column;
+}
+.page-panel:has(> .ant-table-wrapper) > :not(.ant-table-wrapper) {
+  flex-shrink: 0;
+}
+.page-panel > .ant-table-wrapper:has(.ant-table-empty) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+}
+.page-panel > .ant-table-wrapper:has(.ant-table-empty) > .ant-spin {
+  flex: 1 0 auto;
+}
+.page-panel
+  > .ant-table-wrapper:has(.ant-table-empty)
+  :is(.ant-spin-container, .ant-table, .ant-table-container, .ant-table-content),
+.page-panel > .ant-table-wrapper:has(.ant-table-empty) .ant-table-content > table {
+  height: 100%;
+}
+
+/* ===== 搜索页空表：同一口径，但高度得用页面自己量出来的那个值 =====
+   这一页的表体是 `scroll.y`（rc-table 给 `.ant-table-body` 写的是**内联 max-height**），
+   上面那条 flex 链走不到它 —— 所以由页面把已经算好的 `tableScrollY` 用自定义属性递进来
+   （见 SearchEntity/Index.vue 的 `--pt-table-body-h`），这里只在空态把它当高度用。
+   同一个值既是 max-height 又是 height，所以撑满的那一截正好是容器剩下的空间，不会溢出；
+   同样只认空态：有数据时表体高该由内容决定（上限就是那个 max-height）。 */
+.search-entity-table .ant-table-empty .ant-table-body,
+.search-entity-table .ant-table-empty .ant-table-body > table {
+  height: var(--pt-table-body-h, 400px);
+}
+
 /* 站点定义页重写时连带删掉了它那一整块全局样式，但下面这组仍被别的视图用 class="" 引用：
    .site-list → SetSearchSolution/EditDialog.vue
    所以留在全局；要清理得先把这三处改成组件内样式。

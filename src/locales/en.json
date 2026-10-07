@@ -795,8 +795,7 @@
       "userInfoDisplay": "User Info Display"
     },
     "Index": {
-      "pageTitle": "Basic Settings",
-      "saveHint": "Changes are saved immediately, no manual confirmation needed",
+      "savedToast": "Changes saved",
       "tabUi": "Interface & Content Script",
       "tabUserInfo": "User Info",
       "tabSearch": "Search",

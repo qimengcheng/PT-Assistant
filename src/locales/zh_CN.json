@@ -795,8 +795,7 @@
       "userInfoDisplay": "用户信息展示"
     },
     "Index": {
-      "pageTitle": "基础设置",
-      "saveHint": "变更即时保存，无需手动确认",
+      "savedToast": "修改已保存",
       "tabUi": "界面与内容脚本",
       "tabUserInfo": "用户信息",
       "tabSearch": "搜索",

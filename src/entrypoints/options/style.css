@@ -419,6 +419,17 @@ body {
   transform: translateY(0.5px);
 }
 
+/* 图标与它标注的数字之间留 4px 缝（用户 2026-10-07 指的两处：HnR 的「①2」、积分的「$782,169.20」）。
+   这三处（我的数据 / 历史数据弹窗 / 客户端状态弹窗）图标和数字都是同一个 flex 容器里的兄弟
+   flex item，flex item 之间不折叠空白，所以是**真零间距**。
+   只挑 flex 父级下的直接子元素，不给全部 .cell-icon：「最近访问」那颗是行内流（父级是普通 span），
+   模板里的换行经 Vue 编译器 condense 后已经留了一个空格（实测编译产物是 `" " + 文本`），
+   再加 4px 就成 ~7px。4px 是全站那档 8px 缝的一半 —— 图标跟数字是同一个值的一部分，不是两个相邻块。 */
+.d-flex > .cell-icon,
+.d-inline-flex > .cell-icon {
+  margin-inline: 4px;
+}
+
 /* ===== 按钮图标与文字的对齐：这里刻意**不放**任何光学下沉量 =====
    这里原来有一条 `.ant-btn:not(.ant-btn-icon-only) > .ant-btn-icon { transform: translateY(0.15em) }`，
    理由写的是「汉字墨迹中心偏低，纯几何居中会让图标显高」。2026-10-06 拿辅种任务工具条的三颗按钮

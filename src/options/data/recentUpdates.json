@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-07 17:25:10",
-  "headSha": "5c951fc",
+  "generatedAt": "2026-10-07 17:42:27",
+  "headSha": "0c19bfb",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.33.3",
+      "date": "2026-10-07 17:54:13",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「我的数据」里图标和它标注的数字之间留了 4px 缝：以前「①2」「$782,169.20」「2.22 TiB↑」这些都是零间距贴在一起。同一处毛病一次改齐 —— 积分/魔力值、HnR 预警与未满足、上传下载量那几列都算"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.33.2",
       "date": "2026-10-07 17:42:27",

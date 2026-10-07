@@ -272,7 +272,7 @@ export interface IConfigPiniaStorageSchema {
   socialSiteInformation: IFetchSocialSiteInformationConfig;
 
   autoExtendCookies: {
-    enabled: boolean; // 功能开关，默认 false
+    enabled: boolean; // 功能开关，v0.29.5 起默认 true（旧默认 false 由 config store 按版本号纠正一次）
     triggerThreshold: number; // 触发阈值（周），默认 2
     extensionDuration: number; // 延长时长（月），默认 3
   };

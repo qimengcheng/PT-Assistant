@@ -31,6 +31,15 @@ const initTorrentOnEnterDefaultOnSince = "0.21.3";
  */
 const saveLastDownloaderDefaultOnSince = "0.22.37";
 
+/**
+ * v0.29.5 起「Cookie 过期自动延长」默认改为开（用户 2026-10-07 要求）。
+ * 这个功能的作用是防止长期未访问导致登录态丢失 —— 关着时用户并不会因此得到任何好处，
+ * 只会偶发地被踢出登录，所以默认开更合理。
+ * 存量里那个 false 同样是旧默认值、不是用户的选择，按版本号纠正一次；
+ * 追平后不再干预，用户主动关掉就能关掉。
+ */
+const autoExtendCookiesDefaultOnSince = "0.29.5";
+
 /** 语义化版本按 x.y.z 逐段比数值；空串/异常串按 0.0.0 处理（即"很旧"）。 */
 function isOlderVersion(a: string, b: string): boolean {
   const pa = String(a ?? "")
@@ -104,6 +113,14 @@ export const useConfigStore = defineStore("config", {
         isOlderVersion(state.version, saveLastDownloaderDefaultOnSince)
       ) {
         state.download.saveLastDownloader = true;
+        needsSave = true;
+      }
+
+      if (
+        state.autoExtendCookies?.enabled === false &&
+        isOlderVersion(state.version, autoExtendCookiesDefaultOnSince)
+      ) {
+        state.autoExtendCookies.enabled = true;
         needsSave = true;
       }
 
@@ -381,7 +398,7 @@ export const useConfigStore = defineStore("config", {
     },
 
     autoExtendCookies: {
-      enabled: false,
+      enabled: true,
       triggerThreshold: 2,
       extensionDuration: 3,
     },

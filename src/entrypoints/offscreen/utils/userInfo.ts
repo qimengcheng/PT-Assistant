@@ -40,7 +40,7 @@ export async function getSiteUserInfoResult(siteId: string) {
 
     // 尝试延长cookies
     try {
-      await sendMessage("checkAndExtendCookies", site.url);
+      await sendMessage("checkAndExtendCookies", { url: site.url, siteId });
     } catch (error) {
       // 静默处理错误，不影响用户信息获取流程
       logger({ msg: `Failed to extend cookies for site ${siteId}`, level: "debug" });

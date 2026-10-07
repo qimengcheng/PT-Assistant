@@ -138,8 +138,9 @@ onMessage("removeCookie", async ({ data }) => {
 /**
  * 检查并延长指定域名的cookies
  * @param url 域名
+ * @param siteId 站点 id，只用来给「最近续期时间」记键（见 shared/types/storages/other.ts）
  */
-export async function checkAndExtendCookies(url: string) {
+export async function checkAndExtendCookies({ url, siteId }: { url: string; siteId?: string }) {
   try {
     const config = (await extStore.getItem("config"))?.autoExtendCookies ?? { enabled: false };
 
@@ -151,6 +152,8 @@ export async function checkAndExtendCookies(url: string) {
     const cookies = await chrome.cookies.getAll({ url });
 
     const thresholdDays = config.triggerThreshold * 7; // 转换为天数
+
+    let extendedCount = 0;
 
     for (const cookie of cookies) {
       try {
@@ -183,11 +186,19 @@ export async function checkAndExtendCookies(url: string) {
 
           // 使用force=true强制设置cookie，即使原cookie未过期
           await setCookie(cookieDetails, true);
+          extendedCount++;
         }
       } catch (error) {
         // 静默处理单个cookie的错误，继续处理其他cookies
         sendMessage("logger", { msg: `Failed to extend cookie ${cookie.name} for url ${url}`, level: "debug" }).catch();
       }
+    }
+
+    // 真的动过 cookie 才记时间，否则「最近续期」会把"检查过但没到阈值"也显示成续期过
+    if (extendedCount > 0) {
+      const renewals = (await extStore.getItem("cookieRenewals")) ?? {};
+      renewals[siteId ?? url] = Date.now();
+      await extStore.setItem("cookieRenewals", renewals);
     }
   } catch (error) {
     // 静默处理整体错误，不影响调用方
@@ -195,6 +206,6 @@ export async function checkAndExtendCookies(url: string) {
   }
 }
 
-onMessage("checkAndExtendCookies", async ({ data: url }) => {
-  return await checkAndExtendCookies(url);
+onMessage("checkAndExtendCookies", async ({ data }) => {
+  return await checkAndExtendCookies(data);
 });

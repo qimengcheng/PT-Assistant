@@ -1158,7 +1158,18 @@
       "open": "Open",
       "showMessageCount": "Show Notice",
       "tags": "Tags",
-      "url": "URL"
+      "url": "URL",
+      "cookieExpires": "Cookie Expires",
+      "cookieRenewedAt": "Last Renewed"
+    },
+    "cookie": {
+      "sessionOnly": "Session",
+      "none": "None",
+      "sessionHint": "The auto-renewed cookies of this site are session cookies, so nothing gets extended",
+      "noneHint": "This site has no c_secure_* / remember_web_* cookie that the auto-renewer manages",
+      "remainingDays": "{n} days left",
+      "expired": "Expired",
+      "neverRenewed": "Never renewed"
     },
     "delete": {
       "text": "Are you sure to delete these {0} Site?"

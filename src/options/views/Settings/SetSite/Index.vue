@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   AimOutlined,
@@ -21,6 +21,9 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
+import { sendMessage } from "@/messages.ts";
+import { extStore } from "@/storage.ts";
+import { formatDate } from "@/options/utils.ts";
 
 import AddDialog from "./AddDialog.vue";
 import EditDialog from "./EditDialog.vue";
@@ -74,6 +77,100 @@ function orderOf(key: string): "ascend" | "descend" | null {
   return s.order === "asc" ? "ascend" : "descend";
 }
 
+/**
+ * Cookie 两列的数据。
+ *
+ * 到期时间不落在我们自己的存储里 —— 它就在浏览器的 cookie 罐里（`expirationDate`，秒），
+ * 所以每次要展示时按站点 URL 现查一次 chrome.cookies（经 getAllCookies 消息，
+ * 与全仓一致：选项页不直接碰 chrome.cookies）。
+ * 续期时间则是新增的一条：自动续期发生在 service worker，它只拿得到 URL，
+ * 因此由它按 siteId 记进 storage 的 cookieRenewals 键（见 shared/types/storages/other.ts）。
+ */
+interface ICookieExpiryInfo {
+  /** 被续期管理的 cookie 数量，0 = 这个站点没有 c_secure_* / remember_web_* 之类的 cookie */
+  managed: number;
+  /** 其中最早过期的那一枚（毫秒）；全是会话级 cookie 时为 null */
+  earliest: number | null;
+}
+
+const cookieExpiry = ref<Record<string, ICookieExpiryInfo>>({});
+const cookieRenewals = ref<Record<string, number>>({});
+const isLoadingCookieInfo = ref(false);
+
+/** 与 background/utils/cookies.ts 里 shouldExtendCookie 同一口径，两处要一起改 */
+function isAutoRenewedCookie(name: string): boolean {
+  return name.startsWith("c_secure_") || name.startsWith("remember_web_");
+}
+
+async function loadCookieInfo() {
+  const sites = (allAddedSiteInfo.value ?? []) as ISiteTableItem[];
+  isLoadingCookieInfo.value = true;
+  try {
+    const renewals = (await extStore.getItem("cookieRenewals")) ?? {};
+    const info = await Promise.all(
+      sites.map(async (item): Promise<ICookieExpiryInfo> => {
+        const url = item.userConfig?.url ?? item.metadata?.urls?.[0];
+        if (!url) return { managed: 0, earliest: null };
+        try {
+          const cookies = (await sendMessage("getAllCookies", { url })).filter((c) => isAutoRenewedCookie(c.name));
+          const dated = cookies.map((c) => c.expirationDate).filter((x): x is number => !!x);
+          return { managed: cookies.length, earliest: dated.length > 0 ? Math.min(...dated) * 1000 : null };
+        } catch {
+          // 消息没回应/权限异常时按"查不到"处理，不要让一列把整张表带崩
+          return { managed: 0, earliest: null };
+        }
+      }),
+    );
+    const next: Record<string, ICookieExpiryInfo> = {};
+    sites.forEach((item, i) => (next[item.id] = info[i]));
+    cookieExpiry.value = next;
+    cookieRenewals.value = renewals;
+  } finally {
+    isLoadingCookieInfo.value = false;
+  }
+}
+
+// 站点增删后要重查（allAddedSiteInfo 是 computedAsync，水合完成才会有一批 id）
+watch(
+  () => (allAddedSiteInfo.value ?? []).map((x) => x.id).join(","),
+  () => {
+    void loadCookieInfo();
+  },
+  { immediate: true },
+);
+
+function cookieExpiryText(siteId: string): string {
+  const info = cookieExpiry.value[siteId];
+  if (!info) return isLoadingCookieInfo.value ? "…" : "-";
+  if (info.managed === 0) return t("SetSite.cookie.none");
+  if (info.earliest === null) return t("SetSite.cookie.sessionOnly");
+  return formatDate(info.earliest, "yyyy-MM-dd");
+}
+
+/** 悬停提示：单元格只放短文案，解释都收在这里 */
+function cookieExpiryTip(siteId: string): string {
+  const info = cookieExpiry.value[siteId];
+  if (!info) return "";
+  if (info.managed === 0) return t("SetSite.cookie.noneHint");
+  if (info.earliest === null) return t("SetSite.cookie.sessionHint");
+  const days = Math.floor((info.earliest - Date.now()) / 86400000);
+  return days < 0 ? t("SetSite.cookie.expired") : t("SetSite.cookie.remainingDays", { n: days });
+}
+
+function cookieExpiryClass(siteId: string): string {
+  const info = cookieExpiry.value[siteId];
+  if (!info || info.earliest === null) return "cookie-muted";
+  const days = Math.floor((info.earliest - Date.now()) / 86400000);
+  if (days < 0) return "cookie-expired";
+  // 阈值以下的天数交给颜色提示：自动续期的默认触发阈值是 1 周（config.ts 的 triggerThreshold）
+  return days < 7 ? "cookie-warning" : "";
+}
+
+function cookieRenewText(siteId: string): string {
+  const at = cookieRenewals.value[siteId];
+  return at ? formatDate(at, "yyyy-MM-dd HH:mm") : t("SetSite.cookie.neverRenewed");
+}
+
 const columns = computed<TableColumnsType<ISiteTableItem>>(() => {
   const base: TableColumnsType<ISiteTableItem> = [
     {
@@ -87,6 +184,9 @@ const columns = computed<TableColumnsType<ISiteTableItem>>(() => {
     { title: t("SetSite.common.name"), key: "name", align: "left" },
     { title: t("SetSite.common.groups"), key: "groups", align: "left", width: 160 },
     { title: t("SetSite.common.url"), key: "url", align: "left" },
+    // 单元格内容是短文案（日期 / 会话级 / 无），解释走 tooltip，避免换行把行高撑开
+    { title: t("SetSite.common.cookieExpires"), key: "cookieExpires", align: "center", width: 104 },
+    { title: t("SetSite.common.cookieRenewedAt"), key: "cookieRenewedAt", align: "center", width: 132 },
     {
       title: t("SetSite.common.isOffline"),
       key: "userConfig.isOffline",
@@ -364,6 +464,16 @@ function keywordChecked(keyword: string) {
           </a>
         </template>
 
+        <template v-else-if="column.key === 'cookieExpires'">
+          <a-tooltip :title="cookieExpiryTip(record.id)">
+            <span :class="cookieExpiryClass(record.id)">{{ cookieExpiryText(record.id) }}</span>
+          </a-tooltip>
+        </template>
+
+        <template v-else-if="column.key === 'cookieRenewedAt'">
+          <span :class="{ 'cookie-muted': !cookieRenewals[record.id] }">{{ cookieRenewText(record.id) }}</span>
+        </template>
+
         <template v-else-if="String(column.key).startsWith('userConfig.')">
           <a-switch
             size="small"
@@ -468,6 +578,22 @@ function keywordChecked(keyword: string) {
 .url-link-icon {
   margin-left: 4px;
   font-size: 11px;
+}
+
+/* Cookie 两列的状态色：查不到/未续期 → 次要文字；快到期 → 琥珀；已过期 → danger。
+   全局没有 warning 档的 token（style.css 只有 success/danger），这里就地给一个字面值 */
+.cookie-muted {
+  color: var(--pt-color-text-secondary);
+}
+
+.cookie-warning {
+  color: #b45309;
+  font-weight: 500;
+}
+
+.cookie-expired {
+  color: var(--pt-color-danger);
+  font-weight: 600;
 }
 
 .desc-list {

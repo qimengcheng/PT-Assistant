@@ -1158,7 +1158,18 @@
       "open": "打开",
       "showMessageCount": "信息提醒",
       "tags": "标签",
-      "url": "网站链接"
+      "url": "网站链接",
+      "cookieExpires": "Cookie 到期",
+      "cookieRenewedAt": "最近续期"
+    },
+    "cookie": {
+      "sessionOnly": "会话级",
+      "none": "无",
+      "sessionHint": "该站点被自动续期管理的 cookie 是会话级（关浏览器就没了），不参与续期",
+      "noneHint": "该站点没有 c_secure_* / remember_web_* 这类会被自动续期管理的 cookie",
+      "remainingDays": "剩 {n} 天",
+      "expired": "已过期",
+      "neverRenewed": "尚未续期过"
     },
     "delete": {
       "text": "确认删除这 {0} 个站点吗？"

@@ -105,7 +105,7 @@ export interface ProtocolMap {
   setCookie(data: chrome.cookies.SetDetails & { force?: boolean }): void;
   getCookie(data: chrome.cookies.CookieDetails): chrome.cookies.Cookie | null;
   removeCookie(data: chrome.cookies.CookieDetails | chrome.cookies.SetDetails): chrome.cookies.CookieDetails | null;
-  checkAndExtendCookies(url: string): void;
+  checkAndExtendCookies(arg: { url: string; siteId?: string }): void;
 
   // ===== 2. offscreen：站点基础 ( utils/site ) =====
   getSiteList(): Array<{ id: string; name: string; url: string; offline: boolean }>;

@@ -23,8 +23,14 @@ const socialSites = [
           <a-input v-model:value="configStore.socialSiteInformation.ptGenEndpoint" placeholder="https://ptgen.example.com/" />
         </a-form-item>
         <a-form-item>
-          <a-switch v-model:checked="configStore.socialSiteInformation.preferPtGen" size="small" />
-          <span class="label">{{ t("SetBase.SocialInformationWindow.preferPtGen") }}</span>
+          <!-- 必须套 .switch-item：这条规则在 SetBase/Index.vue 的非 scoped 样式里
+               （display:flex + align-items:center + gap:8px），同页另外 5 个窗口的开关行
+               全都套着。裸着放会变成行内排布 —— 实测开关与文字之间 0px 间隙、
+               盒子中心比文字光学中心低 1.65px；套上之后是 8px 与 -0.6px。 -->
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.socialSiteInformation.preferPtGen" size="small" />
+            <span class="label">{{ t("SetBase.SocialInformationWindow.preferPtGen") }}</span>
+          </div>
         </a-form-item>
       </div>
 

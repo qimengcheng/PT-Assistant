@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-07 15:34:36",
-  "headSha": "71ad6c2",
+  "generatedAt": "2026-10-07 15:45:53",
+  "headSha": "3a30667",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.32.4",
+      "date": "2026-10-07 15:58:59",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "基础设置 → 社交信息 里「优先使用 PTGen 获取影片信息」那个开关，以前和文字零间距贴在一起、还比文字高出一点；现在跟同页其它几个设置窗口一样，开关与文字之间留 8px、上下居中"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.32.3",
       "date": "2026-10-07 15:45:53",

@@ -15,10 +15,12 @@ const version = browser.runtime.getManifest().version;
 const definitionCount = definitionList.length;
 
 /**
- * 「最近更新」读的是入库快照 `src/options/data/recentUpdates.json`
- * （`node scripts/gen-recent-updates.mjs` 生成，与特别感谢页的 agentStats.json 同一套路）。
- * 不在运行时去拉 GitHub Release：那要多一条 host 权限、断网就成空面板，
- * 而 Release 正文是给仓库读者看的 Markdown，不是给产品用户看的。
+ * 「最近更新」读的是入库快照 `src/options/data/recentUpdates.json`。
+ * ⚠️ 这份文案**由 agent 读提交历史手写，不用脚本生成**：脚本只能搬运提交标题，
+ * 那是写给仓库读者的内部口吻（「表体高度被自己的公式冻住」「contain 只给真滚得动的面板」），
+ * 用户读不出跟自己有什么关系。规矩见 AGENTS.md §3.7。
+ * 也不在运行时拉 GitHub Release：那要多一条 host 权限、断网就成空面板，
+ * 而 Release 正文同样是给仓库读者看的 Markdown。
  */
 const updates = recentUpdates.versions;
 const releasesUrl = `${REPO_URL}/releases`;

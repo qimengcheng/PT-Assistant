@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { computedAsync } from "@vueuse/core";
 import { nanoid } from "nanoid";
 import { CheckCircleOutlined, CloseCircleOutlined, LeftOutlined, QuestionCircleOutlined, RightOutlined } from "@antdv-next/icons";
@@ -35,6 +35,18 @@ const allBackupServerMetaData = computedAsync(async () => {
   }
   return clientMetaData;
 }, {});
+
+/**
+ * 必须走 `:options`：antdv-next 的 Select **完全不读默认插槽里的 `a-select-option`**
+ * （dist 里 Select 的实现没有 `children` / `slots.default`，整个包也找不到
+ * 旧版那套 `convertChildrenToData`）。`ASelectOption` 虽然还注册着，渲染进去的子节点
+ * 会被静默丢掉 —— 表现就是下拉打开「暂无数据」，不报错也不警告。
+ * 同一流程的下载器对话框（SetDownloader/AddDialog.vue）一直是 `:options` + `#option`，
+ * 所以只有这一页坏。
+ */
+const backupTypeOptions = computed(() =>
+  Object.values(allBackupServerMetaData.value).map((m) => ({ value: m.type, label: m.type })),
+);
 
 async function updateStoredDownloaderConfigByDefault(type: IBackupServerMetadata["type"]) {
   storedBackupServerConfig.value = {
@@ -92,15 +104,16 @@ function resetDialog() {
     <div v-show="currentStep === 0">
       <a-select
         v-model:value="selectedBackupServerType"
+        :options="backupTypeOptions"
         :placeholder="t('SetBackup.AddDialog.selectTypePlaceholder')"
         @change="(v: IBackupServerMetadata['type']) => updateStoredDownloaderConfigByDefault(v)"
       >
-        <a-select-option v-for="meta in Object.values(allBackupServerMetaData)" :key="meta.type" :value="meta.type">
+        <template #option="{ value }">
           <div class="backup-type-option">
-            <img class="backup-type-option__icon" :src="getBackupServerIcon(meta.type)" :alt="meta.type" />
-            <span>{{ meta.type }}</span>
+            <img class="backup-type-option__icon" :src="getBackupServerIcon(value as string)" :alt="String(value)" />
+            <span>{{ value }}</span>
           </div>
-        </a-select-option>
+        </template>
       </a-select>
 
       <!-- v-autocomplete 的 persistent-hint -->
@@ -123,7 +136,7 @@ function resetDialog() {
       <a-flex align="center" gap="small">
         <a-button
           v-show="currentStep === 0"
-          :href="`${REPO_URL}/tree/master/src/packages/backupServer`"
+          :href="`${REPO_URL}/tree/master/packages/backupServer`"
           color="default"
           variant="solid"
           rel="noopener noreferrer nofollow"

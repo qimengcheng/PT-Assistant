@@ -425,6 +425,7 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 | `:footer="null"` + `<template #footer>` 并存 | **弹窗底部按钮整个消失** | 别写 `:footer="null"`。antdv-next 源码 `footer: d !== null && ...` 会把 slot 一起吞掉 |
 | `a-auto-complete` 的 options 传 `string[]` | 输入框**渲染成空控件**（只剩 label） | 传 `[{ value, label }]` 对象数组 |
 | `a-auto-complete` 选中后 | 输入框显示的是 **value**（如下载器随机 id），`option-label-prop` 不生效 | 固定列表选择一律用 `a-select`（单选固定显示 label）+ `show-search` + `option-filter-prop="label"` |
+| `a-select` 用 `<a-select-option>` **子节点**列选项 | 下拉打开是**「暂无数据」**。antdv-next 的 Select 完全不读默认插槽：`dist/select/index.js` 里 `children` 与 `slots.default` 各 0 处命中，整个包也找不到旧版那套 `convertChildrenToData`；`ASelectOption` 只是还注册着名字，渲染进去的节点被静默丢掉。2026-10-07 添加备份服务器对话框就是这么空的，而同一条流程的下载器对话框一直用 `:options`，所以只有这一处坏 | 一律 `:options="{ value, label }[]"`，带图标的选项走 `<template #option="{ value }">`（`SetDownloader/AddDialog.vue` 是参照实现）。全仓已扫过，`a-select-option` 现在只剩注释里那一处 |
 | `a-table` 的 `sorter: true` | 排序箭头动、**数据不排** | antd `getSortFunction` 静默跳过无 compare 的 sorter，必须给真正 compare 函数 |
 | `a-list` 传 `:data-source="[]"` | 渲染内置「暂无数据」占位 | 不用 data-source，直接渲染子项 |
 | `<a-step>` 等注册表里不存在的 `a-*` 标签 | 被当原生未知元素，**内容静默丢失**（带对象插槽时整块空白） | antdv-next 全量 install 实测只有 139 个注册名，**没有** `AStep`/`AList`；Steps 只有 `:items` 数组写法。CI 的 check-antd-tags 会拦 |

@@ -126,7 +126,7 @@ const selectedDescription = computed(() => {
     <template #footer>
       <a-flex align="center" gap="small">
         <a-button
-          :href="`${REPO_URL}/tree/master/src/packages/downloader`"
+          :href="`${REPO_URL}/tree/master/packages/downloader`"
           color="default"
           variant="solid"
           rel="noopener noreferrer nofollow"

@@ -1054,15 +1054,16 @@ export default class NexusPHP extends PrivateSite {
   /**
    * 读信箱列表。
    *
+   * 请求的是信箱首页本身，**不带 action**：站点自己指向信箱的链接就是裸 `messages.php`
+   * （上面取未读数用的 `td[style*='background: red'] a[href*='messages.php']` 抓的正是它），
+   * 而 `action=view` 是「取单条正文」那条路的参数、要跟 msgid 一起用（见 getMessageContent）。
+   *
    * 判据是「这一行有没有指向 msgid 的链接」，不是「表格 class 叫什么」—— NexusPHP 各站皮肤
    * 不同（tainted / classic / 交替行 class 都见过），但查看链接上的 msgid 参数是内核给的。
    * 未读按内核可能输出的两种写法都认：整行 class 带 unread，或标题被 `<b>` 包着。
    */
   public override async getMessages(): Promise<ISiteMessage[]> {
-    const { data } = await this.request<string>({
-      url: this.messageUrl,
-      params: { action: "view" },
-    });
+    const { data } = await this.request<string>({ url: this.messageUrl });
 
     if (typeof data !== "string" || !data) {
       return [];

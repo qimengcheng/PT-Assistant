@@ -17,7 +17,14 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useSiteMessageRead } from "./utils/siteMessageRead.ts";
 
 const showDialog = defineModel<boolean>();
-const { siteId } = defineProps<{ siteId: TSiteID | null }>();
+const { siteId, reportedUnread = 0 } = defineProps<{
+  siteId: TSiteID | null;
+  /**
+   * 站点报告的未读数（徽章上那个数字的来源）。弹窗拿它判「一条都没读到」是真没信还是没解析出来：
+   * 明明有 N 条未读却读到空列表，不能说成「没有未读消息」。
+   */
+  reportedUnread?: number;
+}>();
 
 const { t } = useI18n();
 const metadataStore = useMetadataStore();
@@ -138,9 +145,23 @@ function itemClasses(index: number, item: ISiteMessage) {
           </a-button>
         </div>
 
-        <div v-else-if="messages.length === 0" class="msg-hint">
-          <InboxOutlined />
-          <span>{{ t("MyData.messages.empty") }}</span>
+        <!-- 空列表有两种：真没信，和「信箱页没解析出任何一行」。后者不能报「没有未读消息」
+             —— 站点那边未读数还挂着，用户会以为自己没消息，把站内信漏掉。 -->
+        <div
+          v-else-if="messages.length === 0"
+          :class="['msg-hint', { 'msg-hint--stack': reportedUnread > 0 }]"
+        >
+          <template v-if="reportedUnread > 0">
+            <span>{{ t("MyData.messages.emptyButReportedUnread", { n: reportedUnread }) }}</span>
+            <a-button size="small" @click="openSitePage">
+              <template #icon><ExportOutlined /></template>
+              {{ t("MyData.messages.openSite") }}
+            </a-button>
+          </template>
+          <template v-else>
+            <InboxOutlined />
+            <span>{{ t("MyData.messages.empty") }}</span>
+          </template>
         </div>
 
         <template v-else>

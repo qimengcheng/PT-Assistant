@@ -296,6 +296,7 @@
       "loadFailed": "Failed to load: your session may have expired, or the site changed its layout.",
       "retry": "Retry",
       "empty": "No unread messages",
+      "emptyButReportedUnread": "The site reports {n} unread message(s), but the mailbox page yielded nothing — this site's layout likely doesn't match the generic parser, or your session expired. Please read them on the site for now",
       "pickHint": "Pick a message on the left to read it",
       "noBody": "The body could not be read here. Use 'Open in browser' to see the original.",
       "unreadFlag": "Unread"

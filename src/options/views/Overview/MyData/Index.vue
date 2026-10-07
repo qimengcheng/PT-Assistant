@@ -222,6 +222,12 @@ function unreadBadge(record: IUserInfoItem) {
 
 const showMessageDialog = ref<boolean>(false);
 const messageDialogSiteId = ref<TSiteID | null>(null);
+/**
+ * 打开弹窗时把「站点报告的未读数」一起递进去：弹窗要靠它判断「列表一条都没有」到底是
+ * 真没信，还是没解析出来 —— 后者不能拿「没有未读消息」冒充（见 SiteMessagesDialog 的空态）。
+ * 用的是站点给的原始数字，不减本地已读：本地读过几条不影响信箱页上有没有行。
+ */
+const messageDialogUnread = ref<number>(0);
 
 /**
  * 红数字/圆点是「读站内信」的入口，图标本体仍然是「刷新该站数据」。
@@ -234,6 +240,7 @@ function onBadgeClick(event: MouseEvent, record: IUserInfoItem) {
     return;
   }
   messageDialogSiteId.value = record.site;
+  messageDialogUnread.value = record.messageCount ?? 0;
   showMessageDialog.value = true;
 }
 
@@ -768,7 +775,11 @@ const showExportDialog = ref(false);
   </a-modal>
 
   <HistoryDataViewDialog v-model="showHistoryDataViewDialog" :site-id="historyDataViewDialogSiteId!" />
-  <SiteMessagesDialog v-model="showMessageDialog" :site-id="messageDialogSiteId!" />
+  <SiteMessagesDialog
+    v-model="showMessageDialog"
+    :site-id="messageDialogSiteId!"
+    :reported-unread="messageDialogUnread"
+  />
   <ExportUserInfoDialog v-model="showExportDialog" :selected-site-ids="tableSelected" />
 </template>
 

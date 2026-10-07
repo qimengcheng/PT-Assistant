@@ -42,8 +42,9 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 ## 工程化体系
 
 `.github/workflows/ci.yml` 是单文件流水线（push / PR / 手动触发），
-由 `.githooks/` 的本地 hook 与 CI 各守一半。守卫共 **8 条**（① ~ ⑥ 静态扫描，⑦ ⑧ 行为断言，
-条数以 `node scripts/check-all.mjs` 现取为准 —— 它扫 `scripts/` 目录，新增一条自动进聚合），
+由 `.githooks/` 的本地 hook 与 CI 各守一半。条数以 `node scripts/check-all.mjs` 现取为准
+（它扫 `scripts/` 目录，新增一条自动进聚合）；下表是当下的 ① ~ ⑨
+（① ~ ⑥ 静态扫描，⑦ ⑧ 行为断言，⑨ 查入库的数据快照），
 **CI 的 `build` job 调的就是这一条聚合命令**（在 `pnpm compile` 之后，不再逐条挂 step，
 所以「本地有、CI 没有」这种漂移从结构上没了；`verify` job 只管提交标题那三条硬规则：
 前缀 / 版本号 / 与 `package.json` 一致）；本地改完也要跑，FAIL 非零退出。
@@ -62,10 +63,11 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 防线 ⑥ | `scripts/check-sw-graph.mjs` | SW / content 引导的静态 import 闭包里不许出现 `sizzle`、不许命中 `@ptd/site` / `@ptd/social` 根入口，`import.meta.glob` 必须根绝对，`defineBackground` 必须显式 `type: "module"`（AGENTS.md §3.2 那三条铁律；违反是 SW 启动即崩、消息永远无响应） |
 | 防线 ⑦（行为断言） | `scripts/check-indexdb-retry.mjs` | 懒开共享库的两条不变量：开库失败不能被缓存、成功后必须复用同一句柄。静态扫不出来，靠它钉（手写最小 IDB 桩，不引 fake-indexeddb） |
 | 防线 ⑧（行为断言） | `scripts/check-fingerprint.mjs` | 种子指纹三层逻辑的纯函数断言（误判「本地已有」会让 qBittorrent 重下、直接打负分享率） |
+| 防线 ⑨（数据快照） | `scripts/check-recent-updates.mjs` | 首页「最近更新」那份 `recentUpdates.json`：形状、`date` 必须是完整时间戳且等于该版本那次提交的真实时间（从 `git log` 对）、**比 HEAD 少一条就 FAIL** —— 那份是累积档案，只许加不许裁（AGENTS.md §3.7） |
 | 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `build` job 也挂着它 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
-| 界面数据快照 | `scripts/gen-agent-stats.mjs`（数字）＋ `src/options/data/recentUpdates.json`（文案，手写） | 快照都入库、构建产物直接 import —— 不在运行时拉 GitHub Release（要多一条 host 权限、断网就空面板，而 Release 正文是给仓库读者看的 Markdown）。特别感谢页的贡献量是**数字**，跑脚本重算即可；首页「最近更新」是**给人读的句子**，由 agent 读提交历史逐条改写，**没有也不该有生成脚本**（脚本只能搬提交标题那种内部口吻）。口径与写法见 AGENTS.md §3.7 |
+| 界面数据快照 | `scripts/gen-agent-stats.mjs`（数字）＋ `src/options/data/recentUpdates.json`（文案，手写） | 快照都入库、构建产物直接 import —— 不在运行时拉 GitHub Release（要多一条 host 权限、断网就空面板，而 Release 正文是给仓库读者看的 Markdown）。特别感谢页的贡献量是**数字**，跑脚本重算即可；首页「最近更新」是**给人读的句子**，由 agent 读提交历史逐条改写，**没有也不该有生成脚本**（脚本只能搬提交标题那种内部口吻）；那份 JSON 是**累积档案**，只加不删、每条带完整时间戳，界面默认只铺最新 10 个版本。口径与写法见 AGENTS.md §3.7 |
 
 > ⚠️ **防线 ② 依赖一个未声明的传递依赖**：`antdv-next@1.5.6` 内部用到
 > `@ant-design/fast-color`，它没写进 `package.json`，现在能跑全靠 `pnpm-workspace.yaml`

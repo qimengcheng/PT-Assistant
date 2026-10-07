@@ -1713,6 +1713,8 @@
     "kindImproved": "优化",
     "moreItems": "另有 {n} 条未列出",
     "updatesEmpty": "暂无可展示的更新记录",
+    "updatesExpandAll": "展开全部 {total} 条更新记录",
+    "updatesCollapse": "只看最近 {recent} 条",
     "updatesNote": "下面是随版本构建进扩展的更新快照，截至提交 {sha}（{date}）",
     "modules": {
       "siteDefinitions": "站点定义（{0} 个，按需加载）",

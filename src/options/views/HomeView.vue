@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { definitionList } from "@ptd/site";
 
@@ -21,8 +21,17 @@ const definitionCount = definitionList.length;
  * 用户读不出跟自己有什么关系。规矩见 AGENTS.md §3.7。
  * 也不在运行时拉 GitHub Release：那要多一条 host 权限、断网就成空面板，
  * 而 Release 正文同样是给仓库读者看的 Markdown。
+ *
+ * 快照从 v0.31.1 起是**累积档案**（只加不删，现在 111 条、从 v0.1.0 排到最新），
+ * 全铺开会把这一栏拉成几十屏，所以默认只出最新 PREVIEW_COUNT 个版本。
  */
 const updates = recentUpdates.versions;
+const PREVIEW_COUNT = 10;
+const showAllUpdates = ref(false);
+const visibleUpdates = computed(() =>
+  showAllUpdates.value ? updates : updates.slice(0, PREVIEW_COUNT),
+);
+const hasMoreUpdates = computed(() => updates.length > PREVIEW_COUNT);
 const releasesUrl = `${REPO_URL}/releases`;
 
 // 功能模块状态（随 Roadmap 平移逐个点亮）
@@ -72,7 +81,7 @@ const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
       </header>
 
       <div v-if="updates.length" class="updates">
-        <article v-for="u in updates" :key="u.version" class="update">
+        <article v-for="u in visibleUpdates" :key="u.version" class="update">
           <div class="update-head">
             <a-tag color="processing">v{{ u.version }}</a-tag>
             <span class="update-date">{{ u.date }}</span>
@@ -97,7 +106,18 @@ const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
           </ul>
         </article>
       </div>
-      <p v-else class="updates-empty">{{ t("HomeView.updatesEmpty") }}</p>
+      <!-- 快照是累积档案，默认只铺最新 10 个版本；这里用三条独立 v-if，
+           不写 v-else 链 —— 中间插了这一段之后，链上的「否则」会挂到展开按钮那条判断上 -->
+      <div v-if="hasMoreUpdates" class="updates-toggle">
+        <a-button type="link" size="small" @click="showAllUpdates = !showAllUpdates">
+          {{
+            showAllUpdates
+              ? t("HomeView.updatesCollapse", { recent: PREVIEW_COUNT })
+              : t("HomeView.updatesExpandAll", { total: updates.length })
+          }}
+        </a-button>
+      </div>
+      <p v-if="!updates.length" class="updates-empty">{{ t("HomeView.updatesEmpty") }}</p>
 
       <p class="updates-note">
         {{ t("HomeView.updatesNote", { sha: recentUpdates.headSha, date: recentUpdates.generatedAt }) }}
@@ -251,6 +271,12 @@ const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
 .update-more {
   color: var(--pt-color-text-secondary);
   font-size: 12px;
+}
+
+/* 展开/收起整行居中：它管的是下面那一整段历史，不是某一条记录 */
+.updates-toggle {
+  margin-top: 8px;
+  text-align: center;
 }
 
 .updates-empty,

@@ -147,6 +147,14 @@ jobs:
       - name: Version guard self-test (real hooks in throwaway repos)
         run: sh scripts/check-version-test.sh
 
+      # 首页「最近更新」那份快照的判据自检：往内存里注入十来种畸形（裁掉一条、时间只剩日期、
+      # 时间对不上提交、顺序倒了、totals 小于条数…），逐条确认脚本真会 FAIL、原样必须 PASS。
+      # 不带参数的本体检已经在上面的 check-all 聚合里跑过一次，这一步只补「判据自己还灵不灵」
+      # —— 这条守卫有一处必须会「不报错」的降级（浅克隆里对不上提交时间就跳过那条判据），
+      # 降级写反了它就变成永不报错的摆设，而没人会去读一份 PASS 的自检。
+      - name: Recent-updates guard self-test
+        run: node scripts/check-recent-updates.mjs --selftest
+
       # 用 WXT 自带的 `wxt zip` 而不是系统 zip：
       # 1) 不依赖 runner 是否预装 zip；2) 同时产出 -sources.zip，
       #    那是 Firefox Add-ons 强制要求的源码包；3) 本地已逐条验证过产物命名。

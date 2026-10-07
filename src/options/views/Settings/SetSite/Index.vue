@@ -102,6 +102,45 @@ function isAutoRenewedCookie(name: string): boolean {
   return name.startsWith("c_secure_") || name.startsWith("remember_web_");
 }
 
+/**
+ * 靠用户填的 API 凭据访问、不依赖 cookie 的站点 —— 这些站点的「Cookie 到期 / 最近续期」两列
+ * 该说「不需要」，而不是「无 / 尚未续期过」（后者读起来像「你少了个 cookie」，用户 2026-10-07
+ * 拿 YemaPT 指出这一点）。
+ *
+ * 名单是 2026-10-07 把场上 17 个声明了 `userInputSettingMeta` 的站点**逐个回请求层读过**得出的：
+ *   yemapt / mteam / gazellegames / generationfree / milkie / sunnypt / fsm / beyondhd / hdbits /
+ *   rousipro / huno —— 各自把 token / apikey / passkey 发进请求头或请求体（Authorization、
+ *   x-api-key、X-API-Key、x-milkie-auth、APITOKEN、Bearer、X-Api-Token…；huno 更硬，没填 token
+ *   就抛 NoUserInputError 把请求拦下）
+ *   avistaz / cinemaz / exoticaz / privatehd / animez —— 共用 schemas/AvistazNetwork.ts，
+ *   先 POST /api/v1/jackett/auth 用 username+password+pid 换令牌，再带着令牌打 /api/v1/*
+ *
+ * 为什么不用结构判据（「声明了 userInputSettingMeta 就算」）：两头都会错 ——
+ *   mooko 那个字段 name 叫 note、required:false，是一句「搜索前把结果显示切成列表视图」的提示，
+ *   它其实是 Gazelle 那套 cookie 站点（结构判据会误标它）；
+ *   beyondhd 的 apikey/rsskey 两项都写着 required:false（结构判据会漏掉它）。
+ * 所以这里老实列名单。**新增 API 类站点时往名单里加一行 id**（id == 定义文件名）。
+ */
+const API_AUTH_SITE_IDS: readonly string[] = [
+  "yemapt",
+  "mteam",
+  "gazellegames",
+  "generationfree",
+  "milkie",
+  "sunnypt",
+  "fsm",
+  "beyondhd",
+  "hdbits",
+  "rousipro",
+  "huno",
+  "avistaz",
+  "cinemaz",
+  "exoticaz",
+  "privatehd",
+  "animez",
+];
+const apiAuthSiteIdSet = new Set(API_AUTH_SITE_IDS);
+
 async function loadCookieInfo() {
   const sites = (allAddedSiteInfo.value ?? []) as ISiteTableItem[];
   isLoadingCookieInfo.value = true;
@@ -109,6 +148,8 @@ async function loadCookieInfo() {
     const renewals = (await extStore.getItem("cookieRenewals")) ?? {};
     const info = await Promise.all(
       sites.map(async (item): Promise<ICookieExpiryInfo> => {
+        // 靠 API 凭据的站点不去查 cookie 罐：那趟消息往返问不出任何有用信息
+        if (apiAuthSiteIdSet.has(item.id)) return { managed: 0, earliest: null };
         const url = item.userConfig?.url ?? item.metadata?.urls?.[0];
         if (!url) return { managed: 0, earliest: null };
         try {
@@ -139,7 +180,11 @@ watch(
   { immediate: true },
 );
 
+/** 该站点靠 API 凭据访问，Cookie 两列一律走「不需要」分支（判据与证据见 API_AUTH_SITE_IDS 注释） */
+const usesApiAuth = (siteId: string) => apiAuthSiteIdSet.has(siteId);
+
 function cookieExpiryText(siteId: string): string {
+  if (usesApiAuth(siteId)) return t("SetSite.cookie.notNeeded");
   const info = cookieExpiry.value[siteId];
   if (!info) return isLoadingCookieInfo.value ? "…" : "-";
   if (info.managed === 0) return t("SetSite.cookie.none");
@@ -149,6 +194,7 @@ function cookieExpiryText(siteId: string): string {
 
 /** 悬停提示：单元格只放短文案，解释都收在这里 */
 function cookieExpiryTip(siteId: string): string {
+  if (usesApiAuth(siteId)) return t("SetSite.cookie.notNeededHint");
   const info = cookieExpiry.value[siteId];
   if (!info) return "";
   if (info.managed === 0) return t("SetSite.cookie.noneHint");
@@ -158,6 +204,7 @@ function cookieExpiryTip(siteId: string): string {
 }
 
 function cookieExpiryClass(siteId: string): string {
+  if (usesApiAuth(siteId)) return "cookie-muted";
   const info = cookieExpiry.value[siteId];
   if (!info || info.earliest === null) return "cookie-muted";
   const days = Math.floor((info.earliest - Date.now()) / 86400000);
@@ -167,6 +214,7 @@ function cookieExpiryClass(siteId: string): string {
 }
 
 function cookieRenewText(siteId: string): string {
+  if (usesApiAuth(siteId)) return t("SetSite.cookie.notNeeded");
   const at = cookieRenewals.value[siteId];
   return at ? formatDate(at, "yyyy-MM-dd HH:mm") : t("SetSite.cookie.neverRenewed");
 }
@@ -471,7 +519,11 @@ function keywordChecked(keyword: string) {
         </template>
 
         <template v-else-if="column.key === 'cookieRenewedAt'">
-          <span :class="{ 'cookie-muted': !cookieRenewals[record.id] }">{{ cookieRenewText(record.id) }}</span>
+          <!-- 只有「不需要」这一种情况需要解释（其余状态本身就是可读的日期或「尚未续期过」），
+               标题为空时 antd 的 Tooltip 判定 noTitle、浮层不会出现 -->
+          <a-tooltip :title="usesApiAuth(record.id) ? t('SetSite.cookie.notNeededHint') : ''">
+            <span :class="{ 'cookie-muted': !cookieRenewals[record.id] }">{{ cookieRenewText(record.id) }}</span>
+          </a-tooltip>
         </template>
 
         <template v-else-if="String(column.key).startsWith('userConfig.')">

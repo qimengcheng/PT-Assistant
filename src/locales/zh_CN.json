@@ -1190,7 +1190,9 @@
       "noneHint": "该站点没有 c_secure_* / remember_web_* 这类会被自动续期管理的 cookie",
       "remainingDays": "剩 {n} 天",
       "expired": "已过期",
-      "neverRenewed": "尚未续期过"
+      "neverRenewed": "尚未续期过",
+      "notNeeded": "不需要",
+      "notNeededHint": "该站点用你在站点设置里填的 API 凭据（token / passkey / apikey）访问，不依赖 cookie，所以不需要续期"
     },
     "delete": {
       "text": "确认删除这 {0} 个站点吗？"

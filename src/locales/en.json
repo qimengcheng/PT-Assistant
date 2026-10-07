@@ -1190,7 +1190,9 @@
       "noneHint": "This site has no c_secure_* / remember_web_* cookie that the auto-renewer manages",
       "remainingDays": "{n} days left",
       "expired": "Expired",
-      "neverRenewed": "Never renewed"
+      "neverRenewed": "Never renewed",
+      "notNeeded": "Not needed",
+      "notNeededHint": "This site is accessed with the API credential you filled in (token / passkey / apikey), so no cookie is involved and nothing needs renewing"
     },
     "delete": {
       "text": "Are you sure to delete these {0} Site?"

@@ -285,6 +285,15 @@ body {
   border: 1px solid var(--pt-color-border-light);
   border-radius: 10px;
   overflow: auto;
+}
+
+/* `overscroll-behavior: contain` 只能给**真的滚得动**的那批面板：列表页 `.page` 网格第二行，
+   1fr 那一行给它确定高度，它就是本该有的那个滚动宿主。
+   写在通用规则上会咬到非列表页 —— 那些页面的面板是根节点（或 .page-fill-grow），
+   高度跟着内容长、滚动范围恒等于 0，可 `overflow:auto` 已经让它算滚动容器了，
+   于是滚轮落在它身上被 contain 就地吃掉、又不往外层 `.content` 链，
+   **整页用滚轮滚不动**（2026-10-06 特别感谢页就是这个症状；运行日志页同形状）。 */
+.page > .page-panel {
   overscroll-behavior: contain;
 }
 

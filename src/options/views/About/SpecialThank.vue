@@ -228,8 +228,13 @@ const spanLine = computed(() =>
 
 <style scoped>
 .special-thank {
-  /* 撑满一屏：内容不足一屏时也不给 .content 的灰底留出下半截 */
-  min-height: 100%;
+  /* 必须是 `height` 而不是 `min-height`。这一页的面板就是根节点，全局 .page-panel 带着
+     `overflow:auto` + `overscroll-behavior:contain`：写 min-height 时盒子高度跟着内容长、
+     滚动范围恒等于 0，于是它仍算一个滚动容器 —— 滚轮落在它身上被 contain 就地吃掉，
+     既不滚它也不往外层 .content 链，整页用滚轮滚不动（列表页没这问题，那里面板由
+     .page 网格的 1fr 行拿到确定高度，是真的在滚自己）。
+     给确定高度后它就成了本该有的那个滚动条宿主，灰底也仍然只露 .content 那 8px 缝。 */
+  height: 100%;
   padding: 16px;
 }
 .thank-alert {

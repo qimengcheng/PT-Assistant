@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-07 20:38:04",
-  "headSha": "c9e2030",
+  "generatedAt": "2026-10-07 20:55:00",
+  "headSha": "e06c971",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.36.1",
+      "date": "2026-10-07 21:07:51",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "自动刷新用户信息：「刷新间隔（小时）」现在真的按小时生效了。之前每天第一次刷完之后，后面每一轮都会因为「今天已经有记录了」把所有站点跳过，所以数据一直停在早上，而运行日志里任务看着一直在正常跑"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.36.0",
       "date": "2026-10-07 20:55:00",

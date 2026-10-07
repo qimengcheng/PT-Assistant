@@ -43,6 +43,7 @@ function autoFlushUserInfo(retryIndex: number = 0) {
       return;
     }
 
+    const intervalMs = interval * 60 * 60 * 1000; // interval 的单位是小时（设置页标签也这么写）
     const curDate = new Date();
     const curDateFormat = format(curDate, "yyyy-MM-dd");
     let metadataStore = (await extStore.getItem("metadata"))!;
@@ -70,7 +71,7 @@ function autoFlushUserInfo(retryIndex: number = 0) {
 
       // 如果不是同一天，则不检查距离上次刷新时间是否超过了设定的间隔，这样能保证至少每天刷新一次（即启动浏览器后第一次检查）
       if (curDateFormat === lastFlushDateFormat) {
-        const nextFlushTime = lastFlushAt + interval * 60 * 60 * 1000; // interval in hours
+        const nextFlushTime = lastFlushAt + intervalMs;
         // 确保距离上次刷新时间已经超过了设定的间隔
         if (curDate.getTime() < nextFlushTime) {
           void sendMessage("logger", {
@@ -96,9 +97,18 @@ function autoFlushUserInfo(retryIndex: number = 0) {
     for (const [siteId, siteConfig] of Object.entries(metadataStore.sites)) {
       if (!siteConfig.isOffline && siteConfig.allowQueryUserInfo) {
         try {
-          // 检查当天的记录是否存在
+          /**
+           * 判"这个站点要不要刷"看的是**当天那条记录自己的 updateAt**，不是"今天有没有记录"。
+           * 上游 PT-depiler 那份判的是后者，本仓库 v0.12.2（8d837d8） alarms.ts 入库时照抄，
+           * 于是「刷新间隔（小时）」设 1 和设 24 没有任何区别：每天第一次刷完之后，后面每一轮
+           * 都是 0 个站点被处理，而 lastUserInfoAutoFlushAt 照样被推进到当前时间 —— 表现就是
+           * 日志里任务一直在跑、我的数据里的时间却停在早上。
+           * 失败重试走的是同一条闸，且不受影响：存档只在 status=success 时写（offscreen
+           * /utils/userInfo.ts），所以失败的站点当天没有记录、照旧会重试，刚刷成功的记录还新、不会被重刷。
+           */
           const thisSiteUserInfo = (await sendMessage("getSiteUserInfo", siteId as TSiteID)) ?? {};
-          if (typeof thisSiteUserInfo[curDateFormat] === "undefined") {
+          const todayRecord = thisSiteUserInfo[curDateFormat];
+          if (!todayRecord || curDate.getTime() - (todayRecord.updateAt ?? 0) >= intervalMs) {
             const userInfoResult = await sendMessage("getSiteUserInfoResult", siteId as TSiteID);
             if (userInfoResult.status !== EResultParseStatus.success) {
               failFlushSites.push(siteId as TSiteID);

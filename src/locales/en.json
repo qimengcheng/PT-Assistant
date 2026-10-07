@@ -1535,6 +1535,7 @@
     },
     "nav": {
       "home": "Home",
+      "guide": "Getting Started",
       "sites": "Sites",
       "snapshot": "Search Snapshot",
       "backup": "Backup",

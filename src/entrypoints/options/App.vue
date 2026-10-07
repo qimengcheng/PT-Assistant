@@ -17,6 +17,7 @@ import {
   InboxOutlined,
   PlayCircleOutlined,
   PlaySquareOutlined,
+  ReadOutlined,
   SearchOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -69,6 +70,7 @@ onMounted(async () => {
 const navItems = computed(() => {
   const items = [
     { path: "/", label: t("layout.nav.home"), icon: HomeOutlined },
+    { path: "/guide", label: t("layout.nav.guide"), icon: ReadOutlined },
     { path: "/sites", label: t("layout.nav.sites"), icon: GlobalOutlined },
     { path: "/search", label: t("common.search"), icon: SearchOutlined },
     { path: "/my-data", label: t("route.Overview.MyData"), icon: BarChartOutlined },

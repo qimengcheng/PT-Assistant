@@ -19,6 +19,12 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("../views/HomeView.vue"),
   },
   {
+    // 新手引导：从添加站点到把种子推进下载器，一条路走通。挂在首页后面进左侧菜单。
+    path: "/guide",
+    name: "GuideView",
+    component: () => import("../views/GuideView.vue"),
+  },
+  {
     // 站点管理走与旧版一一对应的正式页（表格 + 站点图标 + 分组筛选 + 增删改 + 一键导入 + 重建映射表）。
     // 早期这里挂的是 SiteManageView.vue —— 一个只有纯文字列表的简易调试页，已移入 tobedeleted。
     path: "/sites",

@@ -39,15 +39,24 @@ export type TPromptInDialog = (
   options?: { allowEmpty?: boolean },
 ) => Promise<string | null>;
 
-/** 返回 Promise<boolean>：确定 true，取消/关闭 false */
+/**
+ * 返回 Promise<boolean>：确定 true，取消/关闭 false。
+ *
+ * okText 默认「完成」，但**破坏性操作要按动作给**（删除就写删除）—— 这个确认框的标题是
+ * 「确认操作」，按钮再写「完成」等于把动作信息全丢了。
+ */
 export function makeConfirmDanger(modal: IDialogModalApi, t: TTranslate) {
-  return function confirmDanger(content: string, okType: "danger" | "primary" = "danger"): Promise<boolean> {
+  return function confirmDanger(
+    content: string,
+    okType: "danger" | "primary" = "danger",
+    okText: string = t("common.dialog.ok"),
+  ): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       modal.confirm({
         title: t("common.dialog.title.confirmAction"),
         content,
         okType,
-        okText: t("common.dialog.ok"),
+        okText,
         cancelText: t("common.dialog.cancel"),
         onOk: () => resolve(true),
         onCancel: () => resolve(false),

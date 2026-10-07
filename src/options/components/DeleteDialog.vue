@@ -69,7 +69,8 @@ async function dialogEnter() {
         <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
       </a-button>
       <a-button danger :loading="isDeleting" type="primary" @click="confirmDelete">
-        <span class="ml-1">{{ t("common.dialog.ok") }}</span>
+        <!-- 这个组件只做删除，按钮要说清动作，不能是通用的「完成」（common.dialog.ok 归增改类弹窗） -->
+        <span class="ml-1">{{ t("common.remove") }}</span>
       </a-button>
     </template>
   </a-modal>

@@ -118,7 +118,7 @@ const tableRowSelection = computed(() => ({
 const { confirmDanger } = useConfirmDanger();
 
 async function deleteSiteUserInfo(date: string[]) {
-  if (!(await confirmDanger(t("MyData.HistoryDataView.deleteConfirm")))) {
+  if (!(await confirmDanger(t("MyData.HistoryDataView.deleteConfirm"), "danger", t("common.remove")))) {
     return;
   }
 

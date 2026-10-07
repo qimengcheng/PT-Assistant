@@ -81,7 +81,7 @@ onMounted(() => {
 const { confirmDanger } = useConfirmDanger();
 
 async function deleteTask(task: IKeepUploadTask) {
-  if (!(await confirmDanger(t("KeepUploadTask.deleteConfirm")))) return;
+  if (!(await confirmDanger(t("KeepUploadTask.deleteConfirm"), "danger", t("common.remove")))) return;
 
   try {
     await sendMessage("deleteKeepUploadTask", task.id);
@@ -94,7 +94,8 @@ async function deleteTask(task: IKeepUploadTask) {
 
 async function deleteSelectedTasks() {
   if (selectedTasks.value.length === 0) return;
-  if (!(await confirmDanger(t("KeepUploadTask.deleteSelectedConfirm", { count: selectedTasks.value.length })))) return;
+  const msg = t("KeepUploadTask.deleteSelectedConfirm", { count: selectedTasks.value.length });
+  if (!(await confirmDanger(msg, "danger", t("common.remove")))) return;
 
   try {
     for (const taskId of selectedTasks.value) {
@@ -109,7 +110,7 @@ async function deleteSelectedTasks() {
 }
 
 async function clearAllTasks() {
-  if (!(await confirmDanger(t("KeepUploadTask.clearConfirm")))) return;
+  if (!(await confirmDanger(t("KeepUploadTask.clearConfirm"), "danger", t("KeepUploadTask.clearAll")))) return;
 
   try {
     await sendMessage("clearKeepUploadTasks", undefined);

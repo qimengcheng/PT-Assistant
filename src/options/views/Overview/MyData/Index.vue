@@ -513,15 +513,15 @@ const showExportDialog = ref(false);
       <!-- 站点信息 -->
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'siteUserConfig.sortIndex'">
-          <div class="d-flex flex-column align-center">
-            <a-badge
-              class="site-unread-badge"
-              :count="unreadBadge(record).count"
-              :dot="unreadBadge(record).dot"
-              color="#f44336"
-              :title="t('MyData.messages.badgeTip')"
-              @click="onBadgeClick($event, record)"
-            >
+          <a-badge
+            class="site-unread-badge"
+            :count="unreadBadge(record).count"
+            :dot="unreadBadge(record).dot"
+            color="#f44336"
+            :title="t('MyData.messages.badgeTip')"
+            @click="onBadgeClick($event, record)"
+          >
+            <div class="site-cell">
               <div class="favicon-hover-wrapper favicon-hover-bg">
                 <SiteFavicon
                   :site-id="record.site"
@@ -529,10 +529,10 @@ const showExportDialog = ref(false);
                   @click="() => flushSiteLastUserInfo([record.site])"
                 />
               </div>
-            </a-badge>
 
-            <SiteName v-if="configStore.myDataTableControl.showSiteName" :site-id="record.site" />
-          </div>
+              <SiteName v-if="configStore.myDataTableControl.showSiteName" :site-id="record.site" />
+            </div>
+          </a-badge>
         </template>
 
         <!-- 用户名，用户ID -->
@@ -813,6 +813,18 @@ const showExportDialog = ref(false);
 
 .favicon-hover-wrapper {
   cursor: pointer;
+}
+
+/* 站点列：图标在左、站名在右（原来是上下两行，行高被堆成 63.8px）。
+   未读徽标因此改成包住「图标 + 站名」整块：antd 的数字挂在被包元素右边缘之外半个自身宽度
+   （台架实测一位数溢出 9.5px、两位数 13.4px），只包图标时横排后数字会压到站名第一个字
+   （gap 4 实测重叠 5.5px），要让开就得把图标到文字撑到 18px 以上。包整块之后数字落在
+   站名右上角，图标与文字就能留紧的 8px（含悬停圆底那 4px 内衬，实测墨迹间距 12px）。 */
+.site-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 /* 红数字/圆点是读站内信的入口，得看着能点（图标本体是刷新，另有 cursor） */

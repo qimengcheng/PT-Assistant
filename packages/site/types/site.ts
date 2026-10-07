@@ -307,6 +307,18 @@ export interface ISiteMetadata {
   };
 
   /**
+   * 站内信（我的数据页点未读数字时读的那一页）。
+   *
+   * 只填 url —— 列表怎么解析由 schema 家族决定（目前只有 NexusPHP 系实现了 getMessages，
+   * 它的默认值是 `/messages.php`，所以这一族站点连 url 都不用填）。
+   * 填这里的前提是**真的核过那个地址**：没有可验证来源时留空，让它走家族的默认值，
+   * 不要照别的站抄。
+   */
+  message?: {
+    url?: string; // 相对站点根的路径，或完整 http(s) 地址
+  };
+
+  /**
    * 该配置项仅对 基于 PrivateSite 模板，且未改写 AbstractPrivateSite.getUserInfoResult 的站点生效
    */
   userInfo?: {

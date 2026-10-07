@@ -4,6 +4,8 @@ import { defineExtensionMessaging } from "@webext-core/messaging";
 import type {
   IAdvancedSearchRequestConfig,
   ISearchResult,
+  ISiteMessageContentResult,
+  ISiteMessagesResult,
   ISiteUserConfig,
   ITorrent,
   IUserInfo,
@@ -175,6 +177,14 @@ export interface ProtocolMap {
   cancelUserInfoQueue(): void;
   getSiteUserInfo(siteId: TSiteID): Record<string, IUserInfo>;
   removeSiteUserInfo(data: { siteId: TSiteID; date: string[] }): void;
+
+  // ===== 2.3.1 offscreen：站内信 ( utils/siteMessages ) =====
+  /**
+   * 读该站的信箱列表。`supported: false` 表示这个 schema 没实现解析（界面给「去网页看」），
+   * 与「支持但你现在没有消息」区分开 —— 后者才该显示空列表。
+   */
+  getSiteMessages(siteId: TSiteID): ISiteMessagesResult;
+  getSiteMessageContent(data: { siteId: TSiteID; messageId: string }): ISiteMessageContentResult;
 
   // ===== 2.4 offscreen：社交信息 ( utils/socialInformation ) =====
   getSocialInformation(data: { site: TSupportSocialSite$1; sid: string }): ISocialInformation;

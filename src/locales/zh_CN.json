@@ -288,6 +288,18 @@
     }
   },
   "MyData": {
+    "messages": {
+      "badgeTip": "阅读站内信",
+      "loading": "正在读取…",
+      "unsupported": "这个站点的信箱格式扩展还不认识，读不出列表。",
+      "openSite": "在网页打开",
+      "loadFailed": "读取失败：可能是登录态失效，或站点改版。",
+      "retry": "重试",
+      "empty": "没有未读消息",
+      "pickHint": "点左侧一条看正文",
+      "noBody": "这条读不到正文，可以用「在网页打开」看原文。",
+      "unreadFlag": "未读"
+    },
     "HistoryDataView": {
       "action": {
         "viewRaw": "查看原始数据"

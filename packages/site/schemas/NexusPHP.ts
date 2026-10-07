@@ -10,6 +10,7 @@ import {
   type ILevelRequirement,
   type ISearchCategories,
   type ISearchInput,
+  type ISiteMessage,
   type ISiteMetadata,
   type ITorrent,
   type ITorrentTag,
@@ -1033,5 +1034,104 @@ export default class NexusPHP extends PrivateSite {
     }
 
     return super.getTorrentDownloadLink(torrent);
+  }
+
+  // ===== 站内信（我的数据页点未读数字那条路）=====
+
+  /** 信箱页地址：站点定义没填就走 NexusPHP 的默认路径 */
+  protected get messageUrl(): string {
+    return this.metadata.message?.url ?? "/messages.php";
+  }
+
+  public override get supportsMessages(): boolean {
+    return true;
+  }
+
+  protected resolveSiteUrl(path: string): string {
+    return path.startsWith("http") ? path : new URL(path, this.url).href;
+  }
+
+  /**
+   * 读信箱列表。
+   *
+   * 判据是「这一行有没有指向 msgid 的链接」，不是「表格 class 叫什么」—— NexusPHP 各站皮肤
+   * 不同（tainted / classic / 交替行 class 都见过），但查看链接上的 msgid 参数是内核给的。
+   * 未读按内核可能输出的两种写法都认：整行 class 带 unread，或标题被 `<b>` 包着。
+   */
+  public override async getMessages(): Promise<ISiteMessage[]> {
+    const { data } = await this.request<string>({
+      url: this.messageUrl,
+      params: { action: "view" },
+    });
+
+    if (typeof data !== "string" || !data) {
+      return [];
+    }
+
+    const doc = createDocument(data);
+    const messages: ISiteMessage[] = [];
+
+    for (const row of Sizzle("tr", doc) as HTMLTableRowElement[]) {
+      const linkList = Sizzle("a[href*='msgid']", row) as HTMLAnchorElement[];
+      if (linkList.length === 0) {
+        continue;
+      }
+
+      const link = linkList[0];
+      const title = extractContent(link.textContent ?? "");
+      if (!title) {
+        continue;
+      }
+
+      const senderNode = Sizzle("a[href*='user.php']", row)[0];
+      // 时间列不按下标取（各站列序不同），按内容里有没有日期样式找
+      const timeText = extractContent(
+        (Sizzle("td", row) as HTMLElement[])
+          .map((td) => extractContent(td.textContent ?? ""))
+          .find((text) => /\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}/.test(text)) ?? "",
+      );
+      const parsedTime = timeText ? parseValidTimeString(timeText) : undefined;
+
+      messages.push({
+        id: (link.href.match(/[?&]msgid=(\d+)/) ?? [])[1],
+        title,
+        sender: senderNode ? extractContent(senderNode.textContent ?? "") : undefined,
+        time: typeof parsedTime === "number" ? parsedTime : undefined,
+        unread: /unread/i.test(row.className) || Sizzle("b", link).length > 0,
+        url: this.resolveSiteUrl(link.getAttribute("href") ?? this.messageUrl),
+      });
+    }
+
+    return messages;
+  }
+
+  /**
+   * 读单条正文。多数 NexusPHP 变体在查看正文时会顺手把该条记为已读，但那不是我们能依赖的
+   * 契约（皮肤/分支各异），所以界面上「数字立刻消失」靠的是扩展自己的已读记账。
+   */
+  public override async getMessageContent(messageId: string): Promise<string | undefined> {
+    const { data } = await this.request<string>({
+      url: this.messageUrl,
+      params: { action: "view", pop: "1", msgid: messageId },
+    });
+
+    if (typeof data !== "string" || !data) {
+      return undefined;
+    }
+
+    const doc = createDocument(data);
+    // 内核把正文放在 td.text；皮肤改名时退到「最长的那一块单元格文本」，短到看不出是正文就不给
+    const direct = (Sizzle("td.text", doc) as HTMLElement[])
+      .map((el) => extractContent(el.textContent ?? ""))
+      .find((text) => text.length > 0);
+    if (direct) {
+      return direct;
+    }
+
+    const fallback = (Sizzle("td", doc) as HTMLElement[])
+      .map((td) => extractContent(td.textContent ?? ""))
+      .sort((a, b) => b.length - a.length)[0];
+
+    return fallback && fallback.length > 20 ? fallback : undefined;
   }
 }

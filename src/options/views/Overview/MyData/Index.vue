@@ -39,10 +39,12 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import ResultParseStatus from "@/options/components/ResultParseStatus.vue";
 import UserLevelRequirementsTd from "./UserLevelRequirementsTd.vue";
 import HistoryDataViewDialog from "./HistoryDataViewDialog.vue";
+import SiteMessagesDialog from "./SiteMessagesDialog.vue";
 import BonusFormatSpan from "./BonusFormatSpan.vue";
 import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
 
 import { formatRatio } from "./utils/format.ts";
+import { useSiteMessageRead } from "./utils/siteMessageRead.ts";
 import { tableData, isTableLoading, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
 
 // 本文件名为 Index.vue，与 SearchEntity/Index.vue 同名；<script setup> 推断出的
@@ -203,14 +205,36 @@ const {
   },
 });
 
+/** 站内信的本地已读记账（徽章数字要扣掉它，点开读完数字才真的掉） */
+const siteMessageRead = useSiteMessageRead();
+
 /** v-badge 的 model-value/content 到 a-badge 的 count/dot 的映射 */
 function unreadBadge(record: IUserInfoItem) {
-  const messageCount = record.messageCount ?? 0;
+  // messageCount 是站点报告的未读数，本地读过的当场扣掉 —— 否则「点开读完了」数字还挂着。
+  // 下一次刷新用户信息时仍以站点给的数字为准（见 utils/siteMessageRead.ts 的说明）。
+  const messageCount = Math.max(0, (record.messageCount ?? 0) - siteMessageRead.readCountOf(record.site));
   if (!configStore.myDataTableControl.showUnreadMessage || messageCount <= 0) {
     return { count: 0, dot: false };
   }
   // 超过 10 条时原实现只显示一个小圆点（content 传 undefined）
   return messageCount > 10 ? { count: 0, dot: true } : { count: messageCount, dot: false };
+}
+
+const showMessageDialog = ref<boolean>(false);
+const messageDialogSiteId = ref<TSiteID | null>(null);
+
+/**
+ * 红数字/圆点是「读站内信」的入口，图标本体仍然是「刷新该站数据」。
+ * 两者都落在 a-badge 这一层（a-badge 把 click 挂到根 span 上），所以按事件目标分流：
+ * 命中的是徽标指示物才开弹窗，否则什么都不做，让 SiteFavicon 自己的 click 去刷新。
+ */
+function onBadgeClick(event: MouseEvent, record: IUserInfoItem) {
+  const target = event.target as HTMLElement | null;
+  if (!target?.closest(".ant-badge-count, .ant-badge-dot")) {
+    return;
+  }
+  messageDialogSiteId.value = record.site;
+  showMessageDialog.value = true;
 }
 
 const tableSelected = ref<TSiteID[]>([]); // 选中的站点行
@@ -483,7 +507,14 @@ const showExportDialog = ref(false);
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'siteUserConfig.sortIndex'">
           <div class="d-flex flex-column align-center">
-            <a-badge :count="unreadBadge(record).count" :dot="unreadBadge(record).dot" color="#f44336">
+            <a-badge
+              class="site-unread-badge"
+              :count="unreadBadge(record).count"
+              :dot="unreadBadge(record).dot"
+              color="#f44336"
+              :title="t('MyData.messages.badgeTip')"
+              @click="onBadgeClick($event, record)"
+            >
               <div class="favicon-hover-wrapper favicon-hover-bg">
                 <SiteFavicon
                   :site-id="record.site"
@@ -737,6 +768,7 @@ const showExportDialog = ref(false);
   </a-modal>
 
   <HistoryDataViewDialog v-model="showHistoryDataViewDialog" :site-id="historyDataViewDialogSiteId!" />
+  <SiteMessagesDialog v-model="showMessageDialog" :site-id="messageDialogSiteId!" />
   <ExportUserInfoDialog v-model="showExportDialog" :selected-site-ids="tableSelected" />
 </template>
 
@@ -770,6 +802,14 @@ const showExportDialog = ref(false);
 
 .favicon-hover-wrapper {
   cursor: pointer;
+}
+
+/* 红数字/圆点是读站内信的入口，得看着能点（图标本体是刷新，另有 cursor） */
+.site-unread-badge {
+  :deep(.ant-badge-count),
+  :deep(.ant-badge-dot) {
+    cursor: pointer;
+  }
 }
 
 .favicon-hover-bg {

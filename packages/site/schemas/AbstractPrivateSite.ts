@@ -13,6 +13,7 @@ import {
   NoUserInputError,
   type IElementQuery,
   type ISiteMetadata,
+  type ISiteMessage,
   type IUserInfo,
   type TLevelId,
   type TPatterns,
@@ -223,5 +224,24 @@ export default class PrivateSite extends BittorrentSite {
   // 允许子类覆盖
   protected guessUserLevelId(userInfo: IUserInfo): TLevelId {
     return guessUserLevelId(userInfo, this.metadata.levelRequirements ?? []);
+  }
+
+  /**
+   * 能否在扩展内读站内信（我的数据页点未读数字那条路）。
+   *
+   * 默认 false：站内信的列表结构各站改版就不一样，没实测过的 schema 不该假装解析得动 ——
+   * 解析不出来时给用户一个空列表比给他一个错误的列表更诚实，所以界面直接给「去网页看」。
+   * 目前只有 NexusPHP 系覆写了这一组（167/340 个定义，含国内绝大多数 PT 站）。
+   */
+  public get supportsMessages(): boolean {
+    return false;
+  }
+
+  public async getMessages(): Promise<ISiteMessage[]> {
+    return [];
+  }
+
+  public async getMessageContent(_messageId: string): Promise<string | undefined> {
+    return undefined;
   }
 }

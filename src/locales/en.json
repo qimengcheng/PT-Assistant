@@ -288,6 +288,18 @@
     }
   },
   "MyData": {
+    "messages": {
+      "badgeTip": "Read site messages",
+      "loading": "Loading...",
+      "unsupported": "This site's mailbox format is not recognized yet, so the list cannot be loaded.",
+      "openSite": "Open in browser",
+      "loadFailed": "Failed to load: your session may have expired, or the site changed its layout.",
+      "retry": "Retry",
+      "empty": "No unread messages",
+      "pickHint": "Pick a message on the left to read it",
+      "noBody": "The body could not be read here. Use 'Open in browser' to see the original.",
+      "unreadFlag": "Unread"
+    },
     "HistoryDataView": {
       "action": {
         "viewRaw": "View Raw Data"

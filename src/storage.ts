@@ -9,6 +9,7 @@ import type {
   TSearchResultSnapshotStorageSchema,
   TKeepUploadTaskStorageSchema,
   TCookieRenewalStorageSchema,
+  TSiteMessageReadStorageSchema,
 } from "@/shared/types.ts";
 
 export interface IExtensionStorageSchema {
@@ -33,6 +34,9 @@ export interface IExtensionStorageSchema {
 
   /** 各站点最近一次自动延长 cookie 的时间，见 shared/types/storages/other.ts 的说明 */
   cookieRenewals: TCookieRenewalStorageSchema;
+
+  /** 站内信的本地已读记账，见 shared/types/storages/other.ts 的说明 */
+  siteMessageRead: TSiteMessageReadStorageSchema;
 }
 
 export type TExtensionStorageKey = keyof IExtensionStorageSchema;
@@ -61,6 +65,7 @@ const items = {
   searchResultSnapshot: storage.defineItem<TSearchResultSnapshotStorageSchema | null>("local:searchResultSnapshot"),
   keepUploadTask: storage.defineItem<TKeepUploadTaskStorageSchema | null>("local:keepUploadTask"),
   cookieRenewals: storage.defineItem<TCookieRenewalStorageSchema | null>("local:cookieRenewals"),
+  siteMessageRead: storage.defineItem<TSiteMessageReadStorageSchema | null>("local:siteMessageRead"),
 };
 
 /**

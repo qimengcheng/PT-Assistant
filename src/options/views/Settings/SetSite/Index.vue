@@ -30,6 +30,7 @@ import RebuildMapDialog from "./RebuildMapDialog.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import { flushSiteFavicon } from "@/options/components/SiteFavicon/utils.ts";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
+import { toPagination } from "@/options/components/tableSorters.ts";
 
 // 数据来源
 import { allAddedSiteInfo, isLoadingAllAddedSites, type ISiteTableItem } from "./utils.ts";
@@ -137,23 +138,16 @@ const filteredItems = computed(() => {
 
 const tableSelected = ref<TSiteID[]>([]);
 
-const pagination = computed<TablePaginationConfig | false>(() => {
+const pagination = computed<TablePaginationConfig | false>(() =>
   // 本页默认档是 -1（`config.ts` 里存的就是它）：旧版 Vuetify 用 -1 表示「不分页、一次全展示」。
-  // 这个约定要保留，但**不能原样交给 antd** —— antd Table 是前端分页，pageSize=-1 会让
-  // slice(0, -1) 吃掉最后一行、页数也算成负数，所以必须换算（与 SearchEntity 的处理一致）。
-  const raw = configStore.tableBehavior.SetSite?.itemsPerPage as unknown;
-  const chosen = typeof raw === "number" && Number.isFinite(raw) && raw > 0;
-  const pageSize = chosen ? raw : 50;
-  // 条目全放得下就不出分页条（用户 2026-10-06 定的口径：默认展示全部，超过 50 条才分页）。
-  // 但用户在尺寸选择器里挑过一档（存下的是正数）之后分页条要常驻 —— 否则挑一档大到放得下
-  // 全部，分页条连同尺寸选择器一起消失，就再也切不回小档了。
-  if (!chosen && filteredItems.value.length <= pageSize) return false;
-  return {
-    pageSize,
-    showSizeChanger: true,
+  // 这个约定由 toPagination 兜底换算成 50（原样交给 antd 会 slice(0,-1) 吃掉最后一行）。
+  // 用户 2026-10-06 定的口径也在那条公共实现里：默认档下条目全放得下就不出分页条，
+  // 一旦他在尺寸选择器里挑过一档（存的是不等于默认档的正数）分页条就常驻。
+  toPagination(configStore.tableBehavior.SetSite?.itemsPerPage, 50, {
     size: "small",
-  };
-});
+    totalRows: filteredItems.value.length,
+  }),
+);
 
 function handleTableChange(
   page: TablePaginationConfig,

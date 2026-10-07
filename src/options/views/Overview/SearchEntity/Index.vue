@@ -21,7 +21,7 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
-import { buildSortOrderMap, toTableColumns } from "@/options/components/tableSorters.ts";
+import { buildSortOrderMap, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
 import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
 import type { ISearchResultTorrent } from "@/shared/types.ts";
 
@@ -257,14 +257,19 @@ watch([tableFilterRef, tablePageSize], () => {
   tablePage.value = 1;
 });
 
-const tablePagination = computed(() => ({
-  current: tablePage.value,
-  pageSize: tablePageSize.value,
-  showSizeChanger: true,
-  onChange: (page: number) => (tablePage.value = page),
-  onShowSizeChange: (_page: number, size: number) =>
-    configStore.updateTableBehavior("SearchEntity", "itemsPerPage", size),
-}));
+const tablePagination = computed(() =>
+  // totalRows 一传就有「一页放得下就不出分页条」——结果只有几条时不必挂着一条分页条
+  // （用户 2026-10-07：条数少的时候不要启用分页）。
+  toPagination(tablePageSize.value, 50, {
+    totalRows: tableItems.value.length,
+    extraConfig: {
+      current: tablePage.value,
+      onChange: (page: number) => (tablePage.value = page),
+      onShowSizeChange: (_page: number, size: number) =>
+        configStore.updateTableBehavior("SearchEntity", "itemsPerPage", size),
+    },
+  }),
+);
 
 /** a-table 没有 v-model，行选择通过 rowSelection.selectedRowKeys + onChange 双向同步 */
 const tableSelectedRowKeys = computed(() => tableSelectedRaw.value.map((x) => x.uniqueId));

@@ -150,6 +150,8 @@ const toggleColumn = (key: string, on: boolean) => {
 const { sortBy, pagination: tablePagination, handleTableChange } = useTableBehavior("MyData", {
   defaultPageSize: 20,
   multiSort: true,
+  // 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）
+  totalRows: () => filteredTableData.value.length,
 });
 
 const tableColumns = computed<TableColumnsType<IUserInfoItem>>(() =>

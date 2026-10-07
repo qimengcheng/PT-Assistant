@@ -221,6 +221,8 @@ const pagination = computed(() =>
   // 另外不能写 current:1 —— 受控值写死会锁死在第 1 页，页码交给 a-table 内部管理。
   toPagination(configStore.tableBehavior.SetSearchSolution.itemsPerPage, 10, {
     showTotal: (total: number) => t("common.totalItems", { total }),
+    // 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）
+    totalRows: tableData.value.length,
   }),
 );
 

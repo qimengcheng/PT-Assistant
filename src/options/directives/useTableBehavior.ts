@@ -12,7 +12,7 @@
  *   // column.sortOrder = sortOrderOf("downloadAt")
  *   // <a-table :pagination="pagination" @change="handleTableChange" />
  */
-import { computed, type ComputedRef } from "vue";
+import { computed, toValue, type ComputedRef, type MaybeRefOrGetter } from "vue";
 import type { TablePaginationConfig, TableSorterResult } from "antdv-next";
 
 import { useConfigStore } from "@/options/stores/config.ts";
@@ -39,10 +39,15 @@ interface IUseTableBehaviorOptions {
    * SearchEntity / MyClient 需要「点第三下取消排序」，传 true。
    */
   clearOnEmpty?: boolean;
+  /**
+   * 当前要展示的条数（过滤后的）。传了就走「一页放得下就不出分页条」，
+   * pagination 的类型也相应变成 `TablePaginationConfig | false`。
+   */
+  totalRows?: MaybeRefOrGetter<number>;
 }
 
 export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOptions = {}) {
-  const { defaultPageSize = 10, size, showTotal, multiSort = false, clearOnEmpty = false } = options;
+  const { defaultPageSize = 10, size, showTotal, multiSort = false, clearOnEmpty = false, totalRows } = options;
   const configStore = useConfigStore();
 
   const behavior: ComputedRef<{
@@ -67,10 +72,11 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
   };
 
   // 分页统一走 tableSorters.toPagination（含 Vuetify -1/0 非法值守卫与 size/showTotal 透传）
-  const pagination = computed<TablePaginationConfig>(() =>
+  const pagination = computed<TablePaginationConfig | false>(() =>
     toPagination(itemsPerPage.value, defaultPageSize, {
       ...(size ? { size } : {}),
       ...(showTotal ? { showTotal } : {}),
+      ...(totalRows === undefined ? {} : { totalRows: toValue(totalRows) }),
     }),
   );
 

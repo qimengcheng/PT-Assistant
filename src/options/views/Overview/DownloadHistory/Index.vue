@@ -52,6 +52,8 @@ const { tableFilterRef, tableWaitFilterRef, tableFilterFn } = tableCustomFilter;
 const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("DownloadHistory", {
   defaultPageSize: 10,
   size: "small",
+  // 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）
+  totalRows: () => filteredItems.value.length,
 });
 
 const columns = computed<TableColumnsType<ITorrentDownloadMetadata>>(() => [

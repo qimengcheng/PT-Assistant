@@ -13,6 +13,7 @@ import axios from "axios";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useLocalStorage } from "@vueuse/core";
+import type { TablePaginationConfig } from "antdv-next";
 
 import pkg from "../../../../package.json";
 import { REPO_URL } from "~/helper.ts";
@@ -83,6 +84,11 @@ const columns = computed(() => [
 ]);
 
 const tableDependencies = computed<ITData[]>(() => Object.values(technologyData.value));
+
+/** 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）。本页不分档、固定 50 条 */
+const tablePagination = computed<TablePaginationConfig | false>(() =>
+  tableDependencies.value.length <= 50 ? false : { pageSize: 50, showSizeChanger: true },
+);
 </script>
 
 <template>
@@ -108,7 +114,7 @@ const tableDependencies = computed<ITData[]>(() => Object.values(technologyData.
         bordered
         :columns="columns"
         :data-source="tableDependencies"
-        :pagination="{ pageSize: 50, showSizeChanger: true }"
+        :pagination="tablePagination"
         row-key="name"
         size="small"
       >

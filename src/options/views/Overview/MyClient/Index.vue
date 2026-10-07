@@ -38,7 +38,7 @@ import { formatSize, formatDate } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
-import { buildSortOrderMap, toTableColumns } from "@/options/components/tableSorters.ts";
+import { buildSortOrderMap, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
 import PushToDownloaderDialog from "./PushToDownloaderDialog.vue";
@@ -385,6 +385,16 @@ const rowSelection = computed<TableRowSelection<CTorrent>>(() => ({
 const tablePage = ref(1);
 const pageSize = computed(() => (configStore.tableBehavior["MyClient"] as any)?.itemsPerPage ?? 25);
 
+// 分页统一走 toPagination：它兜底 Vuetify 遗留的 -1/0（原先这页直接把 -1 交给 antd，
+// 会让 slice(0,-1) 吃掉最后一行），并带上「一页放得下就不出分页条」（用户 2026-10-07）。
+const tablePagination = computed(() =>
+  toPagination(pageSize.value, 25, {
+    size: "small",
+    totalRows: filteredTorrents.value.length,
+    extraConfig: { current: tablePage.value, total: filteredTorrents.value.length },
+  }),
+);
+
 const tableSortOrder = computed(() =>
   buildSortOrderMap((configStore.tableBehavior["MyClient"] as any)?.sortBy),
 );
@@ -531,13 +541,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
       :row-key="(record: CTorrent) => torrentKey(record)"
       :row-selection="rowSelection"
       :loading="loading"
-      :pagination="{
-        current: tablePage,
-        pageSize,
-        showSizeChanger: true,
-        size: 'small',
-        total: filteredTorrents.length,
-      }"
+      :pagination="tablePagination"
       size="small"
       class="table-header-no-wrap"
       @change="handleTableChange"

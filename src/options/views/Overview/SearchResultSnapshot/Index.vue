@@ -35,6 +35,8 @@ const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("SearchR
   defaultPageSize: 25,
   size: "small",
   showTotal: (total: number) => `${total}`,
+  // 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）
+  totalRows: () => filteredItems.value.length,
 });
 
 const columns = computed<TableColumnsType<ISearchSnapshotMetadata>>(() => [

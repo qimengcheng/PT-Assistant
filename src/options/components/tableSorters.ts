@@ -103,18 +103,33 @@ export function buildSortOrderMap(
  * 页数算成负数。
  *
  * extras.size / extras.showTotal 透传给 a-table 的 pagination，不传则不带对应键。
+ * extras.extraConfig 是给受控分页（current / onChange / total）留的口子。
+ *
+ * **extras.totalRows 一传就启用「一页放得下就不出分页条」**（用户 2026-10-07 的口径，
+ * 原先只有站点管理页有）。判"用户挑过一档"的依据是存下来的正数**不等于本页默认档** ——
+ * 因为一旦他挑过一档，分页条就要常驻：否则挑一档大到放得下全部，分页条连同尺寸选择器
+ * 一起消失，就再也切不回小档了（这条取舍最早在 SetSite 上定下）。
  */
 export function toPagination(
   itemsPerPage: unknown,
   fallback = 10,
-  extras: { size?: "small" | "middle"; showTotal?: (total: number) => string } = {},
-): TablePaginationConfig {
+  extras: {
+    size?: "small" | "middle";
+    showTotal?: (total: number) => string;
+    totalRows?: number;
+    extraConfig?: TablePaginationConfig;
+  } = {},
+): TablePaginationConfig | false {
   const raw = itemsPerPage;
-  const pageSize = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : fallback;
+  const usable = typeof raw === "number" && Number.isFinite(raw) && raw > 0;
+  const pageSize = usable ? raw : fallback;
+  const pickedASize = usable && raw !== fallback;
+  if (extras.totalRows !== undefined && !pickedASize && extras.totalRows <= pageSize) return false;
   return {
     pageSize,
     showSizeChanger: true,
     ...(extras.size ? { size: extras.size } : {}),
     ...(extras.showTotal ? { showTotal: extras.showTotal } : {}),
+    ...(extras.extraConfig ?? {}),
   };
 }

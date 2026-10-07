@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { FileSearchOutlined } from "@antdv-next/icons";
-import type { TableColumnsType } from "antdv-next";
+import type { TableColumnsType, TablePaginationConfig } from "antdv-next";
 
 import { sendMessage } from "@/messages.ts";
 import { type ILoggerItem } from "@/shared/types.ts";
@@ -36,6 +36,11 @@ function showLogDataDialogHandler(item: ILoggerItem) {
 
 /** 后台消息在途标志：给 a-table 的 :loading 用。没它的话每秒轮询的那一瞬间表格会闪一下空态 */
 const isLoadingLogger = ref<boolean>(false);
+
+/** 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）。本页不分档、固定 50 条 */
+const tablePagination = computed<TablePaginationConfig | false>(() =>
+  logger.value.length <= 50 ? false : { pageSize: 50, showSizeChanger: true, size: "small" },
+);
 
 function loadLogger() {
   isLoadingLogger.value = true;
@@ -78,7 +83,7 @@ onUnmounted(() => {
         :columns="columns"
         :data-source="logger"
         :loading="isLoadingLogger"
-        :pagination="{ pageSize: 50, showSizeChanger: true, size: 'small' }"
+        :pagination="tablePagination"
         row-key="id"
         size="small"
       >

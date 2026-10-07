@@ -97,17 +97,13 @@ const filteredDownloaders = computed(() => {
   });
 });
 
-const { itemsPerPage, handleTableChange: onTableChange } = useTableBehavior("SetDownloader", {
+// 分页交给 useTableBehavior（内部走 toPagination：Vuetify 的 -1 兜底 + 「一页放得下就不出分页条」）。
+// ⚠️ 不要写 current:1 —— antd 的 current 是受控值，写死后翻到第 2 页也会被立刻弹回第 1 页。
+const { pagination, handleTableChange: onTableChange } = useTableBehavior("SetDownloader", {
   defaultPageSize: 10,
-});
-
-const pagination = computed(() => ({
-  // ⚠️ 不要写 current:1 —— antd 的 current 是受控值，写死后翻到第 2 页也会被立刻弹回第 1 页。
-  // 页码交给 a-table 内部非受控管理，这里只持久化 pageSize。
-  pageSize: itemsPerPage.value,
-  showSizeChanger: true,
   showTotal: (total: number) => t("common.totalItems", { total }),
-}));
+  totalRows: () => filteredDownloaders.value.length,
+});
 
 // 列渲染回调的键名是 render(value, record, index)：antdv-next 没有 ant-design-vue 那个
 // customRender({ text, record })，写成 customRender 会被整列静默忽略、退化成原始值。

@@ -3,7 +3,7 @@
  * 特别感谢页：按本仓库的提交历史，把「智能体」与「模型」两栏各自的贡献量排出来。
  *
  * 数据来自 `src/options/data/agentStats.json`（`node scripts/gen-agent-stats.mjs` 生成、随代码入库）；
- * 图标全部在线直链、不入库，取不到时退化成首字母徽章。
+ * 图标全部在线直链、不入库，取不到（或还没取到）时退化成首字母徽章。
  */
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -35,7 +35,17 @@ interface IStats {
   platforms: IRow[];
 }
 
-/** git 里的名字 → 厂商名与官方 logo 直链（每条都实测过 200，且吃 chrome-extension Referer 也不被拦）。 */
+/**
+ * git 里的名字 → 厂商名与官方 logo 直链（每条都实测过 200，且吃 chrome-extension Referer 也不被拦）。
+ *
+ * 2026-10-07 本机逐条测过快慢（`.tmp-build/speedtest-logos.mjs`，直连、不走代理）：
+ * 国内 CDN 一律 0.04~0.38s；`.ai` 那几条是 1.1~2.1s，慢在 TLS 往返，不是文件大。
+ * 所以能换国内镜像的都换了（WorkBuddy / TraeCode，两条都和新地址逐字节相同）。
+ * 剩下两条没有国内镜像、只能留在海外源：OpenCode 与 ZEN 用 opencode.ai、OpenRouter 用
+ * openrouter.ai —— 它们的官网只有 `.ai` 这一个域名，npmmirror 又不放 simple-icons
+ * （unpkg 白名单 403），换第三方镜像等于给别人的品牌图加一层依赖，不划算。
+ * 这两条的观感靠「先亮首字母徽章、图到了再换」兜住，见模板里那段注释。
+ */
 const BRANDS: Record<string, { vendor?: string; logo: string }> = {
   Qoder: { logo: "https://qoder.com.cn/favIcon.svg" },
   "DeepSeek Harness": { logo: "https://www.deepseek.com/harness/favicon.svg" },
@@ -43,10 +53,14 @@ const BRANDS: Record<string, { vendor?: string; logo: string }> = {
     logo: "https://img.alicdn.com/imgextra/i1/O1CN016pjfTq1KjC2STpeei_!!6000000001199-55-tps-24-24.svg",
   },
   WorkBuddy: {
-    logo: "https://download.codebuddy.ai/web/workbuddy/f5bce0c03cdc17fa28d25634fb48d2791c297da3/assets/logo.svg",
+    // 与旧的 download.codebuddy.ai 那条 sha256 逐字节相同（10ccbc09…），只是换成官网
+    // （workbuddy.cn 首页 <link rel=icon>）自己声明的国内 CDN：本机实测 1.66s → 0.091s。
+    logo: "https://download.codebuddy.cn/web/workbuddy/788eb1c5ba3681efa98cf7b58ae688e293c1bb34/assets/logo.svg",
   },
   TraeCode: {
-    logo: "https://lf16-web-neutral.traecdn.ai/obj/trae-ai-static/trae_website/favicon.png",
+    // 同上：与 traecdn.ai 那条逐字节相同（49d52393…），换到 trae.cn 首页声明的 .com.cn CDN，
+    // 1.19s → 0.084s，而且这条路径不带部署哈希。
+    logo: "https://lf-cdn.trae.com.cn/obj/trae-com-cn/trae_website_prod_cn/favicon.png",
   },
   OpenCode: { logo: "https://opencode.ai/apple-touch-icon-v3.png" },
   "Qwen3.8-Flash": {
@@ -77,6 +91,8 @@ const stats = rawStats as unknown as IStats;
 const { t } = useI18n();
 
 const failed = ref<Record<string, boolean>>({});
+/** 图已经下好了才换掉徽章：没配好的海外站点（opencode.ai / openrouter.ai）要 1~2s，先亮徽章比留个空洞好 */
+const loaded = ref<Record<string, boolean>>({});
 
 /**
  * 排名口径：提交次数 / 代码量（手写新增行，口径见 `SpecialThank.caliber`）。
@@ -171,14 +187,17 @@ const spanLine = computed(() =>
           <span class="rank-no">{{ idx + 1 }}</span>
 
           <img
-            v-if="logoOf(row.name)"
+            v-if="logoOf(row.name) && loaded[row.name]"
             :alt="row.name"
             :src="logoOf(row.name)"
             class="rank-logo"
-            loading="lazy"
             referrerpolicy="no-referrer"
+            @load="loaded[row.name] = true"
             @error="failed[row.name] = true"
           />
+          <!-- 没加载完 / 没有配图 / 图挂了，都先占同一格首字母徽章（36×36 定尺寸，换成图不会位移）。
+               原来这里带 loading="lazy"：模型平台那一栏在折叠线以下，要等滚到才发起请求，
+               海外源再叠 1~2s，就是「图标刷新很慢」的那一段。整页只有 12 张图，不值得懒。 -->
           <span v-else class="rank-logo rank-logo-text">{{ initialsOf(row.name) }}</span>
 
           <div class="rank-main">

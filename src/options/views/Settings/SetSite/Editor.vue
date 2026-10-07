@@ -3,13 +3,14 @@ import { computed, inject, onMounted, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { set } from "es-toolkit/compat";
 import { toMerged } from "es-toolkit";
-import { ExportOutlined, InfoCircleOutlined } from "@antdv-next/icons";
+import { DeleteOutlined, ExportOutlined, InfoCircleOutlined, PlusOutlined } from "@antdv-next/icons";
 import type { SelectProps } from "antdv-next";
 
 import type { ISiteMetadata, ISiteUserConfig, timezoneOffset, TSiteID, TSiteUrl } from "@ptd/site";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate, formValidateRules } from "@/options/utils.ts";
+import { CATEGORY_KINDS, categoryKindLabelKey } from "@/shared/category.ts";
 
 const { t } = useI18n();
 const metadataStore = useMetadataStore();
@@ -72,6 +73,7 @@ async function initSiteData(id: TSiteID, flush = false) {
     // fix: customSiteUrl not show in Editor (#726)
     // 用户配的 url 不在站点定义的候选列表里 → 视为自定义 url，需要展示出来让用户编辑
     customSiteUrl.value = meta.urls.includes(merged.url as TSiteUrl) ? "" : (merged.url as string);
+    syncCategoryRows();
   } catch (e) {
     if (token !== initToken) {
       return;
@@ -155,6 +157,47 @@ const timeoutColor = computed(() => {
 });
 const intervalSliderMax = computed(() => (downloadInterval.value < 600 ? 600 : 1200));
 const intervalSliderStep = computed(() => (downloadInterval.value <= 60 ? 1 : 10));
+
+/**
+ * 分类映射：本站叫法 → 规范类别，存进 `siteUserConfig.categoryMap`。
+ *
+ * 这一张表是**每站的例外**，不是主判据 —— 主判据是 src/shared/category.ts 里那套按别名
+ * 折类的规则（340 个站点、站点自己声明的分类名就有 3200 多个，逐站枚举维护不动）。
+ * 只有在规则把某一站的叫法判错时，才在这里按站点纠正，纠正值优先于规则。
+ * 存在用户配置顶层而不是 merge 下：这张表只有搜索结果页读，而那里拿不到站点定义的
+ * metadata（要异步 import），挂到定义上就成了「写了也没人读」的死配置。
+ */
+const categoryRows = ref<Array<{ key: string; kind: string }>>([]);
+
+function syncCategoryRows() {
+  categoryRows.value = Object.entries(siteUserConfig.value.categoryMap ?? {}).map(([key, kind]) => ({
+    key,
+    kind: String(kind),
+  }));
+}
+
+/** 行编辑走显式提交，不 deep watch：否则用户每敲一个字都会绕回来自家提交，光标会跳 */
+function commitCategoryRows() {
+  const out: Record<string, string> = {};
+  for (const row of categoryRows.value) {
+    const key = row.key.trim();
+    if (key) out[key] = row.kind;
+  }
+  siteUserConfig.value.categoryMap = out;
+}
+
+function addCategoryRow() {
+  categoryRows.value = [...categoryRows.value, { key: "", kind: "other" }];
+}
+
+function removeCategoryRow(idx: number) {
+  categoryRows.value = categoryRows.value.filter((_, i) => i !== idx);
+  commitCategoryRows();
+}
+
+const categoryKindOptions = computed<SelectProps["options"]>(() =>
+  CATEGORY_KINDS.map((kind) => ({ value: kind, label: t(categoryKindLabelKey(kind)) })),
+);
 
 const groupOptions = computed<SelectProps["options"]>(() =>
   (siteMetaData.value.tags ?? []).map((tag) => ({ value: tag, label: tag })),
@@ -362,6 +405,35 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
         <a-button size="small" @click="uploadSpeedLimit = 0">{{ uploadSpeedLimit }} MiB/s</a-button>
       </div>
     </a-form-item>
+
+    <a-form-item :label="t('SetSite.Editor.categoryMap')" :help="t('SetSite.Editor.categoryMapHint')">
+      <div class="category-map">
+        <div v-for="(row, idx) in categoryRows" :key="idx" class="category-map-row">
+          <a-input
+            v-model:value="row.key"
+            size="small"
+            class="category-map-key"
+            :placeholder="t('SetSite.Editor.categoryMapSite')"
+            @change="commitCategoryRows"
+          />
+          <a-select
+            v-model:value="row.kind"
+            size="small"
+            class="category-map-kind"
+            :options="categoryKindOptions"
+            @change="commitCategoryRows"
+          />
+          <a-button size="small" type="text" @click="removeCategoryRow(idx)">
+            <template #icon><DeleteOutlined /></template>
+            {{ t("common.remove") }}
+          </a-button>
+        </div>
+        <a-button size="small" class="category-map-add" @click="addCategoryRow">
+          <template #icon><PlusOutlined /></template>
+          {{ t("SetSite.Editor.categoryMapAdd") }}
+        </a-button>
+      </div>
+    </a-form-item>
   </a-form>
 </template>
 
@@ -404,6 +476,34 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* 分类映射的编辑行：叫法 + 规范类别 + 删除。整块限宽，不然在宽弹窗里
+   那颗删除键会跑到离输入框很远的右边 */
+.category-map {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
+}
+
+.category-map-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-map-key {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.category-map-kind {
+  flex: 0 0 120px;
+}
+
+.category-map-add {
+  align-self: flex-start;
 }
 
 .slider {

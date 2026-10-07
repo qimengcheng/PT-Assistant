@@ -488,7 +488,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 （`dist/`）才能判，它会被自动收进来在构建前假报错 —— 那种守卫要单独给一步排到
 `Build and package` 之后，并加进 `check-all.mjs` 的 `EXCLUDED`。
 
-前六条是**静态扫描**，7、8 是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
+前六条是**静态扫描**，7、8、10 是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
 不需要 loader、不引入新依赖），9 是**数据快照自检**：
 
 | # | 脚本 | 防的静默失效 |
@@ -502,6 +502,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 | 7 | `check-indexdb-retry` | 共享库懒开的两条不变量：失败不缓存、成功必复用 |
 | 8 | `check-fingerprint` | 种子指纹三层逻辑自检（含「本该不同」的用例） |
 | 9 | `check-recent-updates` | 首页「最近更新」那份快照被裁掉条目、时间戳写成只有日期、或 `date` 对不上那次提交的真实时间（§3.7） |
+| 10 | `check-category-map` | 搜索结果「分类」折类判据（§3.8）：同一内容的各种写法必须折到同一类、**别名顺序敏感的那几对不许互撞**、站点覆盖必须压过规则，外加 `common.categoryKind.*` 这批**动态拼出来**的 i18n 键两侧都在（防线 ③ 看不见这种键） |
 
 第六条守的是 §3.2：从两个无 DOM / 必须轻量 的上下文出发，静态 import 闭包不许走到 `sizzle`、
 不许命中 `@ptd/site` / `@ptd/social` 根入口，entrypoint 的 `import.meta.glob` 必须根绝对，
@@ -617,6 +618,31 @@ v0.32.0 把档案从 9 条补到 112 条（含它自己那条），覆盖 v0.1.0
 
 **特别感谢页的 `agentStats.json` 不受这条约束** —— 那是提交计数与行数的**数字**，
 没有口吻问题，仍然靠 `scripts/gen-agent-stats.mjs` 重算入库（见 §2.1 与 README 的界面数据快照行）。
+
+### 3.8 搜索结果「分类」的折类口径
+
+同一种内容在各站点的叫法不一样：一部电影在 21 个站点上写作 `Movies` / `Movies/电影` /
+`电影/Movies` / `电影` / `Movies(电影)` / `Movie(電影)`，直接按原字符串排出来是散的，
+用户按「分类」排序等于没用。判据统一在 `src/shared/category.ts`（`RULES` /
+`categorizeCategory` / `compareCategory`），**页面里不许再自己写一份字符串判断**。
+
+- **为什么不是一张「本站叫法 → 统一名」的全量表**：245 个站点定义里去重后有 **3281 种**
+  写法，枚举表没人维护得动。所以做成两半 —— 绝大多数走规则折类，个别站点走站点级覆盖。
+- **站点例外**存 `ISiteUserConfig.categoryMap`（`Record<原始叫法, 规范类别>`，站点设置 →
+  其他设置 → 分类映射 可编辑）。**故意不挂 `ISiteMetadata`**：读它的只有搜索结果页，而站点
+  定义的 metadata 要 `getDefinedSiteMetadata()` 异步 import 才拿到，挂在定义类型上就是
+  「写了也没人读」的死配置。覆盖与规则冲突时**覆盖赢**；覆盖值写了非法类别时退回规则结果，
+  不会把界面搞成空白。
+- **`RULES` 是按序 first-match，所以别名顺序是判据的一部分**：`纪录片` 必须排在 `电视剧`
+  之前（"纪录片"里含"剧"），`anime` 在 `movie` / `tv` 之前（`Anime Movies`），`variety`
+  在 `tv` 之前。ASCII 别名只在**词首**匹配，否则 `HDTV` 会被当成 `tv`、`av` 会命中
+  `Adventure`。改顺序、加别名、删别名都要先跑 `node scripts/check-category-map.mjs`
+  —— 它把这四对互撞用例和「同一别名被两个 kind 认领」都断言死了。
+- **折类不能把原始数据藏起来**：表格里显示统一名，站点原文走 `a-tooltip` 悬停；
+  折类结果与原文相同时**不挂这层 tooltip**（一行里出现两个一样的词是新 bug）。
+- 折类名是动态拼出来的 i18n 键（`common.categoryKind.<kind>`），防线 ③ 看不见这种键，
+  所以两侧齐全由防线 ⑩ 验。加 kind 时四处都要动：`TCategoryKind` / `CATEGORY_KINDS`（它
+  就是排序档位）/ 两侧 locale / 防线 ⑩ 的期望表。
 
 ---
 

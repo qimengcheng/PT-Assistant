@@ -24,6 +24,7 @@ import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { buildSortOrderMap, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
 import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
 import type { ISearchResultTorrent } from "@/shared/types.ts";
+import { categoryKindLabelKey, categoryKindOf, compareCategory } from "@/shared/category.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
@@ -81,7 +82,38 @@ interface ITableColumn {
   className?: string;
   /** 默认 true（与 Vuetify 一致：只要有 key 就可排序），action 列显式关掉 */
   sortable?: boolean;
+  /** 显示值 ≠ 存储值时自带比较函数（toTableColumns 会用它顶掉按 dataIndex 取值的默认实现） */
+  compare?: (a: any, b: any) => number;
   props?: { disabled?: boolean };
+}
+
+/**
+ * 分类列显示的是折过的规范类别（Movies / 电影 / Movies(电影) / Movie(電影) 都显示「电影」），
+ * 原样叫法留在悬停里。判据与每站覆盖表见 src/shared/category.ts。
+ * 覆盖表读的是 metadataStore.sites[id].categoryMap，派生成 computed —— 不在挂载
+ * 钩子里命令式读（那是异步水合的 store，首屏会静默空，AGENTS §3.4 第五条）。
+ */
+const siteCategoryMaps = computed(() => {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [id, cfg] of Object.entries(metadataStore.sites ?? {})) {
+    const map = cfg.categoryMap;
+    if (map && Object.keys(map).length) out[id] = map;
+  }
+  return out;
+});
+
+function categoryCell(record: any) {
+  return { raw: record?.category, siteMap: siteCategoryMaps.value[record?.site] };
+}
+
+function categoryKindLabel(record: any): string {
+  return t(categoryKindLabelKey(categoryKindOf(categoryCell(record))));
+}
+
+/** 与原样叫法一致时不挂 tooltip：整列几十个悬停组件没有信息量 */
+function categoryOriginal(record: any): string {
+  const raw = String(record?.category ?? "").trim();
+  return raw && raw !== categoryKindLabel(record) ? raw : "";
 }
 
 const fullTableHeader = computed(
@@ -96,7 +128,15 @@ const fullTableHeader = computed(
         className: "search-entity-title-limit",
         props: { disabled: true },
       },
-      { title: t("SearchEntity.index.table.category"), key: "category", dataIndex: "category", align: "center" },
+      {
+        title: t("SearchEntity.index.table.category"),
+        key: "category",
+        dataIndex: "category",
+        align: "center",
+        // 显示的是折过的类别，排序也必须按折过的类别排：按原样叫法排会把拉丁写法的
+        // 「Movies」和中文写法的「电影」分到列表两头，同一类内容被劈开
+        compare: (a: any, b: any) => compareCategory(categoryCell(a), categoryCell(b)),
+      },
       { title: t("SearchEntity.index.table.size"), key: "size", dataIndex: "size", align: "end" },
       { title: t("SearchEntity.index.table.seeders"), key: "seeders", dataIndex: "seeders", align: "end" },
       { title: t("SearchEntity.index.table.leechers"), key: "leechers", dataIndex: "leechers", align: "end" },
@@ -714,6 +754,14 @@ const hasSearchStatus = computed<boolean>(() => {
             <!-- 主标题，副标题，优惠及标签 -->
             <template v-else-if="column.key === 'title'">
               <TorrentTitleTd :item="record" />
+            </template>
+
+            <!-- 分类：显示折过的规范类别，与原样叫法不同时给悬停看本站写法 -->
+            <template v-else-if="column.key === 'category'">
+              <a-tooltip v-if="categoryOriginal(record)" :title="categoryOriginal(record)">
+                <span>{{ categoryKindLabel(record) }}</span>
+              </a-tooltip>
+              <span v-else>{{ categoryKindLabel(record) }}</span>
             </template>
 
             <!-- 种子大小，下载情况 -->

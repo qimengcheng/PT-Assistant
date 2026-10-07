@@ -50,7 +50,9 @@ export function makeSorter<T = any>(path: string) {
  * 会原样保留表头里的其余字段（title / width / align / ellipsis / className /
  * defaultSortOrder / customRender 等），只统一补上 dataIndex、sorter、sortOrder。
  *
- * @param header 本地表头（key/title/align/width/sortable/props.disabled，可夹带任意 antd 列字段）
+ * @param header 本地表头（key/title/align/width/sortable/props.disabled，可夹带任意 antd 列字段；
+ *               给了 `compare` 的列用自带的比较函数 —— 显示值与存储值不是一回事的列需要它，
+ *               例如搜索结果页的「分类」：格子里是折过的规范类别，排序要按规范类别排）
  * @param sortOrderMap 列 key → antd sortOrder（受控排序时传入；未出现在 map 中的列不带 sortOrder，保持非受控）
  * @param options.multiSort 多列排序：sortable 列的 sorter 包装为 { compare, multiple: 列序号 + 1 }
  */
@@ -59,27 +61,29 @@ export function toTableColumns<T = any>(
   sortOrderMap: Record<string, "ascend" | "descend" | null> = {},
   options: { multiSort?: boolean } = {},
 ): TableColumnsType<T> {
-  return header.map(({ props: _props, sortable, sortOrder: explicitSortOrder, ...rest }, colIdx) => {
-    const compare = makeSorter<T>(rest.key);
-    const sortOrder = explicitSortOrder !== undefined ? explicitSortOrder : sortOrderMap[rest.key];
+  return header.map(
+    ({ props: _props, sortable, sortOrder: explicitSortOrder, compare: customCompare, ...rest }, colIdx) => {
+      const compare = customCompare ?? makeSorter<T>(rest.key);
+      const sortOrder = explicitSortOrder !== undefined ? explicitSortOrder : sortOrderMap[rest.key];
 
-    return {
-      ...rest,
-      key: String(rest.key),
-      // 嵌套路径（如 siteUserConfig.sortIndex）用数组形式，antd 才会正确取值 / 排序
-      dataIndex: String(rest.key).split("."),
-      // 默认所有列可排序，只有显式 sortable: false 的例外
-      sorter:
-        sortable === false
-          ? false
-          : options.multiSort
-            ? { compare, multiple: colIdx + 1 }
-            : compare,
-      // 只给受控页面里持久化了排序状态的列带 sortOrder；其余列不带此键，保持非受控
-      // （如弹窗里只用 defaultSortOrder 声明初始排序的场景——带 null 会被 antd 判为受控、点击不生效）
-      ...(sortOrder !== undefined ? { sortOrder } : {}),
-    };
-  }) as TableColumnsType<T>;
+      return {
+        ...rest,
+        key: String(rest.key),
+        // 嵌套路径（如 siteUserConfig.sortIndex）用数组形式，antd 才会正确取值 / 排序
+        dataIndex: String(rest.key).split("."),
+        // 默认所有列可排序，只有显式 sortable: false 的例外
+        sorter:
+          sortable === false
+            ? false
+            : options.multiSort
+              ? { compare, multiple: colIdx + 1 }
+              : compare,
+        // 只给受控页面里持久化了排序状态的列带 sortOrder；其余列不带此键，保持非受控
+        // （如弹窗里只用 defaultSortOrder 声明初始排序的场景——带 null 会被 antd 判为受控、点击不生效）
+        ...(sortOrder !== undefined ? { sortOrder } : {}),
+      };
+    },
+  ) as TableColumnsType<T>;
 }
 
 /**

@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-07 15:45:53",
-  "headSha": "3a30667",
+  "generatedAt": "2026-10-07 15:58:59",
+  "headSha": "9d1b218",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.33.0",
+      "date": "2026-10-07 17:12:00",
+      "added": [
+        "搜索结果里的「分类」不再各站各叫各的：同一片子的 Movies / Movies/电影 / 电影/Movies / Movies(电影) / Movie(電影) 统一显示成「电影」，按这一列排序时同一类的内容也连成一段；鼠标停在类别上还能看到该站点原样的写法",
+        "站点设置 → 其他设置 多了「分类映射」：某一站的叫法被自动归错了类，可以自己填「本站叫法 → 统一类别」纠正，纠正过的只影响这一站，没填的仍走通用判断"
+      ],
+      "addedTotal": 2,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.32.4",
       "date": "2026-10-07 15:58:59",

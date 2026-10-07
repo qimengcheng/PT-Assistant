@@ -437,6 +437,21 @@ export interface ISiteUserConfig {
   // 分类信息，默认为 ISiteMetadata.tags，也允许用户自定义添加，相同的会被合并到一类中
   groups?: string[];
 
+  /**
+   * 本站分类叫法 → 规范类别的覆盖表（键是种子行里原样的叫法，值取 src/shared/category.ts
+   * 里那一套：movie / tv / variety / anime / documentary / music / game / software /
+   * ebook / sport / kids / edu / photo / adult / other）。
+   *
+   * 这是**每站的例外**，不是主判据：主判据是按别名折类的规则，规则判错某一站时用户可在
+   * 「站点设置 → 分类映射」里按站纠正，纠正值优先于规则。
+   * 值用 string 而不是联合类型，是为了让本包不反向依赖应用侧的类型定义。
+   *
+   * 放在用户配置而不是 ISiteMetadata：读它的只有搜索结果页，而站点定义的 metadata 要
+   * `getDefinedSiteMetadata()` 异步 dynamic import 才拿到，几百行的表格不会为每行去 import ——
+   * 挂在定义类型上就等于一个「写了也没人读」的死配置。
+   */
+  categoryMap?: Record<string, string>;
+
   // 请求超时时间，单位为毫秒，如果不设置默认为 30000ms
   timeout?: number;
 

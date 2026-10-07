@@ -64,6 +64,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 防线 ⑦（行为断言） | `scripts/check-indexdb-retry.mjs` | 懒开共享库的两条不变量：开库失败不能被缓存、成功后必须复用同一句柄。静态扫不出来，靠它钉（手写最小 IDB 桩，不引 fake-indexeddb） |
 | 防线 ⑧（行为断言） | `scripts/check-fingerprint.mjs` | 种子指纹三层逻辑的纯函数断言（误判「本地已有」会让 qBittorrent 重下、直接打负分享率） |
 | 防线 ⑨（数据快照） | `scripts/check-recent-updates.mjs` | 首页「最近更新」那份 `recentUpdates.json`：形状、`date` 必须是完整时间戳且等于该版本那次提交的真实时间（从 `git log` 对）、**比 HEAD 少一条就 FAIL** —— 那份是累积档案，只许加不许裁（AGENTS.md §3.7） |
+| 防线 ⑩（行为断言） | `scripts/check-category-map.mjs` | 搜索结果「分类」的折类判据：同一内容的各种写法必须折到同一类、顺序敏感的几对不许互撞（纪录片/电视剧、动漫/电影、软件/游戏、综艺/电视剧）、站点覆盖优先于规则，以及 `common.categoryKind.*` 这批**动态拼出来的** i18n 键两侧都在（防线 ③ 看不见这种键） |
 | 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `build` job 也挂着它 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |

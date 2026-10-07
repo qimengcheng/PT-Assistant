@@ -64,9 +64,14 @@ function updateQuickSiteFilter() {
 }
 
 /**
- * v-chip-group(filter + mandatory) 在 antd 里没有等价物（a-checkable-tag-group 只能吃
- * options 数组、渲染不了站点图标 + 站点名），改为可横向滚动的 a-tag 行：
+ * v-chip-group(filter + mandatory) 在 antd 里没有等价物，改为可横向滚动的 a-tag 行：
  * 选中项用实心 tag 表示，点任意一个站点即快速筛选该站点。
+ *
+ * 2026-10-07 复核过 a-checkable-tag-group 这条退路（旧注释写的「渲染不了站点图标 + 站点名」
+ * 不准确，别按它下结论）：它的 options[].label 是走 CheckableTag 默认插槽渲染的，塞 VNode
+ * 可以带图标。真正不用它的原因是另一条 —— 未选中态是 `background-color: transparent` +
+ * `border-color: transparent`（tag/style/index.js 的 `&-checkable`），在这块淡蓝 alert 上
+ * 看着就是一行裸文字，不像可点的 chip。
  */
 function selectSite(siteId: string) {
   selectedSite.value = siteId;
@@ -82,7 +87,7 @@ function selectSite(siteId: string) {
         <template v-if="configStore.searchEntity.quickSiteFilter">
           <!-- "全部"选项 -->
           <a-tag
-            class="chip_limit_width"
+            class="chip_limit_width chip_white"
             :class="{ chip_content_hidden_fix: smAndDown }"
             @click.stop="clearSiteFilter"
           >
@@ -97,7 +102,7 @@ function selectSite(siteId: string) {
               :key="siteId"
               :color="siteId === selectedSite ? 'blue' : undefined"
               :variant="siteId === selectedSite ? 'solid' : 'outlined'"
-              class="mr-1 mb-1"
+              :class="['mr-1 mb-1', { chip_white: siteId !== selectedSite }]"
               @click.stop="selectSite(siteId)"
             >
               <SiteFavicon :site-id="siteId" :size="14" class="mr-1" />
@@ -135,6 +140,18 @@ function selectSite(siteId: string) {
 <style lang="scss" scoped>
 .chip_limit_width {
   min-width: fit-content;
+}
+
+/**
+ * 未选中的 chip 换白底：antd 的灰底（台架实测 .ant-tag-filled 算出 rgb(245,245,245)）落在
+ * a-alert 的淡蓝底上很脏（用户 2026-10-07 指的就是这块）。Tag 的 API 给不出「白底深字」：
+ * color="#fff" 走 filled 分支时 useColor 把文字也刷成传入色（白底白字），走 solid 分支时
+ * 文字固定 colorTextLightSolid（也是白）；components.Tag.defaultBg 能改，但会连带整棵子树里
+ * 所有 tag。所以按实测强度写这一条：scoped 后是 .chip_white.ant-tag[data-v-…] (0,3,0)，
+ * 压过 cssinjs 运行时注入的 .css-var-….ant-tag (0,2,0) —— 不靠文档顺序，也不用 !important。
+ */
+.chip_white.ant-tag {
+  background-color: #fff;
 }
 
 .site-filter-scroll {

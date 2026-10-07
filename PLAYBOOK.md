@@ -235,6 +235,43 @@ CI 的 `scripts/smoke-background.mjs` 守的就是这一类，见 README「工�
 **补注册前先看体积**：按「实际注册名数」算 —— 有些组件（如 `a-empty`）实现早已在 chunk 里、只是没注册，
 补注册 Δ0 KB；但 `a-float-button` / `a-descriptions` / `a-typography` 这类是实打实的新增体积，换之前先掂量。
 
+### 33. 切英文后仍有中文：两种失效形状，别当成同一种（v0.29.8，2026-10-07）
+
+**现象**：用户在基础设置页选了 English，页面上仍有一片中文（标签页名「界面 / 用户信息 / 下载设置」、
+下拉选项、若干表头）。他给的口径是「选英文之后还有很多没有英文」。
+
+**先排除的那一种（这次不是它）**：缺翻译。`node scripts/check-locale-keys.mjs` 之外我又对两份 JSON 做了
+键集与取值核对 —— zh 1350 / en 1350，`missing in en: 0`，en 的取值里也没有汉字。
+**缺 key 的形态本来就不会显示中文**：locale 是 `en`、`fallbackLocale` 也是 `en`，取不到时渲染的是
+**键路径**（`SetBase.Index.tabUi` 这种），不是中文。所以「显示中文」必然另有来源。
+
+**真根因（第一类，已全仓收口）**：`t()` 被写在 `<script setup>` 顶层的**常量集合**里 ——
+表头数组、tabs、`{value,label}` 选项、状态文本映射。这些在组件创建那一帧求值一次就定死了；
+而 locale 是 `entrypoints/options/main.ts` 里 `watchEffect` 同步给 `i18n.global.locale.value` 的**活值**，
+模板里直接写的 `t()` 会跟着重渲染，setup 里的常量不会。表现就是「切语言当场没反应，重开页面才变」——
+比「完全不变」更难被发现。改法一律是 `computed(() => [...])`：模板侧自动解包不用动，
+脚本侧取值处补 `.value`（`KeepUploadDialog` 的 `statusText` 10 处、`MyData` 的 `fullTableHeader` 3 处，
+它原先是 `reactive` 但没有一处改写，所以换成 computed 是安全的 —— `vue-tsc` 会替我证明没有 `.push/.=` 残留）。
+共 16 个文件。
+
+**排查手法**：常量扫描（脚本在 `.tmp-build/`，一次性工具不入库）—— 取 `<script setup>` 里以
+`const/let` 起头、语句体含 `(^|[^A-Za-z0-9_$])t\(\s*["'\`]` 且声明行没有 `computed` 的整条语句。
+最后那个"排除 computed"的判据很关键：改完之后同一支脚本要出 0 命中，否则等于自欺。
+
+**还挂着的第二类（这次没动，形状不同、不是同一个 bug）**：**根本没走 i18n** 的硬编码中文文案，
+约 40 处，分三档，取舍口径不一样：
+- 浏览器级 UI：`entrypoints/background/utils/contextMenus.ts`（14 处右键菜单标题）、`omnibox.ts`（2 处地址栏提示）。
+  SW 里没有 `useI18n`，而且菜单 title 只在 `onInstalled`/`onUpdated` 建一次，**光换文案还不够** ——
+  语言变了得重建菜单。
+- 消息/提示文案：`SentToDownloaderDialog/utils.ts`、`SearchEntity/utils/search.ts`、`stores/metadata.ts`、
+  `MediaServerEntity/utils.ts`、`MyData/utils/lastUserData.ts`。多数在函数里、按下时才求值，
+  套仓库现成的双语写法即可（参照 `DownloadHistory/utils.ts` 的 `i18nLoadErrorText()`：
+  按 `useConfigStore().lang` 选一份，注释里写明了为什么不用 useI18n）。
+- 渲染常量：`DownloadHistory/utils.ts` 的 `downloadStatusMap`（下载中/等待中/已完成/错误）——
+  它是模块级对象，**和第一类同族**，要按「函数/computed 二选一」改，不是简单替换字符串。
+- 不算 bug 的：`console` 里的 `[PTD] …` 日志、`shared/fingerprint/title.ts` 的字幕组 token（那是数据不是文案）、
+  `SpecialThank.vue` 的厂商名、`definedLangMetaData` 的「简体中文 Chinese (Simplified)」（语言选择器显示母语名是故意的）。
+
 ---
 
 ## 四、存储

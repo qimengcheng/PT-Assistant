@@ -234,12 +234,11 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
                 <!-- 左上角：格式 / 大小 -->
                 <div class="poster-tags poster-tags-left">
                   <a-tag v-if="item.format" color="blue" class="poster-tag">
-                    <PlaySquareOutlined />
-                    {{ item.format?.toUpperCase() }}
-                    <template v-if="firstVideoTitle(item)"> / {{ firstVideoTitle(item) }}</template>
+                    <template #icon><PlaySquareOutlined /></template>
+                    <span>{{ item.format?.toUpperCase() }}<template v-if="firstVideoTitle(item)"> / {{ firstVideoTitle(item) }}</template></span>
                   </a-tag>
                   <a-tag v-if="item.size" class="poster-tag">
-                    <HddOutlined />
+                    <template #icon><HddOutlined /></template>
                     {{ formatSize(item.size ?? 0) }}
                   </a-tag>
                 </div>

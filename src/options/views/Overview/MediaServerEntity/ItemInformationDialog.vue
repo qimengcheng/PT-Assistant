@@ -128,7 +128,7 @@ function formatDuration(rawSeconds: number) {
 
             <a-popover v-if="subtitleStreams.length > 0" trigger="hover">
               <a-tag color="blue" class="cursor-pointer">
-                <FileTextOutlined />
+                <template #icon><FileTextOutlined /></template>
                 {{ subtitleStreams.length }}
               </a-tag>
               <template #content>

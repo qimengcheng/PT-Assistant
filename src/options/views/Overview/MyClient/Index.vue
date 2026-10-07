@@ -504,7 +504,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
       <!-- 工具条右端：下载器筛选标签 + 状态按钮（原 a-alert 的 #action）、自定义列、搜索框 -->
       <a-flex align="center" gap="small" wrap class="page-bar-extra">
         <a-tag v-if="selectedDownloaderIds.length === 1" color="blue" closable @close="clearDownloaderFilter">
-          <img class="client-tag-icon" :src="clientIcon(selectedDownloaderIds[0])" alt="" />
+          <template #icon><img class="client-tag-icon" :src="clientIcon(selectedDownloaderIds[0])" alt="" /></template>
           {{ clientName(selectedDownloaderIds[0]) }}
         </a-tag>
 

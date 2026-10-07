@@ -10,7 +10,6 @@ import {
   SearchOutlined,
   SyncOutlined,
 } from "@antdv-next/icons";
-import { useBreakpoint } from "antdv-next";
 import type { TableColumnsType } from "antdv-next";
 
 import { sendMessage } from "@/messages.ts";
@@ -44,8 +43,6 @@ import {
 
 const { t } = useI18n();
 const configStore = useConfigStore();
-const screens = useBreakpoint();
-const isNarrow = computed(() => screens.value?.xs === true || screens.value?.sm === true);
 
 const { tableFilterRef, tableWaitFilterRef, tableFilterFn } = tableCustomFilter;
 
@@ -62,8 +59,14 @@ const columns = computed<TableColumnsType<ITorrentDownloadMetadata>>(() => [
     title: t("DownloadHistory.table.title"),
     key: "title",
     align: "left",
+    // 故意不给 width：本页 tableLayout 是 fixed（标题列带 ellipsis 就会进那一档），
+    // 只有留一个没有宽度的列，它才吃得到剩下的全部宽度。
+    // 原先这里写的是 `...(isNarrow ? { width: 260 } : {})`，而 isNarrow 判的是
+    // `screens.xs || screens.sm` —— antd 的 sm 是 `(min-width: 576px)`，**不是**「576~767」，
+    // 所以桌面宽度下恒为 true，260 永远在。所有列都定了宽度之后，fixed 布局会把它们
+    // 按比例一起放大去填满容器（实测 1812px 的容器 ÷ 1026px 的列宽合计 = 1.77 倍：
+    // 站点 96→169、下载状态 120→211），标题列反而被压成 260。
     ellipsis: true,
-    ...(isNarrow.value ? { width: 260 } : {}),
   },
   { title: t("DownloadHistory.table.downloader"), key: "downloaderId", align: "left", width: 200 },
   {
@@ -75,8 +78,10 @@ const columns = computed<TableColumnsType<ITorrentDownloadMetadata>>(() => [
     sorter: (a, b) => (a.downloadAt ?? 0) - (b.downloadAt ?? 0),
     sortOrder: sortOrderOf("downloadAt"),
   },
-  { title: t("DownloadHistory.table.status"), key: "downloadStatus", align: "center", width: 120 },
-  { title: t("common.action"), key: "action", align: "center", width: 110 },
+  // 一格内容 = 一个 a-tag（图标 14 + 间距 8 + 最长「已完成」3 字 42 + 标签内衬 16）+ 单元格内衬 16 ≈ 96
+  { title: t("DownloadHistory.table.status"), key: "downloadStatus", align: "center", width: 104 },
+  // 两颗 small 图标按钮（各 ≈28）+ a-space 无间隙 + 单元格内衬 16 ≈ 72，留到 96 防换行撑高行
+  { title: t("common.action"), key: "action", align: "center", width: 96 },
 ]);
 
 /**
@@ -210,14 +215,16 @@ onUnmounted(() => {
         </template>
 
         <template v-else-if="column.key === 'downloadStatus'">
+          <!-- 图标必须走 #icon 插槽：antd 的 Tag 只取默认插槽的**第一个**子节点
+               （`filterEmpty(slots.default())[0]`），把图标当默认子节点写会让后面的文字整个被丢掉 -->
           <a-tag
             v-if="statusOf(record)"
             :color="statusOf(record)!.color"
             class="status-tag"
             @click="() => viewDownloadDetail(record)"
           >
-            <component :is="statusOf(record)!.icon" />
-            <span class="ml-1">{{ statusOf(record)!.title }}</span>
+            <template #icon><component :is="statusOf(record)!.icon" /></template>
+            {{ statusOf(record)!.title }}
           </a-tag>
         </template>
 

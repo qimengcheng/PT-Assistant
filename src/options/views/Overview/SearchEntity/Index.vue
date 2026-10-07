@@ -2,7 +2,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { useBreakpoint } from "antdv-next";
 import {
   AlertOutlined,
   CameraOutlined,
@@ -56,20 +55,13 @@ const configStore = useConfigStore();
 const metadataStore = useMetadataStore();
 const runtimeStore = useRuntimeStore();
 
-/**
- * useBreakpoint() 返回的是**单个 Ref**，其 .value 上挂着 { xs, sm, md, lg, xl, ... }。
- * 原先 Vuetify 的 display.smAndDown 表示「比 lg 窄」，这里用 !lg 近似同一断点。
- */
-const screens = useBreakpoint();
-const smAndDown = computed(() => !screens.value?.lg);
-
 const showAdvanceFilterGenerateDialog = ref<boolean>(false);
 const showSearchStatusDialog = ref<boolean>(false);
 const showSaveSnapshotDialog = ref<boolean>(false);
 
 /**
  * 表格列定义。原先用的是 Vuetify 的 DataTableHeader，这里就地定义一个本地类型：
- * - dataIndex / className / minWidth 是 a-table 需要且语义一致的字段；
+ * - dataIndex / className 是 a-table 需要且语义一致的字段；
  * - align 沿用 start/center/end（rc-table 原生支持这三个值）；
  * - sortable 是 Vuetify 的开关，映射到 a-table 的 sorter（见下 tableHeader）；
  * - props.disabled 仍被 tableHeader 用于「这些列不参与列显隐配置」的判断，语义保持不变。
@@ -79,8 +71,13 @@ interface ITableColumn {
   key: string;
   dataIndex?: string;
   align?: "start" | "center" | "end";
-  minWidth?: number;
-  /** 标题列在窄屏 / 开启限宽时需要压到 32vw，用 className 走 CSS（rc-table 的 maxWidth 只接受数字） */
+  /**
+   * 标题列的限宽走 CSS（rc-table 的 maxWidth 只接受数字，而这里要的是「容器宽 − 其它列预算」
+   * 这种容器查询算式，见下面 .search-entity-title-limit）。
+   * 原来配的 minWidth: 480 已删 —— 它本来就是死配置：本页的 layout 判出来是 fixed
+   * （设了 scroll.y 又没有固定列），而 @v-c/table 只在 tableLayout === 'auto' 时才把
+   * minWidth 写进 <col style="min-width">。删它是清理，不是这条修复的内容。
+   */
   className?: string;
   /** 默认 true（与 Vuetify 一致：只要有 key 就可排序），action 列显式关掉 */
   sortable?: boolean;
@@ -96,10 +93,7 @@ const fullTableHeader = computed(
         key: "title",
         dataIndex: "title",
         align: "start",
-        minWidth: 480,
-        ...(configStore.searchEntifyControl.limitTorrentTitleTdWidth || smAndDown.value
-          ? { className: "search-entity-title-limit" }
-          : {}),
+        className: "search-entity-title-limit",
         props: { disabled: true },
       },
       { title: t("SearchEntity.index.table.category"), key: "category", dataIndex: "category", align: "center" },
@@ -417,7 +411,10 @@ function cancelSearchQueue() {
   runtimeStore.search.isSearching = false;
 }
 
-const tableNonBooleanControlKey = ["maxTagCountBeforeGroup", "hiddenTagNames"];
+// maxTagCountBeforeGroup / hiddenTagNames 不是开关（下面另有输入控件）。
+// limitTorrentTitleTdWidth 也一并藏起来：标题列现在**一律**限宽（见 .search-entity-title-limit），
+// 这个开关失去了意义；config 字段保留，不动存量数据（同 UiWindow 里那两个已摘掉的开关的做法）。
+const tableNonBooleanControlKey = ["maxTagCountBeforeGroup", "hiddenTagNames", "limitTorrentTitleTdWidth"];
 
 // 过滤出表格控制中非布尔类型的键
 const filteredTableBooleanControlKeys = computed(() => {
@@ -809,13 +806,38 @@ const hasSearchStatus = computed<boolean>(() => {
   }
 
   /**
-   * 标题列限宽：原先是 Vuetify header 的 maxWidth: 32vw，
-   * rc-table 的 maxWidth 只接受数字，这里用 className 走 CSS。
+   * 标题列限宽的算式要按「这张表实际有多宽」来定，所以先把表格容器标成 inline-size 尺寸容器。
+   * 标在这里而不是 .ant-table-body 上：设了 scroll.y 之后 rc-table 把表头/表体拆成两张 <table>，
+   * 两边必须算出同一个 max-width，否则列对不齐。
+   */
+  container-type: inline-size;
+
+  /**
+   * 标题列一律限宽（原先是 Vuetify header 的 maxWidth: 32vw，且挂在一个默认关闭的开关上；
+   * 不限宽时这一列的宽度就是最长那条种子名的整行宽度，整张表被撑出横向滚动条）。
+   *
+   * 860 = 其它 10 列的宽度预算。台架照本页真实结构搭（同一份 rc-table：scroll.x: max-content
+   * + scroll.y → 表头/表体两张表 + 隐藏量宽行 + 表头那条 17px 滚动条占位列），
+   * 实测其它列 = 702px（勾选 48 + 站点 64 + 分类 64 + 大小 65 + 四个数字列 64×4 + 时间 100
+   * + 操作 140），加占位列与边框约 740。取 860 是给英文表头（约 +80）和操作列多一颗按钮留余量：
+   * 预算小于真实占用时滚动条就回来了，反过来只是标题列窄一点。
+   *
+   * 220 是地板：窗口很窄时优先保标题能读。代价是容器低于约 970px（740 + 220）时必然溢出，
+   * 那 11 列确实放不下 —— 属于必要滚动条，不是这个式子要消灭的那种。
+   *
+   * 实测三档容器（1309 / 1140 / 972）：表宽 == 容器宽、横向滚动条消失，标题列拿到
+   * 约 500 / 320 / 220，长标题在单元格内被省略号截断（原生 title 悬停看全文）。
+   *
+   * overflow: hidden 不是可选的装饰，它挡的是第二行（标签 / 副标题）：
+   * 标签给到 20 个时只写 max-width —— 表宽仍然 == 容器宽，但标签伸出单元格右边 756px，
+   * 把滚动容器的 scrollWidth 顶大，横向滚动条照样回来；补上 overflow: hidden 才消失。
+   * （标题那一行不需要它：fixed 布局下 max-width 自己就压得住。）
    */
   :deep(.search-entity-title-limit) {
-    max-width: 32vw;
+    /* 前一条是不支持容器查询单位时的兜底，后一条在支持的浏览器里覆盖它 */
+    max-width: 420px;
+    max-width: max(220px, calc(100cqi - 860px));
     overflow: hidden;
-    text-overflow: ellipsis;
   }
 }
 </style>

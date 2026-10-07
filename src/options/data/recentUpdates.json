@@ -1,7 +1,37 @@
 {
   "generatedAt": "2026-10-07",
-  "headSha": "de381eb",
+  "headSha": "db6fece",
   "versions": [
+    {
+      "version": "0.29.3",
+      "date": "2026-10-07",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "搜索结果页不再出现横向滚动条 —— 标题列被超长种子名撑开的问题收住了，标题过长时按列宽截断，鼠标悬停可看完整标题",
+        "「显示偏好」里的「限制种子标题宽度」开关去掉了：标题列现在一律限宽，不用再手动打开"
+      ],
+      "improvedTotal": 2
+    },
+    {
+      "version": "0.29.2",
+      "date": "2026-10-07",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「备份与恢复 → 添加」的类型下拉以前是一片空白（显示「暂无数据」），选不了 WebDAV / 本地，现在能正常选",
+        "备份服务器、下载器那两个 ⓘ 帮助按钮点开的仓库地址是 404（路径早就不存在了），现在指向仓库里真实存在的目录"
+      ],
+      "improvedTotal": 2
+    },
+    {
+      "version": "0.29.1",
+      "date": "2026-10-07",
+      "added": [],
+      "addedTotal": 0,
+      "improved": ["首页「最近更新」的措辞换成给用户看的话，不再照抄仓库内部那些提交标题"],
+      "improvedTotal": 1
+    },
     {
       "version": "0.29.0",
       "date": "2026-10-07",
@@ -61,22 +91,6 @@
       "version": "0.27.0",
       "date": "2026-10-06",
       "added": ["特别感谢页改成智能体 / 模型 / 模型平台三栏贡献榜，数据取自本仓库的提交历史"],
-      "addedTotal": 1,
-      "improved": [],
-      "improvedTotal": 0
-    },
-    {
-      "version": "0.26.0",
-      "date": "2026-10-06",
-      "added": ["特别感谢页的纯文字名单换成 10 家 AI 智能体的在线 logo 墙"],
-      "addedTotal": 1,
-      "improved": [],
-      "improvedTotal": 0
-    },
-    {
-      "version": "0.24.0",
-      "date": "2026-10-06",
-      "added": ["搜索作用域面板里的站点支持拖动排序与置顶"],
       "addedTotal": 1,
       "improved": [],
       "improvedTotal": 0

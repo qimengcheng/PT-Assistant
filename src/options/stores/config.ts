@@ -40,6 +40,17 @@ const saveLastDownloaderDefaultOnSince = "0.22.37";
  */
 const autoExtendCookiesDefaultOnSince = "0.29.5";
 
+/**
+ * v0.29.6 起「自动刷新用户信息」的间隔默认从 3 小时改成 1 小时（用户 2026-10-07：
+ * "默认3分钟也太短了，默认改成60分钟" —— 他读到的是界面上那个错标的"分钟"，
+ * 引擎里这个数一直是按小时乘的（`interval * 60 * 60 * 1000`），所以这次同时把标签改对）。
+ *
+ * 数字档的纠正比布尔档多一处误伤：存量里正好填过 3 的人也会被改成 1。判据仍按先例
+ * （值 == 旧默认 且 version 比这条门旧）走一次，追平后不再干预。3 小时不是任何
+ * 里程碑值，误伤代价是一次重新填表，比让所有人继续吃 3 小时划算。
+ */
+const autoReflushIntervalDefaultOneHourSince = "0.29.6";
+
 /** 语义化版本按 x.y.z 逐段比数值；空串/异常串按 0.0.0 处理（即"很旧"）。 */
 function isOlderVersion(a: string, b: string): boolean {
   const pa = String(a ?? "")
@@ -121,6 +132,21 @@ export const useConfigStore = defineStore("config", {
         isOlderVersion(state.version, autoExtendCookiesDefaultOnSince)
       ) {
         state.autoExtendCookies.enabled = true;
+        needsSave = true;
+      }
+
+      if (
+        state.userInfo?.autoReflush?.interval === 3 &&
+        isOlderVersion(state.version, autoReflushIntervalDefaultOneHourSince)
+      ) {
+        state.userInfo.autoReflush.interval = 1;
+        needsSave = true;
+      }
+
+      // afterTime 曾被一个 a-input-number 绑着（v0.29.6 才换成按小时选），动过就成了数字，
+      // 而 alarms.ts 拿它 `split(":")` —— 抛错的是整个自动刷新任务。存量里修一次。
+      if (state.userInfo?.autoReflush && typeof state.userInfo.autoReflush.afterTime !== "string") {
+        state.userInfo.autoReflush.afterTime = "00:00";
         needsSave = true;
       }
 
@@ -326,7 +352,7 @@ export const useConfigStore = defineStore("config", {
       queueConcurrency: 5,
       autoReflush: {
         enabled: true,
-        interval: 3, // hours
+        interval: 1, // hours（v0.29.6 起 3 → 1；界面原先标的是"分钟"，见 UserInfoWindow）
         afterTime: "00:00",
         retry: {
           max: 3,

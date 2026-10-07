@@ -2,11 +2,28 @@
 /**
  * 用户信息设置：自动刷新队列、并发数、cookie 自动延长、死亡站点显示。
  */
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useConfigStore } from "@/options/stores/config.ts";
 
 const { t } = useI18n();
 const configStore = useConfigStore();
+
+/**
+ * afterTime 在引擎里是 "HH:mm"（alarms.ts 拿它 `split(":")` 跟当前时刻比），不是秒数。
+ * 原先这里挂的是 a-input-number（标签还写着「启动后延迟（秒）」）—— 谁动过一下那个
+ * 数字框，值就成了数字，`split` 当场抛错，整个自动刷新任务静默死掉。
+ * 选项按整点给；存量里那个非整点值补进选项，免得下拉打开看不到自己原来的值。
+ */
+const afterTimeOptions = computed(() => {
+  const options = Array.from({ length: 24 }, (_, h) => {
+    const v = `${String(h).padStart(2, "0")}:00`;
+    return { value: v, label: v };
+  });
+  const current = configStore.userInfo.autoReflush.afterTime;
+  if (current && !options.some((o) => o.value === current)) options.unshift({ value: current, label: current });
+  return options;
+});
 </script>
 
 <template>
@@ -28,7 +45,7 @@ const configStore = useConfigStore();
             </a-col>
             <a-col :span="8">
               <a-form-item :label="t('SetBase.UserInfoWindow.afterTime')">
-                <a-input-number v-model:value="configStore.userInfo.autoReflush.afterTime" :min="0" style="width: 100%" />
+                <a-select v-model:value="configStore.userInfo.autoReflush.afterTime" :options="afterTimeOptions" />
               </a-form-item>
             </a-col>
             <a-col :span="8">

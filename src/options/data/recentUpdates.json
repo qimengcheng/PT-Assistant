@@ -3,6 +3,14 @@
   "headSha": "db6fece",
   "versions": [
     {
+      "version": "0.29.4",
+      "date": "2026-10-07",
+      "added": [],
+      "addedTotal": 0,
+      "improved": ["基础设置页顶部那一大块灰底去掉了 —— 「基础设置」标题不再被一条多余的 40px 上边距顶下来，白色面板往上提了约 35px"],
+      "improvedTotal": 1
+    },
+    {
       "version": "0.29.3",
       "date": "2026-10-07",
       "added": [],
@@ -86,14 +94,6 @@
         "另外 8 个页面补齐了与列表页一致的「工具条 + 白底面板」版式，页面下半截不再是一片灰底"
       ],
       "improvedTotal": 2
-    },
-    {
-      "version": "0.27.0",
-      "date": "2026-10-06",
-      "added": ["特别感谢页改成智能体 / 模型 / 模型平台三栏贡献榜，数据取自本仓库的提交历史"],
-      "addedTotal": 1,
-      "improved": [],
-      "improvedTotal": 0
     }
   ]
 }

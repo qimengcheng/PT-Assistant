@@ -356,20 +356,14 @@ body {
   overflow: clip;
 }
 
-/* 站点定义页重写时连带删掉了它那一整块全局样式，但下面这两组仍被别的视图用 class="" 引用：
-   .hint → SetBase/Index.vue、SetSite/EditSearchEntryList.vue
+/* 站点定义页重写时连带删掉了它那一整块全局样式，但下面这组仍被别的视图用 class="" 引用：
    .site-list → SetSearchSolution/EditDialog.vue
-   所以留在全局；要清理得先把这三处改成组件内样式。 */
-.hint {
-  color: var(--pt-color-text-secondary);
-  padding-top: 40px;
-  text-align: center;
-}
-
-.hint.error {
-  color: var(--pt-color-danger);
-}
-
+   所以留在全局；要清理得先把这三处改成组件内样式。
+   （原先并列的 .hint 已在 v0.29.4 删掉：它的 `padding-top: 40px; text-align: center` 是
+   站点定义页旧样式，会漏进 SetBase 页头那个 `<span class="hint">` —— 那行是 flex +
+   baseline 对齐，被撑高 40px 后标题跟着下移，标题上方就多出一整条灰底。两处用法
+   （SetBase/Index.vue、SetSite/EditSearchEntryList.vue）各自 scoped 里都写了颜色和 padding，
+   全局这条本来就没有存活的部分。） */
 .site-list {
   flex: 1;
   overflow-y: auto;

@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-07 19:17:23",
-  "headSha": "176eb77",
+  "generatedAt": "2026-10-07 19:37:12",
+  "headSha": "14b210f",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.35.2",
+      "date": "2026-10-07 19:48:36",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "特别感谢页右上角那组「按提交次数 / 按代码量」切换：选中那一项现在是实心蓝底白字。之前是浅灰底上一块白色浮标，落在那条本来就是浅灰的栏里，几乎看不出当前选的是哪个"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.35.1",
       "date": "2026-10-07 19:37:12",

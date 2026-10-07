@@ -173,7 +173,13 @@ const spanLine = computed(() =>
 
     <div class="span-bar">
       <span>{{ spanLine }}</span>
-      <a-segmented v-model:value="sortBy" :options="sortOptions" class="sort-control" />
+      <!-- 排序切换用 a-radio-group + button-style="solid"（选中项实心蓝底白字），
+           不用 a-segmented：segmented 的选中态是「灰底轨道上的一块白浮标」，
+           在这条浅灰栏里几乎看不出哪个被选中（用户 2026-10-07 指着它要 solid）。
+           全站这类「固定几选一」都是这么写的（SentToDownloaderDialog、SetDownloader 的候选组）。 -->
+      <a-radio-group v-model:value="sortBy" button-style="solid" class="sort-control">
+        <a-radio-button v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</a-radio-button>
+      </a-radio-group>
       <span class="muted">
         {{ t("SpecialThank.asOf", { version: stats.headVersion, date: stats.span.lastDate }) }}
       </span>
@@ -279,7 +285,10 @@ const spanLine = computed(() =>
   border-radius: 8px;
 }
 .sort-control {
-  /* 三条内容挤在一行：左边汇总、右边截止日期，排序按钮靠 auto 边距贴到右侧那组前面。 */
+  /* 三条内容挤在一行：左边汇总、右边截止日期，排序按钮靠 auto 边距贴到右侧那组前面。
+     flex: 0 0 auto 是必须的 —— 台架量过：radio-group 那排比 segmented 宽 16px（181 vs 165），
+     窄窗口下不钉住它，它自己被压成两行（栏高 54 → 86），该让位的是两边的文字。 */
+  flex: 0 0 auto;
   margin-left: auto;
 }
 .group {

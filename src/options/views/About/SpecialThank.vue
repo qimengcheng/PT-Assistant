@@ -262,7 +262,13 @@ const spanLine = computed(() =>
 .span-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  /* 整行居中。原来这里是 baseline + 下面那条 align-self: center，实测（.tmp-build/bench-seg，
+     真组件 + 全局 token.fontSize 13）结果是：控件方框上沿和正文文字上沿齐平、下沿却低出
+     12.8px —— 也就是那颗胶囊整体往下坠，正是「这部分没有对齐」。改成全行居中后上下各 6.4px，
+     胶囊框中心与两段文字中心都落在同一条线上（胶囊内文字与正文中心差 0.4px，看不出来）。
+     旧注释说 baseline 是为了「让两种字号的正文对齐」，但这行只有 13px 一种字号
+     （左右两段实测都是 19.2px 行高），baseline 换不来任何东西，只会和居中的控件打架。 */
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 10px 14px;
@@ -273,11 +279,8 @@ const spanLine = computed(() =>
   border-radius: 8px;
 }
 .sort-control {
-  /* 三条内容挤在一行：左边汇总、右边截止日期，排序按钮靠 auto 边距贴到右侧那组前面。
-     整行是 baseline 对齐（让两种字号的正文对齐），但这个控件是带内衬的方块，
-     按基线排会偏低，单独退回居中。 */
+  /* 三条内容挤在一行：左边汇总、右边截止日期，排序按钮靠 auto 边距贴到右侧那组前面。 */
   margin-left: auto;
-  align-self: center;
 }
 .group {
   margin-bottom: 20px;

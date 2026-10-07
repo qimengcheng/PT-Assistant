@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, h, ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { countBy } from "es-toolkit";
-import { Switch as aSwitch } from "antdv-next";
 import {
   DeleteOutlined,
   DownloadOutlined,
@@ -13,13 +12,11 @@ import {
   InfoCircleOutlined,
   MinusOutlined,
   PlusOutlined,
-  PushpinFilled,
   SearchOutlined,
 } from "@antdv-next/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
-import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import type { TDownloaderKey } from "@/shared/types.ts";
 import { getDownloaderIcon } from "@ptd/downloader";
 
@@ -45,7 +42,12 @@ const showDeleteDialog = ref(false);
 
 const downloaderTypeCount = computed(() => countBy(metadataStore.getDownloaders, (x) => x.type));
 
-const tableSelected = ref<TDownloaderKey[]>([]);
+const selectedIds = ref<TDownloaderKey[]>([]);
+function toggleSelected(downloaderId: TDownloaderKey, checked: boolean) {
+  selectedIds.value = checked
+    ? [...selectedIds.value, downloaderId]
+    : selectedIds.value.filter((id) => id !== downloaderId);
+}
 
 const toEditDownloaderId = ref<TDownloaderKey | null>(null);
 function editDownloader(downloaderId: TDownloaderKey) {
@@ -97,79 +99,22 @@ const filteredDownloaders = computed(() => {
   });
 });
 
-// 分页交给 useTableBehavior（内部走 toPagination：Vuetify 的 -1 兜底 + 「一页放得下就不出分页条」）。
-// ⚠️ 不要写 current:1 —— antd 的 current 是受控值，写死后翻到第 2 页也会被立刻弹回第 1 页。
-const { pagination, handleTableChange: onTableChange } = useTableBehavior("SetDownloader", {
-  defaultPageSize: 10,
-  showTotal: (total: number) => t("common.totalItems", { total }),
-  totalRows: () => filteredDownloaders.value.length,
+/**
+ * 按「是否启用」分成两组。空组不出标题（「未启用 (0)」那一行没有任何信息量）。
+ * title 走 computed 而不是常量：切语言时它要跟着重算（AGENTS §3.4 那条）。
+ */
+const downloaderGroups = computed(() => {
+  const on = filteredDownloaders.value.filter((d) => d.enabled);
+  const off = filteredDownloaders.value.filter((d) => !d.enabled);
+  return [
+    { key: "enabled", title: t("SetDownloader.index.groupEnabled"), items: on },
+    { key: "disabled", title: t("SetDownloader.index.groupDisabled"), items: off },
+  ].filter((group) => group.items.length > 0);
 });
 
-// 列渲染回调的键名是 render(value, record, index)：antdv-next 没有 ant-design-vue 那个
-// customRender({ text, record })，写成 customRender 会被整列静默忽略、退化成原始值。
-// computed：title 里有 t()，setup 里一次性求值的话切语言不会重算
-const columns = computed(() => [
-  { title: "№", dataIndex: "sortIndex", width: 70, align: "right" as const },
-  {
-    title: t("common.type"),
-    dataIndex: "type",
-    width: 90,
-    align: "center" as const,
-    render: (_value: any, record: any) =>
-      h("img", { src: getDownloaderIcon(record.type), alt: record.type, style: "width:24px;height:24px" }),
-  },
-  {
-    title: t("SetDownloader.common.name"),
-    dataIndex: "name",
-    render: (_value: any, record: any) => {
-      const isDefault = record.id === metadataStore.defaultDownloader?.id;
-      return h("div", { style: "display:flex;align-items:center;gap:6px" }, [
-        isDefault ? h(PushpinFilled, { style: "color:#1677ff;transform:rotate(45deg)" }) : null,
-        h("span", { style: isDefault ? "font-weight:600;color:#1677ff" : "" }, record.name),
-      ]);
-    },
-  },
-  {
-    title: t("SetDownloader.common.address"),
-    dataIndex: "address",
-    render: (_value: any, record: any) =>
-      h("a", { href: record.address, target: "_blank", rel: "noopener noreferrer" }, record.address),
-  },
-  { title: t("common.username"), dataIndex: "username" },
-  {
-    title: t("SetDownloader.index.table.enabled"),
-    dataIndex: "enabled",
-    width: 80,
-    align: "center" as const,
-    render: (_value: any, record: any) =>
-      h(aSwitch, {
-        size: "small",
-        checked: record.enabled,
-        disabled: record.id === metadataStore.defaultDownloader?.id,
-        "onUpdate:checked": (v: any) =>
-          metadataStore.simplePatch("downloaders", record.id, "enabled", Boolean(v)),
-      }),
-  },
-  {
-    title: t("SetDownloader.index.table.autodl"),
-    dataIndex: "feature.DefaultAutoStart",
-    width: 100,
-    align: "center" as const,
-    render: (_value: any, record: any) =>
-      h(aSwitch, {
-        checked: !!record.feature?.DefaultAutoStart,
-        size: "small",
-        "onUpdate:checked": (v: any) =>
-          metadataStore.simplePatch("downloaders", record.id, "feature.DefaultAutoStart", Boolean(v)),
-      }),
-  },
-  {
-    title: t("common.action"),
-    key: "action",
-    width: 230,
-    align: "center" as const,
-  },
-]);
+function isDefaultDownloader(downloaderId: TDownloaderKey) {
+  return downloaderId === metadataStore.defaultDownloader?.id;
+}
 </script>
 
 <template>
@@ -181,7 +126,7 @@ const columns = computed(() => [
       <a-flex align="center" gap="small" wrap>
         <a-button type="primary" @click="showAddDialog = true"><template #icon><PlusOutlined /></template><span>{{ t('common.btn.add') }}</span></a-button>
 
-        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="deleteDownloader(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
+        <a-button type="primary" danger :disabled="selectedIds.length === 0" @click="deleteDownloader(selectedIds)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
 
         <a-button :disabled="metadataStore.getDownloaders.length === 0" @click="showDefaultDownloaderEditDialog = true"><template #icon><DownloadOutlined /></template><span>{{ t('SetDownloader.index.editDefaultDownloaderBtn') }}</span></a-button>
       </a-flex>
@@ -241,60 +186,132 @@ const columns = computed(() => [
       </a-flex>
     </a-flex>
 
-    <!-- 面板只负责给表格一块白底表面并接管内部滚动 -->
+    <!-- 一台下载服务器一张卡片，按是否启用分两组；面板继续当滚动宿主（.page > .page-panel
+         才有 overscroll-behavior: contain，见 style.css 那条注释）。
+         表格那 8 列在这里各自落位：№ 到卡头右端、类型图标到卡头、名称/地址/用户名到字段区、
+         两个开关和 5 颗操作按钮到卡底。分页去掉了 —— 下载器数量是个位数，卡片铺开比翻页直观。 -->
     <div class="page-panel">
-      <a-table
-        bordered
-        :columns="columns"
-        :data-source="filteredDownloaders"
-        :pagination="pagination"
-        :row-selection="{ selectedRowKeys: tableSelected, onChange: (keys: any[]) => (tableSelected = keys as TDownloaderKey[]) }"
-        row-key="id"
-        @change="onTableChange"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'action'">
-            <a-space size="small">
-              <a-tooltip :title="t('SetDownloader.index.table.action.status')">
-                <a-button
-                  type="text"
+      <section v-for="group in downloaderGroups" :key="group.key" class="dl-group">
+        <header class="dl-group-head">
+          <span class="dl-group-title">{{ group.title }}</span>
+          <span class="dl-group-count">({{ group.items.length }})</span>
+        </header>
+
+        <div class="dl-grid">
+          <article v-for="downloader in group.items" :key="downloader.id" class="dl-card">
+            <div class="dl-card-head">
+              <a-checkbox
+                :checked="selectedIds.includes(downloader.id)"
+                @change="(e: any) => toggleSelected(downloader.id, e.target.checked)"
+              />
+              <img class="dl-card-icon" :src="getDownloaderIcon(downloader.type)" :alt="downloader.type" />
+              <!-- 名称整段铺开（不截断），所以这里不需要全文揭示的浮层 -->
+              <span class="dl-card-name">{{ downloader.name }}</span>
+              <a-tag v-if="isDefaultDownloader(downloader.id)" color="blue">{{ t("common.default") }}</a-tag>
+            </div>
+
+            <dl class="dl-card-fields">
+              <dt>{{ t("SetDownloader.common.address") }}</dt>
+              <dd>
+                <a :href="downloader.address" rel="noopener noreferrer nofollow" target="_blank">{{
+                  downloader.address
+                }}</a>
+              </dd>
+              <dt>{{ t("common.username") }}</dt>
+              <dd>{{ downloader.username || "-" }}</dd>
+              <!-- 表格里那列标题写的是「№」，它在编辑器里的真名其实是「优先级」（common.sortIndex），
+                   卡片上按真名标出来，免得只剩一个没人认得的编号 -->
+              <dt>{{ t("common.sortIndex") }}</dt>
+              <dd>{{ downloader.sortIndex }}</dd>
+            </dl>
+
+            <div class="dl-card-foot">
+              <span class="dl-switch">
+                <a-switch
                   size="small"
-                  :disabled="!record.enabled"
-                  @click="manageDownloader(record.id)"
-                >
-                  <template #icon><InfoCircleOutlined /></template>
-                </a-button>
-              </a-tooltip>
-              <a-tooltip :title="t('common.edit')">
-                <a-button type="text" size="small" @click="editDownloader(record.id)">
-                  <template #icon><EditOutlined /></template>
-                </a-button>
-              </a-tooltip>
-              <a-tooltip :title="t('SetDownloader.index.table.action.setPathAndTag')">
-                <a-button type="text" size="small" @click="editDownloaderPathAndTag(record.id)">
-                  <template #icon><FolderOutlined /></template>
-                </a-button>
-              </a-tooltip>
-              <a-tooltip v-if="configStore.download.allowDownloaderFilterForSite" :title="t('SetDownloader.index.table.action.setSiteFilter')">
-                <a-button type="text" size="small" :disabled="!record.enabled" @click="editDownloaderSiteFilter(record.id)">
-                  <template #icon><FilterOutlined /></template>
-                </a-button>
-              </a-tooltip>
-              <a-tooltip :title="t('common.remove')">
-                <a-button
-                  type="text"
-                  danger
+                  :checked="!!downloader.enabled"
+                  :disabled="isDefaultDownloader(downloader.id)"
+                  @update:checked="
+                    (v: any) => metadataStore.simplePatch('downloaders', downloader.id, 'enabled', Boolean(v))
+                  "
+                />
+                <span>{{ t("SetDownloader.index.switchEnabled") }}</span>
+              </span>
+
+              <span class="dl-switch">
+                <a-switch
                   size="small"
-                  :disabled="record.id === metadataStore.defaultDownloader?.id"
-                  @click="deleteDownloader([record.id])"
+                  :checked="!!downloader.feature?.DefaultAutoStart"
+                  @update:checked="
+                    (v: any) =>
+                      metadataStore.simplePatch('downloaders', downloader.id, 'feature.DefaultAutoStart', Boolean(v))
+                  "
+                />
+                <span>{{ t("SetDownloader.index.switchAutoStart") }}</span>
+              </span>
+
+              <span class="dl-card-actions">
+                <a-tooltip :title="t('SetDownloader.index.table.action.status')">
+                  <a-button
+                    type="text"
+                    size="small"
+                    :disabled="!downloader.enabled"
+                    @click="manageDownloader(downloader.id)"
+                  >
+                    <template #icon><InfoCircleOutlined /></template>
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip :title="t('common.edit')">
+                  <a-button type="text" size="small" @click="editDownloader(downloader.id)">
+                    <template #icon><EditOutlined /></template>
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip :title="t('SetDownloader.index.table.action.setPathAndTag')">
+                  <a-button type="text" size="small" @click="editDownloaderPathAndTag(downloader.id)">
+                    <template #icon><FolderOutlined /></template>
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip
+                  v-if="configStore.download.allowDownloaderFilterForSite"
+                  :title="t('SetDownloader.index.table.action.setSiteFilter')"
                 >
-                  <template #icon><DeleteOutlined /></template>
-                </a-button>
-              </a-tooltip>
-            </a-space>
-          </template>
-        </template>
-      </a-table>
+                  <a-button
+                    type="text"
+                    size="small"
+                    :disabled="!downloader.enabled"
+                    @click="editDownloaderSiteFilter(downloader.id)"
+                  >
+                    <template #icon><FilterOutlined /></template>
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip :title="t('common.remove')">
+                  <a-button
+                    type="primary"
+                    danger
+                    size="small"
+                    :disabled="isDefaultDownloader(downloader.id)"
+                    @click="deleteDownloader([downloader.id])"
+                  >
+                    <template #icon><DeleteOutlined /></template>
+                  </a-button>
+                </a-tooltip>
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 两组都空：一台下载服务器都没有时给的是「先去添加」那句话，
+           有下载器但被搜索/筛选挡光时给的是通用的「无数据」。 -->
+      <a-empty
+        v-if="downloaderGroups.length === 0"
+        class="dl-empty"
+        :description="
+          metadataStore.getDownloaders.length === 0
+            ? t('SetDownloader.index.emptyNotice')
+            : t('common.noData')
+        "
+      />
     </div>
   </div>
 
@@ -306,3 +323,108 @@ const columns = computed(() => [
   <PathAndTagSuggestDialog v-model="showPathAndTagSuggestDialog" :client-id="toEditDownloaderId!" />
   <DeleteDialog v-model="showDeleteDialog" :to-delete-ids="toDeleteIds" :confirm-delete="confirmDeleteDownloader" />
 </template>
+
+<style scoped>
+.dl-group + .dl-group {
+  margin-top: 16px;
+}
+.dl-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.dl-group-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.dl-group-count {
+  font-size: 12px;
+  color: var(--pt-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 卡片网格：min() 那一手是必须的 —— 写死 minmax(360px,1fr) 时，面板比 360px 还窄
+   （窄窗口 / 侧栏展开）第一列仍然要 360px，于是整块把面板顶出横向滚动条。
+   auto-fill 而不是 auto-fit：只有一台服务器时 auto-fit 会把那张卡拉满整行。
+   行高对齐交给 grid 默认的 stretch + 下面那条 foot{margin-top:auto}：名字长短不一时，
+   同一行卡片底边齐、开关与操作那一排也齐，不会各自一截。 */
+.dl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: 8px;
+}
+
+.dl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--pt-color-border-light);
+  border-radius: 10px;
+}
+.dl-card:hover {
+  border-color: var(--pt-color-border);
+}
+
+.dl-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dl-card-icon {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.dl-card-name {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* 两列网格：标签列取两张标签里较宽的那个（max-content），值列吃剩余宽度并允许断行。
+   用 flex + 固定标签宽度的话，英文那侧 "Server Address" 比 "Username" 长出一截会被挤。 */
+.dl-card-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 8px;
+  margin: 0;
+}
+.dl-card-fields dt {
+  color: var(--pt-color-text-secondary);
+}
+.dl-card-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.dl-card-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--pt-color-border-light);
+}
+.dl-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dl-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.dl-empty {
+  padding: 32px 0;
+}
+</style>

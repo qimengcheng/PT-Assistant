@@ -1005,10 +1005,14 @@
       "changeDefaultDownloader": "Default downloader updated successfully. If necessary, please further configure the download path and tags.",
       "editDefaultDownloaderBtn": "Edit Default Downloader",
       "emptyNotice": "Before using the download service, you need to add at least one download server.",
+      "groupDisabled": "Disabled",
+      "groupEnabled": "Enabled",
       "remove": {
         "multi": "Are you sure to delete these {count} download servers?",
         "single": "Are you sure to delete this download server?"
       },
+      "switchAutoStart": "Auto start",
+      "switchEnabled": "Enable",
       "table": {
         "action": {
           "deleteDownloader": "Delete this downloader server",

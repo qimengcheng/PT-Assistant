@@ -1005,10 +1005,14 @@
       "changeDefaultDownloader": "更新默认下载服务器成功！如有必要请进一步设置下载地址和标签。",
       "editDefaultDownloaderBtn": "默认下载服务器设置",
       "emptyNotice": "在使用推送服务之前，您至少需要添加一个下载服务器。",
+      "groupDisabled": "未启用",
+      "groupEnabled": "已启用",
       "remove": {
         "multi": "你确定删除这{count}个下载服务器吗？",
         "single": "确认要删除这个下载服务器吗？"
       },
+      "switchAutoStart": "自动下载",
+      "switchEnabled": "启用",
       "table": {
         "action": {
           "deleteDownloader": "删除该下载服务器",

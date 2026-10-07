@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { CloudDownloadOutlined, ReloadOutlined, SaveOutlined } from "@antdv-next/icons";
 import type { Component } from "vue";
@@ -34,11 +34,12 @@ const disableLocalDownload = ref<boolean>(false);
 const showSentToDownloaderDialog = ref<boolean>(false);
 const downloadTorrentsRef = shallowRef<ITorrentDownloadMetadata["torrent"][]>([]);
 
-const btnItem: Record<TReDownloadType, { icon: Component; title: string }> = {
+// computed：标题里有 t()，setup 里一次性求值的话切语言不会重算
+const btnItem = computed<Record<TReDownloadType, { icon: Component; title: string }>>(() => ({
   old: { icon: ReloadOutlined, title: t("DownloadHistory.ReDownloadSelectDialog.oldMethod") },
   local: { icon: SaveOutlined, title: t("downloaderLabel.localDownload") },
   downloader: { icon: CloudDownloadOutlined, title: t("DownloadHistory.ReDownloadSelectDialog.selectDownloader") },
-};
+}));
 
 function submitDownloadFinish(reDownloadType: TReDownloadType) {
   isReDownloading.value[reDownloadType] = false;

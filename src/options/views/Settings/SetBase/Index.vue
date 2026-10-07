@@ -4,7 +4,7 @@
  * 各窗口直接 v-model 绑定 configStore 字段；config store 开启了 persistWebExt
  * 自动持久化（每次变更自动 $save），无需手动保存按钮。
  */
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
@@ -18,15 +18,23 @@ import NativeBridgeWindow from "./NativeBridgeWindow.vue";
 
 const { t } = useI18n();
 
-const tabs = [
-  { key: "ui", label: t("SetBase.Index.tabUi"), component: UiWindow },
-  { key: "user-info", label: t("SetBase.Index.tabUserInfo"), component: UserInfoWindow },
-  { key: "search-entity", label: t("SetBase.Index.tabSearch"), component: SearchEntityWindow },
-  { key: "download", label: t("SetBase.Index.tabDownload"), component: DownloadWindow },
-  { key: "backup", label: t("SetBase.Index.tabBackup"), component: BackupWindow },
-  { key: "social-information", label: t("SetBase.Index.tabSocialInformation"), component: SocialInformationWindow },
-  { key: "native-bridge", label: t("SetBase.Index.tabNativeBridge"), component: NativeBridgeWindow },
-] as const;
+// computed：label 里有 t()，setup 里一次性求值的话切语言不会重算
+const tabs = computed(
+  () =>
+    [
+      { key: "ui", label: t("SetBase.Index.tabUi"), component: UiWindow },
+      { key: "user-info", label: t("SetBase.Index.tabUserInfo"), component: UserInfoWindow },
+      { key: "search-entity", label: t("SetBase.Index.tabSearch"), component: SearchEntityWindow },
+      { key: "download", label: t("SetBase.Index.tabDownload"), component: DownloadWindow },
+      { key: "backup", label: t("SetBase.Index.tabBackup"), component: BackupWindow },
+      {
+        key: "social-information",
+        label: t("SetBase.Index.tabSocialInformation"),
+        component: SocialInformationWindow,
+      },
+      { key: "native-bridge", label: t("SetBase.Index.tabNativeBridge"), component: NativeBridgeWindow },
+    ] as const,
+);
 
 const route = useRoute();
 const router = useRouter();

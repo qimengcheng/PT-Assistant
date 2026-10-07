@@ -2,6 +2,7 @@
 /**
  * 界面设置：语言、主题、表格行为、导航栏、content script 行为开关。
  */
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { definedLangMetaData } from "@/options/plugins/i18n.ts";
@@ -17,23 +18,27 @@ const langOptions = definedLangMetaData.map((meta) => ({ value: meta.value, labe
 // 「小屏设备下自动折叠导航栏」同理：侧栏目前没有任何折叠实现，开关先移除
 // （configStore.autoToggleNavBarOnDisplayChange 字段保留）。
 
-const socialSiteSearchByOptions = [
+// computed：label 里有 t()，setup 里一次性求值的话切语言不会重算
+const socialSiteSearchByOptions = computed(() => [
   { value: "id", label: t("SetBase.UiWindow.socialSiteSearchById") },
   { value: "title", label: t("SetBase.UiWindow.socialSiteSearchByTitle") },
   { value: "imdb", label: t("SetBase.UiWindow.socialSiteSearchByImdb") },
   { value: "chosen", label: t("SetBase.UiWindow.socialSiteSearchByChosen") },
-];
+]);
 
-const contentScriptToggles = [
-  { key: "allowExceptionSites", label: t("SetBase.UiWindow.allowExceptionSites") },
-  { key: "enabledAtSocialSite", label: t("SetBase.UiWindow.enabledAtSocialSite") },
-  { key: "applyTheme", label: t("SetBase.UiWindow.applyTheme") },
-  { key: "defaultOpenSpeedDial", label: t("SetBase.UiWindow.defaultOpenSpeedDial") },
-  { key: "stackedButtons", label: t("SetBase.UiWindow.stackedButtons") },
-  { key: "fadeEnterStyle", label: t("SetBase.UiWindow.fadeEnterStyle") },
-  { key: "doubleConfirmAction", label: t("SetBase.UiWindow.doubleConfirmAction") },
-  { key: "dragLinkOnSpeedDial", label: t("SetBase.UiWindow.dragLinkOnSpeedDial") },
-] as const;
+const contentScriptToggles = computed(
+  () =>
+    [
+      { key: "allowExceptionSites", label: t("SetBase.UiWindow.allowExceptionSites") },
+      { key: "enabledAtSocialSite", label: t("SetBase.UiWindow.enabledAtSocialSite") },
+      { key: "applyTheme", label: t("SetBase.UiWindow.applyTheme") },
+      { key: "defaultOpenSpeedDial", label: t("SetBase.UiWindow.defaultOpenSpeedDial") },
+      { key: "stackedButtons", label: t("SetBase.UiWindow.stackedButtons") },
+      { key: "fadeEnterStyle", label: t("SetBase.UiWindow.fadeEnterStyle") },
+      { key: "doubleConfirmAction", label: t("SetBase.UiWindow.doubleConfirmAction") },
+      { key: "dragLinkOnSpeedDial", label: t("SetBase.UiWindow.dragLinkOnSpeedDial") },
+    ] as const,
+);
 </script>
 
 <template>

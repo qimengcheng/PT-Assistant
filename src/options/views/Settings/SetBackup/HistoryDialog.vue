@@ -26,7 +26,8 @@ const isLoading = ref<boolean>(false);
 const backupHistory = shallowRef<IBackupFileInfo[]>([]);
 
 // antd 的列定义：title / dataIndex / key / align / sorter（不再用 vuetify 的 DataTableHeader）
-const tableHeaders: TableColumnsType<IBackupFileInfo> = [
+// computed：title 里有 t()，setup 里一次性求值的话切语言不会重算
+const tableHeaders = computed<TableColumnsType<IBackupFileInfo>>(() => [
   { title: t("SetBackup.HistoryDialog.table.filename"), key: "filename", dataIndex: "filename", align: "left" },
   { title: t("SetBackup.HistoryDialog.table.size"), key: "size", dataIndex: "size", align: "right" },
   {
@@ -39,7 +40,7 @@ const tableHeaders: TableColumnsType<IBackupFileInfo> = [
     defaultSortOrder: "descend",
   },
   { title: t("common.action"), key: "action", align: "center" },
-];
+]);
 
 const tableSelected = ref<string[]>([]);
 /** a-table 没有 v-model:selectedRowKeys，行选择要显式给 row-selection */

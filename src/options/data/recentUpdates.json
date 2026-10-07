@@ -1,7 +1,17 @@
 {
   "generatedAt": "2026-10-07",
-  "headSha": "db6fece",
+  "headSha": "2b5f80c",
   "versions": [
+    {
+      "version": "0.29.8",
+      "date": "2026-10-07",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "切换界面语言后不再残留中文：表头、基础设置的标签页名称、各处下拉选项原先是在打开页面时定死的，切语言要重开页面才变，现在立刻跟着变"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.29.6",
       "date": "2026-10-07",

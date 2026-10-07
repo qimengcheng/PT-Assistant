@@ -77,7 +77,8 @@ interface ITableHeader {
 }
 
 const siteHistoryData = shallowRef<IShowUserInfo[]>([]);
-const tableHeader = [
+// computed：表头有 t()，setup 里一次性求值的话切语言不会重算
+const tableHeader = computed<ITableHeader[]>(() => [
   {
     title: t("common.date"),
     key: "date",
@@ -94,12 +95,12 @@ const tableHeader = [
   { title: t("levelRequirement.seedingSize"), key: "seedingSize", align: "end", sortable: false },
   { title: t("levelRequirement.bonus"), key: "bonus", align: "end", sortable: false },
   { title: t("common.action"), key: "action", align: "center", width: 90, sortable: false },
-] as ITableHeader[];
+]);
 const tableSelected = ref<string[]>([]);
 
 /** 列生成走公共 toTableColumns（不传 sortOrderMap，保持 date 列的非受控初始排序） */
 const tableColumns = computed<TableColumnsType<IShowUserInfo>>(() =>
-  toTableColumns<IShowUserInfo>(tableHeader),
+  toTableColumns<IShowUserInfo>(tableHeader.value),
 );
 
 // 对应 v-data-table 的 show-select + item-value="date"

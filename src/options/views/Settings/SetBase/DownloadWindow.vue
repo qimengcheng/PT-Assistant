@@ -2,6 +2,7 @@
 /**
  * 下载设置：本地下载方式、推送行为、下载历史。
  */
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { LocalDownloadMethod } from "@/shared/types/common/download.ts";
@@ -9,11 +10,12 @@ import { LocalDownloadMethod } from "@/shared/types/common/download.ts";
 const { t } = useI18n();
 const configStore = useConfigStore();
 
-const localMethodOptions = [
+// computed：label 里有 t()，setup 里一次性求值的话切语言不会重算
+const localMethodOptions = computed(() => [
   { value: "web", label: t("SetBase.DownloadWindow.methodWeb") },
   { value: "browser", label: t("SetBase.DownloadWindow.methodBrowser") },
   { value: "extension", label: t("SetBase.DownloadWindow.methodExtension") },
-];
+]);
 </script>
 
 <template>

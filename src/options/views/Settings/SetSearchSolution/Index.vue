@@ -204,14 +204,15 @@ const tableData = computed<Array<ISearchSolutionMetadata | IAllDefaultRow>>(() =
   return [allDefaultRow.value, ...rows];
 });
 
-const columns = [
+// computed：title 里有 t()，setup 里一次性求值的话切语言不会重算
+const columns = computed(() => [
   { title: "№", dataIndex: "sort", width: 80, align: "center" as const },
   { title: t("common.name"), dataIndex: "name", width: 150 },
   { title: t("SetSearchSolution.solution"), key: "solution" },
   { title: t("SetSearchSolution.table.enable"), key: "enabled", width: 100, align: "center" as const },
   { title: t("SetSearchSolution.table.default"), key: "isDefault", width: 100, align: "center" as const },
   { title: t("common.action"), key: "action", width: 180, align: "center" as const },
-];
+]);
 
 const pagination = computed(() =>
   // 走 toPagination 拿 -1/0 兜底：旧版 Vuetify 用 -1 表示「不分页」，这个约定被搬进了

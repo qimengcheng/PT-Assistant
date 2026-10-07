@@ -41,7 +41,8 @@ const showRestoreDialog = ref<boolean>(false);
 const showDeleteDialog = ref<boolean>(false);
 
 // antd 的列定义：title / dataIndex / key / align（不再用 vuetify 的 DataTableHeader）
-const fullTableHeader: TableColumnsType<IBackupServerMetadata> = [
+// computed：title 里有 t()，setup 里一次性求值的话切语言不会重算
+const fullTableHeader = computed<TableColumnsType<IBackupServerMetadata>>(() => [
   { title: t("common.type"), key: "type", dataIndex: "type", align: "center" },
   { title: t("common.name"), key: "name", dataIndex: "name", align: "start" },
   { title: t("SetBackup.table.backupFields"), key: "backupFields", dataIndex: "backupFields", align: "start" },
@@ -50,7 +51,7 @@ const fullTableHeader: TableColumnsType<IBackupServerMetadata> = [
   { title: t("SetBackup.table.lastBackupAt"), key: "lastBackupAt", dataIndex: "lastBackupAt", align: "end" },
   { title: t("common.enable"), key: "enabled", dataIndex: "enabled", align: "center" },
   { title: t("common.action"), key: "action", align: "center" },
-];
+]);
 
 const tableSelected = ref<TBackupServerKey[]>([]);
 

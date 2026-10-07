@@ -48,7 +48,7 @@ const {
 
 // 种子状态选项 - 使用 i18n 支持
 // icon / color 改为 antd 图标组件与真实色值（Vuetify 的 mdi 字符串 + 语义色名不再适用）
-const statusOptions = [
+const statusOptions = computed(() => [
   {
     value: ETorrentStatus.unknown,
     label: t("torrent.status.unknown"),
@@ -79,7 +79,7 @@ const statusOptions = [
     icon: CheckOutlined,
     color: "#8c8c8c",
   },
-];
+]);
 
 const torrentTags = computed(() => sortTorrentTags(advanceItemPropsRef.value.tags));
 

@@ -103,7 +103,8 @@ const canCreateTask = computed(() => {
 });
 
 // 状态文本
-const statusText = {
+// computed：标签里有 t()，setup 里一次性求值的话切语言不会重算
+const statusText = computed(() => ({
   downloading: t("SearchEntity.KeepUploadDialog.status.downloading"),
   waiting: t("SearchEntity.KeepUploadDialog.status.waiting"),
   downloaded: t("SearchEntity.KeepUploadDialog.status.downloaded"),
@@ -111,7 +112,7 @@ const statusText = {
   failed: t("SearchEntity.KeepUploadDialog.status.failed"),
   downloadFailed: t("SearchEntity.KeepUploadDialog.status.downloadFailed"),
   missingFiles: t("SearchEntity.KeepUploadDialog.status.missingFiles"),
-};
+}));
 
 // 打开对话框时初始化
 watch(showDialog, (val) => {
@@ -269,7 +270,7 @@ function startVerification() {
       torrent: null,
       loading: true,
       verified: false,
-      status: statusText.downloading,
+      status: statusText.value.downloading,
       error: false,
     });
     verifiedItemsOrder.value.push(id);
@@ -290,13 +291,13 @@ async function getTorrent(torrent: ITorrent, id: string): Promise<ITorrentInfoFo
     // 边界检查：确保项仍然存在
     const item = verifiedItems.value.get(id);
     if (!item) return null;
-    item.status = statusText.waiting;
+    item.status = statusText.value.waiting;
     return result;
   } catch (e) {
     // 边界检查：确保项仍然存在
     const item = verifiedItems.value.get(id);
     if (item) {
-      item.status = statusText.downloadFailed;
+      item.status = statusText.value.downloadFailed;
       item.error = true;
     }
     throw e;
@@ -319,12 +320,12 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
       if (torrent) {
         item.torrent = torrent;
         item.verified = true;
-        item.status = statusText.downloaded;
+        item.status = statusText.value.downloaded;
         verifiedCount.value++;
         applyLocalDecision(item);
       } else {
         item.verified = false;
-        item.status = statusText.failed;
+        item.status = statusText.value.failed;
       }
     }
   } else {
@@ -340,7 +341,7 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
     };
 
     if (!baseItem?.verified) {
-      result.status = statusText.failed;
+      result.status = statusText.value.failed;
     }
 
     if (!torrent || !baseItem?.verified) {
@@ -382,11 +383,11 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
 
     if (!result.status) {
       result.status = result.verified
-        ? statusText.success
+        ? statusText.value.success
         : // 没通过时顺手说明原因：是「基准种子更大、本地缺文件」还是压根不是同一份数据
           hasAllFilesOf(torrent, baseTorrentInfo)
-          ? statusText.missingFiles
-          : statusText.failed;
+          ? statusText.value.missingFiles
+          : statusText.value.failed;
     }
 
     Object.assign(item, result);
@@ -449,7 +450,7 @@ function reDownload(id: string) {
   const item = verifiedItems.value.get(id);
   if (!item) return;
   item.loading = true;
-  item.status = statusText.downloading;
+  item.status = statusText.value.downloading;
 
   getTorrent(item.data, id)
     .then((result) => {

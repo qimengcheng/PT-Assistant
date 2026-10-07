@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { type TableColumnsType } from "antdv-next";
 import {
@@ -31,7 +31,8 @@ const tasks = ref<IKeepUploadTask[]>([]);
 const selectedTasks = ref<TKeepUploadTaskKey[]>([]);
 const loading = ref(false);
 
-const columns: TableColumnsType<IKeepUploadTask> = [
+// computed：表头有 t()，setup 里一次性求值的话切语言不会重算
+const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
   { title: t("KeepUploadTask.table.site"), key: "site", align: "center", width: 72 },
   { title: t("KeepUploadTask.table.title"), dataIndex: "title", key: "title", align: "left", ellipsis: true },
   {
@@ -58,7 +59,7 @@ const columns: TableColumnsType<IKeepUploadTask> = [
     sorter: (a, b) => a.time - b.time,
   },
   { title: t("common.action"), key: "action", align: "center", width: 180 },
-];
+]);
 
 async function loadTasks() {
   loading.value = true;

@@ -111,7 +111,8 @@ const pagination = computed(() => ({
 
 // 列渲染回调的键名是 render(value, record, index)：antdv-next 没有 ant-design-vue 那个
 // customRender({ text, record })，写成 customRender 会被整列静默忽略、退化成原始值。
-const columns = [
+// computed：title 里有 t()，setup 里一次性求值的话切语言不会重算
+const columns = computed(() => [
   { title: "№", dataIndex: "sortIndex", width: 70, align: "right" as const },
   {
     title: t("common.type"),
@@ -172,7 +173,7 @@ const columns = [
     width: 230,
     align: "center" as const,
   },
-];
+]);
 </script>
 
 <template>

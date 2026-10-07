@@ -79,10 +79,11 @@ interface IDefinitionRow {
   id: string;
 }
 
-const siteColumns: TableColumnsType<IDefinitionRow> = [
+// computed：title 里有 t()，setup 里一次性求值的话切语言不会重算
+const siteColumns = computed<TableColumnsType<IDefinitionRow>>(() => [
   { title: "№", dataIndex: "index", key: "index", align: "center", width: 56 },
   { title: t("SiteDefinitions.colId"), dataIndex: "id", key: "id" },
-];
+]);
 
 const siteRows = computed<IDefinitionRow[]>(() =>
   filteredList.value.map((id) => ({ index: definitionList.indexOf(id) + 1, id })),
@@ -219,10 +220,10 @@ const fieldRows = computed<IFieldRow[]>(() => {
   return rows;
 });
 
-const fieldColumns: TableColumnsType<IFieldRow> = [
+const fieldColumns = computed<TableColumnsType<IFieldRow>>(() => [
   { title: t("SiteDefinitions.colField"), dataIndex: "name", key: "name", width: 200 },
   { title: t("SiteDefinitions.colValue"), dataIndex: "summary", key: "summary" },
-];
+]);
 
 /** 结构类字段的行才可展开 */
 const expandedKeys = ref<string[]>([]);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { isUndefined } from "es-toolkit/compat";
@@ -71,7 +71,8 @@ interface ITableHeader {
   props?: { disabled?: boolean };
 }
 
-const fullTableHeader = reactive([
+// computed（原先是 reactive）：表头有 t()，setup 里一次性求值的话切语言不会重算
+const fullTableHeader = computed<ITableHeader[]>(() => [
   {
     title: t("common.site"),
     key: "siteUserConfig.sortIndex",
@@ -98,10 +99,10 @@ const fullTableHeader = reactive([
   // table-layout: auto（列宽跟着内容走），刷新时每行的 loading 一出现就把内容撑宽 →
   // 整张表的列一起重排（肉眼可见地抖一下）。
   { title: t("common.action"), key: "action", align: "center", width: 72, sortable: false, props: { disabled: true } },
-] as ITableHeader[]);
+]);
 
 const tableHeader = computed(() => {
-  return fullTableHeader.filter(
+  return fullTableHeader.value.filter(
     (item: ITableHeader) => item?.props?.disabled || configStore.tableBehavior.MyData.columns!.includes(item.key!),
   ) as ITableHeader[];
 });
@@ -126,7 +127,7 @@ type ColumnItem = { key: string; label: string; fixed: boolean };
 const showColumnDialog = ref<boolean>(false);
 
 const columnItems = computed<ColumnItem[]>(() =>
-  fullTableHeader.map((header) => ({ key: header.key, label: header.title, fixed: !!header.props?.disabled })),
+  fullTableHeader.value.map((header) => ({ key: header.key, label: header.title, fixed: !!header.props?.disabled })),
 );
 
 /**
@@ -134,7 +135,7 @@ const columnItems = computed<ColumnItem[]>(() =>
  * `props.disabled || 已选`。所以它们的开关显示成「开且不可改」，
  * 而不是留一个拨了没反应的开关。
  */
-const fixedColumnKeys = computed(() => fullTableHeader.filter((h) => h.props?.disabled).map((h) => h.key));
+const fixedColumnKeys = computed(() => fullTableHeader.value.filter((h) => h.props?.disabled).map((h) => h.key));
 
 const columnVisible = (key: string) => selectedColumnKeys.value.includes(key) || fixedColumnKeys.value.includes(key);
 

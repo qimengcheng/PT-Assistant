@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { FileSearchOutlined } from "@antdv-next/icons";
 import type { TableColumnsType } from "antdv-next";
@@ -11,7 +11,8 @@ import { formatDate } from "@/options/utils.ts";
 const { t } = useI18n();
 const logger = shallowRef<ILoggerItem[]>([]);
 
-const columns: TableColumnsType<ILoggerItem> = [
+// computed：标签里有 t()，setup 里一次性求值的话切语言不会重算
+const columns = computed<TableColumnsType<ILoggerItem>>(() => [
   { title: "ID", dataIndex: "id", key: "id", width: 150 },
   {
     title: "Time",
@@ -23,7 +24,7 @@ const columns: TableColumnsType<ILoggerItem> = [
   },
   { title: "Message", dataIndex: "msg", key: "msg", ellipsis: true },
   { title: t("common.action"), key: "action", width: 100, align: "center" },
-];
+]);
 
 const showLogDataDialog = ref<boolean>(false);
 const logData = ref<ILoggerItem | null>(null);

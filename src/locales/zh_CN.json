@@ -891,10 +891,12 @@
       "undo": "撤销",
       "groupImportPtpp": "导入 PT-Plugin-Plus 用户数据",
       "importPtppMessage": "将 PT-Plugin-Plus 导出的备份中的用户数据导入到本扩展（站点需在 340 个内置定义中）。",
-      "importPtppStep1": "1. 在 PT-Plugin-Plus 中打开「备份 & 恢复」→ 导出备份（zip），或直接使用其 userdatas.json；",
-      "importPtppStep2": "2. 在下方选择该文件；",
-      "importPtppStep3": "3. 在弹出的窗口中勾选要导入的站点并确认导入。",
-      "selectPtppFile": "选择 PT-Plugin-Plus 备份文件（zip 或 userdatas.json）",
+      "importPtppStepsLead": "在导入之前，请先做好以下准备：",
+      "importPtppStep1": "在 PT-Plugin-Plus 中打开「备份 & 恢复」→ 导出备份（zip），或直接使用其 userdatas.json；",
+      "importPtppStep2": "把它选进下方的区域；",
+      "importPtppStep3": "在弹出的窗口中勾选要导入的站点并确认导入。",
+      "dropTitle": "点击选择备份文件，或将文件拖拽到此区域",
+      "dropHint": "支持 PT-Plugin-Plus 导出的备份 zip（内含 userdatas.json），或该 json 文件本身",
       "invalidFileFormat": "文件格式无效：请选择 PT-Plugin-Plus 导出的备份 zip（内含 userdatas.json）或该 json 文件本身"
     },
     "SocialInformationWindow": {

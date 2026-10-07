@@ -891,10 +891,12 @@
       "undo": "Undo",
       "groupImportPtpp": "Import PT-Plugin-Plus user data",
       "importPtppMessage": "Imports the user data from a PT-Plugin-Plus backup into this extension (the site must be one of the 340 built-in definitions).",
-      "importPtppStep1": "1. In PT-Plugin-Plus open 「Backup & Restore」 → export a backup (zip), or use its userdatas.json directly;",
-      "importPtppStep2": "2. Select that file below;",
-      "importPtppStep3": "3. In the dialog that opens, tick the sites to import and confirm the import.",
-      "selectPtppFile": "Select the PT-Plugin-Plus backup file (zip or userdatas.json)",
+      "importPtppStepsLead": "Before importing, please do the following:",
+      "importPtppStep1": "In PT-Plugin-Plus open \"Backup & Restore\" and export a backup (zip), or use its userdatas.json directly;",
+      "importPtppStep2": "pick that file in the area below;",
+      "importPtppStep3": "in the dialog that opens, tick the sites to import and confirm.",
+      "dropTitle": "Click to choose the backup file, or drag it into this area",
+      "dropHint": "Accepts the backup zip exported by PT-Plugin-Plus (containing userdatas.json), or that json file itself",
       "invalidFileFormat": "Invalid file format: select the backup zip exported by PT-Plugin-Plus (containing userdatas.json) or that json file itself"
     },
     "SocialInformationWindow": {

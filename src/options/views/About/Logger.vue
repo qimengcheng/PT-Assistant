@@ -34,19 +34,48 @@ function showLogDataDialogHandler(item: ILoggerItem) {
   showLogDataDialog.value = true;
 }
 
-/** 后台消息在途标志：给 a-table 的 :loading 用。没它的话每秒轮询的那一瞬间表格会闪一下空态 */
+/**
+ * 只有首屏那一次才配给 :loading。
+ *
+ * 每秒轮询也翻这个标志的话，a-table 会把整张表包进 Spin：spin 样式的
+ * `&-spinning .ant-spin-container` 是 `opacity: .5` + `pointer-events: none`，
+ * 还带 0.3s 的 opacity 过渡（dist/spin/style/index.js）。于是每秒整表暗一下再亮一下、
+ * 期间表格点不动 —— 用户看到的「一直在闪」是这一条，不是日志产生得太快。
+ */
 const isLoadingLogger = ref<boolean>(false);
+let hasLoadedOnce = false;
 
 /** 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）。本页不分档、固定 50 条 */
 const tablePagination = computed<TablePaginationConfig | false>(() =>
   logger.value.length <= 50 ? false : { pageSize: 50, showSizeChanger: true, size: "small" },
 );
 
+/**
+ * 这一轮和上一轮是不是同一批日志。
+ *
+ * 日志 id 由 logger() 生成的 nanoid，唯一且不会再改；环形缓冲满 500 条时只从头裁剪，
+ * 所以「条数相同 + 最后一条同 id 同时间」就等于整批没变。
+ */
+function isSameLogBatch(prev: ILoggerItem[], next: ILoggerItem[]) {
+  if (prev.length !== next.length) {
+    return false;
+  }
+  const lastPrev = prev[prev.length - 1];
+  const lastNext = next[next.length - 1];
+  return lastPrev === undefined || (lastPrev.id === lastNext?.id && lastPrev.time === lastNext?.time);
+}
+
 function loadLogger() {
-  isLoadingLogger.value = true;
+  if (!hasLoadedOnce) {
+    isLoadingLogger.value = true;
+  }
   sendMessage("getLogger", undefined)
     .then((res) => {
-      logger.value = res;
+      hasLoadedOnce = true;
+      // 没新日志就别换引用：换一次就是整表（含排序、50 行渲染）重新 diff 一遍，每秒白做。
+      if (!isSameLogBatch(logger.value, res)) {
+        logger.value = res;
+      }
     })
     .finally(() => {
       isLoadingLogger.value = false;
@@ -59,7 +88,16 @@ let pollTimer: number | undefined;
 
 onMounted(() => {
   loadLogger();
-  pollTimer = setInterval(loadLogger, 1000) as unknown as number;
+  pollTimer = setInterval(
+    () => {
+      // 标签页在后台时不做这次整包传输（一次最多 500 条，且每条可能带 data 负载）
+      if (document.hidden) {
+        return;
+      }
+      loadLogger();
+    },
+    1000,
+  ) as unknown as number;
 });
 
 onUnmounted(() => {

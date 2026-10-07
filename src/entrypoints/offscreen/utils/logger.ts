@@ -62,31 +62,18 @@ export function logger(data: ILoggerItem) {
 }
 
 /**
- * 把内存里那一批日志立刻写出去。
+ * 读取走内存，不落 sessionStorage：
  *
- * ⚠️ 原注释写「页面卸载 / offscreen 即将销毁时调用」——**没有任何地方这么调**。
- * 全仓只有 getLogger 处理器（本文件末尾 onMessage("getLogger")）一处调用，offscreen 目录里
- * pagehide / beforeunload / visibilitychange 一个都没注册。
- * 后果：日志靠 scheduleFlush 的 500ms 定时器落盘，offscreen 被销毁时定时器随之丢弃，
- * 末批要等到用户**去查日志页**时才被补写。别以为「卸载瞬间那批已经落盘」。
+ * 原先这里是 `flushLogger(); return loggerStorage.value` —— 日志页每秒轮询一次，等于每秒把
+ * 整个 500 条数组 JSON.stringify 一遍同步写 sessionStorage，而那份 sessionStorage **全仓没有
+ * 读取方**（offscreen 销毁即失效，重启后也没人拿它回填 ring）。这条写还会阻塞 offscreen 主线程，
+ * 让回包更慢、界面上 loading 遮罩停留更久。落盘仍由上面节流的 scheduleFlush 负责。
+ *
+ * 由此也删掉了 `flushLogger`：它的两条调用路（原注释说的「页面卸载时」从来没注册过 pagehide，
+ * 以及这条 getLogger）现在都不存在了。
  */
-export function flushLogger() {
-  if (flushTimer !== null) {
-    clearTimeout(flushTimer);
-    flushTimer = null;
-  }
-  try {
-    loggerStorage.value = [...ring];
-  } catch (e) {
-    console.error("[PTD] logger flush failed:", e);
-  }
-}
-
 onMessage("logger", ({ data }) => logger(data));
-onMessage("getLogger", async () => {
-  flushLogger();
-  return loggerStorage.value;
-});
+onMessage("getLogger", async () => [...ring]);
 onMessage("clearLogger", async () => {
   ring.length = 0;
   loggerStorage.value = [];

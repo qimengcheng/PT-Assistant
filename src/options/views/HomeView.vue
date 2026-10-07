@@ -22,8 +22,9 @@ const definitionCount = definitionList.length;
  * 也不在运行时拉 GitHub Release：那要多一条 host 权限、断网就成空面板，
  * 而 Release 正文同样是给仓库读者看的 Markdown。
  *
- * 快照从 v0.31.1 起是**累积档案**（只加不删，现在 111 条、从 v0.1.0 排到最新），
+ * 快照从 v0.32.0 起是**累积档案**（只加不删，从 v0.1.0 一路排到最新），
  * 全铺开会把这一栏拉成几十屏，所以默认只出最新 PREVIEW_COUNT 个版本。
+ * 条数不往这里抄：跑 `node scripts/check-recent-updates.mjs` 看它自己打印的那行。
  */
 const updates = recentUpdates.versions;
 const PREVIEW_COUNT = 10;
@@ -95,7 +96,8 @@ const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
               <span class="kind kind-improved">{{ t("HomeView.kindImproved") }}</span>
               <span class="line">{{ line }}</span>
             </li>
-            <!-- 快照每桶最多列 MAX 条，剩下的只报个数（完整清单在 Releases 页） -->
+            <!-- totals 大于数组长度时只报个数：那是这份档案里刻意省略掉的条目
+                 （正常发版两个 Total 与数组长度相等，见 AGENTS.md §3.7） -->
             <li v-if="u.addedTotal + u.improvedTotal > u.added.length + u.improved.length" class="update-more">
               {{
                 t("HomeView.moreItems", {

@@ -78,7 +78,7 @@ const fullTableHeader = computed<ITableHeader[]>(() => [
   {
     title: t("common.site"),
     key: "siteUserConfig.sortIndex",
-    align: "center",
+    align: "start",
     props: { disabled: true },
   },
   { title: t("common.username"), key: "name", align: "center" },
@@ -823,7 +823,6 @@ const showExportDialog = ref(false);
 .site-cell {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
 }
 

@@ -66,6 +66,16 @@ const contentScriptToggles = [
       </div>
 
       <div class="group">
+        <div class="group-title">{{ t("SetBase.UiWindow.groupDeveloper") }}</div>
+        <div class="switch-grid">
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.developerMode" size="small" />
+            <span class="label">{{ t("SetBase.UiWindow.developerMode") }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
         <div class="group-title">{{ t("SetBase.UiWindow.groupContentScript") }}</div>
         <div class="switch-item" style="margin-bottom: 10px">
           <a-switch v-model:checked="configStore.contentScript.enabled" size="small" />

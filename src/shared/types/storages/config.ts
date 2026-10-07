@@ -29,6 +29,11 @@ export interface IConfigPiniaStorageSchema {
   saveTableBehavior: boolean;
   enableTableMultiSort: boolean; // 是否启用表格多列排序
 
+  // 开发者模式：左侧导航里标着「调试」的那两项（站点定义 / 调试信息）默认不出现。
+  // 存量用户不需要迁移 —— persistWebExt 的 $patch 只覆盖 storage 里存在的键，
+  // 新键拿的就是这里的默认值 false。
+  developerMode: boolean;
+
   // 用于存储 v-data-table 表格的展示
   tableBehavior: Record<UiTableBehaviorKey, UiTableBehaviorItem>;
 

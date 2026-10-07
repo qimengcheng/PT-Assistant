@@ -66,29 +66,36 @@ onMounted(async () => {
   }
 });
 
-const navItems = computed(() => [
-  { path: "/", label: t("layout.nav.home"), icon: HomeOutlined },
-  { path: "/sites", label: t("layout.nav.sites"), icon: GlobalOutlined },
-  { path: "/search", label: t("common.search"), icon: SearchOutlined },
-  { path: "/my-data", label: t("route.Overview.MyData"), icon: BarChartOutlined },
-  // /my-client 早就注册在 router.ts 里，页面也写完了，但此前只有「下载器」页那个 ⓘ
-  // 按钮能跳过来（manageDownloader），左侧导航漏了这条 —— 文件在 ≠ 用户能看到。
-  // 放在「我的数据」后面：两个「我的」页面相邻；下载器设置仍在下面 /set-downloader。
-  { path: "/my-client", label: t("layout.nav.myClient"), icon: DatabaseOutlined },
-  { path: "/search-result-snapshot", label: t("layout.nav.snapshot"), icon: FolderOpenOutlined },
-  { path: "/download-history", label: t("route.Overview.DownloadHistory"), icon: HistoryOutlined },
-  { path: "/keep-upload-task", label: t("route.Overview.KeepUploadTask"), icon: InboxOutlined },
-  { path: "/media-server-entity", label: t("route.Overview.MediaServerEntity"), icon: PlaySquareOutlined },
-  { path: "/set-backup", label: t("layout.nav.backup"), icon: CloudUploadOutlined },
-  { path: "/set-downloader", label: t("layout.nav.downloader"), icon: DownloadOutlined },
-  { path: "/set-media-server", label: t("layout.nav.mediaServer"), icon: PlayCircleOutlined },
-  { path: "/set-base", label: t("layout.nav.basicSettings"), icon: SettingOutlined },
-  // 「技术栈」不再进左侧导航（2026-10-06），路由 /technology-stack 保留，需要时直链进入。
-  { path: "/special-thank", label: t("route.About.SpecialThank"), icon: TeamOutlined },
-  { path: "/logger", label: t("layout.nav.logger"), icon: FileSearchOutlined },
-  { path: "/debug/site-definitions", label: t("layout.nav.siteDefinitions"), icon: FileTextOutlined, dev: true },
-  { path: "/debugger", label: t("route.Devtools.Debugger"), icon: ToolOutlined, dev: true },
-]);
+const navItems = computed(() => {
+  const items = [
+    { path: "/", label: t("layout.nav.home"), icon: HomeOutlined },
+    { path: "/sites", label: t("layout.nav.sites"), icon: GlobalOutlined },
+    { path: "/search", label: t("common.search"), icon: SearchOutlined },
+    { path: "/my-data", label: t("route.Overview.MyData"), icon: BarChartOutlined },
+    // /my-client 早就注册在 router.ts 里，页面也写完了，但此前只有「下载器」页那个 ⓘ
+    // 按钮能跳过来（manageDownloader），左侧导航漏了这条 —— 文件在 ≠ 用户能看到。
+    // 放在「我的数据」后面：两个「我的」页面相邻；下载器设置仍在下面 /set-downloader。
+    { path: "/my-client", label: t("layout.nav.myClient"), icon: DatabaseOutlined },
+    { path: "/search-result-snapshot", label: t("layout.nav.snapshot"), icon: FolderOpenOutlined },
+    { path: "/download-history", label: t("route.Overview.DownloadHistory"), icon: HistoryOutlined },
+    { path: "/keep-upload-task", label: t("route.Overview.KeepUploadTask"), icon: InboxOutlined },
+    { path: "/media-server-entity", label: t("route.Overview.MediaServerEntity"), icon: PlaySquareOutlined },
+    { path: "/set-backup", label: t("layout.nav.backup"), icon: CloudUploadOutlined },
+    { path: "/set-downloader", label: t("layout.nav.downloader"), icon: DownloadOutlined },
+    { path: "/set-media-server", label: t("layout.nav.mediaServer"), icon: PlayCircleOutlined },
+    { path: "/set-base", label: t("layout.nav.basicSettings"), icon: SettingOutlined },
+    // 「技术栈」不再进左侧导航（2026-10-06），路由 /technology-stack 保留，需要时直链进入。
+    { path: "/special-thank", label: t("route.About.SpecialThank"), icon: TeamOutlined },
+    { path: "/logger", label: t("layout.nav.logger"), icon: FileSearchOutlined },
+    { path: "/debug/site-definitions", label: t("layout.nav.siteDefinitions"), icon: FileTextOutlined, dev: true },
+    { path: "/debugger", label: t("route.Devtools.Debugger"), icon: ToolOutlined, dev: true },
+  ];
+
+  // `dev: true` 那两项是给开发/排障用的内部页面，默认不出现 —— 要看得在
+  // 基础设置 → 界面 → 开发者选项 里把开关打开。只关菜单，不动路由：
+  // 直链 /debugger 仍然进得去，出问题时不必为了进去先改配置。
+  return items.filter((item) => !item.dev || configStore.developerMode);
+});
 
 /**
  * 需要缓存的路由组件名，对应各 Index.vue 里的 defineOptions({ name })。

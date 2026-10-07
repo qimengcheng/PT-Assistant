@@ -125,6 +125,8 @@ export const useConfigStore = defineStore("config", {
     saveTableBehavior: true,
     enableTableMultiSort: false,
 
+    developerMode: false,
+
     contextMenus: {
       enabled: true,
       allowSelectionTextSearch: true,

@@ -798,6 +798,8 @@
       "saveTableBehavior": "Remember the displayed columns of tables",
       "enableTableMultiSort": "Allow multi-column sorting",
       "showReleaseNote": "Show release notes after an update",
+      "groupDeveloper": "Developer",
+      "developerMode": "Show developer menus (Site Definitions / Debugger)",
       "groupContentScript": "Site page helper (content script)",
       "enableContentScript": "Enable the site page helper",
       "socialSiteSearchBy": "Search method on social sites",

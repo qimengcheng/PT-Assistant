@@ -1705,8 +1705,6 @@
     "subtitle": "PT 站点辅助扩展（WXT + Vue 3 + antdv-next 重构版）",
     "siteDefinitionsCard": "内置站点定义",
     "siteDefinitionsUnit": "个 · 按需加载",
-    "modulesTitle": "功能模块",
-    "pending": "建设中",
     "updatesTitle": "最近更新",
     "releasesLink": "查看全部更新历史",
     "kindAdded": "新增",
@@ -1715,18 +1713,7 @@
     "updatesEmpty": "暂无可展示的更新记录",
     "updatesExpandAll": "展开全部 {total} 条更新记录",
     "updatesCollapse": "只看最近 {recent} 条",
-    "updatesNote": "下面是随版本构建进扩展的更新快照，截至提交 {sha}（{date}）",
-    "modules": {
-      "siteDefinitions": "站点定义（{0} 个，按需加载）",
-      "messageLayer": "消息层 / background 中枢",
-      "siteManage": "站点管理（添加/配置/用户信息查询）",
-      "multiSiteSearch": "多站点搜索",
-      "myData": "我的数据（用户信息总览）",
-      "backup": "数据备份/导入（本地 zip + WebDAV/S3/B2）",
-      "downloader": "种子下载器对接（qBittorrent 等）配置页与推送 UI",
-      "contentScript": "content script（页面内识别与悬浮入口）",
-      "mediaServer": "媒体服务器配置页与媒体库浏览"
-    }
+    "updatesNote": "下面是随版本构建进扩展的更新快照，截至提交 {sha}（{date}）"
   },
   "SiteDefinitions": {
     "title": "站点定义",

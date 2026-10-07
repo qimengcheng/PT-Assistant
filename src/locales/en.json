@@ -1705,8 +1705,6 @@
     "subtitle": "PT site assistant extension (rebuilt with WXT + Vue 3 + antdv-next)",
     "siteDefinitionsCard": "Built-in Site Definitions",
     "siteDefinitionsUnit": " · loaded on demand",
-    "modulesTitle": "Feature Modules",
-    "pending": "Under construction",
     "updatesTitle": "Recent updates",
     "releasesLink": "View all releases",
     "kindAdded": "New",
@@ -1715,18 +1713,7 @@
     "updatesEmpty": "No updates to show yet",
     "updatesExpandAll": "Show all {total} updates",
     "updatesCollapse": "Show only the latest {recent}",
-    "updatesNote": "These are update notes built into the extension, up to commit {sha} ({date})",
-    "modules": {
-      "siteDefinitions": "Site definitions ({0}, loaded on demand)",
-      "messageLayer": "Messaging layer / background hub",
-      "siteManage": "Site management (add / configure / user info query)",
-      "multiSiteSearch": "Multi-site search",
-      "myData": "My data (user info overview)",
-      "backup": "Backup & import (local zip + WebDAV/S3/B2)",
-      "downloader": "Torrent downloader integration (qBittorrent etc.) config page and push UI",
-      "contentScript": "Content script (in-page detection and floating entry)",
-      "mediaServer": "Media server config page and library browsing"
-    }
+    "updatesNote": "These are update notes built into the extension, up to commit {sha} ({date})"
   },
   "SiteDefinitions": {
     "title": "Site Definitions",

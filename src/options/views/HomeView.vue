@@ -34,23 +34,6 @@ const visibleUpdates = computed(() =>
 );
 const hasMoreUpdates = computed(() => updates.length > PREVIEW_COUNT);
 const releasesUrl = `${REPO_URL}/releases`;
-
-// 功能模块状态（随 Roadmap 平移逐个点亮）
-// 注意：状态必须与代码实装保持一致，不要凭记忆标注——
-// 下载器（SetDownloader + SentToDownloaderDialog 推送）、content script（悬浮入口 +
-// 站点/社交页解析）、媒体服务器（SetMediaServer 配置 + MediaServerEntity 库浏览）
-// 均已实装，曾长期误标 todo。新增条目时同步更新。
-const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
-  { name: t("HomeView.modules.siteDefinitions", [definitionCount]), status: "ok" as const },
-  { name: t("HomeView.modules.messageLayer"), status: "ok" as const },
-  { name: t("HomeView.modules.siteManage"), status: "ok" as const },
-  { name: t("HomeView.modules.multiSiteSearch"), status: "ok" as const },
-  { name: t("HomeView.modules.myData"), status: "ok" as const },
-  { name: t("HomeView.modules.backup"), status: "ok" as const },
-  { name: t("HomeView.modules.downloader"), status: "ok" as const },
-  { name: t("HomeView.modules.contentScript"), status: "ok" as const },
-  { name: t("HomeView.modules.mediaServer"), status: "ok" as const },
-]);
 </script>
 
 <template>
@@ -125,55 +108,23 @@ const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
         {{ t("HomeView.updatesNote", { sha: recentUpdates.headSha, date: recentUpdates.generatedAt }) }}
       </p>
     </section>
-
-    <section class="page-panel modules-panel">
-      <header class="panel-head">
-        <h3>{{ t("HomeView.modulesTitle") }}</h3>
-      </header>
-      <ul class="modules">
-        <li v-for="m in modules" :key="m.name">
-          <span class="dot" :class="m.status">{{ m.status === "ok" ? "✓" : "…" }}</span>
-          <span :class="{ pending: m.status === 'todo' }">{{ m.name }}</span>
-          <span v-if="m.status === 'todo'" class="pending-tag">{{ t("HomeView.pending") }}</span>
-        </li>
-      </ul>
-    </section>
   </div>
 </template>
 
 <style scoped>
-/* 两列：最近更新占大头，功能模块窄列；窄窗口（options 是独立窗口，能拖到 600px）
-   退回单列。列宽用 minmax(0,…) 是因为 grid 项默认 min-width:auto，
-   不写 0 的话长文本会把这一列撑破而不是自己换行。 */
+/* 一列两行：hero 占内容高，最近更新吃掉剩余高度。
+   右边那栏「功能模块」已于 2026-10-07 删掉 —— 九项全是 ✓，一栏只用来宣布「都做完了」
+   没有信息量，还把它挤成窄列。
+   列宽用 minmax(0,…) 是因为 grid 项默认 min-width:auto，不写 0 的话长文本会把这一列
+   撑破而不是自己换行。 */
 .home {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
-  grid-template-areas:
-    "hero hero"
-    "updates modules";
   gap: 8px;
-  /* 撑满一屏：内容不足一屏时，下半截不该露出整片灰底（第二行的两块面板靠 1fr
-     分到剩余高度，align-items 默认 stretch，两块一样高） */
+  /* 撑满一屏：内容不足一屏时，下半截不该露出整片灰底（第二行 1fr + align-items
+     默认 stretch，面板自己滚） */
   min-height: 100%;
-}
-.hero {
-  grid-area: hero;
-}
-.updates-panel {
-  grid-area: updates;
-}
-.modules-panel {
-  grid-area: modules;
-}
-@media (max-width: 900px) {
-  .home {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "hero"
-      "updates"
-      "modules";
-  }
 }
 
 .hero {
@@ -202,8 +153,7 @@ const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
   margin: 0;
 }
 
-.updates-panel,
-.modules-panel {
+.updates-panel {
   padding: 12px 14px;
 }
 .panel-head {
@@ -286,51 +236,5 @@ const modules = computed<{ name: string; status: "ok" | "todo" }[]>(() => [
   margin: 8px 0 0;
   color: var(--pt-color-text-secondary);
   font-size: 12px;
-}
-
-/* 模块清单：去掉了外框（面板本身就是白表面），只留行分隔线 */
-.modules {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.modules li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  line-height: 1.4;
-}
-.modules li + li {
-  border-top: 1px solid var(--pt-color-border-light);
-}
-.dot {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-}
-.dot.ok {
-  background: var(--pt-color-success-bg, #f6ffed);
-  color: var(--pt-color-success, #52c41a);
-}
-.dot.todo {
-  background: var(--pt-color-disabled-bg, #f5f5f5);
-  color: var(--pt-color-disabled, #bfbfbf);
-}
-.pending {
-  color: var(--pt-color-text-secondary);
-}
-.pending-tag {
-  margin-left: auto;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: var(--pt-color-disabled-bg, #f5f5f5);
-  color: var(--pt-color-disabled, #bfbfbf);
-  font-size: 11px;
 }
 </style>

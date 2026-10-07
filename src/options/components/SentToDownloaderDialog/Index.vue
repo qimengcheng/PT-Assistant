@@ -367,10 +367,22 @@ function dialogLeave() {
               <div class="quick-send-item-main">
                 <img class="downloader-avatar" :src="getDownloaderIcon(downloader.type)" :alt="downloader.type" />
                 <div class="quick-send-item-body">
-                  <div class="quick-send-item-title" :title="downloaderTitle(downloader)">
-                    {{ downloaderTitle(downloader) }}
-                  </div>
-                  <div v-if="path" class="quick-send-item-subtitle" :title="path">{{ path }}</div>
+                  <!-- 名字与保存路径都是「截断 + 悬停看全文」，全文揭示统一走 a-popover
+                       （原生 title 的样式页面控制不了）。delay 与 TorrentTitleTd 同档 0.4s，
+                       理由见那边注释。这两处 div 必须是 .quick-send-item-body 的直接子节点：
+                       a-popover 不生成包装元素，触发事件直接 clone 到子节点上。 -->
+                  <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+                    <template #content>
+                      <div class="reveal-text">{{ downloaderTitle(downloader) }}</div>
+                    </template>
+                    <div class="quick-send-item-title">{{ downloaderTitle(downloader) }}</div>
+                  </a-popover>
+                  <a-popover v-if="path" trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+                    <template #content>
+                      <div class="reveal-text">{{ path }}</div>
+                    </template>
+                    <div class="quick-send-item-subtitle">{{ path }}</div>
+                  </a-popover>
                 </div>
               </div>
 
@@ -490,7 +502,13 @@ function dialogLeave() {
               class="choice-group"
             >
               <a-radio-button v-for="item in grp.items" :key="item.value" :value="item.value">
-                <span v-if="item.mono" class="choice-mono" :title="item.label">{{ item.label }}</span>
+                <!-- 路径是 .choice-mono 那三条 ellipsis 之一，全文同样换 a-popover -->
+                <a-popover v-if="item.mono" trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+                  <template #content>
+                    <div class="reveal-text">{{ item.label }}</div>
+                  </template>
+                  <span class="choice-mono">{{ item.label }}</span>
+                </a-popover>
                 <template v-else>{{ item.label }}</template>
               </a-radio-button>
             </a-radio-group>
@@ -637,6 +655,14 @@ function dialogLeave() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* popover 里的全文：换成多行 + 宽度上限（与 TorrentTitleTd 同一份写法）。
+   路径串常有无空格长段，overflow-wrap 用 anywhere 才断得开。 */
+.reveal-text {
+  max-width: 480px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 // 分段按钮组：antd 的 group 默认 inline-block，候选一多就一路撑破弹窗右边界，

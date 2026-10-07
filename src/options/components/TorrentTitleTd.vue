@@ -94,27 +94,34 @@ function canAdvanceSearch(site: TSupportSocialSite) {
   <div class="t_main">
     <div class="t_row">
       <!--
-        下面几处刻意继续用 CSS 的 text-truncate / text-ellipsis，而不是 antd 的
-        <a-typography-text :ellipsis>，原因有三条（别再当成待办改回去）：
-        ① 悬停提示已经在了 —— 主标题 :title="item.title"、副标题 :title="item.subTitle"、
-           社交卡标题 :title 都是原生 title。ellipsis 属性能提供的「截断 + 悬停全文」这里已齐全，
-           换过去行为上零增益，只是写法不同。
-        ② 本组件被 content 侧复用（content-script/app/components/AdvanceListModuleDialog.vue 导入它），
+        下面两处刻意继续用 CSS 的 text-truncate / text-ellipsis，而不是 antd 的
+        <a-typography-text :ellipsis>，原因有两条（别再当成待办改回去）：
+        ① 本组件被 content 侧复用（content-script/app/components/AdvanceListModuleDialog.vue 导入它），
            加 <a-typography-text> 就必须往 src/content-script/antd-lite.ts 注册 Typography，
            而 Typography 子包约 19 KB（对照 FloatButton 实测 +47.8 KB 的先例），代价摊给每个 PT 站点。
-        ③ 第 138 行那个 <h3> 在 <a-popover> 的 #content 里，再嵌一层 tooltip 会叠成双层浮层。
+        ② 全文揭示已经由 <a-popover> 负责，ellipsis 那套「截断 + 悬停全文」在这里是重复能力。
+
+        揭示一律走 popover，不再用原生 title：原生那层的底色、字号、行宽、出现延迟都由系统画，
+        页面一点都控制不了（2026-10-07 用户口径，全站这一族换成 a-popover）。
+        mouse-enter-delay 给 0.4s：默认的 0.1s 是按小命中区定的（本仓库 UserLevelRequirementsTd
+        那颗图标用 0.2s），而标题是一整行 —— 鼠标扫过结果表会一路弹窗。
+        480px 上限 + white-space:normal 让全文换行铺开，不在浮层里再拖一条超长单行。
       -->
       <!-- 种子主标题信息 -->
       <span class="text-truncate flex-1-1-0">
-        <a
-          :href="item.url"
-          :title="item.title"
-          class="t_title text-decoration-none text-body-large text-truncate"
-          rel="noopener noreferrer nofollow"
-          target="_blank"
-        >
-          {{ item.title ?? item.url ?? item.link }}
-        </a>
+        <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+          <template #content>
+            <div class="reveal-text">{{ item.title ?? item.url ?? item.link }}</div>
+          </template>
+          <a
+            :href="item.url"
+            class="t_title text-decoration-none text-body-large text-truncate"
+            rel="noopener noreferrer nofollow"
+            target="_blank"
+          >
+            {{ item.title ?? item.url ?? item.link }}
+          </a>
+        </a-popover>
       </span>
 
       <!-- 种子的媒体信息 -->
@@ -144,10 +151,13 @@ function canAdvanceSearch(site: TSupportSocialSite) {
                         <a-skeleton-button active style="width: 150px; height: 225px" />
                       </template>
                     </a-image>
+                    <!-- 这一处的全文直接铺开，不给 popover：它自己就挂在社交卡那层浮层里，
+                         再套一层浮层会打架 —— 指针移到内层浮层时，外层判定 mouseleave 关掉，
+                         而内层的触发元素（就是这个 h3）在外层 DOM 子树里，跟着一起消失。
+                         卡片宽 150px，标题换成多行的代价只是卡片高一点。 -->
                     <h3
                       v-if="socialInformation[key]?.title"
-                      class="text-ellipsis font-weight-bold"
-                      :title="socialInformation[key]?.title"
+                      class="social-card-title font-weight-bold"
                     >
                       {{ socialInformation[key]?.title.split(" / ")[0] }}
                     </h3>
@@ -226,13 +236,26 @@ function canAdvanceSearch(site: TSupportSocialSite) {
       </div>
 
       <!-- 种子副标题信息 -->
-      <span
+      <a-popover
         v-if="configStore.searchEntifyControl.showTorrentSubtitle && item.subTitle"
-        :title="item.subTitle"
-        class="t_subTitle text-grey text-truncate flex-1-1-0"
+        trigger="hover"
+        placement="topLeft"
+        :mouse-enter-delay="0.4"
       >
-        {{ item.subTitle }}
-      </span>
+        <template #content>
+          <div class="reveal-text">{{ item.subTitle }}</div>
+        </template>
+        <!-- v-if 挂在 a-popover 上而不是挂在那个 span 上：子节点不在时插槽是空的，
+             Popover 会退化成给自己补一个空 span 当触发元素（台架实测那层 span 里只剩一个
+             Vue 占位注释节点），空 span 就成了 .t_row 的 flex item，下面那条 min-width:0
+             再也算不到 span 头上。
+             子节点在位时它不生成任何包装元素 —— 触发事件直接 clone 到子节点
+             （@v-c/trigger/dist/index.js:351 取 slots.default()[0] 再 mergeProps），
+             所以 flex-1-1-0 与 min-width:0 仍然算在它头上，截断照常生效（台架实测 client 389 / scroll 718）。
+             注意这条注释里不要写 Vue 的空注释节点字面量：那串的两个连字符加大于号本身就是
+             HTML 注释的结束符，写进去这一段模板会被从中间截断，构建期才炸。 -->
+        <span class="t_subTitle text-grey text-truncate flex-1-1-0">{{ item.subTitle }}</span>
+      </a-popover>
     </div>
   </div>
 </template>
@@ -269,5 +292,19 @@ function canAdvanceSearch(site: TSupportSocialSite) {
 
 .social-card {
   text-align: center;
+}
+
+/* 社交卡里的标题：整段铺开（最多 150px 宽），不再有原生 title 兜住截断的部分 */
+.social-card-title {
+  overflow-wrap: anywhere;
+}
+
+/* popover 里的全文：换成多行 + 宽度上限。
+   不设上限的话超长标题在浮层里仍是一条横贯半屏的长串，和原生 title 是同一个毛病。
+   overflow-wrap: anywhere 处理无空格的长串（种子标题里成串的 hash / 版本号很常见）。 */
+.reveal-text {
+  max-width: 480px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 </style>

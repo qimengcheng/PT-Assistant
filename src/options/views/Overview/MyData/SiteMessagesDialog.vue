@@ -80,14 +80,14 @@ async function selectMessage(index: number) {
   activeContent.value = "";
 
   if (!item.id) {
-    // 解析不出 msgid 的站给不了正文，但列表本身仍然可读
+    // 列表里连 id 都解析不出来的站给不了正文，但列表本身仍然可读
     activeContent.value = t("MyData.messages.noBody");
     return;
   }
 
   isLoadingContent.value = true;
   try {
-    const result = await sendMessage("getSiteMessageContent", { siteId: siteId!, messageId: item.id });
+    const result = await sendMessage("getSiteMessageContent", { siteId: siteId!, messageId: item.id, url: item.url });
     activeContent.value = result.content ?? t("MyData.messages.noBody");
     if (siteId) {
       await messageRead.markRead(siteId, [item.id]);

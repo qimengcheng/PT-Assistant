@@ -39,7 +39,7 @@ onMessage("getSiteMessageContent", async ({ data }): Promise<ISiteMessageContent
     if (!site.supportsMessages) {
       return { supported: false, status: EResultParseStatus.success };
     }
-    const content = await site.getMessageContent(data.messageId);
+    const content = await site.getMessageContent(data.messageId, data.url);
     return {
       supported: true,
       status: content === undefined ? EResultParseStatus.parseError : EResultParseStatus.success,

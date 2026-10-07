@@ -771,6 +771,12 @@ export const SchemaMetadata: Pick<
   },
 };
 
+/**
+ * 像绝对时间的文本（`2026-10-01 13:50:50` / `10-01-2026`）。
+ * 信箱列表里用它挑出"哪一格/哪个 title 是时间"：皮肤常把绝对时间放 title、文字给相对时间。
+ */
+const isDateTimeText = (text: string): boolean => /\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}/.test(text);
+
 export default class NexusPHP extends PrivateSite {
   protected guessSearchFieldIndexConfig(): Record<string, string[]> {
     return {
@@ -1054,13 +1060,10 @@ export default class NexusPHP extends PrivateSite {
   /**
    * 读信箱列表。
    *
-   * 请求的是信箱首页本身，**不带 action**：站点自己指向信箱的链接就是裸 `messages.php`
-   * （上面取未读数用的 `td[style*='background: red'] a[href*='messages.php']` 抓的正是它），
-   * 而 `action=view` 是「取单条正文」那条路的参数、要跟 msgid 一起用（见 getMessageContent）。
-   *
-   * 判据是「这一行有没有指向 msgid 的链接」，不是「表格 class 叫什么」—— NexusPHP 各站皮肤
-   * 不同（tainted / classic / 交替行 class 都见过），但查看链接上的 msgid 参数是内核给的。
-   * 未读按内核可能输出的两种写法都认：整行 class 带 unread，或标题被 `<b>` 包着。
+   * 判据是「这一行有没有指向单条正文的链接」。参数名各分支不统一：内核经典写法是
+   * `messages.php?action=viewmessage&id=123`（2026-10-07 拿 LuckPT 真实信箱页核过，
+   * 整页搜不到 `msgid` 三个字），也有变体用 `msgid` —— 两种都认。
+   * v0.31.0 那版只认 `msgid`，于是所有站一条都读不出，界面退成「信箱页一条都没读到」。
    */
   public override async getMessages(): Promise<ISiteMessage[]> {
     const { data } = await this.request<string>({ url: this.messageUrl });
@@ -1072,33 +1075,56 @@ export default class NexusPHP extends PrivateSite {
     const doc = createDocument(data);
     const messages: ISiteMessage[] = [];
 
-    for (const row of Sizzle("tr", doc) as HTMLTableRowElement[]) {
-      const linkList = Sizzle("a[href*='msgid']", row) as HTMLAnchorElement[];
-      if (linkList.length === 0) {
+    /**
+     * 逐条**链接**去定位它自己那一行（`closest("tr")`），不是逐行去找链接：
+     * 信箱页外层还有一整包裹住全站的 `<tr><td id="outer">`，按行走时那张大行
+     * 会把所有消息当成"一行"、只吐出第一条（拿 LuckPT 真实页面跑仓库这份代码实测到的）。
+     */
+    const visited = new Set<HTMLTableRowElement>();
+    for (const link of Sizzle("a[href*='viewmessage'], a[href*='msgid']", doc) as HTMLAnchorElement[]) {
+      const row = link.closest("tr");
+      if (!row || visited.has(row)) {
         continue;
       }
+      visited.add(row);
 
-      const link = linkList[0];
       const title = extractContent(link.textContent ?? "");
       if (!title) {
         continue;
       }
 
+      const cellList = Sizzle("td", row) as HTMLElement[];
+      // 发讯者：用户发来的信带 user.php 链接，系统信是纯文本（LuckPT 那一列就是「系统」），
+      // 所以链接取不到时退到主题格的下一格 —— 但挡掉长得像日期的，那种是列序不同的日期格。
       const senderNode = Sizzle("a[href*='user.php']", row)[0];
-      // 时间列不按下标取（各站列序不同），按内容里有没有日期样式找
-      const timeText = extractContent(
-        (Sizzle("td", row) as HTMLElement[])
-          .map((td) => extractContent(td.textContent ?? ""))
-          .find((text) => /\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}/.test(text)) ?? "",
-      );
+      const titleCellIndex = cellList.findIndex((td) => td.contains(link));
+      const nextCellText =
+        titleCellIndex >= 0 && Sizzle("input", cellList[titleCellIndex + 1] ?? doc.body).length === 0
+          ? extractContent(cellList[titleCellIndex + 1]?.textContent ?? "")
+          : "";
+      // 时间：皮肤常把绝对时间放在 title 上、文字给相对时间
+      // （LuckPT 是 `<span title="2026-10-01 13:50:50">6天4时前</span>`），所以 title 优先、文字兜底。
+      const timeText =
+        (Sizzle("span[title], td[title]", row) as HTMLElement[])
+          .map((el) => el.getAttribute("title") ?? "")
+          .find((text) => isDateTimeText(text)) ??
+        cellList.map((td) => extractContent(td.textContent ?? "")).find((text) => isDateTimeText(text)) ?? "";
       const parsedTime = timeText ? parseValidTimeString(timeText) : undefined;
 
       messages.push({
-        id: (link.href.match(/[?&]msgid=(\d+)/) ?? [])[1],
+        id: (link.href.match(/[?&](?:msgid|id)=(\d+)/) ?? [])[1],
         title,
-        sender: senderNode ? extractContent(senderNode.textContent ?? "") : undefined,
+        sender: senderNode
+          ? extractContent(senderNode.textContent ?? "")
+          : nextCellText && !isDateTimeText(nextCellText)
+            ? nextCellText
+            : undefined,
         time: typeof parsedTime === "number" ? parsedTime : undefined,
-        unread: /unread/i.test(row.className) || Sizzle("b", link).length > 0,
+        // 未读标记三种都见过：整行 class 带 unread、状态格里带 unread 的图标、标题被 <b> 包着
+        unread:
+          /unread/i.test(row.className) ||
+          Sizzle("[class*='unread']", row).length > 0 ||
+          Sizzle("b", link).length > 0,
         url: this.resolveSiteUrl(link.getAttribute("href") ?? this.messageUrl),
       });
     }
@@ -1107,14 +1133,17 @@ export default class NexusPHP extends PrivateSite {
   }
 
   /**
-   * 读单条正文。多数 NexusPHP 变体在查看正文时会顺手把该条记为已读，但那不是我们能依赖的
-   * 契约（皮肤/分支各异），所以界面上「数字立刻消失」靠的是扩展自己的已读记账。
+   * 读单条正文。**优先直接取列表页给的那条链接**：action 名（viewmessage / view）、
+   * 参数名（id / msgid）、要不要 pop=1 各分支都不一样，而列表里那条链接一定是该站认的写法。
+   * 没带 url 时才按经典写法拼一次参数（例如调用方只有 id）。
    */
-  public override async getMessageContent(messageId: string): Promise<string | undefined> {
-    const { data } = await this.request<string>({
-      url: this.messageUrl,
-      params: { action: "view", pop: "1", msgid: messageId },
-    });
+  public override async getMessageContent(messageId: string, url?: string): Promise<string | undefined> {
+    const { data } = url
+      ? await this.request<string>({ url })
+      : await this.request<string>({
+          url: this.messageUrl,
+          params: { action: "viewmessage", id: messageId },
+        });
 
     if (typeof data !== "string" || !data) {
       return undefined;

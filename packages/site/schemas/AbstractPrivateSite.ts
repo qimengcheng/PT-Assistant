@@ -241,7 +241,11 @@ export default class PrivateSite extends BittorrentSite {
     return [];
   }
 
-  public async getMessageContent(_messageId: string): Promise<string | undefined> {
+  /**
+   * @param messageId 列表给出的站内信 id
+   * @param url 列表里那条指向正文的链接原样（能拿到就该用它：各分支的 action/参数名不统一）
+   */
+  public async getMessageContent(_messageId: string, _url?: string): Promise<string | undefined> {
     return undefined;
   }
 }

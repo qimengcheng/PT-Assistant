@@ -184,7 +184,7 @@ export interface ProtocolMap {
    * 与「支持但你现在没有消息」区分开 —— 后者才该显示空列表。
    */
   getSiteMessages(siteId: TSiteID): ISiteMessagesResult;
-  getSiteMessageContent(data: { siteId: TSiteID; messageId: string }): ISiteMessageContentResult;
+  getSiteMessageContent(data: { siteId: TSiteID; messageId: string; url?: string }): ISiteMessageContentResult;
 
   // ===== 2.4 offscreen：社交信息 ( utils/socialInformation ) =====
   getSocialInformation(data: { site: TSupportSocialSite$1; sid: string }): ISocialInformation;

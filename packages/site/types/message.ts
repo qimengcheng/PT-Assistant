@@ -7,12 +7,12 @@ import type { EResultParseStatus } from "./base.ts";
  * 其余 schema 的 `supportsMessages` 为 false，界面据此显示「暂不支持，去网页看」而不是空列表。
  */
 export interface ISiteMessage {
-  id?: string; // 站内信 id（NexusPHP 的 msgid），取正文与本地已读记账都靠它
+  id?: string; // 站内信 id（NexusPHP 各分支叫 `id` 或 `msgid`），本地已读记账靠它
   title: string;
   sender?: string;
-  time?: number; // 解析得出的时间戳；站点只给相对时间（"x 天前"）时留空
+  time?: number; // 解析得出的时间戳；站点只给相对时间、title 上也没有绝对时间时留空
   unread?: boolean;
-  url?: string; // 站内原文地址，弹窗里「在网页打开」用
+  url?: string; // 站内原文地址：弹窗里「在网页打开」用它，取正文也照它（各分支的 action/参数名不统一）
 }
 
 export interface ISiteMessagesResult {

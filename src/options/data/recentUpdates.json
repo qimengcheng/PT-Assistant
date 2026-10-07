@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-07 21:22:53",
-  "headSha": "685b529",
+  "generatedAt": "2026-10-07 21:40:28",
+  "headSha": "2d96448",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.37.2",
+      "date": "2026-10-07 22:10:36",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "站内信能读了。之前点「我的数据」上那个红色未读数字，所有站点都只会说「信箱页一条都没读到」—— 解析器只认一种链接写法（msgid），而站点实际用的是 viewmessage&id。拿你贴来的真实信箱页核过：现在列得出 10 条，未读数 8 也和站点自己报的对上，时间、发讯者都带齐"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.37.1",
       "date": "2026-10-07 21:40:28",

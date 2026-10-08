@@ -358,10 +358,18 @@ GitHub 未认证接口是 60 次/小时/IP，一天一条离打爆自己很远�
 `smoke-background.mjs` 的注册事件清单里多了 `alarms.onAlarm` 与 `notifications.onClicked`，
 证明新模块在产物形态下确实加载了（这条是 §25 那一类「源码看着没问题、跑产物才炸」的唯一防线）。
 
-**没做到的**：新 UI（基础设置那一页 + 首页那张卡片）**没有肉眼验收**。
-台架起不来 —— 把整条 options 依赖图（antdv-next + `@ptd/site` 工具桶 + social/sizzle + downloader 包）
-交给 vite dev 做冷启动预打包，隐藏页里那个 optimizer 始终不收敛，两次尝试各耗掉几分钟仍挂不上组件。
-所以这一项按「构建产物交给他看」收尾。
+**做到的一半**：把**真的** `UpdateWindow.vue` 在 Node 里 SSR 渲染了一遍（vite `ssrLoadModule` +
+`wxt/testing/fake-browser` 顶掉 chrome + 一个 pre 插件在 plugin-vue 之前摘掉 `<style>` ——
+SSR 环境下 `vite:css-post` 那张 `cssModulesCache` 没被填，任何 `?vue&type=style` 请求都当场抛），
+13 条断言全过：分组标题、四行 descriptions、两颗开关、两条说明的**中文文本都在**，
+且渲染结果里**没有 `SetUpdate.` 这类裸键路径**（取不到键时 vue-i18n 会把键路径当文案渲染，这是防线 ③ 的靶子，
+而它看不见 `SetUpdate.status.${x}` 这种动态键，所以这一遍是补的那一半）。
+
+**没做到的**：**像素层面没验**（首页那张卡片会不会把欢迎语挤成第三行、那一页的间距节奏），
+`updateAvailable` 那一支也没渲染到 —— SSR 不跑 `onMounted`，读不到缓存就永远停在 initial 态。
+浏览器台架那条路试过两次：以仓库根为 root 时 vite 的冷启动预打包要把整条 options 图
+（antdv-next + `@ptd/site` 工具桶 + social/sizzle + downloader/backupServer 包）收一遍，
+在本机的隐藏页里始终不收敛，`#app` 一直是空的。所以这两处按「构建产物交给他肉眼验收」收尾。
 
 ---
 

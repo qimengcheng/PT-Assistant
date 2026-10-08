@@ -5,8 +5,9 @@
  * 正文按**纯文本**显示。刻意不用 v-html：站内信是站点侧不可信内容，选项页能调 chrome.*
  * 消息，把站点 HTML 原样注进去等于给每个站点开一个 XSS 面。
  */
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useDebounceFn } from "@vueuse/core";
 import { CheckOutlined, ExportOutlined, InboxOutlined, SyncOutlined } from "@antdv-next/icons";
 import { EResultParseStatus, type ISiteMessage, type TSiteID } from "@ptd/site";
 
@@ -80,6 +81,28 @@ const isMarkingAll = ref(false);
 const markProgress = ref({ done: 0, total: 0 });
 
 /**
+ * 点开一条正文 = 那条 viewmessage 的 GET 已经把站点侧翻成已读，但身后那一行的红数字读的是
+ * `lastUserInfo[site].messageCount` —— 不重取一次用户信息，它永远不会掉（用户 2026-10-08
+ * 报的「把已读的读了，角标还是 1」就是这一条：读正文之后没有任何地方去刷）。
+ * 攒 1.2 秒再刷：连点几条只发一趟请求；关弹窗 / 组件卸载时立刻兑现，不留到下一次定时刷新。
+ */
+const pendingBadgeRefresh = new Set<TSiteID>();
+const runBadgeRefresh = useDebounceFn(() => {
+  const ids = [...pendingBadgeRefresh];
+  pendingBadgeRefresh.clear();
+  if (ids.length > 0) {
+    flushSiteLastUserInfo(ids);
+  }
+}, 1200);
+
+function scheduleBadgeRefresh(id: TSiteID) {
+  pendingBadgeRefresh.add(id);
+  runBadgeRefresh();
+}
+
+onBeforeUnmount(() => runBadgeRefresh.flush());
+
+/**
  * 一键已读。用的还是「点开一条正文」那条 GET —— 信箱页给的那条 viewmessage 链接，站点收到
  * 就把这条翻成已读（真页对账：LuckPT 读前横幅 8 条、点开一张正文页已经是 7 条）。
  * 所以这里不发任何 POST、不猜 authkey 那类写接口，代价只是逐条取回整页。
@@ -121,6 +144,7 @@ async function markAllAsRead() {
     await loadMessages(id);
   }
   // 站点侧的未读数被改过了，「我的数据」那一行的红数字要跟着掉
+  pendingBadgeRefresh.clear();
   flushSiteLastUserInfo([id]);
 }
 
@@ -145,6 +169,8 @@ async function selectMessage(index: number) {
     activeContent.value = result.content ?? t("MyData.messages.noBody");
     if (siteId) {
       await messageRead.markRead(siteId, [item.id]);
+      // 站点侧这一条已经被这次 GET 标成已读了，红数字得重取才跟得上
+      scheduleBadgeRefresh(siteId);
     }
   } finally {
     isLoadingContent.value = false;
@@ -154,7 +180,12 @@ async function selectMessage(index: number) {
 watch(
   () => [showDialog.value, siteId] as const,
   async ([open, id]) => {
-    if (!open || !id) {
+    if (!open) {
+      // 关掉弹窗的那一眼正是他会去看红数字的时候，别把攒下的刷新留给 debounce 尾巴
+      runBadgeRefresh.flush();
+      return;
+    }
+    if (!id) {
       return;
     }
     siteName.value = await metadataStore.getSiteName(id);

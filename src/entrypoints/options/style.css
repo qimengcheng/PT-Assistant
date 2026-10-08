@@ -332,12 +332,33 @@ body {
 /* ===== 表格斑马纹：全站一条，不按页挂 class =====
    原先是 compat 里的 `.table-stripe` + 每张表自己加 class，20 张表只有 8 张加了，
    剩下 12 张没人会想起来补 —— 所以判据从"记得挂 class"改成"默认就有"。
-   底色落在 <tr> 而不是 <td>：antd 的 hover 与选中态都是给 <td> 上底色，
-   天然盖得住条纹，两边都不需要 !important（站点定义页的行高亮就是靠 td + !important）。
    只认 tr.ant-table-row：空态占位行、展开行、测量行都拿不到这个类，
-   免得「暂无数据」那一整行也被刷成灰底。 */
-.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) {
+   免得「暂无数据」那一整行也被刷成灰底。
+
+   底色落在 <td> 而不是 <tr>（v0.37.4 改的）：antd 的悬停/选中都是给 <td> 上底色，
+   条纹在 <tr> 上时被它们盖住就整行变白或变蓝，而那个悬停底色是 rc-table 用 React 状态
+   加在 td 上的（`.ant-table-cell-row-hover`，带 0.2s 背景过渡 + 去抖），鼠标快速划过时
+   会留下几行没退干净的 —— 用户口径「隔行样式在 hover 过后会消失，不稳定」。
+   条纹和悬停同落在 td 上之后，两者只比特异度，过渡变成灰↔蓝的同元素交叉淡化，
+   任何一刻都不会出现"既不是灰也不是蓝"的白行。 */
+.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) > td {
   background: #fafafa;
+}
+
+/* 悬停底色改由 CSS `:hover` 驱动，并关掉 antd 那个 JS 类：`:hover` 由浏览器维护，
+   不存在"移开了还留着"。`:not(.ant-table-row-selected)` 是把选中行的两档底色让给 antd
+   自己的规则，选中 + 悬停仍然有单独一档颜色。 #f0f7ff = ConfigProvider 的 Table.rowHoverBg，
+   两侧 App.vue 同值；这里取字面量是因为 CSS 拿不到 JS 里的 token 对象。
+
+   两条规则的特异度都是按「压过 antd 那两条」定的，不靠源码顺序：
+   antd 的 `.ant-table-wrapper .ant-table-tbody .ant-table-row > .ant-table-cell-row-hover`
+   是 0,4,0，所以关掉它那条要写到 0,4,1（多带一个 td 类型选择器）；
+   它的选中档是 0,5,0，仍然在一切之上。 */
+.ant-table-wrapper .ant-table-tbody .ant-table-row > td.ant-table-cell-row-hover {
+  background: transparent;
+}
+.ant-table-tbody > tr.ant-table-row:not(.ant-table-row-selected):hover > td {
+  background: #f0f7ff;
 }
 
 /* ===== 表格圆角：全站一条，判据同样是"默认就有" =====

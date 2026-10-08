@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-07 22:34:31",
-  "headSha": "af81254",
+  "generatedAt": "2026-10-08 08:59:23",
+  "headSha": "a75bf34",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.37.4",
+      "date": "2026-10-08 08:59:03",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "表格的隔行底色稳住了。之前鼠标划过一片行之后，会留下几行的条纹被悬停色盖着退不干净，灰白交替看着时有时无；现在条纹和悬停落在同一层上，谁在上面是定死的"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.37.3",
       "date": "2026-10-07 22:31:08",

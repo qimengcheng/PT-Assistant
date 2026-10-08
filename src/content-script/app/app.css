@@ -38,12 +38,20 @@
   z-index: 9999999;
 }
 
-/* 表格斑马纹，与 options 侧 style.css 里那条同值同判据。
+/* 表格斑马纹，与 options 侧 style.css 里那条同值同判据（含"底色落在 td 而不是 tr"、
+   悬停改由 :hover 驱动这两条，改一处要两处同改）。
    content 侧此前挂的是 class="table-stripe"，但那条规则只存在于
    `src/entrypoints/options/vuetify-compat.css`（只有 options 的 main.ts 引入），
    所以注入 UI 里那张表的 class 从来没生效过 —— 现在改成默认就有，class 也删了。 */
-.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) {
+.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) > td {
   background: #fafafa;
+}
+
+.ant-table-wrapper .ant-table-tbody .ant-table-row > td.ant-table-cell-row-hover {
+  background: transparent;
+}
+.ant-table-tbody > tr.ant-table-row:not(.ant-table-row-selected):hover > td {
+  background: #f0f7ff;
 }
 
 /* 滚动条样式，与 options 侧 style.css 里那组同值同判据（shadow root 内的元素

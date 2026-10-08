@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-08 12:56:30",
-  "headSha": "6b7cb42",
+  "generatedAt": "2026-10-08 13:17:40",
+  "headSha": "15ef2a7",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.41.2",
+      "date": "2026-10-08 13:17:00",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "编辑下载服务器的弹窗重排：每个开关原本「标签在上、开关在下」再叠一段大留白，一颗 16px 高的开关吃掉约 90px；现在改成标签在左、开关在右，用户名与密码并排、超时滑块和它的数值同行，整块内容从 1221px 压到 721px，一般窗口高度下不用再滚动。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.41.1",
       "date": "2026-10-08 12:55:44",

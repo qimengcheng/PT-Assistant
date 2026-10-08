@@ -593,14 +593,18 @@ const hasSearchStatus = computed<boolean>(() => {
             size="small"
             @click="showSearchStatusDialog = true"
           >
+            <!-- 三颗图标一律不写颜色，跟着按钮前景走（primary 蓝底上是白）。
+                 原来这两处内联色是 Vuetify 时代的 Material 残留，落在这颗蓝底上量到的对比度：
+                 时钟 #607d8b = 1.07:1（等于看不见）、警告 #faad14 = 2.16:1，都低于非文本图形
+                 的 3:1 下限；继承白色是 4.10:1。要区分三种计数靠字形本身，不靠手挑色。 -->
             <template v-if="searchPlanStatus.success > 0">
               <CheckOutlined class="mr-1" />{{ searchPlanStatus.success }}
             </template>
             <template v-if="searchPlanStatus.error > 0">
-              <AlertOutlined class="mr-1" style="color: #faad14" />{{ searchPlanStatus.error }}
+              <AlertOutlined class="mr-1" />{{ searchPlanStatus.error }}
             </template>
             <template v-if="searchPlanStatus.queued > 0">
-              <ClockCircleOutlined class="mr-1" style="color: #607d8b" />{{ searchPlanStatus.queued }}
+              <ClockCircleOutlined class="mr-1" />{{ searchPlanStatus.queued }}
             </template>
           </a-button>
         </a-tooltip>

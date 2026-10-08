@@ -8,9 +8,14 @@
  *   都不猜接口、不写死参数名（v0.31.0 凭印象写死 `msgid` 让所有站都读不出，那次教训）；
  * - 批量动作跑完一律重拉列表 + 重取用户信息，红数字与行状态都以站点给的为准；
  * - 本地已读记账只管显示（置灰、未读标记），不参与任何计数。
+ *
+ * 点行上的标题就地展开正文（用户 2026-10-08：「点击消息标题应该可以看消息内容才对啊」）。
+ * 刻意不做成左右分栏：这一弹窗的主用途是跨站批量处理，为「顺手看一条」把批量那套版式
+ * 重排不值当；站内信绝大多数是系统广播，正文短。
  */
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useDebounceFn } from "@vueuse/core";
 import {
   CheckOutlined,
   DeleteOutlined,
@@ -77,6 +82,13 @@ const selected = ref<Set<string>>(new Set());
 const KEY_SEP = "\u0000";
 const keyOf = (siteId: TSiteID, messageId: string) => `${siteId}${KEY_SEP}${messageId}`;
 
+/** 展开看正文的那一条（`keyOf(siteId, id)`）。同一时刻只展开一条，铺开几块正文会把列表撑得没法读 */
+const expandedKey = ref<string | null>(null);
+const expandedContent = ref("");
+const isLoadingContent = ref(false);
+/** 取正文要抓整页（几百毫秒到几秒），连点两条时后回来的那一份不能盖到当前这条底下 */
+let bodyRequestSeq = 0;
+
 /** 哪一颗按钮在转：两条批量动作不能同时跑，也让转的那颗自己说话 */
 const busyKind = ref<"read" | "delete" | null>(null);
 
@@ -87,12 +99,22 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 这一组里当前该显示的行（开关只影响显示，不动已勾选的） */
+/**
+ * 这一组里当前该显示的行（开关只影响显示，不动已勾选的）。
+ *
+ * **正在看正文的那一条强制留着**：点开正文那次 GET 本身就把站点侧翻成已读了，本地记账一写，
+ * 「只看未读」当场就会把它筛没 —— 人还在读，行先没了。单站弹窗没这个问题（它一直显示全部、
+ * 只把读完的置灰），这一版有开关，所以必须补这一半。
+ */
 function visibleMessages(group: IGroup): ISiteMessage[] {
   if (!onlyUnread.value) {
     return group.messages;
   }
-  return group.messages.filter((item) => item.unread && !messageRead.isRead(group.siteId, item.id));
+  return group.messages.filter(
+    (item) =>
+      (item.unread && !messageRead.isRead(group.siteId, item.id)) ||
+      (!!item.id && expandedKey.value === keyOf(group.siteId, item.id)),
+  );
 }
 
 function isUnreadRow(group: IGroup, item: ISiteMessage) {
@@ -166,6 +188,79 @@ function toggleRow(group: IGroup, item: ISiteMessage, checked: boolean) {
   selected.value = next;
 }
 
+/**
+ * 红数字重取：攒 1.2 秒，连点几条只发一趟；关弹窗 / 卸载时立刻兑现。
+ * 判据与单站弹窗那条完全一致（`SiteMessagesDialog.vue` 的 scheduleBadgeRefresh），
+ * 因为要补的是同一件事 —— 读正文那条 GET 已经把站点侧翻成已读了，
+ * 而身后表格那枚红数字读的是 `lastUserInfo[site].messageCount`，不重取就永远不掉。
+ */
+const pendingBadgeRefresh = new Set<TSiteID>();
+const runBadgeRefresh = useDebounceFn(() => {
+  const ids = [...pendingBadgeRefresh];
+  pendingBadgeRefresh.clear();
+  if (ids.length > 0) {
+    flushSiteLastUserInfo(ids);
+  }
+}, 1200);
+
+function scheduleBadgeRefresh(id: TSiteID) {
+  pendingBadgeRefresh.add(id);
+  runBadgeRefresh();
+}
+
+onBeforeUnmount(() => runBadgeRefresh.flush());
+
+function isExpanded(group: IGroup, item: ISiteMessage) {
+  return !!item.id && expandedKey.value === keyOf(group.siteId, item.id);
+}
+
+function collapseBody() {
+  bodyRequestSeq += 1; // 让在途的那一份回来时认不出自己
+  expandedKey.value = null;
+  expandedContent.value = "";
+  isLoadingContent.value = false;
+}
+
+/**
+ * 点标题展开 / 再点收起。走的是单站弹窗同一条路：读信箱页给的那条 `item.url`，不猜接口。
+ *
+ * ⚠️ 这条 GET 一到站点就把该条翻成已读 —— 所以本地记账和红数字重取**都放在 seq 判断外面**：
+ * 哪怕此刻界面已经切到别条，站点侧的状态也已经变了，不跟就会留下一行还挂着「未读」。
+ * 只有写进那块正文才认 seq：后回来的旧内容不能盖到当前这条底下。
+ */
+async function toggleBody(group: IGroup, item: ISiteMessage) {
+  if (!item.id) {
+    return; // 没有 id 的行没法回站点寻址，跟复选框同一条判据
+  }
+  const key = keyOf(group.siteId, item.id);
+  if (expandedKey.value === key) {
+    collapseBody();
+    return;
+  }
+  const seq = (bodyRequestSeq += 1);
+  expandedKey.value = key;
+  expandedContent.value = "";
+  isLoadingContent.value = true;
+  try {
+    const result = await sendMessage("getSiteMessageContent", {
+      siteId: group.siteId,
+      messageId: item.id,
+      url: item.url,
+    });
+    if (seq === bodyRequestSeq) {
+      expandedContent.value = result.content ?? t("MyData.messages.noBody");
+      isLoadingContent.value = false;
+    }
+    await messageRead.markRead(group.siteId, [item.id]);
+    scheduleBadgeRefresh(group.siteId);
+  } catch {
+    if (seq === bodyRequestSeq) {
+      expandedContent.value = t("MyData.messages.noBody");
+      isLoadingContent.value = false;
+    }
+  }
+}
+
 /** 选中的行按站点归堆，供两条批量动作共用 */
 function selectedBySite(): Map<TSiteID, string[]> {
   const map = new Map<TSiteID, string[]>();
@@ -189,6 +284,11 @@ async function loadOne(siteId: TSiteID) {
   const group = groups.value.find((item) => item.siteId === siteId);
   if (!group) {
     return;
+  }
+  // 这一组的行马上换成站点给的新内容，展开着的那块正文就成了旧账 —— 收掉。
+  // 只收本站这一组：在别的组里读着、这边点重试，不该把那边关掉。
+  if (expandedKey.value?.startsWith(`${siteId}${KEY_SEP}`)) {
+    collapseBody();
   }
   group.state = "loading";
   try {
@@ -338,9 +438,13 @@ async function openSitePage(siteId: TSiteID) {
 watch(
   () => showDialog.value,
   async (open) => {
-    if (open) {
-      await loadAll();
+    if (!open) {
+      // 关掉弹窗的那一眼正是他会去看红数字的时候，别把攒下的刷新留给 debounce 尾巴
+      collapseBody();
+      runBadgeRefresh.flush();
+      return;
     }
+    await loadAll();
   },
   { immediate: true },
 );
@@ -458,32 +562,53 @@ watch(
         </div>
 
         <template v-else>
-          <div v-for="(item, index) in visibleMessages(group)" :key="item.id ?? index" class="am-item">
-            <a-checkbox
-              :checked="!!item.id && selected.has(keyOf(group.siteId, item.id))"
-              :disabled="!item.id"
-              @change="(e: any) => toggleRow(group, item, e.target.checked)"
-            />
-            <span class="am-item-title" :class="{ 'am-item-title--read': !isUnreadRow(group, item) }">
-              {{ item.title }}
-            </span>
-            <span v-if="isUnreadRow(group, item)" class="am-item-flag">
-              {{ t("MyData.allMessages.unreadFlag") }}
-            </span>
-            <span class="am-item-meta">
-              {{ item.sender || "-" }}
-              <template v-if="item.time"> · {{ formatDate(item.time) }}</template>
-            </span>
-            <a
-              v-if="item.url"
-              :href="item.url"
-              target="_blank"
-              rel="noopener noreferrer nofollow"
-              class="am-item-link"
-            >
-              {{ t("MyData.allMessages.openSite") }}
-            </a>
-          </div>
+          <template v-for="(item, index) in visibleMessages(group)" :key="item.id ?? index">
+            <div class="am-item">
+              <a-checkbox
+                :checked="!!item.id && selected.has(keyOf(group.siteId, item.id))"
+                :disabled="!item.id"
+                @change="(e: any) => toggleRow(group, item, e.target.checked)"
+              />
+              <!-- 标题就是这一行的展开开关（没有 id 的行取不到正文，也就不给 pointer）；
+                   复选框只管勾选，所以 click 只挂在标题上，不挂整行 -->
+              <span
+                class="am-item-title"
+                :class="{
+                  'am-item-title--read': !isUnreadRow(group, item),
+                  'am-item-title--link': !!item.id,
+                  'am-item-title--open': isExpanded(group, item),
+                }"
+                @click="toggleBody(group, item)"
+              >
+                {{ item.title }}
+              </span>
+              <span v-if="isUnreadRow(group, item)" class="am-item-flag">
+                {{ t("MyData.allMessages.unreadFlag") }}
+              </span>
+              <span class="am-item-meta">
+                {{ item.sender || "-" }}
+                <template v-if="item.time"> · {{ formatDate(item.time) }}</template>
+              </span>
+              <a
+                v-if="item.url"
+                :href="item.url"
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                class="am-item-link"
+              >
+                {{ t("MyData.allMessages.openSite") }}
+              </a>
+            </div>
+
+            <div v-if="isExpanded(group, item)" class="am-item-body">
+              <div v-if="isLoadingContent" class="am-hint am-hint--body">
+                <SyncOutlined spin />
+                <span>{{ t("MyData.allMessages.loading") }}</span>
+              </div>
+              <!-- 纯文本，刻意不 v-html：站内信是站点侧不可信内容，选项页能调 chrome.* 消息 -->
+              <pre v-else class="am-body-text">{{ expandedContent }}</pre>
+            </div>
+          </template>
         </template>
       </section>
     </div>
@@ -555,6 +680,39 @@ watch(
   color: rgba(0, 0, 0, 0.45);
 }
 
+.am-item-title--link {
+  cursor: pointer;
+}
+
+/* 悬停与「正展开着」同色：读完的那条会留在原地（只看未读时被强制留着），
+   不给个持续的高亮就看不出这块正文是哪一行的 */
+.am-item-title--link:hover,
+.am-item-title--open {
+  color: #1677ff;
+}
+
+.am-item-body {
+  margin: 2px 0 6px 26px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f7f9fc;
+  /* 长正文不能把列表顶出视野：这块自己滚。上限给到大约 6 行，
+     再长就读到这里该切「在网页打开」了 —— 那半句 noBody 的文案也是这么说的 */
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.am-body-text {
+  margin: 0;
+  /* pre 保段落换行，站点给的无空格长串要自己折行，否则把弹窗撑出横向滚动 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.85);
+}
+
 .am-item-flag {
   flex: 0 0 auto;
   color: #f44336;
@@ -587,5 +745,10 @@ watch(
 
 .am-hint--row {
   padding: 6px 0 6px 26px;
+}
+
+/* 正文块自己已经有内衬了，这条只把提示的那份 padding 撤掉，别叠两层 */
+.am-hint--body {
+  padding: 0;
 }
 </style>

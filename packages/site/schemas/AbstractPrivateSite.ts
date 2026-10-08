@@ -14,6 +14,7 @@ import {
   type IElementQuery,
   type ISiteMetadata,
   type ISiteMessage,
+  type ISiteMessageActionResult,
   type IUserInfo,
   type TLevelId,
   type TPatterns,
@@ -247,5 +248,13 @@ export default class PrivateSite extends BittorrentSite {
    */
   public async getMessageContent(_messageId: string, _url?: string): Promise<string | undefined> {
     return undefined;
+  }
+
+  /**
+   * 批量删除站内信。默认不支持（理由同 `supportsMessages`：没实测过的 schema 不该假装删得动）。
+   * 注意这条会**改站点侧的数据**，所以调用方必须在跑完后重拉列表，以站点给的为准。
+   */
+  public async deleteMessages(_messageIds: string[]): Promise<ISiteMessageActionResult> {
+    return { supported: false, status: EResultParseStatus.success, handled: 0 };
   }
 }

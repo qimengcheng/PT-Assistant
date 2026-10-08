@@ -6,6 +6,7 @@
  */
 import {
   EResultParseStatus,
+  type ISiteMessageActionResult,
   type ISiteMessageContentResult,
   type ISiteMessagesResult,
   type TSiteID,
@@ -48,5 +49,18 @@ onMessage("getSiteMessageContent", async ({ data }): Promise<ISiteMessageContent
   } catch (error) {
     failNote(`getSiteMessageContent for ${data.siteId}/${data.messageId}`, error);
     return { supported: true, status: EResultParseStatus.parseError };
+  }
+});
+
+onMessage("deleteSiteMessages", async ({ data }): Promise<ISiteMessageActionResult> => {
+  try {
+    const site = await getSiteInstance<"private">(data.siteId);
+    if (!site.supportsMessages) {
+      return { supported: false, status: EResultParseStatus.success, handled: 0 };
+    }
+    return await site.deleteMessages(data.messageIds);
+  } catch (error) {
+    failNote(`deleteSiteMessages for ${data.siteId}`, error);
+    return { supported: true, status: EResultParseStatus.unknownError, handled: 0 };
   }
 });

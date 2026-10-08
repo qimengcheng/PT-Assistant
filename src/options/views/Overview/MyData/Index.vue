@@ -17,6 +17,7 @@ import {
   ExportOutlined,
   FilterOutlined,
   LineChartOutlined,
+  MailOutlined,
   SearchOutlined,
   SettingOutlined,
   StopOutlined,
@@ -40,6 +41,7 @@ import ResultParseStatus from "@/options/components/ResultParseStatus.vue";
 import UserLevelRequirementsTd from "./UserLevelRequirementsTd.vue";
 import HistoryDataViewDialog from "./HistoryDataViewDialog.vue";
 import SiteMessagesDialog from "./SiteMessagesDialog.vue";
+import AllSiteMessagesDialog from "./AllSiteMessagesDialog.vue";
 import BonusFormatSpan from "./BonusFormatSpan.vue";
 import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
 
@@ -249,6 +251,17 @@ function onBadgeClick(event: MouseEvent, record: IUserInfoItem) {
 
 const tableSelected = ref<TSiteID[]>([]); // 选中的站点行
 
+const showAllMessagesDialog = ref<boolean>(false);
+
+/**
+ * 工具条「站内信」按钮上的汇总数字：各站报的未读数之和。
+ * 用的是站点给的原始值，不减本地已读记账 —— 口径与行内那颗徽章完全一致
+ * （见 SiteMessagesDialog 顶部；同一条被扣两遍会把红数字长期压小）。
+ */
+const totalUnreadMessageCount = computed(() =>
+  tableData.value.reduce((sum, row) => sum + (row.messageCount ?? 0), 0),
+);
+
 /** 对应 v-data-table 的 show-select + item-value="site" */
 const tableRowSelection = computed(() => ({
   selectedRowKeys: tableSelected.value,
@@ -409,6 +422,15 @@ const showExportDialog = ref(false);
 
         <!-- 列显隐：勾选面板收进按钮 + modal，工具条不再摊一排 tag -->
         <a-button @click="showColumnDialog = true"><template #icon><ColumnWidthOutlined /></template><span>{{ t("MyData.index.columns") }}</span></a-button>
+
+        <!-- 站内信汇总。a-badge 要包住整颗按钮：只包文字那一半会把数字裁到按钮右沿内侧 -->
+        <a-divider type="vertical" class="mx-2" />
+
+        <a-tooltip :title="t('MyData.index.allMessagesTip')">
+          <a-badge :count="totalUnreadMessageCount" :overflow-count="99">
+            <a-button @click="showAllMessagesDialog = true"><template #icon><MailOutlined /></template><span>{{ t("MyData.index.allMessages") }}</span></a-button>
+          </a-badge>
+        </a-tooltip>
       </a-flex>
 
       <div class="page-bar-extra">
@@ -778,6 +800,7 @@ const showExportDialog = ref(false);
   </a-modal>
 
   <HistoryDataViewDialog v-model="showHistoryDataViewDialog" :site-id="historyDataViewDialogSiteId!" />
+  <AllSiteMessagesDialog v-model="showAllMessagesDialog" />
   <SiteMessagesDialog
     v-model="showMessageDialog"
     :site-id="messageDialogSiteId!"

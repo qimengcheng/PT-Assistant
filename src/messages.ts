@@ -5,6 +5,7 @@ import type {
   IAdvancedSearchRequestConfig,
   ISearchResult,
   ISiteMessageContentResult,
+  ISiteMessageActionResult,
   ISiteMessagesResult,
   ISiteUserConfig,
   ITorrent,
@@ -195,6 +196,11 @@ export interface ProtocolMap {
    */
   getSiteMessages(siteId: TSiteID): ISiteMessagesResult;
   getSiteMessageContent(data: { siteId: TSiteID; messageId: string; url?: string }): ISiteMessageContentResult;
+  /**
+   * 批量删除某站的站内信（会改站点侧数据）。调用方跑完必须重拉列表，以站点给的为准 ——
+   * 删不动的站返回 `supported:false`，界面要说「这个站删不了」而不是「已删除」。
+   */
+  deleteSiteMessages(data: { siteId: TSiteID; messageIds: string[] }): ISiteMessageActionResult;
 
   // ===== 2.4 offscreen：社交信息 ( utils/socialInformation ) =====
   getSocialInformation(data: { site: TSupportSocialSite$1; sid: string }): ISocialInformation;

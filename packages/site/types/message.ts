@@ -31,3 +31,16 @@ export interface ISiteMessageContentResult {
    */
   content?: string;
 }
+
+/**
+ * 批量操作（删除）的结果。
+ *
+ * `supported:false` = 这个 schema 家族没实现该动作，界面要分开显示，不能报「已完成」；
+ * `handled` = 真的在信箱页上找到复选框并发出去处理的条数，少于请求条数就是有几条对不上号
+ * （界面跑完会重拉一次列表，以站点给的状态为准，不拿这个数去改本地计数）。
+ */
+export interface ISiteMessageActionResult {
+  supported: boolean;
+  status: EResultParseStatus;
+  handled: number;
+}

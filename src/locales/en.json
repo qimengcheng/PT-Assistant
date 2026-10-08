@@ -307,6 +307,31 @@
       "markAllReadTip": "Only the messages loaded in this list get marked. If the site paginates its mailbox, open the next page and run it again.",
       "unreadCount": "{n} unread"
     },
+    "allMessages": {
+      "title": "Site Messages",
+      "selectAll": "Select all",
+      "onlyUnread": "Unread only",
+      "showAll": "Show all",
+      "reload": "Reload",
+      "selectedCount": "{n} selected",
+      "progress": "Processing {done}/{total}...",
+      "markRead": "Mark as read",
+      "delete": "Delete",
+      "deleteConfirm": "Delete the selected {n} message(s)? This goes straight to the sites and cannot be undone.",
+      "deleteSkipped": "These sites refused the delete, handle them on the site: {sites}",
+      "loading": "Loading...",
+      "unsupported": "This site's mailbox format is not recognized yet, so the list cannot be loaded.",
+      "failed": "Failed to load: your session may have expired, or the site changed its layout.",
+      "retry": "Retry",
+      "emptyNoUnread": "No site reports unread messages",
+      "noUnreadInGroup": "Nothing unread left in this group (the site reports {n}) — the rest are on later mailbox pages, open the site to page through them.",
+      "allReadInGroup": "Nothing unread left in this group.",
+      "emptyInGroup": "The site reports {n} unread, but the mailbox page yielded nothing — this site's layout likely doesn't match the generic parser, or your session expired.",
+      "openSite": "Open in browser",
+      "unreadFlag": "Unread",
+      "unreadOf": "{n} unread",
+      "totalOf": "{n} loaded"
+    },
     "HistoryDataView": {
       "action": {
         "viewRaw": "View Raw Data"
@@ -339,6 +364,8 @@
       "title": "Export User Info"
     },
     "index": {
+      "allMessages": "Messages",
+      "allMessagesTip": "Collects every site that reports unread mail. Select per site or across all sites, then mark as read or delete in batch",
       "columns": "Columns",
       "exportData": "Export",
       "filter": {

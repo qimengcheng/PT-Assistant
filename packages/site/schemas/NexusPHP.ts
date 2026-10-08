@@ -11,6 +11,7 @@ import {
   type ISearchCategories,
   type ISearchInput,
   type ISiteMessage,
+  type ISiteMessageActionResult,
   type ISiteMetadata,
   type ITorrent,
   type ITorrentTag,
@@ -1185,5 +1186,101 @@ export default class NexusPHP extends PrivateSite {
 
     // 8 个字符是挡住「自 / 日期 / 系统」这类表头与发件人名的下限，不是正文长度上限
     return fallback && fallback.length >= 8 ? fallback : undefined;
+  }
+
+  /**
+   * 批量删除。**从信箱页现读现拼**，不写死 action / 参数名：找到那几条的复选框 →
+   * 取它的 `name`（各分支叫 `delchecked[]` 还是别的都不一定）和它所在 `<form>` 的
+   * action/method，再把表单里其余字段（`returnto`、某些皮肤自带的 authkey、下拉的当前项）
+   * 一并照抄提交 —— 跟取正文用列表给的那条链接是同一个理由：**页面自己给的就是该站认的写法**，
+   * 凭 NexusPHP 印象写死会让所有站都点不动（v0.31.0 那次写死 `msgid` 就是这么翻车的）。
+   *
+   * 一页上常同时挂着「删除」和「移至回收站」两套复选框，所以先挑 action 里带 delete 的那个表单；
+   * 挑不到、但第一个表单的 action 明显是 move/restore 这类**不是删除**的动作时，宁可返回
+   * supported:false 也不发这一枪 —— 删不动要说出来，不能报「已删除」。
+   */
+  public override async deleteMessages(messageIds: string[]): Promise<ISiteMessageActionResult> {
+    const wanted = new Set(messageIds);
+    if (wanted.size === 0) {
+      return { supported: true, status: EResultParseStatus.success, handled: 0 };
+    }
+
+    const { data } = await this.request<string>({ url: this.messageUrl });
+    if (typeof data !== "string" || !data) {
+      return { supported: false, status: EResultParseStatus.parseError, handled: 0 };
+    }
+
+    const doc = createDocument(data);
+    const boxes = (Sizzle("input[type='checkbox']", doc) as HTMLInputElement[]).filter((input) =>
+      wanted.has(input.value),
+    );
+    if (boxes.length === 0) {
+      return { supported: false, status: EResultParseStatus.parseError, handled: 0 };
+    }
+
+    const formOf = (input: HTMLInputElement) => input.closest("form");
+    const isDeleteForm = (form: HTMLFormElement | null) =>
+      !!form && /delete|remove|del\b/i.test(`${form.getAttribute("action") ?? ""} ${form.getAttribute("name") ?? ""}`);
+    const isMoveForm = (form: HTMLFormElement | null) =>
+      !!form && /move|restore|undelete/i.test(`${form.getAttribute("action") ?? ""} ${form.getAttribute("name") ?? ""}`);
+
+    const chosen =
+      boxes.find((input) => isDeleteForm(formOf(input))) ??
+      (isMoveForm(formOf(boxes[0])) ? undefined : boxes[0]);
+    const form = chosen ? formOf(chosen) : null;
+    const field = chosen?.name;
+    if (!form || !field) {
+      return { supported: false, status: EResultParseStatus.parseError, handled: 0 };
+    }
+
+    const actionUrl = this.resolveSiteUrl(form.getAttribute("action") || this.messageUrl);
+    const method = (form.getAttribute("method") || "post").toLowerCase() === "get" ? "get" : "post";
+    const body = new URLSearchParams();
+    const handled = new Set<string>();
+
+    for (const el of Sizzle("input, select, textarea", form) as HTMLElement[]) {
+      const name = el.getAttribute("name");
+      if (!name) {
+        continue;
+      }
+      if (el.tagName === "SELECT") {
+        const selected = (el as HTMLSelectElement).selectedOptions?.[0];
+        if (selected) {
+          body.append(name, selected.value);
+        }
+        continue;
+      }
+      const input = el as HTMLInputElement;
+      const type = (input.type || "text").toLowerCase();
+      if (type === "checkbox") {
+        // 浏览器只会带上勾上的复选框，这里同样只带用户挑中的那几条
+        if (name === field && wanted.has(input.value)) {
+          body.append(name, input.value);
+          handled.add(input.value);
+        }
+        continue;
+      }
+      if (type === "submit" || type === "button" || type === "reset" || type === "image") {
+        continue;
+      }
+      body.append(name, input.value ?? "");
+    }
+
+    if (handled.size === 0) {
+      return { supported: false, status: EResultParseStatus.parseError, handled: 0 };
+    }
+
+    await this.request<string>(
+      method === "get"
+        ? { url: actionUrl, params: body }
+        : {
+            url: actionUrl,
+            method: "post",
+            data: body,
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          },
+    );
+
+    return { supported: true, status: EResultParseStatus.success, handled: handled.size };
   }
 }

@@ -307,6 +307,31 @@
       "markAllReadTip": "只标列表里读到的这些条；站点那边信箱分页时，后面的要翻到那一页再点一次。",
       "unreadCount": "未读 {n} 条"
     },
+    "allMessages": {
+      "title": "站内信汇总",
+      "selectAll": "全选",
+      "onlyUnread": "只看未读",
+      "showAll": "显示全部",
+      "reload": "重新读取",
+      "selectedCount": "已选 {n} 条",
+      "progress": "正在处理 {done}/{total}…",
+      "markRead": "标记已读",
+      "delete": "删除",
+      "deleteConfirm": "确定删除选中的 {n} 条站内信吗？删除会直接发到站点，删掉的读不回来。",
+      "deleteSkipped": "这些站点没删动，需要去网页处理：{sites}",
+      "loading": "正在读取…",
+      "unsupported": "这个站点的信箱格式扩展还不认识，读不出列表。",
+      "failed": "读取失败：可能是登录态失效，或站点改版。",
+      "retry": "重试",
+      "emptyNoUnread": "没有站点报告有未读站内信",
+      "noUnreadInGroup": "这一组里没有未读行了（站点报告 {n} 条未读）—— 未读的那几条在信箱后面的分页，翻页得去网页读。",
+      "allReadInGroup": "这一组已经没有未读了。",
+      "emptyInGroup": "站点报告 {n} 条未读，但信箱页一条都没读到 —— 多半是该站页面和通用解析对不上，或登录态已失效。",
+      "openSite": "在网页打开",
+      "unreadFlag": "未读",
+      "unreadOf": "未读 {n} 条",
+      "totalOf": "读到 {n} 条"
+    },
     "HistoryDataView": {
       "action": {
         "viewRaw": "查看原始数据"
@@ -339,6 +364,8 @@
       "title": "导出用户信息"
     },
     "index": {
+      "allMessages": "站内信",
+      "allMessagesTip": "汇总所有报告有未读的站点，可按站点或跨站全选，批量标记已读、批量删除",
       "columns": "显示列",
       "exportData": "导出数据",
       "filter": {

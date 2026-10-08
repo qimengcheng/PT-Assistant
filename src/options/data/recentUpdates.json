@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-08 10:14:43",
-  "headSha": "98f359a",
+  "generatedAt": "2026-10-08 10:38:30",
+  "headSha": "84ed163",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.38.1",
+      "date": "2026-10-08 10:36:25",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「我的数据」的未读红数字现在就是站点报的那条数。它此前还会再减掉「在扩展里点开过几条」，而站点那边本来就已经把点开的那条算成已读了 —— 于是横幅写「你有2条新短讯」、徽章却显 1，刷新也回不来。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.38.0",
       "date": "2026-10-08 10:14:07",

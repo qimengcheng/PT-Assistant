@@ -44,7 +44,6 @@ import BonusFormatSpan from "./BonusFormatSpan.vue";
 import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
 
 import { formatRatio } from "./utils/format.ts";
-import { useSiteMessageRead } from "./utils/siteMessageRead.ts";
 import { tableData, isTableLoading, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
 
 // 本文件名为 Index.vue，与 SearchEntity/Index.vue 同名；<script setup> 推断出的
@@ -205,14 +204,15 @@ const {
   },
 });
 
-/** 站内信的本地已读记账（徽章数字要扣掉它，点开读完数字才真的掉） */
-const siteMessageRead = useSiteMessageRead();
-
 /** v-badge 的 model-value/content 到 a-badge 的 count/dot 的映射 */
 function unreadBadge(record: IUserInfoItem) {
-  // messageCount 是站点报告的未读数，本地读过的当场扣掉 —— 否则「点开读完了」数字还挂着。
-  // 下一次刷新用户信息时仍以站点给的数字为准（见 utils/siteMessageRead.ts 的说明）。
-  const messageCount = Math.max(0, (record.messageCount ?? 0) - siteMessageRead.readCountOf(record.site));
+  /**
+   * 只显站点自己报的那个数，**不减本地已读**。v0.31.0 拿记账去减，于是徽章和站点横幅
+   * 长期对不上（站点横幅「你有2条新短讯」、徽章 1，刷新也不回来）：记账只增不减，
+   * 而读信那条 GET 本身就会把站点侧标成已读（LuckPT 真页：读前横幅 8、读后 7），
+   * 减一次等于把同一条扣两遍。记账现在只管列表里那行的置灰，见 utils/siteMessageRead.ts。
+   */
+  const messageCount = record.messageCount ?? 0;
   if (!configStore.myDataTableControl.showUnreadMessage || messageCount <= 0) {
     return { count: 0, dot: false };
   }

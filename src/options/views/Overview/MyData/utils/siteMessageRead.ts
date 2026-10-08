@@ -6,9 +6,12 @@ import { extStore } from "@/storage.ts";
 /**
  * 站内信的「本地已读」记账（siteId → { msgid → 读的时间戳 }）。
  *
- * 模块级一份 ref，徽章和弹窗都读它：读完消息要让红数字当场掉下来，否则「点开读了」和
- * 「没读」看起来没区别。它**不改站点侧的已读状态**（那要每站一个带 authkey 的 POST，
- * 我们没有可验证的通用实现），下一次刷新用户信息时仍以站点给的 messageCount 为准。
+ * **只管弹窗里那一行的置灰，不许参与任何计数。** 徽章那个数字一律显站点自己报的
+ * `messageCount`：v0.31.0 起拿这份记账去减，而记账只增不减（没有任何地方清它），
+ * 于是和站点横幅长期对不上 —— 站点写「你有2条新短讯」、徽章显 1，刷新也回不来。
+ * 更要紧的是「读一条不影响站点侧」这个前提本身就是错的：读正文走的是列表页那条
+ * viewmessage 链接的 GET，站点会顺手把它标成已读（LuckPT 真页对账：读前横幅 8 条、
+ * 读后 7 条）。所以站点给的数里已经扣过了，再减一遍等于同一条扣两遍。
  */
 const readMap = ref<Record<TSiteID, Record<string, number>>>({});
 
@@ -31,10 +34,6 @@ export function useSiteMessageRead() {
   ensureLoaded();
 
   return {
-    /** 该站已读的条数（messageCount 是未读数，两者相减就是徽章该显示的数字） */
-    readCountOf(siteId: TSiteID): number {
-      return Object.keys(readMap.value[siteId] ?? {}).length;
-    },
     isRead(siteId: TSiteID, messageId?: string): boolean {
       return !!messageId && readMap.value[siteId]?.[messageId] !== undefined;
     },
@@ -55,16 +54,6 @@ export function useSiteMessageRead() {
 
       readMap.value = { ...readMap.value, [siteId]: trimmed };
       await extStore.setItem("siteMessageRead", readMap.value);
-    },
-    /** 站点侧报告「已经没有未读」时清掉该站记账，免得旧 msgid 永远占着 */
-    async clearSite(siteId: TSiteID) {
-      if (!readMap.value[siteId]) {
-        return;
-      }
-      const next = { ...readMap.value };
-      delete next[siteId];
-      readMap.value = next;
-      await extStore.setItem("siteMessageRead", next);
     },
   };
 }

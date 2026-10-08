@@ -579,22 +579,64 @@ body {
    `:has(> .ant-btn-icon)` 把图标+文字形态排除掉就行，实际是反过来的——受影响的正是
    被保留下来的那一批。 */
 
-/* ===== Modal：超长内容限高，标题与底部按钮保持可见 =====
+/* ===== Modal：弹窗跟着视口走，标题与底部按钮始终留在视口里 =====
    宽度不用在这里兜：antdv-next 的 .ant-modal 自带 max-width: calc(100vw - 32px)
    （<576px 屏宽时为 16px），写死的 :width=1200 等在窄窗口里会被自动压窄。
-   但长表单/长表格弹窗（KeepUpload、Restore、HistoryDataView 等）超高时，antdv-next 默认让
-   整个弹窗随 .ant-modal-wrap 一起滚，确认按钮会被顶出视口。这里只给 body 加限高内滚动。
-   220px 固定占用 = top 100 + container 上 padding 16 + 标题行 24 + 标题下间距 8
-   + 底部按钮区 40（marginTop 8 + 按钮 32）+ container 下 padding 16 + 16 余量。
+   长表单/长表格弹窗（KeepUpload、Restore、HistoryDataView 等）超高时不能让整弹窗
+   随 .ant-modal-wrap 一起滚 —— 那样确认按钮会被顶出视口，所以滚动只发生在 body 里。
+
+   改之前这条限高是手数的常数：`max-height: calc(100vh - 220px)`，220 = top 100 +
+   标题 + 页脚 + 内衬 + 余量。三个毛病（数字都来自台架 .tmp-build/bench-modal，
+   挂真 Editor.vue + 真 a-steps + 真页脚，800px 宽，即「新增下载服务器」那一个）：
+   ① 常数与实测对不上：标题 22 + 标题下间距 8 + 页脚 32 + 页脚上间距 12 +
+      container 上下内衬 20+20 = 114，而它按 120 扣，白扣 6px；
+   ② antd 默认的 top: 100px 被整份扣掉，可那 100px 只是「矮弹窗离顶好看一点」，
+      高弹窗并不用得起 —— 这个弹窗内容实测 786，在 981px 高的视口下可用只有
+      981-220=761，差 25px 就挂上滚动条，而拖到底只挪得动 25px（用户口径
+      「有滚动条实际也不滚动」「这个分辨率下可以没有滚动条」）；
+   ③ 各弹窗页脚高度不同（一行按钮 / 两行 / 带复选框），常数只能按一种算，
+      其余的要么白丢高度要么按钮出视口。
+   现在交给布局算：wrap 变纵向 flex，弹窗用 auto 外边距 + max-height，body 拿
+   标题/页脚之外的剩余高度。于是矮弹窗垂直居中（**位置会变，这是换来高度的代价**），
+   高弹窗自动铺满视口、上下各留 24px，标题和页脚都不出视口。全场只剩 24px 这一个常数。
+   `top: auto` 那条必须写成 `.ant-modal-wrap .ant-modal`（0,2,0）：组件默认的
+   `top: 100px` 是 cssinjs 运行时注进 <head> 的，同特异度抢不过它。 */
 /* 弹层（select 下拉、popover 等）默认 teleport 到 body，不在本容器内，不会被裁剪。
    overflow-x 必须显式 hidden：一个轴设成 auto 会让另一个轴的 visible 也按 auto 计算，
    而 antdv-next 的 .ant-modal-body 在非 wireframe 下 padding 是 0（padding 全在
-   .ant-modal-container 上，见 dist/modal/style/token 的 bodyPadding/contentPadding），
+   .ant-modal-container 上，实测 20px 24px），
    于是 <a-row :gutter="16"> 的 margin-inline:-8px 没有 padding 可吸收，
    凭空撑出 16px → 每个带栅格的弹窗底部都挂一条横向滚动条（下载器编辑弹窗实测如此）。
    裁掉的正是栅格设计上该被外层 padding 吸收的那 8px，列自带 8px 内衬，不丢内容。 */
+.ant-modal-wrap {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.ant-modal-wrap .ant-modal {
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+  max-height: calc(100% - 48px);
+  top: auto;
+}
+
+.ant-modal-container {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ant-modal-header,
+.ant-modal-footer {
+  flex-shrink: 0;
+}
+
 .ant-modal-body {
-  max-height: calc(100vh - 220px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
 }

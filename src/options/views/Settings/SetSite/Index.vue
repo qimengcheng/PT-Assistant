@@ -289,7 +289,7 @@ const tableSelected = ref<TSiteID[]>([]);
 
 // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
-/** 他挑过一档之后，实测条数就不再管这一页 */
+/** 他挑过一档之后仍要量：那一档以实测容量为上限 */
 const pickedSize = computed(() => {
   const behavior = configStore.tableBehavior.SetSite;
   return isPageSizePicked(behavior?.itemsPerPage, 50, (behavior as any)?.pageSizePicked);
@@ -297,7 +297,6 @@ const pickedSize = computed(() => {
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,
   rows: () => filteredItems.value,
-  enabled: () => !pickedSize.value,
 });
 
 const pagination = computed<TablePaginationConfig | false>(() =>
@@ -310,6 +309,8 @@ const pagination = computed<TablePaginationConfig | false>(() =>
     totalRows: filteredItems.value.length,
     fitSize: fitPageSize.value,
     picked: pickedSize.value,
+    // 用户 2026-10-08：「这个页面大于 50 条时才启用分页」——50 个站以内整页放完，由面板自己滚
+    maxSinglePage: 50,
   }),
 );
 

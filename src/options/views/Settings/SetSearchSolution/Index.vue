@@ -217,7 +217,7 @@ const columns = computed(() => [
 
 // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
-/** 他挑过一档之后，实测条数就不再管这一页 */
+/** 他挑过一档之后仍要量：那一档以实测容量为上限 */
 const pickedSize = computed(() => {
   const behavior = configStore.tableBehavior.SetSearchSolution;
   return isPageSizePicked(behavior?.itemsPerPage, 10, (behavior as any)?.pageSizePicked);
@@ -225,7 +225,6 @@ const pickedSize = computed(() => {
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,
   rows: () => tableData.value,
-  enabled: () => !pickedSize.value,
 });
 
 const pagination = computed(() =>

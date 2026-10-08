@@ -115,9 +115,11 @@ export function buildSortOrderMap(
  * 一起消失，就再也切不回小档了（这条取舍最早在 SetSite 上定下）。
  *
  * **extras.fitSize 一传就启用「按面板高度实测每页条数」**（useAutoFitPageSize，用户
- * 2026-10-08）：> 0 且这一页没被挑过档时用它，否则仍用存下来/兜底的那一档。
- * 实测值和「挑过档」是打架的 —— 窗口变高时实测值要跟着变，而他挑的那一档不能变，
- * 所以挑过档必须赢。传了 fitSize 就**同时传 picked**：只靠「存的正数 != 默认档」判会漏
+ * 2026-10-08）。它和「挑过一档」的关系是**上限**而不是替代：
+ * 没挑过档 → 这一档就等于实测容量（否则高屏下面板下半截空着）；
+ * 挑过档 → 照他那一档，但**超过容量时压到容量**（「有分页条的时候不要出现滚动条」，
+ * 用户 2026-10-08 补的口径；挑得比容量小是他觉得好读，那是他的选择，不动）。
+ * 传了 fitSize 就**同时传 picked**：只靠「存的正数 != 默认档」判会漏
  * （他挑的正好是默认档时又会被实测值盖回去），那一档现在由 handleTableChange 另写一个
  * pageSizePicked 标记。
  */
@@ -146,7 +148,7 @@ export function toPagination(
   const stored = usable ? raw : fallback;
   const pickedASize = extras.picked ?? (usable && raw !== fallback);
   const fit = typeof extras.fitSize === "number" && extras.fitSize > 0 ? extras.fitSize : 0;
-  const pageSize = !pickedASize && fit ? fit : stored;
+  const pageSize = fit ? (pickedASize ? Math.min(stored, fit) : fit) : stored;
   if (extras.totalRows !== undefined && !pickedASize) {
     if (extras.maxSinglePage && extras.totalRows <= extras.maxSinglePage) {
       return false;

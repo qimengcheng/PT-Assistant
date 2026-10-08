@@ -47,7 +47,7 @@ interface IUseTableBehaviorOptions {
   totalRows?: MaybeRefOrGetter<number>;
   /**
    * 按面板高度实测每页条数（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）。
-   * 只在**用户没挑过档位**时生效，挑过就永远用他那一档 —— 见 toPagination 的 fitSize。
+   * 没挑过档时这一档就等于它，挑过档时它是上限 —— 见 toPagination 的 fitSize。
    */
   autoFit?: {
     container: MaybeRefOrGetter<HTMLElement | null | undefined>;
@@ -89,14 +89,13 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
 
   const sortBy = computed<ISortBy[]>(() => behavior.value.sortBy ?? []);
 
-  /** 他有没有挑过一档 —— 挑过就实测条数让位，整条量算也不再跑 */
+  /** 他有没有挑过一档 —— 挑过就用那一档，但实测容量仍是上限（见 toPagination 的 fitSize） */
   const pickedSize = computed(() =>
     isPageSizePicked(behavior.value.itemsPerPage, defaultPageSize, behavior.value.pageSizePicked),
   );
 
-  const fitted = autoFit
-    ? useAutoFitPageSize({ ...autoFit, enabled: () => !pickedSize.value }).fitted
-    : computed(() => 0);
+  // 挑过档也要继续量：那一档得拿实测容量当上限，不然他挑的 20 在一屏只放得下 15 时就把面板撑出滚动条
+  const fitted = autoFit ? useAutoFitPageSize(autoFit).fitted : computed(() => 0);
 
   /** configStore 里某列的排序状态 → antd 的受控 sortOrder */
   const sortOrderOf = (key: string): "ascend" | "descend" | null => {

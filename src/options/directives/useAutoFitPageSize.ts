@@ -5,8 +5,9 @@
  * 又要把页面铺满」。原先各页的 itemsPerPage 是写死的常数（10 / 25 / 50），高屏下面板
  * 下半截全是空白，矮屏下又拖出一条滚动条。
  *
- * 这里只产出一个 `fitted`（还没量到时为 0），用不用它由调用方决定 —— 用户在尺寸选择器里
- * 显式挑过一档时不能覆盖他（判据与写法见 toPagination 的 fitSize / picked）。
+ * 这里只产出一个 `fitted`（还没量到时为 0），用不用它由调用方决定 —— 调用点是
+ * `toPagination` 的 fitSize：没挑过档时这一档就等于它，挑过档时它是**上限**
+ * （「有分页条就不许出滚动条」，用户 2026-10-08 补的口径）。
  *
  * ## 每一项减数都必须不依赖 pageSize
  * 这是 SearchEntity 那个 `recalcTableScrollY` 踩过三次的水泥坑：拿会漂的量当基准会得到
@@ -24,8 +25,10 @@
  * ## ②那一圈为什么不会来回抖
  * 往回退过一次，那个值就记成本轮上限（`ceiling`），同一轮里不再往上涨回去。没有这条会成环：
  * 退掉一行后按平均高算「缝隙又够放一行了」→ 加回来一个高行 → 又超高 → 又退，实测就在
- * 12 ↔ 13 之间跳。另外增减都只在「这一页是满页」时做：末页只剩三行时缝隙恒常很大，
- * 不加这条会一路加到把整份数据并成一页。
+ * 12 ↔ 13 之间跳。**加行**要「这一页是满页」才做（末页只剩三行时缝隙恒常很大，不加这条会一路
+ * 加到把整份数据并成一页），**退行**不看满不满：渲染出来的这几行已经超了可用高，滚动条就在
+ * 眼前，而调用方那一档可能比这一屏容量小（挑过的档被压到 min(挑的, 容量)）—— 那种页面永远
+ * 不满，照满页判就再也退不动。
  *
  * 一轮（epoch）= 面板高 + 数据条数 + 可用高 + 表头单元格数；任一项变了就重新量、重新放开
  * 上限（窗口变高、筛选换数据、切语言改字号、显示列增删、面板里那条说明条出现/消失都落在
@@ -46,12 +49,6 @@ interface IAutoFitPageSizeOptions {
    * 全部高度），谁都救不了，那条滚动条不是本机制造成的。
    */
   min?: number;
-  /**
-   * 关掉时整条量算都不跑（默认一直跑）。用户挑过一档就该传 `() => false` 那种：
-   * 那一档是他定的，界面上渲染的行数跟可用高对不上，量下去只会一路退到下限，
-   * 白跑几轮还顺手把 fitted 变成一个以后都用不上的错值。
-   */
-  enabled?: () => boolean;
 }
 
 function cssPx(value: string) {
@@ -68,7 +65,7 @@ function blockSpace(el: HTMLElement) {
 /** 只认 tr.ant-table-row：空态占位行、rc-table 的隐藏量宽行、展开行都拿不到这个类 */
 const ROW_SELECTOR = ".ant-table-tbody > tr.ant-table-row";
 
-export function useAutoFitPageSize({ container, rows, min = 1, enabled }: IAutoFitPageSizeOptions) {
+export function useAutoFitPageSize({ container, rows, min = 1 }: IAutoFitPageSizeOptions) {
   const fitted = shallowRef(0);
   const scope = getCurrentScope();
   /** 本轮退到过这个值就不再往上涨回去，见文件头「那一圈为什么不会来回抖」 */
@@ -120,7 +117,6 @@ export function useAutoFitPageSize({ container, rows, min = 1, enabled }: IAutoF
   }
 
   function measure() {
-    if (enabled && !enabled()) return;
     const el = toValue(container);
     if (!el) return;
 
@@ -156,12 +152,14 @@ export function useAutoFitPageSize({ container, rows, min = 1, enabled }: IAutoF
       // ①：初值按平均行高，能把这一屏铺到只剩几像素
       seeded = true;
       next = Math.floor(avail / (sum / heights.length));
+    } else if (sum > avail) {
+      // ②a：这一页真正占掉的行高超了可用高 → 往回退，并把这个值记成上限。
+      // 基准取**渲染出来的行数**而不是 fitted：他挑的那一档被 toPagination 压到
+      // min(挑的, 容量) 时渲染行数比 fitted 小，照 fitted 退要空转好几轮才落到放得下的那一档。
+      ceiling = heights.length - 1;
+      next = heights.length - 1;
     } else if (!fullPage) {
       return; // 不满的一页没有「还能不能再塞一行」可判，见文件头
-    } else if (sum > avail) {
-      // ②a：真放进这一页的行超高了 → 往回退一行，并把这个值记成上限
-      ceiling = fitted.value - 1;
-      next = fitted.value - 1;
     } else if (fitted.value < ceiling && avail - sum >= max) {
       // ②b：缝隙还放得下**最高**那一行，才敢再加一行
       next = fitted.value + 1;

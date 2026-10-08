@@ -3,7 +3,7 @@
 // 仓库相关
 // ⚠️ 这里是本项目自己的仓库，不是上游 pt-plugins/PT-depiler。
 // 该常量被 About/SpecialThank、About/TechnologyStack、SetSite / SetDownloader / SetBackup
-// 的「源码 / 文档」入口，以及 ReleaseNoteDialog 的三个链接共同使用 ——
+// 的「源码 / 文档」入口共同使用 ——
 // 指向错仓库会让所有这些入口一起跳到别人的项目去。
 export const REPO_NAME = "qimengcheng/PT-Assistant";
 export const REPO_URL = `https://github.com/${REPO_NAME}`;

@@ -63,10 +63,6 @@ const contentScriptToggles = computed(
             <a-switch v-model:checked="configStore.enableTableMultiSort" size="small" />
             <span class="label">{{ t("SetBase.UiWindow.enableTableMultiSort") }}</span>
           </div>
-          <div class="switch-item">
-            <a-switch v-model:checked="configStore.showReleaseNoteOnVersionChange" size="small" />
-            <span class="label">{{ t("SetBase.UiWindow.showReleaseNote") }}</span>
-          </div>
         </div>
       </div>
 

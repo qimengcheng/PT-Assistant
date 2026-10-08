@@ -811,7 +811,6 @@
       "groupTableAndVersion": "Table & Version",
       "saveTableBehavior": "Remember the displayed columns of tables",
       "enableTableMultiSort": "Allow multi-column sorting",
-      "showReleaseNote": "Show release notes after an update",
       "groupDeveloper": "Developer",
       "developerMode": "Show developer menus (Site Definitions / Debugger)",
       "groupContentScript": "Site page helper (content script)",
@@ -1534,14 +1533,6 @@
       "wrongPixelRatioNotice": "Your page display may be affected by zooming. It is recommended to zoom at 100% to ensure your browsing experience~"
     },
     "init": "Please wait patiently for the page to load.....",
-    "releaseNote": {
-      "changelog": "Changelog",
-      "currentVersion": " (current version)",
-      "faq": "FAQ",
-      "startUsing": "Get Started",
-      "title": "Welcome to {extName}",
-      "download": "Download"
-    },
     "nav": {
       "home": "Home",
       "guide": "Getting Started",

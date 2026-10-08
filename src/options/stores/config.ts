@@ -17,7 +17,8 @@ const deprecatedConfigKeys = [
 /**
  * v0.21.3 起「进入我的下载器自动加载」默认改为开（旧默认下进页面不点刷新就是一片空白）。
  * 存量里那个 false 是旧默认值、不是用户的选择，所以在版本号追平 0.21.3 之前纠正成 true；
- * 追平后不再干预，用户主动关掉就能关掉。version 由 ReleaseNoteDialog 关闭时写入。
+ * 追平后不再干预，用户主动关掉就能关掉。version 在下面的 afterRestore 末尾追平到当前版本
+ * （v0.37.7 起；原先是 ReleaseNoteDialog 关闭时写的，那个弹窗已删）。
  * （0.5.x → 0.2x 重编号时这里漏改成了 "0.5.46"，对新编号永远判不出"更旧"，故订正。）
  */
 const initTorrentOnEnterDefaultOnSince = "0.21.3";
@@ -150,6 +151,15 @@ export const useConfigStore = defineStore("config", {
         needsSave = true;
       }
 
+      // 记下「这份配置属于哪个版本」：上面那几条版本门都读它，所以必须在它们之后才推进。
+      // 这一句原先写在 ReleaseNoteDialog 的关闭回调里（那个弹窗 v0.37.7 删掉了）——
+      // 不接过来的话 version 会永远停在旧值，以后每加一条 xxxDefaultOnSince 门都会一直判「版本更旧」，
+      // 把用户手动改回来的值又反复盖掉。
+      if (state.version !== __EXT_VERSION__) {
+        state.version = __EXT_VERSION__;
+        needsSave = true;
+      }
+
       if (needsSave) {
         context.store.$save();
       }
@@ -163,7 +173,6 @@ export const useConfigStore = defineStore("config", {
     autoToggleNavBarOnDisplayChange: true,
 
     ignoreWrongPixelRatio: false,
-    showReleaseNoteOnVersionChange: true,
 
     saveTableBehavior: true,
     enableTableMultiSort: false,

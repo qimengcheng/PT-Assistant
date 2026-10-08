@@ -811,7 +811,6 @@
       "groupTableAndVersion": "表格与版本",
       "saveTableBehavior": "记住表格的显示列配置",
       "enableTableMultiSort": "允许多列排序",
-      "showReleaseNote": "版本更新后显示更新说明",
       "groupDeveloper": "开发者选项",
       "developerMode": "显示开发者菜单（站点定义 / 调试信息）",
       "groupContentScript": "站点页面助手（content script）",
@@ -1534,14 +1533,6 @@
       "wrongPixelRatioNotice": "检测到您的页面展示可能受到缩放影响，建议您将当前页面缩放调整为100%，以保障您的浏览体验～"
     },
     "init": "请耐心等待页面加载.....",
-    "releaseNote": {
-      "changelog": "更新日志",
-      "currentVersion": "（当前版本）",
-      "faq": "常见问题",
-      "startUsing": "开始使用",
-      "title": "欢迎使用 {extName}",
-      "download": "下载"
-    },
     "nav": {
       "home": "首页",
       "guide": "新手引导",

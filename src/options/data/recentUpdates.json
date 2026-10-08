@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-08 11:27:10",
-  "headSha": "d62b4b9",
+  "generatedAt": "2026-10-08 11:42:30",
+  "headSha": "1372a18",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.40.2",
+      "date": "2026-10-08 11:41:18",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "新手引导页的目录不再跟着正文滚走：滚的只有右边那一列，目录任何时候都整列在位（原先滚到页面末尾时，上面几条会被切掉看不见）。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.40.1",
       "date": "2026-10-08 11:25:57",

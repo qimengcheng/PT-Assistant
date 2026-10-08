@@ -32,11 +32,6 @@ function jumpTo(id: string) {
   <article class="page-fill guide-view">
     <section class="page-panel page-fill-grow">
       <div class="guide-inner">
-        <header class="guide-head">
-          <h1>{{ t("layout.nav.guide") }}</h1>
-          <p class="guide-tagline">{{ doc.tagline }}</p>
-        </header>
-
         <div class="guide-body">
           <nav class="guide-toc">
             <span class="guide-toc-label">{{ doc.toc }}</span>
@@ -53,6 +48,11 @@ function jumpTo(id: string) {
           </nav>
 
           <div class="guide-content">
+            <header class="guide-head">
+              <h1>{{ t("layout.nav.guide") }}</h1>
+              <p class="guide-tagline">{{ doc.tagline }}</p>
+            </header>
+
             <section v-for="item in doc.sections" :id="`guide-${item.id}`" :key="item.id" class="guide-section">
               <h2>{{ item.title }}</h2>
               <p v-if="item.lead" class="guide-lead">{{ item.lead }}</p>
@@ -83,17 +83,27 @@ function jumpTo(id: string) {
 
 <style scoped>
 /* 正文限宽 + 目录靠左一列：这一页是给人读的长文，铺满两千像素的屏会一行拉到一百多个汉字。
-   外层 .page-panel 自己滚（.page-fill + .page-fill-grow 把白面板撑到视口底，
-   不留半屏灰底 —— 见 AGENTS §3.4 与 style.css 那两条）。
+   滚动归正文那一列自己（v0.40.2 改的）：外层面板不再滚，目录因此**完全不跟着滚**，
+   任何时候都整列可见 —— 用户口径「目录不能被滚动滚走，应该一直都能完整看到」。
+   原先是「面板滚 + 目录 sticky」，两个毛病：滚到页尾时 sticky 被容器底边顶回去，
+   目录上面几条被切掉；标题那一块（guide-head）也占着滚动区，滚上来时把目录往下推。
    它同时当容器查询的容器：目录那一列要不要收回去，看的是这块读书区有多宽，不是整个视口有多宽。 */
 .page-panel {
   container-type: inline-size;
 }
 
+/* min-height:100% 的那套撑满机制换成确定高，下面才轮得到「列内滚」 */
+.guide-view {
+  height: 100%;
+}
+
 .guide-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   max-width: 1060px;
   margin: 0 auto;
-  padding: 8px 8px 32px;
+  padding: 8px 8px 0;
 }
 
 .guide-head {
@@ -114,19 +124,29 @@ function jumpTo(id: string) {
 }
 
 .guide-body {
+  /* 吃掉面板剩下的整高，两列各自到边；能滚的是右边那一列 */
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 0 32px;
 }
 
-/* 竖排 + 跟着滚：align-self 必须是 start， stretched 到整行高度就没有可粘的余量了 */
+/* 目录不参与滚动，所以不再 sticky；窗口太矮、一列放不下七条时它自己出滚动条，
+   位置不动 —— 滚走的是一条目录里的后几条，而不是整列目录被推上去切掉。 */
 .guide-toc {
-  position: sticky;
-  top: 8px;
-  align-self: start;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.guide-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 32px;
 }
 
 .guide-toc-label {
@@ -141,18 +161,20 @@ function jumpTo(id: string) {
   padding-inline: 8px;
 }
 
-/* 窄到放不下两列（读书区 720px 以下）时收回成一列：目录回到正文上方横排 */
+/* 窄到放不下两列（读书区 720px 以下）时收回成一列：目录回到正文上方横排，
+   仍然不滚 —— 滚的只有正文那一行 */
 @container (max-width: 720px) {
   .guide-body {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .guide-toc {
-    position: static;
     flex-direction: row;
     flex-wrap: wrap;
     gap: 4px;
     margin-bottom: 24px;
+    overflow-y: visible;
   }
 
   .guide-toc .ant-btn {

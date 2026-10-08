@@ -71,8 +71,10 @@ async function loadMessages(id: TSiteID) {
   }
 }
 
-/** 列表里能标成已读的那几条：没有 id 或链接的行点不动 */
-const unreadItems = computed(() => messages.value.filter((item) => item.unread && item.id && item.url));
+/** 列表里还能标成已读的那几条：没有 id 或链接的行点不动，在扩展里点开过的也不算 */
+const unreadItems = computed(() =>
+  messages.value.filter((item) => item.unread && !readInApp(item) && item.id && item.url),
+);
 
 const isMarkingAll = ref(false);
 const markProgress = ref({ done: 0, total: 0 });
@@ -166,9 +168,20 @@ function timeText(time?: number) {
   return time ? formatDate(time) : "";
 }
 
+/**
+ * 这一条是不是在扩展里点开过了。`item.unread` 是**列表页那次抓取**给的状态，
+ * 点开正文之后它不会自己变 —— 所以「未读」那个标记必须一起看这份记账，
+ * 否则刚读完的一条还挂着未读（用户 2026-10-08 报的就是这个）。
+ */
+function readInApp(item: ISiteMessage) {
+  return !!item.id && !!siteId && messageRead.isRead(siteId, item.id);
+}
+
 function itemClasses(index: number, item: ISiteMessage) {
-  const isRead = !!item.id && messageRead.isRead(siteId!, item.id);
-  return ["msg-item", { "msg-item--active": index === activeIndex.value, "msg-item--read": isRead }];
+  return [
+    "msg-item",
+    { "msg-item--active": index === activeIndex.value, "msg-item--read": readInApp(item) },
+  ];
 }
 </script>
 
@@ -237,7 +250,7 @@ function itemClasses(index: number, item: ISiteMessage) {
           >
             <div class="msg-line">
               <span class="msg-title">{{ item.title }}</span>
-              <span v-if="item.unread" class="msg-flag">{{ t("MyData.messages.unreadFlag") }}</span>
+              <span v-if="item.unread && !readInApp(item)" class="msg-flag">{{ t("MyData.messages.unreadFlag") }}</span>
             </div>
             <div class="msg-meta">
               <span>{{ item.sender || "-" }}</span>

@@ -301,7 +301,11 @@
       "emptyButReportedUnread": "站点报告还有 {n} 条未读，但信箱页一条都没读到 —— 多半是该站页面和通用解析对不上，或登录态已失效。可以先去网页看",
       "pickHint": "点左侧一条看正文",
       "noBody": "这条读不到正文，可以用「在网页打开」看原文。",
-      "unreadFlag": "未读"
+      "unreadFlag": "未读",
+      "markAllRead": "标记全部为已读",
+      "markAllReadProgress": "正在标记 {done}/{total}…",
+      "markAllReadTip": "只标列表里读到的这些条；站点那边信箱分页时，后面的要翻到那一页再点一次。",
+      "unreadCount": "未读 {n} 条"
     },
     "HistoryDataView": {
       "action": {

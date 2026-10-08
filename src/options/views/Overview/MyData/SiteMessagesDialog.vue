@@ -5,15 +5,16 @@
  * 正文按**纯文本**显示。刻意不用 v-html：站内信是站点侧不可信内容，选项页能调 chrome.*
  * 消息，把站点 HTML 原样注进去等于给每个站点开一个 XSS 面。
  */
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ExportOutlined, InboxOutlined, SyncOutlined } from "@antdv-next/icons";
+import { CheckOutlined, ExportOutlined, InboxOutlined, SyncOutlined } from "@antdv-next/icons";
 import { EResultParseStatus, type ISiteMessage, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";
 import { formatDate } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
+import { flushSiteLastUserInfo } from "./utils/lastUserData.ts";
 import { useSiteMessageRead } from "./utils/siteMessageRead.ts";
 
 const showDialog = defineModel<boolean>();
@@ -70,6 +71,57 @@ async function loadMessages(id: TSiteID) {
   }
 }
 
+/** 列表里能标成已读的那几条：没有 id 或链接的行点不动 */
+const unreadItems = computed(() => messages.value.filter((item) => item.unread && item.id && item.url));
+
+const isMarkingAll = ref(false);
+const markProgress = ref({ done: 0, total: 0 });
+
+/**
+ * 一键已读。用的还是「点开一条正文」那条 GET —— 信箱页给的那条 viewmessage 链接，站点收到
+ * 就把这条翻成已读（真页对账：LuckPT 读前横幅 8 条、点开一张正文页已经是 7 条）。
+ * 所以这里不发任何 POST、不猜 authkey 那类写接口，代价只是逐条取回整页。
+ * 单条成不成也不看返回值：跑完重新拉一次列表，站点标的才算。
+ */
+async function markAllAsRead() {
+  /** 跑这一批要几十秒，中途弹窗可能换站或关掉：全程只认进来时那一站 */
+  const id = siteId;
+  if (!id || isMarkingAll.value || unreadItems.value.length === 0) {
+    return;
+  }
+
+  const targets = unreadItems.value;
+  isMarkingAll.value = true;
+  markProgress.value = { done: 0, total: targets.length };
+  const readIds: string[] = [];
+
+  for (const item of targets) {
+    const messageId = item.id;
+    const url = item.url;
+    if (messageId && url) {
+      try {
+        await sendMessage("getSiteMessageContent", { siteId: id, messageId, url });
+        readIds.push(messageId);
+      } catch {
+        // 一条打不通不停下整批，剩下的接着标
+      }
+    }
+    markProgress.value = { done: markProgress.value.done + 1, total: targets.length };
+    // 逐条之间留一道缝：一口气把 N 条打过去会撞上站点对刷新频率的保护
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+
+  if (readIds.length > 0) {
+    await messageRead.markRead(id, readIds);
+  }
+  isMarkingAll.value = false;
+  if (showDialog.value && siteId === id) {
+    await loadMessages(id);
+  }
+  // 站点侧的未读数被改过了，「我的数据」那一行的红数字要跟着掉
+  flushSiteLastUserInfo([id]);
+}
+
 async function selectMessage(index: number) {
   const item = messages.value[index];
   if (!item) {
@@ -122,6 +174,18 @@ function itemClasses(index: number, item: ISiteMessage) {
 
 <template>
   <a-modal v-model:open="showDialog" :title="siteName" :width="860" :footer="null">
+    <div v-if="unreadItems.length > 0" class="msg-toolbar">
+      <a-button size="small" :loading="isMarkingAll" @click="markAllAsRead">
+        <template #icon>
+          <CheckOutlined />
+        </template>
+        {{ isMarkingAll ? t("MyData.messages.markAllReadProgress", markProgress) : t("MyData.messages.markAllRead") }}
+      </a-button>
+      <a-tooltip :title="t('MyData.messages.markAllReadTip')">
+        <span class="msg-toolbar-hint">{{ t("MyData.messages.unreadCount", { n: unreadItems.length }) }}</span>
+      </a-tooltip>
+    </div>
+
     <div class="msg-body">
       <div class="msg-list">
         <div v-if="isLoading" class="msg-hint">
@@ -209,6 +273,16 @@ function itemClasses(index: number, item: ISiteMessage) {
 </template>
 
 <style scoped>
+.msg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.msg-toolbar-hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
 .msg-body {
   display: flex;
   gap: 12px;

@@ -301,7 +301,11 @@
       "emptyButReportedUnread": "The site reports {n} unread message(s), but the mailbox page yielded nothing — this site's layout likely doesn't match the generic parser, or your session expired. Please read them on the site for now",
       "pickHint": "Pick a message on the left to read it",
       "noBody": "The body could not be read here. Use 'Open in browser' to see the original.",
-      "unreadFlag": "Unread"
+      "unreadFlag": "Unread",
+      "markAllRead": "Mark all as read",
+      "markAllReadProgress": "Marking {done}/{total}...",
+      "markAllReadTip": "Only the messages loaded in this list get marked. If the site paginates its mailbox, open the next page and run it again.",
+      "unreadCount": "{n} unread"
     },
     "HistoryDataView": {
       "action": {

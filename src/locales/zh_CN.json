@@ -274,6 +274,7 @@
       "seeding": "做种中",
       "unknown": "未知"
     },
+    "stateFilterAll": "全部",
     "table": {
       "addedAt": "添加时间",
       "client": "下载器",

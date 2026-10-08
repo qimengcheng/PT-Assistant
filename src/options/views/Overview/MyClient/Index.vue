@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useTemplateRef } from "vue";
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -80,6 +80,14 @@ const loading = ref(false);
 const tableSelected = ref<CTorrent[]>([]);
 const searchText = ref("");
 
+/** 工具条那排状态筛选的取值：`all` 或七个种子状态之一 */
+type AllOrState = "all" | CTorrentState;
+/**
+ * 按状态筛选（用户 2026-10-08：「加个 radio button group，可以按状态分类筛选」）。
+ * 与搜索框是叠加关系；不持久化 —— 这一页的搜索框、下载器筛选都不存，单独把这一档存下来反而不一致。
+ */
+const stateFilter = ref<AllOrState>("all");
+
 // delete dialog
 const showDeleteDialog = ref(false);
 const toDeleteTorrents = ref<CTorrent[]>([]);
@@ -112,7 +120,10 @@ const allTorrents = computed(() => Object.values(torrents.value).flat());
 
 const filteredTorrents = computed(() => {
   const active = activeDownloaderIds.value;
-  const base = active.flatMap((id) => torrents.value[id] ?? []);
+  let base = active.flatMap((id) => torrents.value[id] ?? []);
+  if (stateFilter.value !== "all") {
+    base = base.filter((torrent) => torrent.state === stateFilter.value);
+  }
   if (!searchText.value) return base;
   const q = searchText.value.toLowerCase();
   return base.filter(
@@ -123,6 +134,21 @@ const filteredTorrents = computed(() => {
       t.savePath.toLowerCase().includes(q),
   );
 });
+
+/**
+ * 标签全部走字面 `t()`：防线③（check-locale-keys）看不见 `t("前缀" + x)` 这种拼出来的键，
+ * 而这里七个状态名和表格里那颗 chip 共用同一批键 —— 写成动态的就等于把这七处交给肉眼核对。
+ */
+const stateFilterOptions = computed(() => [
+  { value: "all" as AllOrState, label: t("MyClient.stateFilterAll") },
+  { value: CTorrentState.downloading, label: t("MyClient.state.downloading") },
+  { value: CTorrentState.seeding, label: t("MyClient.state.seeding") },
+  { value: CTorrentState.queued, label: t("MyClient.state.queued") },
+  { value: CTorrentState.checking, label: t("MyClient.state.checking") },
+  { value: CTorrentState.paused, label: t("MyClient.state.paused") },
+  { value: CTorrentState.error, label: t("MyClient.state.error") },
+  { value: CTorrentState.unknown, label: t("MyClient.state.unknown") },
+]);
 
 // 当前选中种子的下载器类型对应的能力元数据（用于显示可用操作）
 const clientMetaMap = ref<Record<string, TorrentClientMetaData>>({});
@@ -384,6 +410,9 @@ const rowSelection = computed<TableRowSelection<CTorrent>>(() => ({
 }));
 
 const tablePage = ref(1);
+// 换筛选条件要回到第 1 页：分页是受控的（tablePage 只由翻页回调写），
+// 停在第 5 页时筛到只剩两行，切出来的那一页是空的 —— 看着像筛坏了而不是筛窄了。
+watch([searchText, stateFilter], () => (tablePage.value = 1));
 const pageSize = computed(() => (configStore.tableBehavior["MyClient"] as any)?.itemsPerPage ?? 25);
 
 // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
@@ -521,8 +550,17 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
       </a-dropdown>
       </a-flex>
 
-      <!-- 工具条右端：下载器筛选标签 + 状态按钮（原 a-alert 的 #action）、自定义列、搜索框 -->
+      <!-- 工具条右端：状态筛选 + 下载器筛选标签 + 状态按钮（原 a-alert 的 #action）、自定义列、搜索框 -->
       <a-flex align="center" gap="small" wrap class="page-bar-extra">
+        <!-- 固定几选一一律 a-radio-group + button-style="solid"（选中实心蓝底白字），不用 a-segmented：
+             segmented 的选中态是灰底轨道上一块白浮标，落在那条浅灰栏里几乎看不出选的是哪个（AGENTS §3.4）。
+             工具条里的控件不写 size —— 这一排是 32px 档，跟同栏那几颗按钮齐平。 -->
+        <a-radio-group v-model:value="stateFilter" button-style="solid">
+          <a-radio-button v-for="opt in stateFilterOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </a-radio-button>
+        </a-radio-group>
+
         <a-tag v-if="selectedDownloaderIds.length === 1" color="blue" closable @close="clearDownloaderFilter">
           <template #icon><img class="client-tag-icon" :src="clientIcon(selectedDownloaderIds[0])" alt="" /></template>
           {{ clientName(selectedDownloaderIds[0]) }}

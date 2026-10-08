@@ -274,6 +274,7 @@
       "seeding": "Seeding",
       "unknown": "Unknown"
     },
+    "stateFilterAll": "All",
     "table": {
       "addedAt": "Added At",
       "client": "Client",

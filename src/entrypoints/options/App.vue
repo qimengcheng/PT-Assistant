@@ -134,6 +134,10 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
        另一套色板，点一下排序表头就看见色差。hover 那档按 #eef2f7 往深取一档；
        active（当前排好序的那一列表头）v0.37.5 起直接等于 headerBg —— 用户口径「排序的时候
        表头列的颜色不要变」，那一列靠排序箭头已经标出来了，不需要再刷一层底色。
+       bodySortBg（排好序那一列的**表体**格）v0.40.4 起给 transparent：它默认 colorFillAlterSolid
+       ≈#fafafa，于是白底偶数行上会刷出一条灰带（下载历史按「下载时间」排序，他截图量到同一行里
+       那一列 #fafafa、左右两列 #ffffff）。给 transparent 之后斑马纹与悬停都从行自己透出来，
+       不会再盖一层。
        headerColor 没动：antd 默认 colorTextHeading(≈rgba(0,0,0,.88)) 在这个底色上对比足够。
        content 侧同值另配一份（见 src/content-script/app/App.vue）：那边的样式注入在
        shadow root 里，读不到这侧的 ConfigProvider。 -->
@@ -147,6 +151,7 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
           headerBg: '#eef2f7',
           headerSortHoverBg: '#e4ebf3',
           headerSortActiveBg: '#eef2f7',
+          bodySortBg: 'transparent',
         },
       },
     }"

@@ -308,6 +308,8 @@ onBeforeUnmount(() => stopSnakebarWatch());
             headerBg: '#eef2f7',
             headerSortHoverBg: '#e4ebf3',
             headerSortActiveBg: '#eef2f7',
+            // 排好序那一列的表体格：antd 默认 #fafafa，会在白底行上刷出一条灰带（用户 2026-10-08）
+            bodySortBg: 'transparent',
           },
         },
       }"

@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-08 11:52:00",
-  "headSha": "5e76147",
+  "generatedAt": "2026-10-08 12:02:50",
+  "headSha": "41877a6",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.40.4",
+      "date": "2026-10-08 12:01:34",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "点表头排序时，那一列的格子不再被刷上一层灰底（原先白底的行上会顺着一列出现一条灰带）。表头那一档上次已经改成不变色了。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.40.3",
       "date": "2026-10-08 11:50:46",

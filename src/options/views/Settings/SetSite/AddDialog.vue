@@ -107,6 +107,7 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
         :show-search="true"
         :options="siteOptions"
         :filter-option="filterSiteOption"
+        :popup-match-select-width="false"
         :placeholder="selectedSiteId ? '' : t('SetSite.add.selectSitePlaceholder')"
         class="site-select"
       >
@@ -236,6 +237,11 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
   margin-left: 8px;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
+  /* 弹层宽度改成由内容决定之后，tags 是整串 join 出来的、不设上限会把弹层撑到屏幕外 */
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .switch-row {

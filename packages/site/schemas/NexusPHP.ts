@@ -1150,18 +1150,40 @@ export default class NexusPHP extends PrivateSite {
     }
 
     const doc = createDocument(data);
-    // 内核把正文放在 td.text；皮肤改名时退到「最长的那一块单元格文本」，短到看不出是正文就不给
-    const direct = (Sizzle("td.text", doc) as HTMLElement[])
-      .map((el) => extractContent(el.textContent ?? ""))
+
+    /**
+     * 内核 messages.php?action=viewmessage 的正文是「独占一行的那一格」：
+     * 表头是 自 / 日期 两列，正文行只有一个 td 且 colspan=2，最后一行又是 移至 / 删除 两列。
+     * 判据取结构而不是 class —— 皮肤会改 class，colspan 是排版本身，改了就塌。
+     * 真页核过：LuckPT 2026-10-01 那条「国庆节福利」（整页只有一处 colspan）。
+     */
+    const bodyCell = (Sizzle("tr", doc) as HTMLTableRowElement[])
+      .map((tr) => Array.from(tr.children).filter((c) => c.tagName === "TD") as HTMLTableCellElement[])
+      .find((tds) => tds.length === 1 && Number(tds[0].getAttribute("colspan") ?? "1") > 1)?.[0];
+    if (bodyCell) {
+      return extractContent(bodyCell.textContent ?? "").trim();
+    }
+
+    // 新版内核把正文放在 td.text。必须排掉外层布局格：真页上 `<td id="nav_block" class="text">`
+    // 也带这个 class，而它装的是「欢迎回来 + 流量统计」那一整块 —— 不排就是之前那副坏样子。
+    const direct = (Sizzle("td.text", doc) as HTMLTableCellElement[])
+      .filter((td) => !td.querySelector("td"))
+      .map((td) => extractContent(td.textContent ?? "").trim())
       .find((text) => text.length > 0);
     if (direct) {
       return direct;
     }
 
-    const fallback = (Sizzle("td", doc) as HTMLElement[])
-      .map((td) => extractContent(td.textContent ?? ""))
+    // 连那一行的 colspan 都被改掉时的兜底：在所有「叶子格」里取最长的。
+    // 必须排掉两类：包着别的 td 的外层布局格（不排就会拿到整页文本 —— 之前界面里
+    // 那副「导航 + 欢迎回来 + 流量统计」的坏样子就是它），以及带表单控件的操作格
+    //（「移至 收件箱 [删除] [转发短讯]」比很多正文还长）。
+    const fallback = (Sizzle("td", doc) as HTMLTableCellElement[])
+      .filter((td) => !td.querySelector("td, form, input, select, button"))
+      .map((td) => extractContent(td.textContent ?? "").trim())
       .sort((a, b) => b.length - a.length)[0];
 
-    return fallback && fallback.length > 20 ? fallback : undefined;
+    // 8 个字符是挡住「自 / 日期 / 系统」这类表头与发件人名的下限，不是正文长度上限
+    return fallback && fallback.length >= 8 ? fallback : undefined;
   }
 }

@@ -528,13 +528,15 @@
       "uploadAtFormatAsAlive": "Display Upload Time as Relative Time",
       "defaultSearchPlan": "Default search plan",
       "searchKeywordPlaceholder": "Enter keywords to start searching",
-      "searchPlanSettings": "Search Plan Settings"
+      "searchPlanSettings": "Search Plan Settings",
+      "manageSnapshots": "Search Snapshots"
     },
     "siteFilter": {
       "all": "All Site"
     }
   },
   "SearchResultSnapshot": {
+    "title": "Search Snapshots",
     "EditNameDialog": {
       "snapshotName": "Snapshot Name",
       "title": "Rename Search Snapshot"
@@ -1537,7 +1539,6 @@
       "home": "Home",
       "guide": "Getting Started",
       "sites": "Sites",
-      "snapshot": "Search Snapshot",
       "backup": "Backup",
       "downloader": "Downloader",
       "myClient": "My Clients",

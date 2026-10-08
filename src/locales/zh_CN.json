@@ -528,13 +528,15 @@
       "uploadAtFormatAsAlive": "上传时间显示为相对时间",
       "defaultSearchPlan": "默认搜索方案",
       "searchKeywordPlaceholder": "输入关键词开始搜索",
-      "searchPlanSettings": "搜索方案设置"
+      "searchPlanSettings": "搜索方案设置",
+      "manageSnapshots": "搜索快照"
     },
     "siteFilter": {
       "all": "全部站点"
     }
   },
   "SearchResultSnapshot": {
+    "title": "搜索快照",
     "EditNameDialog": {
       "snapshotName": "快照名称",
       "title": "搜索快照重命名"
@@ -1537,7 +1539,6 @@
       "home": "首页",
       "guide": "新手引导",
       "sites": "站点管理",
-      "snapshot": "搜索快照",
       "backup": "数据备份",
       "downloader": "下载器",
       "myClient": "我的下载器",

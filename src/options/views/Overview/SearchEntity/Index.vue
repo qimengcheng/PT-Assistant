@@ -9,6 +9,7 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   FilterOutlined,
+  FolderOpenOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
   SearchOutlined,
@@ -35,6 +36,7 @@ import TorrentProcessTd from "./TorrentProcessTd.vue";
 import QuickFilterNotice from "./QuickFilterNotice.vue";
 import SearchStatusDialog from "./SearchStatusDialog.vue";
 import SaveSnapshotDialog from "./SaveSnapshotDialog.vue";
+import SnapshotManagerDialog from "./SnapshotManagerDialog.vue";
 import AdvanceFilterGenerateDialog from "./AdvanceFilterGenerateDialog.vue";
 import SearchScopeSelect from "./SearchScopeSelect.vue";
 // 搜索方案管理页整块复用（而不是抄一份精简版）：增删改/启默/导入导出全在那一个组件里
@@ -59,6 +61,8 @@ const runtimeStore = useRuntimeStore();
 const showAdvanceFilterGenerateDialog = ref<boolean>(false);
 const showSearchStatusDialog = ref<boolean>(false);
 const showSaveSnapshotDialog = ref<boolean>(false);
+/** 快照管理弹窗：这一页原先是左侧导航里的独立一项，v0.38.0 起并进搜索页 */
+const showSnapshotManagerDialog = ref<boolean>(false);
 
 /**
  * 表格列定义。原先用的是 Vuetify 的 DataTableHeader，这里就地定义一个本地类型：
@@ -400,17 +404,33 @@ watch(
   },
 );
 
+/**
+ * 装载一份快照。两条路都走这里：地址栏带 `?snapshot=xxx` 进来（外部链接、旧书签），
+ * 以及快照管理弹窗里那一行的「查看」—— 后者原先是 router.push 跳到搜索页，
+ * 现在这一页就是搜索页，就地装载，不再多一次导航。
+ */
+function applySnapshot(snapshotId: string) {
+  metadataStore.getSearchSnapshotData(snapshotId).then((data) => {
+    if (!data) return;
+    runtimeStore.search = { ...data, snapshot: snapshotId };
+    // 如果启用了快速站点筛选，则重置一下筛选器，以防止快速站点筛选中无站点数据
+    if (configStore.searchEntity.quickSiteFilter) {
+      buildAdvanceItemPropsFn();
+    }
+  });
+}
+
+/** 快照管理弹窗里点「查看」：就地装载，然后把弹窗收掉 —— 他要的是回到结果列表看这份快照 */
+function viewSnapshotFromManager(snapshotId: string) {
+  applySnapshot(snapshotId);
+  showSnapshotManagerDialog.value = false;
+}
+
 watch(
   () => route.query,
   (newParams, oldParams) => {
     if (newParams.snapshot) {
-      metadataStore.getSearchSnapshotData(newParams.snapshot as string).then((data) => {
-        data && (runtimeStore.search = { ...data, snapshot: newParams.snapshot as string });
-        // 如果启用了快速站点筛选，则重置一下筛选器，以防止快速站点筛选中无站点数据
-        if (configStore.searchEntity.quickSiteFilter) {
-          buildAdvanceItemPropsFn();
-        }
-      });
+      applySnapshot(newParams.snapshot as string);
     } else {
       if (
         newParams.flush ||
@@ -518,6 +538,10 @@ const hasSearchStatus = computed<boolean>(() => {
   <a-button type="text" @click="showSearchPlanSettingsDialog = true">
     <template #icon><SettingOutlined /></template>
     {{ t("SearchEntity.index.searchPlanSettings") }}
+  </a-button>
+  <a-button type="text" @click="showSnapshotManagerDialog = true">
+    <template #icon><FolderOpenOutlined /></template>
+    {{ t("SearchEntity.index.manageSnapshots") }}
   </a-button>
 </div>
   <a-alert type="info" class="search-alert">
@@ -835,6 +859,7 @@ const hasSearchStatus = computed<boolean>(() => {
   <AdvanceFilterGenerateDialog v-model="showAdvanceFilterGenerateDialog" />
   <SearchStatusDialog v-model="showSearchStatusDialog" />
   <SaveSnapshotDialog v-model="showSaveSnapshotDialog" />
+  <SnapshotManagerDialog v-model="showSnapshotManagerDialog" @view="viewSnapshotFromManager" />
 
   <!-- 标题只走 :title 属性（#title 插槽会和右上角关闭按钮相撞）；body 定高是为了让
        复用进来的 .page 骨架（height:100% + 1fr 面板行）在弹层内部滚动，而不是撑长页面 -->

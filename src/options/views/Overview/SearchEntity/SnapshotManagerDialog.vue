@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { refDebounced } from "@vueuse/core";
 import {
   DeleteOutlined,
@@ -18,10 +17,12 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { type ISearchSnapshotMetadata, type TSearchSnapshotKey } from "@/shared/types.ts";
 
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
-import EditNameDialog from "./EditNameDialog.vue";
+import SnapshotEditNameDialog from "./SnapshotEditNameDialog.vue";
+
+const open = defineModel<boolean>({ required: true });
+const emit = defineEmits<{ (e: "view", snapshotId: TSearchSnapshotKey): void }>();
 
 const { t } = useI18n();
-const router = useRouter();
 const metadataStore = useMetadataStore();
 
 const showEditNameDialog = ref<boolean>(false);
@@ -81,15 +82,6 @@ const filteredItems = computed(() => {
   return list.filter((item) => item.name.toLowerCase().includes(keyword));
 });
 
-function viewSnapshot(searchSnapshotId: TSearchSnapshotKey) {
-  router.push({
-    name: "SearchEntity",
-    query: {
-      snapshot: searchSnapshotId,
-    },
-  });
-}
-
 const toEditId = ref<TSearchSnapshotKey | null>(null);
 function editSnapshotName(searchSnapshotId: TSearchSnapshotKey) {
   toEditId.value = searchSnapshotId;
@@ -109,31 +101,27 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
 </script>
 
 <template>
-  <!-- 骨架（48px 工具条 + 白底面板）见 style.css 的 .page / .page-bar / .page-panel。
-       原先删除按钮挂在卡片 #title、筛选框挂在 #extra：卡片头的垂直 padding 实测是 0，
-       size="small" 下头高只有 38px，32px 的按钮塞进去只剩上下各 3px —— 整条贴到窗口顶。 -->
-  <div class="page">
-    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
-      <a-flex align="center" gap="small" wrap>
-        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)"><template #icon><MinusOutlined /></template><span>{{ t('common.remove') }}</span></a-button>
-      </a-flex>
-
-      <div class="page-bar-extra">
-        <a-input
-          v-model:value="tableWaitFilter"
-          allow-clear
-          class="toolbar-filter"
-          :placeholder="t('SearchResultSnapshot.table.filterLabel')"
-        >
-          <template #prefix>
-            <SearchOutlined />
-          </template>
-        </a-input>
-      </div>
+  <!-- 这一页原先是左侧导航里的独立一项，v0.38.0 起并进搜索页：工具条那颗按钮开这个弹窗。
+       表格里的「查看」不再 router.push 跳到搜索页（那就成了从搜索页跳回搜索页），
+       而是把快照 id 抛给父组件，由它就地装载。 -->
+  <a-modal v-model:open="open" :title="t('SearchResultSnapshot.title')" :width="900" :footer="null">
+    <a-flex align="center" gap="small" wrap class="manager-bar">
+      <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="tryToDeleteSearchSnapshot(tableSelected)">
+        <template #icon><MinusOutlined /></template>
+        <span>{{ t("common.remove") }}</span>
+      </a-button>
+      <a-input
+        v-model:value="tableWaitFilter"
+        allow-clear
+        class="toolbar-filter"
+        :placeholder="t('SearchResultSnapshot.table.filterLabel')"
+      >
+        <template #prefix>
+          <SearchOutlined />
+        </template>
+      </a-input>
     </a-flex>
 
-    <!-- 面板只给表格一块白底表面；表格自己的 scroll.y 仍管内部滚动 -->
-    <div class="page-panel">
     <a-table
       bordered
       :columns="columns"
@@ -154,7 +142,7 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
         <template v-else-if="column.key === 'action'">
           <a-space :size="0">
             <a-tooltip :title="t('SearchResultSnapshot.table.action.view')">
-              <a-button size="small" type="text" @click="viewSnapshot(record.id)">
+              <a-button size="small" type="text" @click="emit('view', record.id)">
                 <template #icon>
                   <FileSearchOutlined />
                 </template>
@@ -178,14 +166,17 @@ async function confirmDeleteSearchSnapshot(searchSnapshotId: TSearchSnapshotKey)
         </template>
       </template>
     </a-table>
-    </div>
-  </div>
+  </a-modal>
 
-  <EditNameDialog v-model="showEditNameDialog" :edit-id="toEditId!" />
+  <SnapshotEditNameDialog v-model="showEditNameDialog" :edit-id="toEditId!" />
   <DeleteDialog v-model="showDeleteDialog" :to-delete-ids="toDeleteIds" :confirm-delete="confirmDeleteSearchSnapshot" />
 </template>
 
 <style scoped lang="scss">
+.manager-bar {
+  margin-bottom: 8px;
+}
+
 .toolbar-filter {
   max-width: 320px;
 }

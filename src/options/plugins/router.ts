@@ -57,11 +57,13 @@ export const routes: RouteRecordRaw[] = [
     name: "SearchEntity",
     component: () => import("../views/Overview/SearchEntity/Index.vue"),
   },
+  // 「搜索快照」那一页 v0.38.0 起并进搜索页（工具条那颗按钮开弹窗管理）。
+  // 旧地址留着只跳转不渲染：书签和 `?snapshot=xxx` 这类深链不能断，query 原样带过去，
+  // 落到 /search 后由那一页的 route.query 观察器就地装载这份快照。
   {
     path: "/search-result-snapshot",
     alias: "/search-snapshot",
-    name: "SearchResultSnapshot",
-    component: () => import("../views/Overview/SearchResultSnapshot/Index.vue"),
+    redirect: (to) => ({ path: "/search", query: to.query }),
   },
   {
     path: "/download-history",

@@ -99,6 +99,15 @@ onMounted(refresh);
         :title="t(`SetUpdate.error.${state.errorCode}`, { status: state.httpStatus })"
       />
 
+      <!-- 走备用通道时"成功"了，但少给两样东西（发布时间、zip 直链）。不解释的话看着像数据坏了。 -->
+      <a-alert
+        v-else-if="state.via === 'html'"
+        type="info"
+        show-icon
+        class="group-alert"
+        :title="t('SetUpdate.viaFallback')"
+      />
+
       <div class="update-actions">
         <a-button type="primary" :loading="isChecking" @click="checkNow">
           <template #icon><SyncOutlined /></template>

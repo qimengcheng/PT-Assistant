@@ -32,7 +32,17 @@ export type TCookieRenewalStorageSchema = Record<string, number>;
 export type TSiteMessageReadStorageSchema = Record<TSiteID, Record<string, number>>;
 
 /** 检查更新的失败原因。存的是码不是句子：界面按码取当前语言的文案（§3.5 内部标识符不进 UI）。 */
-export type TUpdateCheckError = "" | "network" | "http" | "badData";
+export type TUpdateCheckError = "" | "network" | "http" | "badData" | "rateLimited";
+
+/**
+ * 这次版本号是从哪条路拿到的。
+ *
+ * `api` = REST 接口（信息最全：带发布时间与按浏览器分好的 zip 直链）；
+ * `html` = 退到 `releases/latest` 那条 302 跳转（见 @/shared/updateCheck.ts 里 fetchLatestViaHtml
+ * 的注释：GitHub 的匿名配额按**出口 IP** 算，共享代理出口几乎必然已被别人用完，那条路会 403）。
+ * 界面按它解释「为什么这次没有发布时间、下载按钮开的是 Release 页」，不让人以为数据坏了。
+ */
+export type TUpdateCheckVia = "" | "api" | "html";
 
 /**
  * 「检查更新」的结果缓存。
@@ -62,4 +72,6 @@ export interface IUpdateCheckState {
   httpStatus: number;
   /** 已经为哪个版本发过系统通知 —— 同一版本只提醒一次 */
   notifiedFor: string;
+  /** 这次结果走的是哪条通道（见 TUpdateCheckVia）；"" = 还没成功过 */
+  via: TUpdateCheckVia;
 }

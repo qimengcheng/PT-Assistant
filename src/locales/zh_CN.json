@@ -1120,9 +1120,11 @@
     },
     "error": {
       "network": "连不上更新服务器，请检查网络后重试",
-      "http": "更新服务器返回 HTTP {status}（多为仓库还没有已发布的版本，或该网络被限流）",
-      "badData": "更新服务器返回的内容里读不出版本号"
+      "http": "更新服务器返回 HTTP {status}，两条路都没能拿到版本号",
+      "badData": "更新服务器返回的内容里读不出版本号",
+      "rateLimited": "GitHub 的匿名接口按出口 IP 限速（每小时 60 次），你现在这个出口的配额已经被用完（HTTP {status}），改走发布页跳转也没拿到版本号。换个网络出口或稍后再试。"
     },
+    "viaFallback": "这次是从 GitHub 的 Release 页跳转拿到的版本号（api.github.com 的匿名配额按出口 IP 计算，你现在这个出口用完了）。所以这一条没有「发布时间」，「前往下载页」开的也是 Release 页而不是本浏览器的安装包直链。",
     "checkNow": "立即检查更新",
     "gotoRelease": "前往下载页",
     "gotoReleaseNote": "查看该版本的更新说明",

@@ -13,9 +13,12 @@
  */
 import { REPO_API, REPO_URL } from "~/helper.ts";
 import { extStore } from "@/storage.ts";
-import type { IUpdateCheckState, TUpdateCheckError } from "@/shared/types.ts";
+import type { IUpdateCheckState, TUpdateCheckError, TUpdateCheckVia } from "@/shared/types.ts";
 
 const LATEST_RELEASE_API = `${REPO_API}/releases/latest`;
+
+/** 备用通道：同一条「最新 Release」的网页版，靠 302 的 Location 带出 tag */
+const LATEST_RELEASE_HTML = `${REPO_URL}/releases/latest`;
 
 /** 一次请求的耐心上限：拿不到就算了，不占着 SW */
 const FETCH_TIMEOUT_MS = 15_000;
@@ -43,6 +46,7 @@ export function emptyUpdateState(): IUpdateCheckState {
     errorCode: "",
     httpStatus: 0,
     notifiedFor: "",
+    via: "",
   };
 }
 
@@ -113,6 +117,29 @@ function pickAssetUrl(assets: IGithubReleaseAsset[] | undefined, releaseUrl: str
 }
 
 /**
+ * 备用通道：向发布页要那条 302。
+ *
+ * 为什么需要它：GitHub 的匿名 REST 配额是**按出口 IP** 算的（每小时 60 次），而挂在共享代理出口
+ * 后面的用户，那个 IP 上别人早就把配额用完了 —— 实测本机出口 103.167.135.21 走代理拿到的就是
+ * 403「API rate limit exceeded」，同一时刻绕开代理直连是 200。这条网页跳转不占 REST 配额，
+ * 302 的 Location 里就带着 tag 名，判「有没有新版本」够用。
+ *
+ * 代价要说清：这条路拿不到 published_at，也拿不到按浏览器分好的 zip 直链，
+ * 所以 downloadUrl 就是 Release 页本身（点「前往下载页」会落到那一页，不假装是直链）。
+ * 拿不出版本号（仓库一条 Release 都没有 → 404，或被网关改了跳转）时返回 null，让调用方报错。
+ */
+async function fetchLatestViaHtml(signal: AbortSignal): Promise<{ latest: string; releaseUrl: string } | null> {
+  const res = await fetch(LATEST_RELEASE_HTML, { method: "GET", redirect: "follow", signal, credentials: "omit" });
+  const tag = /\/releases\/tag\/([^/?#]+)/.exec(res.url ?? "");
+  const latest = normalizeVersion(tag ? decodeURIComponent(tag[1]) : "");
+  if (!latest) {
+    return null;
+  }
+  // 用服务器给的那条最终地址（去掉查询串），不自己拼 `v<版本>` —— tag 前缀不是我们该假设的
+  return { latest, releaseUrl: String(res.url).split(/[?#]/)[0] };
+}
+
+/**
  * 发一次请求并把结果整块写回 storage。**不抛异常**：失败也写成状态存起来（界面上要显示
  * 「上次检查失败」而不是什么都不变），返回值永远是写进去的那一份。
  */
@@ -120,6 +147,7 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
   const state = await readUpdateState();
   const now = Date.now();
 
+  // 两条路共用这一份耐心上限：备用通道只在主路已经失败时才走，不该另起一个 15 秒
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -129,6 +157,7 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
   let releaseUrl = "";
   let downloadUrl = "";
   let publishedAt = "";
+  let via: TUpdateCheckVia = "";
 
   try {
     const res = await fetch(LATEST_RELEASE_API, {
@@ -138,8 +167,14 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
       credentials: "omit",
     });
     if (!res.ok) {
-      errorCode = "http";
       httpStatus = res.status;
+      /**
+       * 光看状态码分不开「仓库没发布过」和「这个出口 IP 配额用完了」—— 而这两件事要告诉用户的话
+       * 完全不同（前者是仓库的事，后者他换个节点就好）。GitHub 那句原文里有 rate limit 字样，
+       * 所以把响应体读出来当**判据**用；界面不 echo 远端原文（§3.5），仍按码取自己的文案。
+       */
+      const body = await res.text().catch(() => "");
+      errorCode = res.status === 429 || /rate limit/i.test(body) ? "rateLimited" : "http";
     } else {
       const json = (await res.json()) as IGithubReleaseResponse;
       latest = normalizeVersion(json?.tag_name);
@@ -149,12 +184,32 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
         releaseUrl = json.html_url || `${REPO_URL}/releases`;
         downloadUrl = pickAssetUrl(json.assets, releaseUrl);
         publishedAt = json.published_at ?? "";
+        via = "api";
+      }
+    }
+
+    if (errorCode) {
+      try {
+        const fallback = await fetchLatestViaHtml(controller.signal);
+        if (fallback) {
+          latest = fallback.latest;
+          releaseUrl = fallback.releaseUrl;
+          downloadUrl = fallback.releaseUrl;
+          publishedAt = "";
+          via = "html";
+          errorCode = "";
+          httpStatus = 0;
+        }
+      } catch {
+        // 备用通道自己也没走通：留着主路那条错误码（那才是原因），这里不另立一个"network"
       }
     }
   } catch {
-    // fetch  reject（断网 / DNS / CORS）与超时 abort 都是这里；错误原文是浏览器给的英文句子，
-    // 不进界面（§3.5），只留一个码让界面按当前语言取文案。
-    errorCode = "network";
+    // fetch reject（断网 / DNS / CORS）与超时 abort 都是这里；错误原文是浏览器给的英文句子，
+    // 不进界面（§3.5），只留一个码让界面按当前语言取文案。已经判出原因的不要去覆盖它。
+    if (!errorCode) {
+      errorCode = "network";
+    }
   } finally {
     clearTimeout(timer);
   }
@@ -164,8 +219,8 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
     lastCheckAt: now,
     errorCode,
     httpStatus,
-    // 失败时保留上一次的 latestVersion / 链接：那次确实是查到的，没必要当作不知道
-    ...(errorCode ? {} : { latestVersion: latest, releaseUrl, downloadUrl, publishedAt }),
+    // 失败时保留上一次的 latestVersion / 链接 / 通道：那次确实是查到的，没必要当作不知道
+    ...(errorCode ? {} : { latestVersion: latest, releaseUrl, downloadUrl, publishedAt, via }),
   };
 
   await writeUpdateState(next);

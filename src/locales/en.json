@@ -1120,9 +1120,11 @@
     },
     "error": {
       "network": "Could not reach the update server. Check your connection and try again.",
-      "http": "The update server replied HTTP {status} (usually no published release yet, or this network is rate limited)",
-      "badData": "The reply from the update server carries no version number"
+      "http": "The update server replied HTTP {status}; neither route produced a version number",
+      "badData": "The reply from the update server carries no version number",
+      "rateLimited": "GitHub rate-limits anonymous API requests per exit IP (60 per hour) and your exit IP has used them all (HTTP {status}). Falling back to the release page didn't yield a version either. Try a different network exit, or check again later."
     },
+    "viaFallback": "This version number came from the GitHub release page redirect (api.github.com rate-limits anonymous requests per exit IP, and yours is used up). So there is no publish date here, and 'Go to download page' opens the release page rather than a direct link to this browser's package.",
     "checkNow": "Check now",
     "gotoRelease": "Open download page",
     "gotoReleaseNote": "Read the release notes",

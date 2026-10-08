@@ -666,8 +666,8 @@ const showExportDialog = ref(false);
         <template v-else-if="column.key === 'bonus'">
           <div class="d-flex flex-column align-end">
             <div class="bonus-line d-flex align-center justify-end flex-nowrap">
-              <DollarOutlined class="cell-icon cell-icon--green" :title="t('levelRequirement.bonus')" />
               <BonusFormatSpan :num="record.bonus" />
+              <DollarOutlined class="cell-icon cell-icon--green" :title="t('levelRequirement.bonus')" />
             </div>
             <div
               v-if="
@@ -677,8 +677,8 @@ const showExportDialog = ref(false);
               "
               class="bonus-line d-flex align-center justify-end flex-nowrap"
             >
-              <ThunderboltOutlined class="cell-icon cell-icon--green" :title="t('levelRequirement.seedingBonus')" />
               <BonusFormatSpan :num="record.seedingBonus" />
+              <ThunderboltOutlined class="cell-icon cell-icon--green" :title="t('levelRequirement.seedingBonus')" />
             </div>
           </div>
         </template>

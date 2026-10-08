@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-08 16:44:14",
-  "headSha": "036efa7",
+  "generatedAt": "2026-10-08 17:32:38",
+  "headSha": "af6de44",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.43.1",
+      "date": "2026-10-08 17:47:55",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「我的数据」的积分那一列，钱和闪电图标改到数字后面：这两行数字本来就是右对齐的，图标摆在前面就会跟着数字长短左右跑，看着一列歪歪扭扭；挪到后面之后图标自己排成一条竖线，和上传/下载、最近访问那几列的写法一致了。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.43.0",
       "date": "2026-10-08 17:32:38",

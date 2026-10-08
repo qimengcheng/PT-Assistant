@@ -144,6 +144,34 @@ body {
   font-size: 11px;
 }
 
+/*
+ * logo 那一行右边的齿轮 = 「基础设置」的入口（2026-10-08 从左侧菜单挪到这里）。
+ * margin-left: auto 顶到行尾；28px 见方压在 32px 的 logo 以内，不会把这一行抬高。
+ * 选中态自己标（菜单里再没有这一条，切到那页时整列导航都不亮）。
+ */
+.brand-settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  border-radius: 6px;
+  color: var(--pt-color-text-secondary);
+  font-size: 16px;
+  text-decoration: none;
+}
+
+.brand-settings:hover {
+  background: var(--pt-color-bg-hover);
+  color: var(--pt-color-primary);
+}
+
+.brand-settings.is-active {
+  background: var(--pt-color-bg-selected);
+  color: var(--pt-color-primary-text);
+}
+
 .menu {
   padding: 8px;
   display: flex;

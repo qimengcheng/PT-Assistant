@@ -70,7 +70,8 @@ const navItems = computed(() => {
     { path: "/media-server-entity", label: t("route.Overview.MediaServerEntity"), icon: PlaySquareOutlined },
     { path: "/set-backup", label: t("layout.nav.backup"), icon: CloudUploadOutlined },
     { path: "/set-downloader", label: t("layout.nav.downloader"), icon: DownloadOutlined },
-    { path: "/set-base", label: t("layout.nav.basicSettings"), icon: SettingOutlined },
+    // 「基础设置」不在这里了（用户 2026-10-08）：它和上面两条一样是 set-* 那族，但入口挪到了
+    // logo 那一行右边那颗齿轮上 —— 菜单里少一条，选中态也跟着由齿轮自己标。
     // 「技术栈」不再进左侧导航（2026-10-06），路由 /technology-stack 保留，需要时直链进入。
     { path: "/special-thank", label: t("route.About.SpecialThank"), icon: TeamOutlined },
     { path: "/logger", label: t("layout.nav.logger"), icon: FileSearchOutlined },
@@ -159,6 +160,17 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
               <h1>PT Assistant</h1>
               <span class="version">v{{ version }} (WXT)</span>
             </div>
+            <!-- 基础设置的入口（原先是菜单里一条）。用 router-link 而不是 @click：
+                 和菜单项一样保留 ctrl / 中键开新标签。 -->
+            <a-tooltip :title="t('layout.nav.basicSettings')">
+              <router-link
+                to="/set-base"
+                class="brand-settings"
+                :class="{ 'is-active': activePath === '/set-base' }"
+              >
+                <SettingOutlined />
+              </router-link>
+            </a-tooltip>
           </header>
 
           <nav class="menu">

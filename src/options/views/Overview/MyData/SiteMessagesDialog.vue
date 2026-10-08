@@ -64,11 +64,31 @@ async function loadMessages(id: TSiteID) {
     supported.value = result.supported;
     messages.value = result.messages;
     loadFailed.value = result.supported && result.status !== EResultParseStatus.success;
+    if (!loadFailed.value) {
+      reconcileBadgeWithList(id, result.messages);
+    }
   } catch {
     supported.value = true;
     loadFailed.value = true;
   } finally {
     isLoading.value = false;
+  }
+}
+
+/**
+ * 列表页本身就带站点侧的未读状态（每行的 `unread` 是抓那一页时站点给的）。它和徽章那个数
+ * 不一致，就说明徽章是旧的 —— 用户 2026-10-08 报的形状：角标挂着 2（上一次刷新时的数），
+ * 点开弹窗却只读到 1 条新的，"那角标也要更新成 1 才对"。这时去重取一次用户信息，
+ * 让站点给的新数覆盖它。
+ *
+ * ⚠️ 刻意**不**把列表里的未读条数直接写成徽章：信箱页是分页的，一个挂着 30 条未读、
+ * 一页只给 20 行的站，照抄列表会把角标少报成 20。列表只当「该去对账」的信号，
+ * 数仍然只认 user.php 那个（AGENTS §3.4 / v0.38.1 的口径：徽章一律显站点报的数）。
+ */
+function reconcileBadgeWithList(id: TSiteID, list: ISiteMessage[]) {
+  const siteUnread = list.filter((item) => item.unread).length;
+  if (siteUnread !== reportedUnread) {
+    scheduleBadgeRefresh(id);
   }
 }
 

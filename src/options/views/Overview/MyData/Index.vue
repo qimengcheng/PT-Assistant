@@ -640,7 +640,7 @@ const showExportDialog = ref(false);
         <!-- 魔力/积分 -->
         <template v-else-if="column.key === 'bonus'">
           <div class="d-flex flex-column align-end">
-            <div class="d-flex align-center justify-end flex-nowrap">
+            <div class="bonus-line d-flex align-center justify-end flex-nowrap">
               <DollarOutlined class="cell-icon cell-icon--green" :title="t('levelRequirement.bonus')" />
               <BonusFormatSpan :num="record.bonus" />
             </div>
@@ -650,7 +650,7 @@ const showExportDialog = ref(false);
                 record.seedingBonus !== '' &&
                 !isUndefined(record.seedingBonus)
               "
-              class="d-flex align-center justify-end flex-nowrap"
+              class="bonus-line d-flex align-center justify-end flex-nowrap"
             >
               <ThunderboltOutlined class="cell-icon cell-icon--green" :title="t('levelRequirement.seedingBonus')" />
               <BonusFormatSpan :num="record.seedingBonus" />

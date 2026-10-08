@@ -37,47 +37,69 @@ function jumpTo(id: string) {
           <p class="guide-tagline">{{ doc.tagline }}</p>
         </header>
 
-        <nav class="guide-toc">
-          <span class="guide-toc-label">{{ doc.toc }}</span>
-          <a-button v-for="section in doc.sections" :key="section.id" type="link" size="small" @click="jumpTo(section.id)">
-            {{ section.title }}
-          </a-button>
-        </nav>
+        <div class="guide-body">
+          <nav class="guide-toc">
+            <span class="guide-toc-label">{{ doc.toc }}</span>
+            <a-button
+              v-for="section in doc.sections"
+              :key="section.id"
+              type="link"
+              size="small"
+              block
+              @click="jumpTo(section.id)"
+            >
+              {{ section.title }}
+            </a-button>
+          </nav>
 
-        <section v-for="item in doc.sections" :id="`guide-${item.id}`" :key="item.id" class="guide-section">
-          <h2>{{ item.title }}</h2>
-          <p v-if="item.lead" class="guide-lead">{{ item.lead }}</p>
+          <div class="guide-content">
+            <section v-for="item in doc.sections" :id="`guide-${item.id}`" :key="item.id" class="guide-section">
+              <h2>{{ item.title }}</h2>
+              <p v-if="item.lead" class="guide-lead">{{ item.lead }}</p>
 
-          <ol v-if="item.steps" class="guide-list">
-            <li v-for="(step, i) in item.steps" :key="i">{{ (step.title ? step.title + itemSep : "") + step.text }}</li>
-          </ol>
+              <ol v-if="item.steps" class="guide-list">
+                <li v-for="(step, i) in item.steps" :key="i">{{ (step.title ? step.title + itemSep : "") + step.text }}</li>
+              </ol>
 
-          <ul v-if="item.points" class="guide-list">
-            <li v-for="(point, i) in item.points" :key="i">
-              <strong v-if="point.title">{{ point.title }}{{ itemSep }}</strong>{{ point.text }}
-            </li>
-          </ul>
+              <ul v-if="item.points" class="guide-list">
+                <li v-for="(point, i) in item.points" :key="i">
+                  <strong v-if="point.title">{{ point.title }}{{ itemSep }}</strong>{{ point.text }}
+                </li>
+              </ul>
 
-          <dl v-if="item.faq" class="guide-faq">
-            <template v-for="(qa, i) in item.faq" :key="i">
-              <dt>{{ qa.q }}</dt>
-              <dd>{{ qa.a }}</dd>
-            </template>
-          </dl>
-        </section>
+              <dl v-if="item.faq" class="guide-faq">
+                <template v-for="(qa, i) in item.faq" :key="i">
+                  <dt>{{ qa.q }}</dt>
+                  <dd>{{ qa.a }}</dd>
+                </template>
+              </dl>
+            </section>
+          </div>
+        </div>
       </div>
     </section>
   </article>
 </template>
 
 <style scoped>
-/* 正文限宽：这一页是给人读的长文，铺满两千像素的屏会一行拉到一百多个汉字。
+/* 正文限宽 + 目录靠左一列：这一页是给人读的长文，铺满两千像素的屏会一行拉到一百多个汉字。
    外层 .page-panel 自己滚（.page-fill + .page-fill-grow 把白面板撑到视口底，
-   不留半屏灰底 —— 见 AGENTS §3.4 与 style.css 那两条）。 */
+   不留半屏灰底 —— 见 AGENTS §3.4 与 style.css 那两条）。
+   它同时当容器查询的容器：目录那一列要不要收回去，看的是这块读书区有多宽，不是整个视口有多宽。 */
+.page-panel {
+  container-type: inline-size;
+}
+
 .guide-inner {
-  max-width: 860px;
+  max-width: 1060px;
   margin: 0 auto;
   padding: 8px 8px 32px;
+}
+
+.guide-head {
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--pt-color-border-light);
 }
 
 .guide-head h1 {
@@ -91,20 +113,51 @@ function jumpTo(id: string) {
   color: rgba(0, 0, 0, 0.65);
 }
 
+.guide-body {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 0 32px;
+}
+
+/* 竖排 + 跟着滚：align-self 必须是 start， stretched 到整行高度就没有可粘的余量了 */
 .guide-toc {
+  position: sticky;
+  top: 8px;
+  align-self: start;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--pt-color-border-light);
+  flex-direction: column;
+  gap: 2px;
 }
 
 .guide-toc-label {
-  margin-inline-end: 8px;
+  margin-bottom: 4px;
   font-weight: 600;
   font-size: 13px;
+}
+
+/* block 链接按钮默认把文字居中，目录要的是左对齐的一列 */
+.guide-toc .ant-btn {
+  justify-content: flex-start;
+  padding-inline: 8px;
+}
+
+/* 窄到放不下两列（读书区 720px 以下）时收回成一列：目录回到正文上方横排 */
+@container (max-width: 720px) {
+  .guide-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .guide-toc {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 24px;
+  }
+
+  .guide-toc .ant-btn {
+    width: auto;
+  }
 }
 
 .guide-section {

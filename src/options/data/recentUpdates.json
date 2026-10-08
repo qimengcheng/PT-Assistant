@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-08 09:03:36",
-  "headSha": "eee5fc6",
+  "generatedAt": "2026-10-08 09:09:03",
+  "headSha": "46399a7",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.37.6",
+      "date": "2026-10-08 09:08:54",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "新手引导的目录挪到正文左边一列，跟着页面一起滚，读到哪一节都在手边；这块区域窄到放不下两列时它自己回到正文上方横排。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.37.5",
       "date": "2026-10-08 09:03:04",

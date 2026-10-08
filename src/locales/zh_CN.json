@@ -937,12 +937,16 @@
     "SocialInformationWindow": {
       "groupPtGen": "PTGen（通用百科信息转储服务）",
       "ptGenEndpoint": "PTGen API 端点",
+      "ptGenEndpointHint": "填你自己部署的地址，里面必须带 <site> 和 <sid> 两个占位符（照上面那行的样子换掉就行）。留空则用内置的公共端点；填了也仍会同时试一次内置的备用端点，谁先返回用谁。",
       "preferPtGen": "优先使用 PTGen 获取影片信息",
       "groupCredentials": "站点凭据",
-      "credentialPlaceholder": "未配置则使用匿名访问",
+      "bangumiHint": "Bangumi 的访问令牌，填了按 Bearer 方式带上；不填就是匿名请求，配额更低。",
+      "anidbHint": "填了才走 AniDB 官方接口（填客户端名，可以写成 名字/版本）；不填则抓取网页解析。",
       "groupNetwork": "网络",
       "timeout": "请求超时（秒）",
-      "cacheDay": "缓存天数"
+      "timeoutHint": "单次请求的等待上限。几个端点是同时试的，不会把这段时间挨个加起来。",
+      "cacheDay": "缓存天数",
+      "cacheDayHint": "查到的影片信息在本地留多少天，期限内不再重复请求；填 0 表示每次都重新查。"
     },
     "RestorePtppUserDataDialog": {
       "dialogTitle": "导入 PT-Plugin-Plus 用户数据",

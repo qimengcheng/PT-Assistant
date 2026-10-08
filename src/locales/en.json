@@ -937,12 +937,16 @@
     "SocialInformationWindow": {
       "groupPtGen": "PTGen (general wiki information dump service)",
       "ptGenEndpoint": "PTGen API endpoint",
+      "ptGenEndpointHint": "Point it at your own deployment. The URL must keep the <site> and <sid> placeholders (replace them the way the example line above does). Leave it empty to use the built-in public endpoint; even when you fill it in, the built-in fallback is probed at the same time and whichever answers first wins.",
       "preferPtGen": "Prefer PTGen for movie information",
       "groupCredentials": "Site credentials",
-      "credentialPlaceholder": "Leave empty to access anonymously",
+      "bangumiHint": "Bangumi access token, sent as a Bearer credential. Without it the requests stay anonymous and hit a lower quota.",
+      "anidbHint": "AniDB's official API is used only when a client name is filled in (write name/version to set the client version). Without it the site page is scraped instead.",
       "groupNetwork": "Network",
       "timeout": "Request timeout (seconds)",
-      "cacheDay": "Cache days"
+      "timeoutHint": "The wait limit for a single request. Endpoints are probed concurrently, so this is not summed up per endpoint.",
+      "cacheDay": "Cache days",
+      "cacheDayHint": "How long fetched movie information stays in the local cache before it is requested again; 0 means always refetch."
     },
     "RestorePtppUserDataDialog": {
       "dialogTitle": "Import PT-Plugin-Plus user data",

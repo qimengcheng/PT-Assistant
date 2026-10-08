@@ -405,20 +405,28 @@ body {
   overflow: clip;
 }
 
-/* ===== 列表页空表：撑满面板剩余高度，占位提示居中 =====
-   用户 2026-10-07 口径：「表格没有数据的时候高度也要占满下面的空间，empty 的提示也要居中，
-   很多页面都有这个问题，都要改」。空表原本是内容高 —— 台架量过：表头 37.8 + 占位行 149.8
-   （那 149.8 = `.ant-empty-normal` 的 margin-block 32+32 + 图与字 69 + 单元格上下内衬 16），
-   而面板是网格/flex 给的确定高度，于是表格底下露出一大截没有格线的空白、提示贴在表头下面。
+/* ===== 列表页那张表：撑满面板、分页条钉在最下面 =====
+   两段口径，都是他直接说的：
+   · 2026-10-07「表格没有数据的时候高度也要占满下面的空间，empty 的提示也要居中，很多页面都有这个问题」
+   · 2026-10-08「翻页控件要一直在最下面」—— 我的数据 13 条/页那张图，分页条底下还空 54.4 CSS px
+     （量法：表体最后一条格线在 878.4、面板底边在 980.8，分页条自己占 881.6..926.4）
 
-   做法：面板当纵向 flex，只让表格那一支吃剩余高度，再把确定高度一层层传到 `<table>`。
-   表格的 height 是**最小高**，多余空间由行分摊；空态只有一行占位行 → 它自己长满，
-   而 `<td>` 的 vertical-align 默认就是 middle，提示于是自动垂直居中（水平本来就居中）。
+   做法：面板当纵向 flex（下面那道 `:has(> .ant-table-wrapper)` 门），wrapper → `.ant-spin` →
+   `.ant-spin-container` 一层层吃满剩余高度，`.ant-table` 用 `flex: 1 0 auto` 长到该长的。
+   分页条是 `.ant-spin-container` 里 `.ant-table` 的**后一个兄弟**，前面那支长满了，
+   它就被顶到面板底部 —— 于是「行没铺满」剩下的那一截空白落在**表体与分页条之间**，
+   而不是分页条底下。antdv-next 的 Spin 在 nested 形态只渲染一层 `.ant-spin`，
+   `.ant-spin-container` 是它的子节点（`dist/spin/index.js:95-107` 实测读出来的，
+   这一版没有 `ant-spin-nested-loading` 那层）。
 
-   三条边界，都是这台架上量出来的（`.tmp-build/bench-empty`）：
-   ① 撑高那一串挂在 `:has(.ant-table-empty)` 上 —— 有数据时（哪怕只有两行）一律不动：
-      实测 2 行时表体仍是内容高 114、下面留 204 空白，那是原本的样子，不是回归。
-   ② flex 项写 `flex: 1 0 auto` 而不是配 `min-height: 0`：8 行超过面板时它不被压缩
+   空态再多做一步：把确定高度一层层传到 `<table>`。表格的 height 是**最小高**，多余空间由行分摊；
+   空态只有一行占位行 → 它自己长满，而 `<td>` 的 vertical-align 默认就是 middle，
+   提示于是自动垂直居中（水平本来就居中）。
+
+   三条边界，都是台架上量出来的（`.tmp-build/bench-empty`）：
+   ① 只有空态那一串 `height: 100%` 挂在 `:has(.ant-table-empty)` 上 —— 有数据时不把确定高度
+      灌进 <table>，否则行会被摊高。上面那一条 flex 链则**不分状态**（分页条要一直钉住）。
+   ② flex 项一律写 `flex: 1 0 auto` 而不是配 `min-height: 0`：8 行超过面板时它不被压缩
       （实测 wrapper 341 > 面板 318，溢出 23 交给面板自己滚）；写 min-height:0 会让它先被压扁。
    ③ 面板的 `:has(> .ant-table-wrapper)` 门是必须的：首页那两块面板、新手引导页面板里
       装的不是表，不该被改成 flex；同面板里的说明条（媒体服务器页那条 alert）另给一条
@@ -431,16 +439,27 @@ body {
 .page-panel:has(> .ant-table-wrapper) > :not(.ant-table-wrapper) {
   flex-shrink: 0;
 }
-.page-panel > .ant-table-wrapper:has(.ant-table-empty) {
+.page-panel > .ant-table-wrapper {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.page-panel > .ant-table-wrapper > .ant-spin {
+  flex: 1 0 auto;
+}
+.page-panel > .ant-table-wrapper .ant-spin-container {
   display: flex;
   flex-direction: column;
+  height: 100%;
+}
+.page-panel > .ant-table-wrapper .ant-spin-container > .ant-table {
   flex: 1 0 auto;
 }
-.page-panel > .ant-table-wrapper:has(.ant-table-empty) > .ant-spin {
-  flex: 1 0 auto;
+/* 表体超高时不许把分页条压扁（它是 flex 项，默认能缩） */
+.page-panel > .ant-table-wrapper .ant-table-pagination {
+  flex-shrink: 0;
 }
-.page-panel
-  > .ant-table-wrapper:has(.ant-table-empty)
+.page-panel > .ant-table-wrapper:has(.ant-table-empty)
   :is(.ant-spin-container, .ant-table, .ant-table-container, .ant-table-content),
 .page-panel > .ant-table-wrapper:has(.ant-table-empty) .ant-table-content > table {
   height: 100%;

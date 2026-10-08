@@ -45,6 +45,15 @@ export type TUpdateCheckError = "" | "network" | "http" | "badData" | "rateLimit
 export type TUpdateCheckVia = "" | "api" | "html";
 
 /**
+ * 第二条路（`releases/latest` 那条 302）这次为什么没给出版本号。
+ *
+ * 只在两条都没成时才有意义：界面原先一句「两条路都没能拿到版本号」把三种完全不同的事揉在一起 ——
+ * 第二条路根本没试（第一条就抛错了）、试了但跳转里没有 tag（被网关改写、或仓库一条 Release 都没有）、
+ * 试了但那一跳自己失败了（代理只放行了 api 那台）。这三种要他做的事不一样，所以分开记。
+ */
+export type TUpdateCheckFallback = "" | "noTag" | "threw";
+
+/**
  * 「检查更新」的结果缓存。
  *
  * 单独一个键而不是塞进 config：写它的是 service worker，而 config 那个 blob 由选项页的
@@ -74,4 +83,12 @@ export interface IUpdateCheckState {
   notifiedFor: string;
   /** 这次结果走的是哪条通道（见 TUpdateCheckVia）；"" = 还没成功过 */
   via: TUpdateCheckVia;
+  /**
+   * 匿名配额什么时候恢复（毫秒时间戳）；0 = 不知道。
+   * 来自 GitHub 那条 `x-ratelimit-reset`（unix 秒）。按出口 IP 算，所以这个数对整条代理
+   * 出口上的所有人都一样 —— 给他是为了把「稍后再试」换成「几点之后再点」。
+   */
+  rateLimitResetsAt: number;
+  /** 第二条路这次的失败形状（见 TUpdateCheckFallback）；成功或没试都为 "" */
+  fallbackOutcome: TUpdateCheckFallback;
 }

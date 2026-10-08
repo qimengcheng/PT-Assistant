@@ -38,6 +38,24 @@ const showReleaseLink = computed(
   () => state.value.releaseUrl !== "" && state.value.downloadUrl !== state.value.releaseUrl,
 );
 
+/**
+ * 失败那行的补充说明。两个片段都可能没有，所以拼不出来就不给 description
+ * （a-alert 少了 description 会退回单行标题的紧凑形状，不会留一条空缝）。
+ */
+const errorDetail = computed(() => {
+  const parts: string[] = [];
+  if (state.value.errorCode === "rateLimited" && state.value.rateLimitResetsAt > 0) {
+    parts.push(t("SetUpdate.error.quotaResetsAt", { at: format(new Date(state.value.rateLimitResetsAt), "HH:mm") }));
+  }
+  // 键按字面写死三条，不用 `t("前缀" + 码)`：防线③看不见拼出来的键（AGENTS §3.4）
+  if (state.value.fallbackOutcome === "noTag") {
+    parts.push(t("SetUpdate.error.fallbackNoTag"));
+  } else if (state.value.fallbackOutcome === "threw") {
+    parts.push(t("SetUpdate.error.fallbackThrew"));
+  }
+  return parts.length > 0 ? parts.join("；") : undefined;
+});
+
 function fmtTime(ms: number): string {
   return ms === 0 ? t("SetUpdate.neverChecked") : format(new Date(ms), "yyyy-MM-dd HH:mm:ss");
 }
@@ -97,6 +115,7 @@ onMounted(refresh);
         show-icon
         class="group-alert"
         :title="t(`SetUpdate.error.${state.errorCode}`, { status: state.httpStatus })"
+        :description="errorDetail"
       />
 
       <!-- 走备用通道时"成功"了，但少给两样东西（发布时间、zip 直链）。不解释的话看着像数据坏了。 -->

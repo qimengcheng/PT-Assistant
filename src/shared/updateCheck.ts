@@ -13,7 +13,7 @@
  */
 import { REPO_API, REPO_URL } from "~/helper.ts";
 import { extStore } from "@/storage.ts";
-import type { IUpdateCheckState, TUpdateCheckError, TUpdateCheckVia } from "@/shared/types.ts";
+import type { IUpdateCheckState, TUpdateCheckError, TUpdateCheckFallback, TUpdateCheckVia } from "@/shared/types.ts";
 
 const LATEST_RELEASE_API = `${REPO_API}/releases/latest`;
 
@@ -47,6 +47,8 @@ export function emptyUpdateState(): IUpdateCheckState {
     httpStatus: 0,
     notifiedFor: "",
     via: "",
+    rateLimitResetsAt: 0,
+    fallbackOutcome: "",
   };
 }
 
@@ -126,17 +128,21 @@ function pickAssetUrl(assets: IGithubReleaseAsset[] | undefined, releaseUrl: str
  *
  * 代价要说清：这条路拿不到 published_at，也拿不到按浏览器分好的 zip 直链，
  * 所以 downloadUrl 就是 Release 页本身（点「前往下载页」会落到那一页，不假装是直链）。
- * 拿不出版本号（仓库一条 Release 都没有 → 404，或被网关改了跳转）时返回 null，让调用方报错。
+ * 拿不出版本号时返回 `ok:false`（仓库一条 Release 都没有 → 那条跳转本来就停在 /releases/latest），
+ * 请求自己失败（代理只放行 api 那台、断网、超时）则抛给调用方 ——
+ * 两者要告诉用户的话不一样，不能都糊成「两条路都没拿到」，所以也不拿异常当控制流。
  */
-async function fetchLatestViaHtml(signal: AbortSignal): Promise<{ latest: string; releaseUrl: string } | null> {
+async function fetchLatestViaHtml(
+  signal: AbortSignal,
+): Promise<{ ok: true; latest: string; releaseUrl: string } | { ok: false }> {
   const res = await fetch(LATEST_RELEASE_HTML, { method: "GET", redirect: "follow", signal, credentials: "omit" });
   const tag = /\/releases\/tag\/([^/?#]+)/.exec(res.url ?? "");
   const latest = normalizeVersion(tag ? decodeURIComponent(tag[1]) : "");
   if (!latest) {
-    return null;
+    return { ok: false };
   }
   // 用服务器给的那条最终地址（去掉查询串），不自己拼 `v<版本>` —— tag 前缀不是我们该假设的
-  return { latest, releaseUrl: String(res.url).split(/[?#]/)[0] };
+  return { ok: true, latest, releaseUrl: String(res.url).split(/[?#]/)[0] };
 }
 
 /**
@@ -158,6 +164,8 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
   let downloadUrl = "";
   let publishedAt = "";
   let via: TUpdateCheckVia = "";
+  let fallbackOutcome: TUpdateCheckFallback = "";
+  let rateLimitResetsAt = 0;
 
   try {
     const res = await fetch(LATEST_RELEASE_API, {
@@ -170,11 +178,32 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
       httpStatus = res.status;
       /**
        * 光看状态码分不开「仓库没发布过」和「这个出口 IP 配额用完了」—— 而这两件事要告诉用户的话
-       * 完全不同（前者是仓库的事，后者他换个节点就好）。GitHub 那句原文里有 rate limit 字样，
-       * 所以把响应体读出来当**判据**用；界面不 echo 远端原文（§3.5），仍按码取自己的文案。
+       * 完全不同（前者是仓库的事，后者他换个节点就好）。
+       *
+       * 判据用**两条**，因为原先只靠响应体那一条会误报：读体要等整条响应落地，超时/中断时
+       * `.catch(() => "")` 交出空串，于是货真价实的限流 403 被判成 `http`，界面就说成
+       * 「两条路都没能拿到版本号」（用户 2026-10-08 撞上的正是这句）。
+       * 实测限流那趟的响应头就带着答案、而且跨源读得到（本机出口，浏览器网络栈）：
+       *   403 + x-ratelimit-limit:60 / x-ratelimit-remaining:0 / x-ratelimit-used:60 /
+       *        x-ratelimit-resource:core / x-ratelimit-reset:<unix 秒>
+       * 所以头先判、体只当补充。**只在 403/429 上认 remaining:0** —— 404 也带这套头，
+       * 配额恰好归零时按头判会把「仓库没发布过」误说成限流。
        */
-      const body = await res.text().catch(() => "");
-      errorCode = res.status === 429 || /rate limit/i.test(body) ? "rateLimited" : "http";
+      const remaining = res.headers.get("x-ratelimit-remaining");
+      const isQuotaCode = res.status === 403 || res.status === 429;
+      // 头先判（读得到、不等响应体落地）；体只当补充 —— 429 本身就是"请求过多"，不用再判
+      let limited = isQuotaCode && (res.status === 429 || remaining === "0");
+      if (isQuotaCode && !limited) {
+        const body = await res.text().catch(() => "");
+        limited = /rate limit/i.test(body);
+      }
+      if (limited) {
+        errorCode = "rateLimited";
+        const reset = Number(res.headers.get("x-ratelimit-reset"));
+        rateLimitResetsAt = Number.isFinite(reset) && reset > 0 ? reset * 1000 : 0;
+      } else {
+        errorCode = "http";
+      }
     } else {
       const json = (await res.json()) as IGithubReleaseResponse;
       latest = normalizeVersion(json?.tag_name);
@@ -191,7 +220,7 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
     if (errorCode) {
       try {
         const fallback = await fetchLatestViaHtml(controller.signal);
-        if (fallback) {
+        if (fallback.ok) {
           latest = fallback.latest;
           releaseUrl = fallback.releaseUrl;
           downloadUrl = fallback.releaseUrl;
@@ -199,9 +228,13 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
           via = "html";
           errorCode = "";
           httpStatus = 0;
+        } else {
+          fallbackOutcome = "noTag";
         }
       } catch {
-        // 备用通道自己也没走通：留着主路那条错误码（那才是原因），这里不另立一个"network"
+        // 这一跳自己就没走通（代理只放行 api 那台 / 断网 / 15 秒耐心到）。留着主路那条错误码，
+        // 它才是原因；但要把「第二条路试过、且是这么失败的」记下来，否则下次还是只能猜。
+        fallbackOutcome = "threw";
       }
     }
   } catch {
@@ -219,6 +252,8 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
     lastCheckAt: now,
     errorCode,
     httpStatus,
+    fallbackOutcome,
+    rateLimitResetsAt,
     // 失败时保留上一次的 latestVersion / 链接 / 通道：那次确实是查到的，没必要当作不知道
     ...(errorCode ? {} : { latestVersion: latest, releaseUrl, downloadUrl, publishedAt, via }),
   };

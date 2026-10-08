@@ -26,6 +26,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
 import type { IDownloaderMetadata } from "@/shared/types.ts";
 
+import { CATEGORY_FOLDER_PREFIX, matchCategoryFolder } from "./categoryMatch.ts";
 import { sendTorrentToDownloader } from "./utils.ts";
 
 const showDialog = defineModel<boolean>();
@@ -118,9 +119,6 @@ const labelField = createChoiceField(
   () => suggestTags.value,
 );
 
-/** `category:` 前缀的推荐目录单独成组：这批是分类目录，和按盘符列出来的具体路径不是一类东西 */
-const CATEGORY_FOLDER_PREFIX = "category:";
-
 interface IChoiceItem {
   value: string;
   label: string;
@@ -160,6 +158,30 @@ const labelItems = computed<IChoiceItem[]>(() => [
   { value: CHOICE_CUSTOM, label: t("SentToDownloaderDialog.manualInput") },
 ]);
 
+/**
+ * 打开弹窗 / 换下载器时，按种子自己的分类预选一条「分类目录」
+ * （用户 2026-10-08：「点击发送到下载器时，自动按种子的分类匹配下载路径的分类目录」）。
+ * 判据与「同档多解就不猜」那套规则在 categoryMatch.ts（那里能直接跑断言）。
+ */
+const siteCategoryMaps = computed(() => {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [id, cfg] of Object.entries(metadataStore.sites ?? {})) {
+    const map = cfg.categoryMap;
+    if (map && Object.keys(map).length) out[id] = map;
+  }
+  return out;
+});
+
+/** 命中就把它填成保存路径；没命中不动当前值（沿用上次记住的那一档 / 下载器默认） */
+function applyAutoCategoryPath(downloader?: IDownloaderMetadata) {
+  const hit = matchCategoryFolder(
+    (downloader ?? selectedDownloader.value)?.suggestFolders ?? [],
+    torrentItems,
+    (siteId) => siteCategoryMaps.value[siteId],
+  );
+  if (hit) addTorrentOptions.value.savePath = hit;
+}
+
 /** 高级设置面板默认展开：这里存的是 a-collapse 的 activeKey */
 const advancedActiveKeys = ref<string[]>(["advanced"]);
 
@@ -194,6 +216,9 @@ const downloaderOptions = computed(() => sortedEnabledDownloadersBySite.value.ma
 
 function onDownloaderChange() {
   restoreAddTorrentOptions(selectedDownloader.value ?? undefined);
+  // 分类目录是每个下载器自己配的一批，换了就按新那批重新预选一次
+  applyAutoCategoryPath();
+  syncChoiceFields();
 }
 
 /** 字段值被程序改过（重置、合并上次的选择）之后，把两个分段按钮的选中态对齐回去 */
@@ -313,6 +338,8 @@ function dialogEnter() {
         addTorrentOptions.value,
         metadataStore.lastDownloader?.options ?? {},
       ) as Required<Omit<CAddTorrentOptions, "localDownloadOption">>;
+      // 排在合并之后：这一档要盖过「记住上次选项」里那条路径 —— 上次的种子和这次不一定是同一类内容
+      applyAutoCategoryPath();
       syncChoiceFields();
     }
   }

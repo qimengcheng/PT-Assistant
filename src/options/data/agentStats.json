@@ -1,38 +1,38 @@
 {
   "_comment": "本文件由 `node scripts/gen-agent-stats.mjs` 从 git 历史生成，请勿手改；提交历史变了就重跑。",
-  "generatedAt": "2026-10-06",
-  "headSha": "588863b",
-  "headVersion": "0.27.2",
+  "generatedAt": "2026-10-08",
+  "headSha": "a409ab5",
+  "headVersion": "0.41.2",
   "span": {
-    "commits": 134,
-    "matched": 134,
-    "feat": 23,
+    "commits": 204,
+    "matched": 204,
+    "feat": 37,
     "firstDate": "2026-10-02",
-    "lastDate": "2026-10-06",
+    "lastDate": "2026-10-08",
     "versionFrom": "0.1.0",
-    "versionTo": "0.27.2"
+    "versionTo": "0.41.2"
   },
   "totals": {
-    "handAdd": 56168,
-    "handDel": 10411,
-    "bulkAdd": 90053
+    "handAdd": 64400,
+    "handDel": 12630,
+    "bulkAdd": 90444
   },
   "agents": [
     {
       "name": "Qoder",
-      "commits": 47,
-      "feat": 10,
-      "handAdd": 7046,
-      "handDel": 2882,
-      "bulkAdd": 602,
+      "commits": 117,
+      "feat": 24,
+      "handAdd": 15278,
+      "handDel": 5101,
+      "bulkAdd": 993,
       "firstDate": "2026-10-03",
-      "lastDate": "2026-10-06",
+      "lastDate": "2026-10-08",
       "versionFrom": "0.19.1",
-      "versionTo": "0.27.2",
+      "versionTo": "0.41.2",
       "partners": [
         {
           "name": "Qwen3.8-Flash",
-          "count": 47
+          "count": 117
         }
       ]
     },
@@ -138,19 +138,19 @@
   "models": [
     {
       "name": "Qwen3.8-Flash",
-      "commits": 65,
-      "feat": 11,
-      "handAdd": 13799,
-      "handDel": 3464,
-      "bulkAdd": 605,
+      "commits": 135,
+      "feat": 25,
+      "handAdd": 22031,
+      "handDel": 5683,
+      "bulkAdd": 996,
       "firstDate": "2026-10-02",
-      "lastDate": "2026-10-06",
+      "lastDate": "2026-10-08",
       "versionFrom": "0.5.0",
-      "versionTo": "0.27.2",
+      "versionTo": "0.41.2",
       "partners": [
         {
           "name": "Qoder",
-          "count": 47
+          "count": 117
         },
         {
           "name": "千问办公",

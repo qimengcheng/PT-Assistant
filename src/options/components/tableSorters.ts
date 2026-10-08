@@ -131,6 +131,14 @@ export function toPagination(
     extraConfig?: TablePaginationConfig;
     fitSize?: number;
     picked?: boolean;
+    /**
+     * 「不超过这么多条就整页放完、不出分页条」——按页给的硬档，优先于 fitSize。
+     *
+     * 为什么要它而只靠 fitSize：fitSize 是「面板实高 ÷ 行高」量出来的，我的数据那页量到 13，
+     * 于是 19 个站被切成两页 —— 而他要的是这个页数不到 50 就别分页（面板自己滚）。
+     * 两条判据不是一回事：一条问「放得下吗」，一条问「值不值得分页」。
+     */
+    maxSinglePage?: number;
   } = {},
 ): TablePaginationConfig | false {
   const raw = itemsPerPage;
@@ -139,7 +147,14 @@ export function toPagination(
   const pickedASize = extras.picked ?? (usable && raw !== fallback);
   const fit = typeof extras.fitSize === "number" && extras.fitSize > 0 ? extras.fitSize : 0;
   const pageSize = !pickedASize && fit ? fit : stored;
-  if (extras.totalRows !== undefined && !pickedASize && extras.totalRows <= pageSize) return false;
+  if (extras.totalRows !== undefined && !pickedASize) {
+    if (extras.maxSinglePage && extras.totalRows <= extras.maxSinglePage) {
+      return false;
+    }
+    if (extras.totalRows <= pageSize) {
+      return false;
+    }
+  }
   return {
     pageSize,
     showSizeChanger: true,

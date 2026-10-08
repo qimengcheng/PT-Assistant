@@ -54,6 +54,11 @@ interface IUseTableBehaviorOptions {
     rows: MaybeRefOrGetter<readonly unknown[] | null | undefined>;
     min?: number;
   };
+  /**
+   * 「不超过这么多条就整页放完、不出分页条」，透传给 toPagination 的同名硬档。
+   * 与 autoFit 各管一头：autoFit 问「这一屏放得下几条」，这条问「这么点值不值得分页」。
+   */
+  maxSinglePage?: number;
 }
 
 export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOptions = {}) {
@@ -65,6 +70,7 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
     clearOnEmpty = false,
     totalRows,
     autoFit,
+    maxSinglePage,
   } = options;
   const configStore = useConfigStore();
 
@@ -107,6 +113,7 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
       ...(totalRows === undefined ? {} : { totalRows: toValue(totalRows) }),
       // fitSize 没启用时这两个键都不带，toPagination 走它原来那条判据，老页面一字不变
       ...(autoFit ? { fitSize: fitted.value, picked: pickedSize.value } : {}),
+      ...(maxSinglePage ? { maxSinglePage } : {}),
     }),
   );
 

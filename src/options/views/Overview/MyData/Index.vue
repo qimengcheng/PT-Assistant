@@ -158,11 +158,45 @@ const { sortBy, pagination: tablePagination, handleTableChange } = useTableBehav
   totalRows: () => filteredTableData.value.length,
   // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
   autoFit: { container: () => pagePanel.value, rows: () => filteredTableData.value },
+  // 但不超过 50 条时干脆不分页（用户 2026-10-08：「这个页面没有超过50条不要分页」）。
+  // 这条排在 autoFit 前面：实高量出来只有 13 行，19 个站就会被切成两页 —— 他要的不是这个。
+  maxSinglePage: 50,
 });
 
 const tableColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
   toTableColumns<IUserInfoItem>(tableHeader.value, buildSortOrderMap(sortBy.value)),
 );
+
+/**
+ * 「异常」的口径 = 筛选面板那颗「最后更新状态异常」用的同一批状态，两处共用这一个常量。
+ * 不含 waiting/working（那是正在刷）、也不含 noResults/passParse（不是读取失败）。
+ */
+const ABNORMAL_STATUSES: EResultParseStatus[] = [
+  EResultParseStatus.parseError,
+  EResultParseStatus.unknownError,
+  EResultParseStatus.needLogin,
+  EResultParseStatus.noUserInput,
+];
+
+/**
+ * 异常行单独一张表（用户 2026-10-08）。读不出的站混在几十行正常数据里要翻很久，
+ * 而它们恰恰是唯一需要他动手的（重新登录、去站点看看）。
+ *
+ * 走 tableData 而不是 filteredTableData：这是一份「哪些站这次没读到」的健康清单，
+ * 不该被搜索框筛掉 —— 他搜某个站的时候，别的站坏了这件事不应该因此消失。
+ * 一条都没有时整块不渲染（含标题），留一张空表在那儿是新的噪音。
+ */
+const abnormalTableData = computed(() =>
+  tableData.value.filter((row) => ABNORMAL_STATUSES.includes(row.status as EResultParseStatus)),
+);
+
+const abnormalColumns = computed<TableColumnsType<IUserInfoItem>>(() => [
+  { title: t("common.site"), key: "site" },
+  { title: t("common.username"), key: "name" },
+  { title: t("MyData.index.siteStatus"), key: "status" },
+  { title: t("MyData.table.updateAt"), key: "updateAt" },
+  { title: t("common.action"), key: "action", align: "center", width: 72 },
+]);
 
 const tableNonBooleanControlKey = [
   "joinTimeFormat",
@@ -462,12 +496,7 @@ const showExportDialog = ref(false);
                     type="text"
                     size="small"
                     @click="
-                      advanceFilterDictRef.status.required = [
-                        EResultParseStatus.parseError,
-                        EResultParseStatus.unknownError,
-                        EResultParseStatus.needLogin,
-                        EResultParseStatus.noUserInput,
-                      ].map((item) => item.toString());
+                      advanceFilterDictRef.status.required = ABNORMAL_STATUSES.map((item) => item.toString());
                       updateTableFilterValueFn();
                     "
                   >
@@ -522,6 +551,64 @@ const showExportDialog = ref(false);
     </a-flex>
 
     <div ref="pagePanel" class="page-panel">
+    <!-- 异常行单独一张表（用户 2026-10-08）：读不出的站混在几十行数据里要翻很久，
+         而它们恰恰是唯一需要他动手的。一条都没有时整块不渲染（连标题一起），
+         空表占在那儿是新噪音。
+         外面这层 div 不是可有可无：style.css 里 `.page-panel > .ant-table-wrapper` 那串
+         flex 规则是给「主表」准备的，异常表若也当直接子节点，会被同一条 flex:1 0 auto 拉去
+         跟主表抢高度；包一层之后它按 `.page-panel > :not(.ant-table-wrapper)` 拿 flex-shrink:0。 -->
+    <div v-if="abnormalTableData.length > 0" class="abnormal-block">
+      <a-flex align="center" gap="small" class="abnormal-title">
+        <ExclamationCircleOutlined class="cell-icon cell-icon--red" />
+        <span>{{ t("MyData.index.abnormalSites", { n: abnormalTableData.length }) }}</span>
+      </a-flex>
+      <a-table
+        bordered
+        size="small"
+        :columns="abnormalColumns"
+        :data-source="abnormalTableData"
+        :row-key="(r: any) => r.site"
+        :pagination="false"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'site'">
+            <a-flex align="center" gap="small">
+              <SiteFavicon :site-id="record.site" :size="18" />
+              <SiteName :site-id="record.site" />
+            </a-flex>
+          </template>
+
+          <template v-else-if="column.key === 'name'">
+            <span :title="record.id as string" class="text-no-wrap">
+              {{ configStore.myDataTableControl.showUserName ? (record.name ?? "-") : "******" }}
+            </span>
+          </template>
+
+          <template v-else-if="column.key === 'status'">
+            <ResultParseStatus :status="record.status" />
+          </template>
+
+          <template v-else-if="column.key === 'updateAt'">
+            <span class="text-no-wrap">{{ record.updateAt ? formatDate(record.updateAt) : "-" }}</span>
+          </template>
+
+          <template v-else-if="column.key === 'action'">
+            <a-tooltip :title="t('MyData.table.action.flushData')">
+              <a-button
+                type="text"
+                size="small"
+                :disabled="runtimeStore.userInfo.flushPlan[record.site]"
+                :loading="runtimeStore.userInfo.flushPlan[record.site]"
+                @click="flushSiteLastUserInfo([record.site])"
+              >
+                <template #icon><SyncOutlined /></template>
+              </a-button>
+            </a-tooltip>
+          </template>
+        </template>
+      </a-table>
+    </div>
+
     <a-table
       bordered
       :columns="tableColumns"
@@ -814,6 +901,17 @@ const showExportDialog = ref(false);
   min-width: 280px;
   max-height: 60vh;
   overflow-y: auto;
+}
+
+/* 异常表与主表之间留一道缝（全站口径 8px 的放大档：这里隔着的是两张表的表头，不是两个控件） */
+.abnormal-block {
+  margin-bottom: 16px;
+}
+
+.abnormal-title {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--pt-color-text-secondary);
 }
 
 .my-data-search {

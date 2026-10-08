@@ -364,6 +364,7 @@
       "title": "Export User Info"
     },
     "index": {
+      "abnormalSites": "Sites that failed to load ({n})",
       "allMessages": "Messages",
       "allMessagesTip": "Collects every site that reports unread mail. Select per site or across all sites, then mark as read or delete in batch",
       "columns": "Columns",

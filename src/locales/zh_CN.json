@@ -364,6 +364,7 @@
       "title": "导出用户信息"
     },
     "index": {
+      "abnormalSites": "读取异常的站点（{n}）",
       "allMessages": "站内信",
       "allMessagesTip": "汇总所有报告有未读的站点，可按站点或跨站全选，批量标记已读、批量删除",
       "columns": "显示列",

@@ -46,11 +46,10 @@ function autoFlushUserInfo(retryIndex: number = 0) {
     const intervalMs = interval * 60 * 60 * 1000; // interval 的单位是小时（设置页标签也这么写）
     const curDate = new Date();
     const curDateFormat = format(curDate, "yyyy-MM-dd");
-    let metadataStore = (await extStore.getItem("metadata"))!;
+    let metadataStore: IMetadataPiniaStorageSchema;
 
-    // 如果不是重试，则要检查是否满足刷新条件
+    // 自动刷新只有这一条全局闸：每日时段（在 afterTime 之前不干活）。重试轮不受它管。
     if (retryIndex === 0) {
-      // 检查当前时间是否在允许的刷新时间之后
       const [afterHour, afterMinute] = afterTime.split(":").map((v) => parseInt(v));
       if (
         curDate.getHours() < afterHour ||
@@ -61,25 +60,49 @@ function autoFlushUserInfo(retryIndex: number = 0) {
         });
         return;
       }
+    }
 
-      metadataStore = (await extStore.getItem("metadata"))!;
-      // 首次安装 / 从未刷新过时 lastUserInfoAutoFlushAt 是 undefined，
-      // date-fns 的 format(undefined) 会抛 RangeError —— 整个自动刷新会静默失效（日志里都看不到）。
-      // 这里归一成 0（1970），既不会抛错，又天然满足「跨天必刷一次」的判定。
-      const lastFlushAt = metadataStore.lastUserInfoAutoFlushAt ?? 0;
-      const lastFlushDateFormat = format(new Date(lastFlushAt), "yyyy-MM-dd");
+    // 这里原先还有一条**全局**间隔闸：拿 `lastUserInfoAutoFlushAt`（上一轮任务开跑的时刻）
+    // 加上间隔，没到就把整轮 return 掉。它和下面那条「按站点自己的 updateAt 判到期」不是一回事，
+    // 于是要坏：
+    //  ① 一轮哪怕只刷了 3 个站，也把整闸推到 6 小时之后 —— 另外那些已经超时的站被这一轮"代表"了，
+    //     最坏要等接近两倍间隔才轮到；
+    //  ② 一个站都没刷的那轮同样会把整闸推进（写在轮尾，不看刷没刷成），
+    //     于是刚超时一分钟的站又要等满一个间隔。
+    // 用户 2026-10-08 撞上的就是这条：设定 6 小时，「我的数据」里有站已经 7 时 44 分没刷，
+    // 而日志在 16:37 报 "refresh interval not reached"。
+    // 现在间隔只对**每个站点自己**生效（下面那条判据），整轮不再有闸；「跨天必刷一次」的保证
+    // 也不丢 —— 换天之后当天没有记录，`!todayRecord` 那一支本来就会刷。
 
-      // 如果不是同一天，则不检查距离上次刷新时间是否超过了设定的间隔，这样能保证至少每天刷新一次（即启动浏览器后第一次检查）
-      if (curDateFormat === lastFlushDateFormat) {
-        const nextFlushTime = lastFlushAt + intervalMs;
-        // 确保距离上次刷新时间已经超过了设定的间隔
-        if (curDate.getTime() < nextFlushTime) {
-          void sendMessage("logger", {
-            msg: `Auto-refreshing user information paused since refresh interval not reached.`,
-          });
-          return;
+    /**
+     * 先只读各站自己的存档挑出「到期」的站点（这一段不联网），一个都没有就静默结束这一轮。
+     *
+     * 判"这个站点要不要刷"看的是**当天那条记录自己的 updateAt**，不是"今天有没有记录"。
+     * 上游 PT-depiler 那份判的是后者，本仓库 v0.12.2（8d837d8） alarms.ts 入库时照抄，
+     * 于是「刷新间隔（小时）」设 1 和设 24 没有任何区别：每天第一次刷完之后，后面每一轮
+     * 都是 0 个站点被处理 —— 表现就是日志里任务一直在跑、我的数据里的时间却停在早上。
+     * 失败重试走的是同一条闸，且不受影响：存档只在 status=success 时写（offscreen
+     * /utils/userInfo.ts），所以失败的站点当天没有记录、照旧会重试，刚刷成功的记录还新、不会被重刷。
+     */
+    const dueSites: TSiteID[] = [];
+    metadataStore = (await extStore.getItem("metadata"))!; // 遍历 metadataStore 中添加的站点
+    for (const [siteId, siteConfig] of Object.entries(metadataStore.sites)) {
+      if (siteConfig.isOffline || !siteConfig.allowQueryUserInfo) continue;
+      try {
+        const thisSiteUserInfo = (await sendMessage("getSiteUserInfo", siteId as TSiteID)) ?? {};
+        const todayRecord = thisSiteUserInfo[curDateFormat];
+        if (!todayRecord || curDate.getTime() - (todayRecord.updateAt ?? 0) >= intervalMs) {
+          dueSites.push(siteId as TSiteID);
         }
+      } catch (e) {
+        // 连自己的存档都读不出来：交给下面那一趟去刷（原先这种站点是直接记进失败列表）
+        dueSites.push(siteId as TSiteID);
       }
+    }
+
+    if (dueSites.length === 0) {
+      // 没站到期就整轮静默返回：既不刷、也不写 lastUserInfoAutoFlushAt、也不排重试。
+      return;
     }
 
     void sendMessage("logger", {
@@ -93,31 +116,15 @@ function autoFlushUserInfo(retryIndex: number = 0) {
      * 由于是后台任务，所以我们不使用 promise 来并行处理，以确保 flushQueue 中永远只有一个任务在运行，
      * 防止用户设置的并发数过大而被浏览器block
      */
-    metadataStore = (await extStore.getItem("metadata"))!; // 遍历 metadataStore 中添加的站点
-    for (const [siteId, siteConfig] of Object.entries(metadataStore.sites)) {
-      if (!siteConfig.isOffline && siteConfig.allowQueryUserInfo) {
-        try {
-          /**
-           * 判"这个站点要不要刷"看的是**当天那条记录自己的 updateAt**，不是"今天有没有记录"。
-           * 上游 PT-depiler 那份判的是后者，本仓库 v0.12.2（8d837d8） alarms.ts 入库时照抄，
-           * 于是「刷新间隔（小时）」设 1 和设 24 没有任何区别：每天第一次刷完之后，后面每一轮
-           * 都是 0 个站点被处理，而 lastUserInfoAutoFlushAt 照样被推进到当前时间 —— 表现就是
-           * 日志里任务一直在跑、我的数据里的时间却停在早上。
-           * 失败重试走的是同一条闸，且不受影响：存档只在 status=success 时写（offscreen
-           * /utils/userInfo.ts），所以失败的站点当天没有记录、照旧会重试，刚刷成功的记录还新、不会被重刷。
-           */
-          const thisSiteUserInfo = (await sendMessage("getSiteUserInfo", siteId as TSiteID)) ?? {};
-          const todayRecord = thisSiteUserInfo[curDateFormat];
-          if (!todayRecord || curDate.getTime() - (todayRecord.updateAt ?? 0) >= intervalMs) {
-            const userInfoResult = await sendMessage("getSiteUserInfoResult", siteId as TSiteID);
-            if (userInfoResult.status !== EResultParseStatus.success) {
-              failFlushSites.push(siteId as TSiteID);
-            }
-            processedSiteCount += 1;
-          }
-        } catch (e) {
-          failFlushSites.push(siteId as TSiteID);
+    for (const siteId of dueSites) {
+      try {
+        const userInfoResult = await sendMessage("getSiteUserInfoResult", siteId);
+        if (userInfoResult.status !== EResultParseStatus.success) {
+          failFlushSites.push(siteId);
         }
+        processedSiteCount += 1;
+      } catch (e) {
+        failFlushSites.push(siteId);
       }
     }
 
@@ -126,7 +133,8 @@ function autoFlushUserInfo(retryIndex: number = 0) {
       data: { failFlushSites },
     });
 
-    // 将刷新时间存入 metadataStore
+    // 将刷新时间存入 metadataStore：走到这里说明这一轮真的刷过站点
+    // （这个字段的名字就是"上次刷新时间"，所以没刷的那轮不能推进它 —— 上面已经提前 return 了）
     metadataStore = (await extStore.getItem("metadata"))!;
     metadataStore.lastUserInfoAutoFlushAt = new Date().getTime(); // 刷新时间应该是实际完成时间
     await extStore.setItem("metadata", metadataStore);

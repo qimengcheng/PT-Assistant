@@ -143,7 +143,9 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
        又能和白底偶数行、#fafafa 奇数行、#f0f7ff 悬停行四档都拉开。
        headerSortHoverBg / headerSortActiveBg 必须跟着改：这两档默认是 colorFillContentSolid /
        colorFillSecondarySolid（从白色容器算出来的**灰**实心色），底色换成蓝灰后它们会退色成
-       另一套色板，点一下排序表头就看见色差。所以按 #eef2f7 往深各取一档。
+       另一套色板，点一下排序表头就看见色差。hover 那档按 #eef2f7 往深取一档；
+       active（当前排好序的那一列表头）v0.37.5 起直接等于 headerBg —— 用户口径「排序的时候
+       表头列的颜色不要变」，那一列靠排序箭头已经标出来了，不需要再刷一层底色。
        headerColor 没动：antd 默认 colorTextHeading(≈rgba(0,0,0,.88)) 在这个底色上对比足够。
        content 侧同值另配一份（见 src/content-script/app/App.vue）：那边的样式注入在
        shadow root 里，读不到这侧的 ConfigProvider。 -->
@@ -156,7 +158,7 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
           rowHoverBg: '#f0f7ff',
           headerBg: '#eef2f7',
           headerSortHoverBg: '#e4ebf3',
-          headerSortActiveBg: '#dbe5f0',
+          headerSortActiveBg: '#eef2f7',
         },
       },
     }"

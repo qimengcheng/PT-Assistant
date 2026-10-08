@@ -307,7 +307,7 @@ onBeforeUnmount(() => stopSnakebarWatch());
             rowHoverBg: '#f0f7ff',
             headerBg: '#eef2f7',
             headerSortHoverBg: '#e4ebf3',
-            headerSortActiveBg: '#dbe5f0',
+            headerSortActiveBg: '#eef2f7',
           },
         },
       }"

@@ -92,11 +92,13 @@ onUnmounted(() => {
 <template>
   <div class="set-base page-fill">
     <div class="set-base-body page-fill-grow">
-      <a-tabs v-model:activeKey="activeKey" type="card" size="small">
-        <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label">
-          <component :is="tab.component" />
-        </a-tab-pane>
-      </a-tabs>
+      <div class="set-base-inner">
+        <a-tabs v-model:activeKey="activeKey" type="card" size="small">
+          <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label">
+            <component :is="tab.component" />
+          </a-tab-pane>
+        </a-tabs>
+      </div>
     </div>
   </div>
 </template>
@@ -165,5 +167,15 @@ onUnmounted(() => {
 
 .set-base .compact-form :deep(.ant-select) {
   width: 260px;
+}
+
+/* 七个 tab 的内容收成一条居中的竖栏：面板很宽时表单原先全贴在最左边，右边一大片是空的
+   （用户口径「放到页面中间吧」）。1280 是量出来的：他那张「用户信息」截图里第一行三格
+   控件从 x=306 排到 x=1505（输入框竖边 27px → 这张图 DPR=1，即 1199 CSS px），
+   留一点余量，收这一档不会把任何一行挤成换行。
+   外层 .set-base-body 仍是滚动容器，这里只加一个普通块级子元素，不动 flex/contain 那条链。 */
+.set-base-inner {
+  max-width: 1280px;
+  margin: 0 auto;
 }
 </style>

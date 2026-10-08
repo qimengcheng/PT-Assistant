@@ -136,7 +136,8 @@ function pickPtppFile(file: File) {
 
 <style scoped>
 /* 与同目录 NativeBridgeWindow 同一档：控件收进 720 这一列。
-   不然三步说明被 .ant-tabs 的 960 上限拉成整幅，一行读到头。 */
+   不然三步说明被整条 1280 竖栏拉成一行读到头。这一列由 SetBase/Index.vue 那条
+   `.set-base .backup-window { margin-inline: auto }` 居中，不贴竖栏左沿。 */
 .backup-window {
   max-width: 720px;
 }

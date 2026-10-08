@@ -138,10 +138,16 @@ onUnmounted(() => {
   color: rgba(0, 0, 0, 0.88);
 }
 
-/* 开关两列网格：每项 switch + label 水平排列 */
+/* 开关网格：一格至少 300、等宽铺满 —— 1280 竖栏里正好三列（内容宽 1248 = 1280 − 16×2 内衬）。
+   原来写死 `1fr 1fr` 两列，每格 612，而这一屏最长的开关档实测只有 270（zh）/ 364（en）
+   → 每格白丢 250~340，两列之间和行尾各挂着一条三四百像素的空档，就是用户 2026-10-08 圈
+   出来的那两块。数字来自台架 .tmp-build/bench-setbase（真 style 块 + 真 a-switch + 真语言包
+   文案，逐条量 label 的 scrollWidth）。
+   ⚠️ 用 auto-fill 而不是 auto-fit：auto-fit 会把没占满的空列塌掉、把剩下的格拉宽，
+   于是「表格与版本」这种两条一组的网格又被拉回 612 一档 —— 等于白改。 */
 .set-base .switch-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   column-gap: 24px;
   row-gap: 10px;
 }
@@ -153,12 +159,12 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+/* 标签允许换行：en 有三条超过 400 一档（autoExtendCookies 464、methodExtension 401、
+   initDownloaderTorrentOnEnter 370），原来 nowrap + ellipsis 会把设置名截断 ——
+   截断一个设置名比让它占两行严重（AGENTS §3.5：用户看不全的文案等于坏文案）。 */
 .set-base .switch-item .label {
   margin-left: 0;
   font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .set-base .compact-form :deep(.ant-form-item) {

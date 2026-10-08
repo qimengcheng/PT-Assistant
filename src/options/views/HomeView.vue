@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { computedAsync } from "@vueuse/core";
 import { definitionList } from "@ptd/site";
 
 import { REPO_URL } from "~/helper.ts";
 import recentUpdates from "@/options/data/recentUpdates.json";
+import { deriveUpdateStatus, emptyUpdateState, readUpdateState } from "@/shared/updateCheck.ts";
 
 const { t } = useI18n();
 
@@ -15,12 +17,22 @@ const version = browser.runtime.getManifest().version;
 const definitionCount = definitionList.length;
 
 /**
+ * 「有新版本」这条提示读的是后台那份缓存（@/shared/updateCheck.ts），首页只读不查 ——
+ * 发请求的是 service worker 里的每日任务，这里再发一次只会多一次对外请求。
+ * 缓存为空（从没检查过）时整块不出现。
+ */
+const updateState = computedAsync(async () => await readUpdateState(), emptyUpdateState());
+const availableVersion = computed(() =>
+  deriveUpdateStatus(updateState.value, version) === "updateAvailable" ? updateState.value.latestVersion : "",
+);
+
+/**
  * 「最近更新」读的是入库快照 `src/options/data/recentUpdates.json`。
  * ⚠️ 这份文案**由 agent 读提交历史手写，不用脚本生成**：脚本只能搬运提交标题，
  * 那是写给仓库读者的内部口吻（「表体高度被自己的公式冻住」「contain 只给真滚得动的面板」），
  * 用户读不出跟自己有什么关系。规矩见 AGENTS.md §3.7。
- * 也不在运行时拉 GitHub Release：那要多一条 host 权限、断网就成空面板，
- * 而 Release 正文同样是给仓库读者看的 Markdown。
+ * 也不在运行时拉 Release 的**正文**：断网会把这一栏空成一片，而正文同样是给仓库读者看的 Markdown。
+ * （联网只取「最新版本是几」那一个号，就是上面那块卡片，见 @/shared/updateCheck.ts）
  *
  * 快照从 v0.32.0 起是**累积档案**（只加不删，从 v0.1.0 一路排到最新），
  * 全铺开会把这一栏拉成几十屏，所以默认只出最新 PREVIEW_COUNT 个版本。
@@ -45,14 +57,28 @@ const releasesUrl = `${REPO_URL}/releases`;
         <h2>{{ t("HomeView.welcome") }}</h2>
         <p class="sub">{{ t("HomeView.subtitle") }}</p>
       </div>
-      <div class="hero-stats">
-        <a-statistic :title="t('common.version')" :value="'v' + version" />
-        <a-divider type="vertical" class="stat-divider" />
-        <a-statistic
-          :title="t('HomeView.siteDefinitionsCard')"
-          :value="definitionCount"
-          :suffix="t('HomeView.siteDefinitionsUnit')"
-        />
+      <div class="hero-side">
+        <!-- 有新版本时占掉统计那格：两格并排会把欢迎语挤到第三行，而这条提示本来就比统计重要 -->
+        <a
+          v-if="availableVersion"
+          class="update-card"
+          :href="updateState.releaseUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <div class="update-label">{{ t("HomeView.updateAvailableLabel") }}</div>
+          <div class="update-value">v{{ availableVersion }}</div>
+          <div class="update-current">{{ t("common.version") }} v{{ version }}</div>
+        </a>
+        <div v-else class="hero-stats">
+          <a-statistic :title="t('common.version')" :value="'v' + version" />
+          <a-divider type="vertical" class="stat-divider" />
+          <a-statistic
+            :title="t('HomeView.siteDefinitionsCard')"
+            :value="definitionCount"
+            :suffix="t('HomeView.siteDefinitionsUnit')"
+          />
+        </div>
       </div>
     </section>
 
@@ -151,6 +177,41 @@ const releasesUrl = `${REPO_URL}/releases`;
 .stat-divider {
   height: 40px;
   margin: 0;
+}
+
+/* 有新版本时那一格换成这张卡片：宽度只比统计那格的一半多一点，不会把欢迎语挤到下一行。
+   配色走 antd 的 warning 家族（与 a-tag color="warning" 同档），和更新记录里那条「新增」绿错开。 */
+.hero-side {
+  min-width: 0;
+}
+.update-card {
+  display: block;
+  padding: 6px 14px;
+  border: 1px solid #ffd591;
+  border-radius: 10px;
+  background: #fffbe6;
+  text-decoration: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.update-card:hover {
+  border-color: #faad14;
+  box-shadow: 0 2px 8px rgba(250, 173, 20, 0.16);
+}
+.update-label {
+  font-size: 12px;
+  color: #ad6800;
+}
+.update-value {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: rgba(0, 0, 0, 0.88);
+}
+.update-current {
+  font-size: 12px;
+  color: var(--pt-color-text-secondary);
 }
 
 .updates-panel {

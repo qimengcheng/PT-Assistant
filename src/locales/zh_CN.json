@@ -810,7 +810,8 @@
       "tabDownload": "下载",
       "tabBackup": "备份",
       "tabSocialInformation": "社交信息",
-      "tabNativeBridge": "原生通信桥"
+      "tabNativeBridge": "原生通信桥",
+      "tabUpdate": "检查更新"
     },
     "UiWindow": {
       "interfaceLanguage": "界面语言",
@@ -1072,6 +1073,37 @@
       "credentialPlaceholder": "用户凭据",
       "timeout": "请求超时（秒）",
       "configId": "配置 ID"
+    }
+  },
+  "SetUpdate": {
+    "groupStatus": "版本信息",
+    "groupSettings": "自动检查",
+    "groupInfo": "说明",
+    "labelCurrent": "当前版本",
+    "labelLatest": "最新版本",
+    "labelStatus": "检查结果",
+    "labelLastCheck": "上次检查",
+    "labelPublished": "发布时间",
+    "neverChecked": "从未",
+    "status": {
+      "never": "还没检查过",
+      "failed": "检查失败",
+      "upToDate": "已是最新版本",
+      "updateAvailable": "有新版本可更新"
+    },
+    "error": {
+      "network": "连不上更新服务器，请检查网络后重试",
+      "http": "更新服务器返回 HTTP {status}（多为仓库还没有已发布的版本，或该网络被限流）",
+      "badData": "更新服务器返回的内容里读不出版本号"
+    },
+    "checkNow": "立即检查更新",
+    "gotoRelease": "前往下载页",
+    "gotoReleaseNote": "查看该版本的更新说明",
+    "autoCheck": "每天自动检查一次",
+    "notify": "发现新版本时发系统通知",
+    "info": {
+      "description": "版本信息来自本项目的 GitHub 仓库：每个版本发布时会打出 Chrome / Firefox 两个安装包，「前往下载页」给的就是当前浏览器那一份。",
+      "privacy": "检查更新只是向 api.github.com 请求一条公开的版本记录：不带账号、不带站点 Cookie、不上传任何站点数据。关掉「每天自动检查一次」后，除非手动点「立即检查更新」，扩展不会为此主动联网。"
     }
   },
   "SetNativeBridge": {
@@ -1740,7 +1772,8 @@
     "updatesEmpty": "暂无可展示的更新记录",
     "updatesExpandAll": "展开全部 {total} 条更新记录",
     "updatesCollapse": "只看最近 {recent} 条",
-    "updatesNote": "下面是随版本构建进扩展的更新快照，截至提交 {sha}（{date}）"
+    "updatesNote": "下面是随版本构建进扩展的更新快照，截至提交 {sha}（{date}）",
+    "updateAvailableLabel": "发现新版本"
   },
   "SiteDefinitions": {
     "title": "站点定义",

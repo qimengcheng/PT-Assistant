@@ -10,6 +10,7 @@ import type {
   TKeepUploadTaskStorageSchema,
   TCookieRenewalStorageSchema,
   TSiteMessageReadStorageSchema,
+  IUpdateCheckState,
 } from "@/shared/types.ts";
 
 export interface IExtensionStorageSchema {
@@ -37,6 +38,9 @@ export interface IExtensionStorageSchema {
 
   /** 站内信的本地已读记账，见 shared/types/storages/other.ts 的说明 */
   siteMessageRead: TSiteMessageReadStorageSchema;
+
+  /** 「检查更新」的结果缓存，见 shared/types/storages/other.ts 的说明 */
+  updateCheck: IUpdateCheckState;
 }
 
 export type TExtensionStorageKey = keyof IExtensionStorageSchema;
@@ -66,6 +70,7 @@ const items = {
   keepUploadTask: storage.defineItem<TKeepUploadTaskStorageSchema | null>("local:keepUploadTask"),
   cookieRenewals: storage.defineItem<TCookieRenewalStorageSchema | null>("local:cookieRenewals"),
   siteMessageRead: storage.defineItem<TSiteMessageReadStorageSchema | null>("local:siteMessageRead"),
+  updateCheck: storage.defineItem<IUpdateCheckState | null>("local:updateCheck"),
 };
 
 /**

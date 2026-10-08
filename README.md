@@ -68,7 +68,8 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `build` job 也挂着它 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
-| 界面数据快照 | `scripts/gen-agent-stats.mjs`（数字）＋ `src/options/data/recentUpdates.json`（文案，手写） | 快照都入库、构建产物直接 import —— 不在运行时拉 GitHub Release（要多一条 host 权限、断网就空面板，而 Release 正文是给仓库读者看的 Markdown）。特别感谢页的贡献量是**数字**，跑脚本重算即可；首页「最近更新」是**给人读的句子**，由 agent 读提交历史逐条改写，**没有也不该有生成脚本**（脚本只能搬提交标题那种内部口吻）；那份 JSON 是**累积档案**，只加不删、每条带完整时间戳，界面默认只铺最新 10 个版本。口径与写法见 AGENTS.md §3.7 |
+| 检查更新 | `src/shared/updateCheck.ts` + `src/entrypoints/background/utils/updateCheck.ts` | 只有 service worker 每天问一次仓库的 `releases/latest`（一条公开接口，不带账号与 cookie），结果写 `chrome.storage.local` 的 `updateCheck`；界面（基础设置 → 检查更新、首页那张卡片）只读缓存、手动检查经 `checkForUpdate` 消息交回 SW。为什么不走 `chrome.runtime.requestUpdateCheck()`、限速与「同一版本只提醒一次」的判据见 PLAYBOOK §35 |
+| 界面数据快照 | `scripts/gen-agent-stats.mjs`（数字）＋ `src/options/data/recentUpdates.json`（文案，手写） | 快照都入库、构建产物直接 import —— 不在运行时拉 Release **正文**（断网会把那一栏空成一片，而正文是给仓库读者看的 Markdown；运行时联网的只有「最新版本是几」那一个号，见上面的「检查更新」行）。特别感谢页的贡献量是**数字**，跑脚本重算即可；首页「最近更新」是**给人读的句子**，由 agent 读提交历史逐条改写，**没有也不该有生成脚本**（脚本只能搬提交标题那种内部口吻）；那份 JSON 是**累积档案**，只加不删、每条带完整时间戳，界面默认只铺最新 10 个版本。口径与写法见 AGENTS.md §3.7 |
 
 > ⚠️ **防线 ② 依赖一个未声明的传递依赖**：`antdv-next@1.5.6` 内部用到
 > `@ant-design/fast-color`，它没写进 `package.json`，现在能跑全靠 `pnpm-workspace.yaml`
@@ -95,7 +96,7 @@ PT-assistant-wxt/
 ├── scripts/           ← CI 守卫 + 构建入口 build-verify.mjs + 版本号包装 versioned-commit.mjs + 发版辅助（见「工程化体系」）
 ├── src/
 │   ├── entrypoints/
-│   │   ├── background/    # MV3 module SW：cookies/DNR/alarms/消息路由
+│   │   ├── background/    # MV3 module SW：cookies/DNR/alarms（含每日检查更新）/消息路由
 │   │   ├── content.ts     # 页面内引导脚本（轻量，命中站点才动态 import app）
 │   │   ├── content-app.ts # content script 应用本体（ES 输出，懒加载）
 │   │   ├── offscreen/     # 页面解析宿主（搜索/用户信息/备份）

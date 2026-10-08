@@ -30,3 +30,36 @@ export type TCookieRenewalStorageSchema = Record<string, number>;
  * 下一次刷新数据时以站点给的数字为准。
  */
 export type TSiteMessageReadStorageSchema = Record<TSiteID, Record<string, number>>;
+
+/** 检查更新的失败原因。存的是码不是句子：界面按码取当前语言的文案（§3.5 内部标识符不进 UI）。 */
+export type TUpdateCheckError = "" | "network" | "http" | "badData";
+
+/**
+ * 「检查更新」的结果缓存。
+ *
+ * 单独一个键而不是塞进 config：写它的是 service worker，而 config 那个 blob 由选项页的
+ * pinia 持久化独占写入 —— 理由与 TCookieRenewalStorageSchema 相同，SW 去 patch 它会和
+ * 选项页的整键写互相覆盖。
+ *
+ * 这里**不存**「有没有新版本」：那是 `latestVersion` 与当前 manifest 版本的比较结果，
+ * 存下来就成了两份真源 —— 用户升级之后、下一次检查之前，界面会拿着旧的
+ * 「有新版本」继续提醒。判据统一由 @/shared/updateCheck.ts 的 deriveUpdateStatus 现算。
+ */
+export interface IUpdateCheckState {
+  /** 最近一次**发起**检查的毫秒时间戳；0 = 从没检查过（也是自动检查的限速依据） */
+  lastCheckAt: number;
+  /** 最近一次成功检查到的版本号（已去掉 v 前缀）；"" = 还没有可信结果 */
+  latestVersion: string;
+  /** 那条 Release 的网页 */
+  releaseUrl: string;
+  /** 与当前浏览器匹配的 zip 直链；取不到资产时回落到 releaseUrl */
+  downloadUrl: string;
+  /** Release 的发布时间（GitHub 给的 UTC ISO，界面转本地时区展示）；"" = 未知 */
+  publishedAt: string;
+  /** 最近一次失败的错误码；成功时为空串 */
+  errorCode: TUpdateCheckError;
+  /** 失败时 HTTP 状态码（0 = 不是 HTTP 层的问题），用于区分限流 403 与仓库不存在 404 */
+  httpStatus: number;
+  /** 已经为哪个版本发过系统通知 —— 同一版本只提醒一次 */
+  notifiedFor: string;
+}

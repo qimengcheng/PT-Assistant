@@ -275,4 +275,16 @@ export interface IConfigPiniaStorageSchema {
     triggerThreshold: number; // 触发阈值（周），默认 2
     extensionDuration: number; // 延长时长（月），默认 3
   };
+
+  /**
+   * 检查更新（v0.42.0 起）。
+   *
+   * 两个开关的默认值都是 true，所以**不需要版本门**：`persistWebExt` 的 `$patch` 只用
+   * storage 里存在的键覆盖，存量数据没有 `updateCheck` 这一片，拿到的就是这里的默认值，
+   * 用户主动关掉才会落盘 false。（对照 `developerMode` 那条注释里的同一个理由。）
+   */
+  updateCheck: {
+    enabled: boolean; // 是否每天自动查一次仓库的 Release 记录
+    notify: boolean; // 发现新版本时是否发系统通知（同一版本只提醒一次）
+  };
 }

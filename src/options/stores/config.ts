@@ -437,6 +437,11 @@ export const useConfigStore = defineStore("config", {
       triggerThreshold: 2,
       extensionDuration: 3,
     },
+
+    updateCheck: {
+      enabled: true,
+      notify: true,
+    },
   }),
   getters: {
     uiTheme(): Exclude<supportThemeType, "auto"> {

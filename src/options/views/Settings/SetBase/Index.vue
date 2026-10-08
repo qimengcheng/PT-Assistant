@@ -20,6 +20,7 @@ import DownloadWindow from "./DownloadWindow.vue";
 import BackupWindow from "./BackupWindow.vue";
 import SocialInformationWindow from "./SocialInformationWindow.vue";
 import NativeBridgeWindow from "./NativeBridgeWindow.vue";
+import UpdateWindow from "./UpdateWindow.vue";
 
 const { t } = useI18n();
 
@@ -38,6 +39,7 @@ const tabs = computed(
         component: SocialInformationWindow,
       },
       { key: "native-bridge", label: t("SetBase.Index.tabNativeBridge"), component: NativeBridgeWindow },
+      { key: "update", label: t("SetBase.Index.tabUpdate"), component: UpdateWindow },
     ] as const,
 );
 

@@ -317,6 +317,54 @@ CI 的 `scripts/smoke-background.mjs` 守的就是这一类，见 README「工�
 
 ---
 
+### 35. 检查更新：一条公开接口、一个写者、一天一次（v0.42.0，2026-10-08）
+
+**口径**：「增加检测更新的功能」。六个字，没有说查哪儿、在哪儿提示、多久查一次 ——
+下面三处取舍都是替他做的，汇报里点出来了。
+
+**通道选 GitHub Releases，不选 `chrome.runtime.requestUpdateCheck()`。** 后者只问 Chrome 应用商店，
+而且**不返回「最新版是哪个」**（只有状态码），Firefox 用户和「从 Release 页下 zip 自己加载未打包版」的用户
+两头落空。本仓库每个版本本来就是 CI 打 tag + 一个 Release 挂三个 zip（AGENTS §2.4），
+`GET /repos/<仓库>/releases/latest` 一条请求就同时给出 tag、Release 页、以及**分浏览器的资产直链**
+（按 `PT-Assistant-<版本>-<chrome|firefox>.zip` 的名字挑，挑不到就回落到 Release 页）。
+权限不用新加：manifest 的 `host_permissions` 本来就是 `*://*/*`。
+请求带 `credentials: "omit"` —— 不给 GitHub 捎任何 cookie。
+
+**`updateCheck` 这个键只有 service worker 写。** 理由是 §15 那条的延续：`extStore` 的写队列是
+**每上下文各一份**、跨上下文不互斥的，而这份状态是「读整块 → 改 → 写回整块」。
+所以选项页只**读**缓存，「立即检查更新」发 `checkForUpdate` 消息交回 SW 做，
+自动检查与手动检查因此共用同一条实现、同一个写者。这条跟 `cookieRenewals` 是同一个套路。
+
+**「有没有新版本」不存进 storage。** 它是 `latestVersion` 与 `runtime.getManifest().version` 的比较结果，
+存下来就有两份真源：用户升级到最新版之后、下一次检查之前，界面会拿着旧的「有新版本」继续提醒。
+所以每次现算（`deriveUpdateStatus`），返回四种态 `never / failed / upToDate / updateAvailable`。
+其中「这次失败但手里已有版本号」判成 `updateAvailable`/`upToDate` 而不是 `failed` ——
+那份版本号仍然是真的，失败只在界面上额外提一句。
+
+**限速照 autoFlushUserInfo 那一族的样子做**：闹钟每 6 小时滴答一次（`immediate: true`，SW 每次醒来都排上），
+真正的「一天一次」由任务体里的闸门判（`lastCheckAt` 距今 < 24h 就直接 return）。
+GitHub 未认证接口是 60 次/小时/IP，一天一条离打爆自己很远；而 SW 唤醒很频繁，
+不设这道闸就成了「每次唤醒都对外请求一次」。
+
+**同一个版本只提醒一次**：`notifiedFor` 记下已经通知过的版本号。用户在设置页手动查到新版本也算「已经知道了」，
+同样占掉这个名额，第二天不会再弹一条重复的。点通知开的是那条资产直链，且只认 `https://` 开头的。
+
+**错误存码不存句子**（`errorCode: "" | "network" | "http" | "badData"` + `httpStatus`）。
+浏览器抛的是英文原句，进界面就违反 AGENTS §3.5（内部标识符不进 UI）；界面按码取当前语言的文案。
+
+**实测**（`.tmp-build/test-update-check.mjs`，一次性脚本没入库）：用 vite 的 `ssrLoadModule` 在 Node 里
+真加载源文件，30 条断言全过 —— 含**打真接口那一条**（拿回 `0.41.3` 与 chrome 资产直链）、
+断网 / HTTP 404 / 返回体没有 `tag_name` 三条降级、以及 storage 往返读回等于写入。
+`smoke-background.mjs` 的注册事件清单里多了 `alarms.onAlarm` 与 `notifications.onClicked`，
+证明新模块在产物形态下确实加载了（这条是 §25 那一类「源码看着没问题、跑产物才炸」的唯一防线）。
+
+**没做到的**：新 UI（基础设置那一页 + 首页那张卡片）**没有肉眼验收**。
+台架起不来 —— 把整条 options 依赖图（antdv-next + `@ptd/site` 工具桶 + social/sizzle + downloader 包）
+交给 vite dev 做冷启动预打包，隐藏页里那个 optimizer 始终不收敛，两次尝试各耗掉几分钟仍挂不上组件。
+所以这一项按「构建产物交给他看」收尾。
+
+---
+
 ## 四、存储
 
 ### 15. 存储读写不再经 background 代理（2026-10-03）

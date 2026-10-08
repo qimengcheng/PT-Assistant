@@ -51,6 +51,7 @@ import type {
   IRestoreOptions,
   TBackupFields,
   BridgeStatus,
+  IUpdateCheckState,
 } from "@/shared/types.ts";
 import { isDebug } from "~/helper.ts";
 
@@ -108,6 +109,15 @@ export interface ProtocolMap {
   getCookie(data: chrome.cookies.CookieDetails): chrome.cookies.Cookie | null;
   removeCookie(data: chrome.cookies.CookieDetails | chrome.cookies.SetDetails): chrome.cookies.CookieDetails | null;
   checkAndExtendCookies(arg: { url: string; siteId?: string }): void;
+
+  // ===== 1.3 检查更新（background）=====
+  /**
+   * 立刻查一次仓库的最新 Release 并写回结果，返回写进去的那一份。
+   *
+   * 为什么这件事必须由 SW 做而不是选项页自己 fetch：`updateCheck` 这个键只有一个写者
+   * （extStore 的写队列不跨上下文互斥），实现也只有一份，自动检查与手动检查走同一条路。
+   */
+  checkForUpdate(): IUpdateCheckState;
 
   // ===== 2. offscreen：站点基础 ( utils/site ) =====
   getSiteList(): Array<{ id: string; name: string; url: string; offline: boolean }>;

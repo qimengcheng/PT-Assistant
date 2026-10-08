@@ -15,6 +15,8 @@ import { cleanupStaleDNRSessionRules } from "./utils/webRequest.ts";
 import "./utils/omnibox.ts";
 // 定时任务：自动刷新站点数据 / 自动备份 / 冷却后重新推送种子
 import "./utils/alarms.ts";
+// 检查更新：每日一次查仓库的最新 Release，发现新版本发系统通知（手动检查走同一条消息）
+import "./utils/updateCheck.ts";
 // 原生通信桥（可选权限 nativeMessaging）：本机 ptd CLI ↔ 扩展，未授权时自动休眠
 import "./utils/nativeMessaging.ts";
 import { fixAllStoredUserInfo } from "./utils/fixer.ts";

@@ -810,7 +810,8 @@
       "tabDownload": "Download",
       "tabBackup": "Backup",
       "tabSocialInformation": "Social Info",
-      "tabNativeBridge": "Native Bridge"
+      "tabNativeBridge": "Native Bridge",
+      "tabUpdate": "Updates"
     },
     "UiWindow": {
       "interfaceLanguage": "Interface language",
@@ -1072,6 +1073,37 @@
       "credentialPlaceholder": "User credentials",
       "timeout": "Request Timeout (seconds)",
       "configId": "Config ID"
+    }
+  },
+  "SetUpdate": {
+    "groupStatus": "Version",
+    "groupSettings": "Automatic checks",
+    "groupInfo": "Notes",
+    "labelCurrent": "Current version",
+    "labelLatest": "Latest version",
+    "labelStatus": "Result",
+    "labelLastCheck": "Last checked",
+    "labelPublished": "Published",
+    "neverChecked": "Never",
+    "status": {
+      "never": "Not checked yet",
+      "failed": "Check failed",
+      "upToDate": "Up to date",
+      "updateAvailable": "Update available"
+    },
+    "error": {
+      "network": "Could not reach the update server. Check your connection and try again.",
+      "http": "The update server replied HTTP {status} (usually no published release yet, or this network is rate limited)",
+      "badData": "The reply from the update server carries no version number"
+    },
+    "checkNow": "Check now",
+    "gotoRelease": "Open download page",
+    "gotoReleaseNote": "Read the release notes",
+    "autoCheck": "Check once a day",
+    "notify": "Notify me when a new version is out",
+    "info": {
+      "description": "Version info comes from this project's GitHub repository: every release ships a Chrome and a Firefox package, and \"Open download page\" points at the one for your browser.",
+      "privacy": "Checking for updates is a single public request to api.github.com: no account, no site cookies, no site data. With \"Check once a day\" off, the extension goes online for this only when you press \"Check now\"."
     }
   },
   "SetNativeBridge": {
@@ -1740,7 +1772,8 @@
     "updatesEmpty": "No updates to show yet",
     "updatesExpandAll": "Show all {total} updates",
     "updatesCollapse": "Show only the latest {recent}",
-    "updatesNote": "These are update notes built into the extension, up to commit {sha} ({date})"
+    "updatesNote": "These are update notes built into the extension, up to commit {sha} ({date})",
+    "updateAvailableLabel": "Update available"
   },
   "SiteDefinitions": {
     "title": "Site Definitions",

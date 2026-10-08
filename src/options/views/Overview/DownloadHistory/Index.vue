@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef, useTemplateRef } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   DeleteOutlined,
@@ -43,6 +43,7 @@ import {
 
 const { t } = useI18n();
 const configStore = useConfigStore();
+const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 
 const { tableFilterRef, tableWaitFilterRef, tableFilterFn } = tableCustomFilter;
 
@@ -51,6 +52,8 @@ const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("Downloa
   size: "small",
   // 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）
   totalRows: () => filteredItems.value.length,
+  // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
+  autoFit: { container: () => pagePanel.value, rows: () => filteredItems.value },
 });
 
 const columns = computed<TableColumnsType<ITorrentDownloadMetadata>>(() => [
@@ -179,7 +182,7 @@ onUnmounted(() => {
       </div>
     </a-flex>
 
-    <div class="page-panel">
+    <div ref="pagePanel" class="page-panel">
     <a-table
       bordered
       :columns="columns"

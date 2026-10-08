@@ -113,6 +113,13 @@ export function buildSortOrderMap(
  * 原先只有站点管理页有）。判"用户挑过一档"的依据是存下来的正数**不等于本页默认档** ——
  * 因为一旦他挑过一档，分页条就要常驻：否则挑一档大到放得下全部，分页条连同尺寸选择器
  * 一起消失，就再也切不回小档了（这条取舍最早在 SetSite 上定下）。
+ *
+ * **extras.fitSize 一传就启用「按面板高度实测每页条数」**（useAutoFitPageSize，用户
+ * 2026-10-08）：> 0 且这一页没被挑过档时用它，否则仍用存下来/兜底的那一档。
+ * 实测值和「挑过档」是打架的 —— 窗口变高时实测值要跟着变，而他挑的那一档不能变，
+ * 所以挑过档必须赢。传了 fitSize 就**同时传 picked**：只靠「存的正数 != 默认档」判会漏
+ * （他挑的正好是默认档时又会被实测值盖回去），那一档现在由 handleTableChange 另写一个
+ * pageSizePicked 标记。
  */
 export function toPagination(
   itemsPerPage: unknown,
@@ -122,12 +129,16 @@ export function toPagination(
     showTotal?: (total: number) => string;
     totalRows?: number;
     extraConfig?: TablePaginationConfig;
+    fitSize?: number;
+    picked?: boolean;
   } = {},
 ): TablePaginationConfig | false {
   const raw = itemsPerPage;
   const usable = typeof raw === "number" && Number.isFinite(raw) && raw > 0;
-  const pageSize = usable ? raw : fallback;
-  const pickedASize = usable && raw !== fallback;
+  const stored = usable ? raw : fallback;
+  const pickedASize = extras.picked ?? (usable && raw !== fallback);
+  const fit = typeof extras.fitSize === "number" && extras.fitSize > 0 ? extras.fitSize : 0;
+  const pageSize = !pickedASize && fit ? fit : stored;
   if (extras.totalRows !== undefined && !pickedASize && extras.totalRows <= pageSize) return false;
   return {
     pageSize,
@@ -136,4 +147,16 @@ export function toPagination(
     ...(extras.showTotal ? { showTotal: extras.showTotal } : {}),
     ...(extras.extraConfig ?? {}),
   };
+}
+
+/**
+ * 「用户在尺寸选择器里挑过一档」的统一判据，给 toPagination 的 picked 用。
+ * 新标记 `tableBehavior[key].pageSizePicked` 由 handleTableChange 在用户改档那一次写下；
+ * 老用户存的东西里没有它，所以退回原口径「存下来的正数不等于本页默认档」。
+ * 两条都要：少了后者的话，升级之后第一次改档以前所有老用户的自选档都会被判成"没挑过"，
+ * 实测条数当场盖掉他挑的那一档。
+ */
+export function isPageSizePicked(stored: unknown, fallback: number, flag?: unknown) {
+  const usable = typeof stored === "number" && Number.isFinite(stored) && stored > 0;
+  return flag === true || (usable && stored !== fallback);
 }

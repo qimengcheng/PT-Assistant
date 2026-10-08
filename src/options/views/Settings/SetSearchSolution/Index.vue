@@ -3,7 +3,7 @@
  * 搜索方案管理页（antdv-next 平移）。
  * 自定义搜索方案的增删改、启用/设默、JSON 导入导出；表格首行为固定的「全部站点」自动生成方案。
  */
-import { computed, ref } from "vue";
+import { computed, ref, useTemplateRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { cloneDeep, omit } from "es-toolkit";
 import { saveAs } from "file-saver";
@@ -26,7 +26,8 @@ import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate } from "@/options/utils.ts";
-import { toPagination } from "@/options/components/tableSorters.ts";
+import { isPageSizePicked, toPagination } from "@/options/components/tableSorters.ts";
+import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 import type { ISearchSolutionMetadata, TSolutionKey } from "@/shared/types.ts";
 
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
@@ -214,6 +215,19 @@ const columns = computed(() => [
   { title: t("common.action"), key: "action", width: 180, align: "center" as const },
 ]);
 
+// 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
+const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
+/** 他挑过一档之后，实测条数就不再管这一页 */
+const pickedSize = computed(() => {
+  const behavior = configStore.tableBehavior.SetSearchSolution;
+  return isPageSizePicked(behavior?.itemsPerPage, 10, (behavior as any)?.pageSizePicked);
+});
+const { fitted: fitPageSize } = useAutoFitPageSize({
+  container: () => pagePanel.value,
+  rows: () => tableData.value,
+  enabled: () => !pickedSize.value,
+});
+
 const pagination = computed(() =>
   // 走 toPagination 拿 -1/0 兜底：旧版 Vuetify 用 -1 表示「不分页」，这个约定被搬进了
   // config 默认值，而 antd Table 是前端分页，pageSize=-1 会让 slice(0,-1) 吃掉最后一行、
@@ -223,12 +237,18 @@ const pagination = computed(() =>
     showTotal: (total: number) => t("common.totalItems", { total }),
     // 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）
     totalRows: tableData.value.length,
+    fitSize: fitPageSize.value,
+    picked: pickedSize.value,
   }),
 );
 
 function onTableChange(pag: any) {
-  if (pag.pageSize) {
+  // 只有「报回来的档 ≠ 界面上正在显示的那一档」才算他改了尺寸：翻页与排序也带着当前档回来
+  const displayed = pagination.value === false ? 0 : pagination.value?.pageSize ?? 0;
+  if (pag.pageSize && displayed && pag.pageSize !== displayed) {
     configStore.updateTableBehavior("SetSearchSolution", "itemsPerPage", pag.pageSize);
+    // 挑档 = 明确意图，从此不再被实测条数盖掉
+    configStore.updateTableBehavior("SetSearchSolution", "pageSizePicked", true);
   }
 }
 
@@ -270,7 +290,7 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
     </a-flex>
 
     <!-- 面板只负责给表格一块白底表面并接管内部滚动 -->
-    <div class="page-panel">
+    <div ref="pagePanel" class="page-panel">
       <a-table
         bordered
         :columns="columns"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   AimOutlined,
@@ -33,7 +33,8 @@ import RebuildMapDialog from "./RebuildMapDialog.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import { flushSiteFavicon } from "@/options/components/SiteFavicon/utils.ts";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
-import { toPagination } from "@/options/components/tableSorters.ts";
+import { isPageSizePicked, toPagination } from "@/options/components/tableSorters.ts";
+import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 // 数据来源
 import { allAddedSiteInfo, isLoadingAllAddedSites, type ISiteTableItem } from "./utils.ts";
@@ -286,6 +287,19 @@ const filteredItems = computed(() => {
 
 const tableSelected = ref<TSiteID[]>([]);
 
+// 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
+const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
+/** 他挑过一档之后，实测条数就不再管这一页 */
+const pickedSize = computed(() => {
+  const behavior = configStore.tableBehavior.SetSite;
+  return isPageSizePicked(behavior?.itemsPerPage, 50, (behavior as any)?.pageSizePicked);
+});
+const { fitted: fitPageSize } = useAutoFitPageSize({
+  container: () => pagePanel.value,
+  rows: () => filteredItems.value,
+  enabled: () => !pickedSize.value,
+});
+
 const pagination = computed<TablePaginationConfig | false>(() =>
   // 本页默认档是 -1（`config.ts` 里存的就是它）：旧版 Vuetify 用 -1 表示「不分页、一次全展示」。
   // 这个约定由 toPagination 兜底换算成 50（原样交给 antd 会 slice(0,-1) 吃掉最后一行）。
@@ -294,6 +308,8 @@ const pagination = computed<TablePaginationConfig | false>(() =>
   toPagination(configStore.tableBehavior.SetSite?.itemsPerPage, 50, {
     size: "small",
     totalRows: filteredItems.value.length,
+    fitSize: fitPageSize.value,
+    picked: pickedSize.value,
   }),
 );
 
@@ -302,8 +318,12 @@ function handleTableChange(
   _filters: unknown,
   sorter: TableSorterResult | TableSorterResult[],
 ) {
-  if (page.pageSize) {
+  // 只有「报回来的档 ≠ 界面上正在显示的那一档」才算他改了尺寸：翻页与排序也带着当前档回来
+  const displayed = pagination.value === false ? 0 : pagination.value?.pageSize ?? 0;
+  if (page.pageSize && displayed && page.pageSize !== displayed) {
     configStore.updateTableBehavior("SetSite", "itemsPerPage", page.pageSize);
+    // 挑档 = 明确意图，从此不再被实测条数盖掉
+    configStore.updateTableBehavior("SetSite", "pageSizePicked", true);
   }
   const single = Array.isArray(sorter) ? sorter[0] : sorter;
   if (single?.order && single.columnKey) {
@@ -460,7 +480,7 @@ function keywordChecked(keyword: string) {
 
     <!-- 面板是唯一的滚动容器：这张表不写 scroll.y（视口常数是目测的，外壳内衬一改就失准），
          一次全展示时由 .page-panel 自己滚 -->
-    <div class="page-panel">
+    <div ref="pagePanel" class="page-panel">
     <a-table
       bordered
       :columns="columns"

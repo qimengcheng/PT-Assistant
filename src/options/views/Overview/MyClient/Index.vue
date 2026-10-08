@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -38,7 +38,8 @@ import { formatSize, formatDate } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
-import { buildSortOrderMap, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
+import { buildSortOrderMap, isPageSizePicked, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
+import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
 import PushToDownloaderDialog from "./PushToDownloaderDialog.vue";
@@ -385,12 +386,27 @@ const rowSelection = computed<TableRowSelection<CTorrent>>(() => ({
 const tablePage = ref(1);
 const pageSize = computed(() => (configStore.tableBehavior["MyClient"] as any)?.itemsPerPage ?? 25);
 
+// 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
+const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
+/** 他挑过一档之后，实测条数就不再管这一页 */
+const pickedSize = computed(() => {
+  const behavior = (configStore.tableBehavior as Record<string, any>).MyClient;
+  return isPageSizePicked(behavior?.itemsPerPage, 25, behavior?.pageSizePicked);
+});
+const { fitted: fitPageSize } = useAutoFitPageSize({
+  container: () => pagePanel.value,
+  rows: () => filteredTorrents.value,
+  enabled: () => !pickedSize.value,
+});
+
 // 分页统一走 toPagination：它兜底 Vuetify 遗留的 -1/0（原先这页直接把 -1 交给 antd，
 // 会让 slice(0,-1) 吃掉最后一行），并带上「一页放得下就不出分页条」（用户 2026-10-07）。
 const tablePagination = computed(() =>
   toPagination(pageSize.value, 25, {
     size: "small",
     totalRows: filteredTorrents.value.length,
+    fitSize: fitPageSize.value,
+    picked: pickedSize.value,
     extraConfig: { current: tablePage.value, total: filteredTorrents.value.length },
   }),
 );
@@ -408,8 +424,13 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
     }
   }
   configStore.updateTableBehavior("MyClient", "sortBy", next);
-  if (pagination?.pageSize) {
+  // 只有「报回来的档 ≠ 界面上正在显示的那一档」才算他改了尺寸：翻页与排序同样带着
+  // 当前那一档回来，照 `if (pagination?.pageSize)` 判会把他第一次翻页就误判成挑档。
+  const displayed = tablePagination.value === false ? 0 : tablePagination.value?.pageSize ?? 0;
+  if (pagination?.pageSize && displayed && pagination.pageSize !== displayed) {
     configStore.updateTableBehavior("MyClient", "itemsPerPage", pagination.pageSize);
+    // 挑档 = 明确意图，从此不再被实测条数盖掉
+    configStore.updateTableBehavior("MyClient", "pageSizePicked", true);
   }
   tablePage.value = pagination?.current ?? 1;
 }
@@ -533,7 +554,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
       </a-flex>
     </a-flex>
 
-    <div class="page-panel">
+    <div ref="pagePanel" class="page-panel">
     <a-table
       bordered
       :columns="tableHeader"

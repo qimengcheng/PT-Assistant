@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, useTemplateRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { isUndefined } from "es-toolkit/compat";
@@ -148,11 +148,14 @@ const toggleColumn = (key: string, on: boolean) => {
 };
 
 /** 排序/分页行为统一收敛到 useTableBehavior（MyData 允许多列排序）；列生成走公共 toTableColumns */
+const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 const { sortBy, pagination: tablePagination, handleTableChange } = useTableBehavior("MyData", {
   defaultPageSize: 20,
   multiSort: true,
   // 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）
   totalRows: () => filteredTableData.value.length,
+  // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
+  autoFit: { container: () => pagePanel.value, rows: () => filteredTableData.value },
 });
 
 const tableColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
@@ -496,7 +499,7 @@ const showExportDialog = ref(false);
       </div>
     </a-flex>
 
-    <div class="page-panel">
+    <div ref="pagePanel" class="page-panel">
     <a-table
       bordered
       :columns="tableColumns"

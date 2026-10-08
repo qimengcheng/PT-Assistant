@@ -16,7 +16,8 @@ import { computed, toValue, type ComputedRef, type MaybeRefOrGetter } from "vue"
 import type { TablePaginationConfig, TableSorterResult } from "antdv-next";
 
 import { useConfigStore } from "@/options/stores/config.ts";
-import { toPagination } from "@/options/components/tableSorters.ts";
+import { isPageSizePicked, toPagination } from "@/options/components/tableSorters.ts";
+import { useAutoFitPageSize } from "./useAutoFitPageSize.ts";
 
 type TSortOrder = "asc" | "desc";
 interface ISortBy {
@@ -44,14 +45,32 @@ interface IUseTableBehaviorOptions {
    * pagination 的类型也相应变成 `TablePaginationConfig | false`。
    */
   totalRows?: MaybeRefOrGetter<number>;
+  /**
+   * 按面板高度实测每页条数（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）。
+   * 只在**用户没挑过档位**时生效，挑过就永远用他那一档 —— 见 toPagination 的 fitSize。
+   */
+  autoFit?: {
+    container: MaybeRefOrGetter<HTMLElement | null | undefined>;
+    rows: MaybeRefOrGetter<readonly unknown[] | null | undefined>;
+    min?: number;
+  };
 }
 
 export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOptions = {}) {
-  const { defaultPageSize = 10, size, showTotal, multiSort = false, clearOnEmpty = false, totalRows } = options;
+  const {
+    defaultPageSize = 10,
+    size,
+    showTotal,
+    multiSort = false,
+    clearOnEmpty = false,
+    totalRows,
+    autoFit,
+  } = options;
   const configStore = useConfigStore();
 
   const behavior: ComputedRef<{
     itemsPerPage?: number;
+    pageSizePicked?: boolean;
     columns?: string[];
     sortBy?: ISortBy[];
   }> = computed(() => (configStore.tableBehavior as Record<string, any>)[tableKey] ?? {});
@@ -63,6 +82,15 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
   });
 
   const sortBy = computed<ISortBy[]>(() => behavior.value.sortBy ?? []);
+
+  /** 他有没有挑过一档 —— 挑过就实测条数让位，整条量算也不再跑 */
+  const pickedSize = computed(() =>
+    isPageSizePicked(behavior.value.itemsPerPage, defaultPageSize, behavior.value.pageSizePicked),
+  );
+
+  const fitted = autoFit
+    ? useAutoFitPageSize({ ...autoFit, enabled: () => !pickedSize.value }).fitted
+    : computed(() => 0);
 
   /** configStore 里某列的排序状态 → antd 的受控 sortOrder */
   const sortOrderOf = (key: string): "ascend" | "descend" | null => {
@@ -77,6 +105,8 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
       ...(size ? { size } : {}),
       ...(showTotal ? { showTotal } : {}),
       ...(totalRows === undefined ? {} : { totalRows: toValue(totalRows) }),
+      // fitSize 没启用时这两个键都不带，toPagination 走它原来那条判据，老页面一字不变
+      ...(autoFit ? { fitSize: fitted.value, picked: pickedSize.value } : {}),
     }),
   );
 
@@ -85,8 +115,17 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
     _filters: unknown,
     sorter: TableSorterResult | TableSorterResult[],
   ) {
-    if (page.pageSize && page.pageSize !== itemsPerPage.value) {
+    // 「他改了尺寸」唯一的可靠信号是「报回来的档 ≠ 界面上正在显示的那一档」：翻页和排序
+    // 同样会带着 pageSize 回来，而带的就是当前这一档（InternalTable 的 triggerOnChange 用
+    // getPaginationParam 把 mergedPagination 原样递出来）。原先那句 `!== itemsPerPage.value`
+    // 在没有实测档时等价，但开了 autoFit 之后显示的是实测档 —— 他一翻页就会被误判成
+    // 「他挑了实测那一档」，从此永久锁死。分页条没出（false）时不可能改尺寸，一并跳过。
+    const displayed = pagination.value === false ? 0 : pagination.value?.pageSize ?? 0;
+    if (page.pageSize && displayed && page.pageSize !== displayed) {
       configStore.updateTableBehavior(tableKey, "itemsPerPage", page.pageSize);
+      // 挑档 = 明确意图，从此不再被实测条数盖掉。只有开了 autoFit 的页才写这个标记，
+      // 免得给没这功能的页面凭空多存一个键。
+      if (autoFit) configStore.updateTableBehavior(tableKey, "pageSizePicked", true);
     }
 
     const sorters = (Array.isArray(sorter) ? sorter : [sorter]).filter(

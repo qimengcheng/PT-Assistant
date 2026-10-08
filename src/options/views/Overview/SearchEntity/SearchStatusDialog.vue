@@ -66,7 +66,10 @@ const filteredSearchPlan = computed(() => {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :title="dialogTitle" :width="800">
+  <!-- 这是一只看状态的窗口：每一行的动作（重新搜索 / 上移队列）都在行内，
+       默认页脚那颗「确定」没有任何事可做（没人接 @ok），点了只是没反应 —— 撤掉整个页脚，
+       关掉走右上角的 ✕ 或 ESC。与 ClientStatusDialog、TorrentDetailDialog 那几只同类窗口同写法。 -->
+  <a-modal v-model:open="showDialog" :title="dialogTitle" :width="800" :footer="null">
 
     <div>
       <!-- v-chip-group(filter + multiple) → a-checkbox-group 多选 -->

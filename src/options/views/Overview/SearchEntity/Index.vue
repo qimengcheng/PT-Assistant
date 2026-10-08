@@ -717,7 +717,6 @@ const hasSearchStatus = computed<boolean>(() => {
           mode="multiple"
           :options="columnOptions"
           :max-tag-count="1"
-          size="small"
           class="table-header-filter-clear ml-1"
           :style="{ maxWidth: '220px', minWidth: '180px' }"
           @change="onColumnsChange"
@@ -729,7 +728,6 @@ const hasSearchStatus = computed<boolean>(() => {
         <a-input
           v-model:value="tableWaitFilterRef"
           allow-clear
-          size="small"
           :placeholder="t('SearchEntity.index.filterLabel')"
           style="max-width: 500px"
           @change="(e: any) => buildFilterDictFn(e?.target?.value ?? '')"

@@ -137,7 +137,9 @@ const fullTableHeader = computed(
         // 「Movies」和中文写法的「电影」分到列表两头，同一类内容被劈开
         compare: (a: any, b: any) => compareCategory(categoryCell(a), categoryCell(b)),
       },
-      { title: t("SearchEntity.index.table.size"), key: "size", dataIndex: "size", align: "end" },
+      // width 是给下面那条进度条留的：这一列由「大小」那一行数字定宽时只有六十来像素，
+      // 图标占掉 16 之后条子只剩四十多，看着就是"进度条太短"。
+      { title: t("SearchEntity.index.table.size"), key: "size", dataIndex: "size", align: "end", width: 112 },
       { title: t("SearchEntity.index.table.seeders"), key: "seeders", dataIndex: "seeders", align: "end" },
       { title: t("SearchEntity.index.table.leechers"), key: "leechers", dataIndex: "leechers", align: "end" },
       { title: t("SearchEntity.index.table.completed"), key: "completed", dataIndex: "completed", align: "end" },

@@ -51,18 +51,37 @@ const color = computed(() => {
 </script>
 
 <template>
-  <!--
-    v-row/v-col 换成 a-row/a-col：a-row 用 :gutter="0" 取消列间距（对应原来的 gap="0"），
-    align="middle" 让很矮的进度条与图标垂直居中（#1554）。
-  -->
-  <a-row :gutter="0" align="middle" class="pt-1">
-    <a-col class="pa-0" :span="2">
-      <component :is="icon" :style="{ color }" />
-    </a-col>
-    <a-col class="pl-1" :span="22">
-      <a-progress :percent="torrent.progress!" :show-info="false" :stroke-color="color" size="small" />
-    </a-col>
-  </a-row>
+  <!-- 图标定宽、进度条吃剩余宽度。
+       原先是 a-row + :span="2" / :span="22" 的 24 格：这一列只有六十来像素宽，
+       span 2 折出来不到 6px，14px 的箭头溢出压在进度条上，条子只剩 span 22 那点宽度 ——
+       就是「箭头和进度条重叠了，而且进度条也太短了」。 -->
+  <div class="process-row pt-1">
+    <component :is="icon" :style="{ color }" class="process-icon" />
+    <a-progress
+      class="process-bar"
+      :percent="torrent.progress!"
+      :show-info="false"
+      :stroke-color="color"
+      size="small"
+    />
+  </div>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.process-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.process-icon {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.process-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+</style>

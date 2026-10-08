@@ -1259,7 +1259,7 @@
     "spanSummary": "共 {commits} 条提交 · {agents} 个智能体 · {models} 款模型 · 手写 +{add} / −{del} 行",
     "thankNote": "感谢参与本项目开发的智能体与模型，排名可按提交次数或代码量切换。",
     "usedBy": "用过它的智能体：",
-    "usedModels": "用过它的模型："
+    "usedModels": "它用过的模型："
   },
   "TechnologyStack": {
     "dependency": "项目依赖",

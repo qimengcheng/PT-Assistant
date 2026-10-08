@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-08 09:30:29",
-  "headSha": "4577704",
+  "generatedAt": "2026-10-08 09:37:50",
+  "headSha": "3943ed2",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.37.11",
+      "date": "2026-10-08 09:37:39",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "特别感谢页「智能体」那一栏下面的标签改成了「它用过的模型」—— 原先写反了，读起来像哪些模型用过这个智能体。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.37.10",
       "date": "2026-10-08 09:29:58",

@@ -52,7 +52,7 @@ const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
  * 期间界面原先什么都不动 —— 他 2026-10-09 报「点了没反应，过了几秒才提示发送成功，会以为功能失效」。
  * 记到「哪一路」是为了只让被点的那颗转圈，同时把同任务其它发送键暂时按住（三路发的集合有重叠）。
  */
-type TSendKind = "base" | "other" | "all";
+type TSendKind = "base" | "other" | "all" | `one:${number}`;
 const sending = ref<Record<string, TSendKind | undefined>>({});
 const sendingOf = (id: string) => sending.value[id];
 
@@ -189,19 +189,19 @@ async function clearAllTasks() {
   }
 }
 
-// 发送种子到下载器
+// 发送种子到下载器。返回「这一趟有没有真发出去」—— 行内那颗「发送并换为基准」要等它成功才挪基准
 async function sendTorrentsToDownloader(
   task: IKeepUploadTask,
   items: IKeepUploadTask["items"],
   kind: TSendKind,
-) {
-  if (items.length === 0) return;
-  if (sending.value[task.id]) return;
+): Promise<boolean> {
+  if (items.length === 0) return false;
+  if (sending.value[task.id]) return false;
 
   const downloader = metadataStore.downloaders[task.downloadOptions.downloaderId];
   if (!downloader) {
     runtimeStore.showSnakebar(t("KeepUploadTask.downloaderNotFound"), { color: "error" });
-    return;
+    return false;
   }
 
   sending.value[task.id] = kind;
@@ -256,10 +256,12 @@ async function sendTorrentsToDownloader(
     runtimeStore.showSnakebar(t("KeepUploadTask.sendSingleSuccess"), { color: "success" });
     // 发出去不等于在做种：跳过校验之后「数据其实不在」只会以状态的形式冒出来，所以自己回来查一趟
     scheduleAutoRecheck(task.id);
+    return true;
   } catch (e) {
     const rawReason = e instanceof Error ? e.message : String(e);
     const reason = rawReason.trim() === "Fails." ? t("KeepUploadTask.qBittorrentLegacyFails") : rawReason;
     runtimeStore.showSnakebar(t("KeepUploadTask.sendSingleErrorWithReason", { reason }), { color: "error" });
+    return false;
   } finally {
     sending.value[task.id] = undefined;
   }
@@ -522,9 +524,37 @@ function reseedRows(record: IKeepUploadTask) {
   });
 }
 
+/**
+ * 展开列表里那一条在下载器那边的结论。
+ *
+ * 数据就是「做种状态」列悬停明细那一份（`reseedStatuses` 按 infoHash 存），这里只是换个地方摆出来 ——
+ * 不另算一套判据，否则同一页会出现两个说法。
+ * 「还没查过」单独一档：那不是一个结论，把它写成「下载器里没有」是骗人（他 2026-10-09 要的就是这一列能在每条上看到）。
+ */
+const RESEED_VERDICT_COLOR: Record<TReseedVerdict, string> = {
+  seeding: "success",
+  wrong: "error",
+  paused: "default",
+  pending: "processing",
+  notFound: "warning",
+};
+function itemReseed(record: IKeepUploadTask, item: IKeepUploadTask["items"][number]) {
+  const perTask = reseedStatuses.value[record.id];
+  if (!perTask) return { color: "default", text: t("KeepUploadTask.recheck.state.idle") };
+  const hash = String(item.hash ?? "").toLowerCase();
+  if (!hash) return { color: "default", text: t("KeepUploadTask.recheck.state.untracked") };
+  const status = perTask[hash];
+  if (!status) return { color: "warning", text: reseedVerdictText.value.notFound };
+  return { color: RESEED_VERDICT_COLOR[status.verdict], text: reseedVerdictText.value[status.verdict] };
+}
+
+/** 展开列表的每一行：条目本身 + 序号 + 它在下载器那边的结论（模板里一处算好，别逐行调四遍） */
+function taskItemRows(record: IKeepUploadTask) {
+  return record.items.map((item, index) => ({ item, index, state: itemReseed(record, item) }));
+}
+
 // 发送基准种子到下载器
-function sendBaseTorrent(task: IKeepUploadTask) {
-  const items = task.items.slice(0, 1);
+function sendBaseTorrent(task: IKeepUploadTask) {  const items = task.items.slice(0, 1);
   void sendTorrentsToDownloader(task, items, "base");
 }
 
@@ -541,6 +571,20 @@ async function sendAllTorrents(task: IKeepUploadTask) {
   if (!(await confirmDanger(t("KeepUploadTask.sendConfirm", { count: task.items.length })))) return;
   const items = task.items.slice(0);
   void sendTorrentsToDownloader(task, items, "all");
+}
+
+/**
+ * 行内那颗「只发这一条并换它当基准」：他 2026-10-09 的场景是「基准那条下得太慢，想换个站下」。
+ *
+ * 顺序是**先发、成功后才挪基准** —— 反过来一旦发送失败，任务的基准已经变成一条根本没发出去的种子，
+ * 那比「没换」更难发现（界面会开始按错的那条判断做种状态）。
+ * 第一条本身就是基准，所以那一行只做发送、不做重排。
+ */
+async function sendOneAndPromote(task: IKeepUploadTask, index: number) {
+  const item = task.items[index];
+  if (!item) return;
+  const okToSend = await sendTorrentsToDownloader(task, [item], `one:${index}`);
+  if (okToSend && index > 0) await setAsBaseTorrent(task, index);
 }
 
 // 复制下载链接
@@ -761,29 +805,45 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
         </template>
       </template>
 
-      <template #expandedRowRender="{ record }">
+      <template #expandedRowRender="{ record: subRecord }">
         <ul class="task-items">
-          <li v-for="(subItem, index) in record.items" :key="index" class="task-item">
-            <SiteFavicon :site-id="subItem.site" :size="16" />
+          <li v-for="row in taskItemRows(subRecord as IKeepUploadTask)" :key="row.index" class="task-item">
+            <SiteFavicon :site-id="row.item.site" :size="16" />
             <div class="task-item-main">
-              <a :href="subItem.link" target="_blank" rel="noopener noreferrer nofollow">
-                {{ subItem.title }}
+              <a :href="row.item.link" target="_blank" rel="noopener noreferrer nofollow">
+                {{ row.item.title }}
               </a>
               <!-- 副标题：和上面主标题那一列一样，逐条也要有两行（旧任务里没这一项，就不出这一行） -->
-              <div v-if="subItem.subTitle" class="text-body-small text-grey">
-                {{ subItem.subTitle }}
+              <div v-if="row.item.subTitle" class="text-body-small text-grey">
+                {{ row.item.subTitle }}
               </div>
               <div class="text-body-small text-grey">
-                {{ formatSize(subItem.size) }}, {{ t("KeepUploadTask.seeders") }}{{ subItem.seeders ?? "-" }},
-                {{ t("KeepUploadTask.leechers") }}{{ subItem.leechers ?? "-" }}
+                {{ formatSize(row.item.size) }}, {{ t("KeepUploadTask.seeders") }}{{ row.item.seeders ?? "-" }},
+                {{ t("KeepUploadTask.leechers") }}{{ row.item.leechers ?? "-" }}
               </div>
             </div>
-            <a-tooltip v-if="!record.baseLocal" :title="t('KeepUploadTask.setAsBaseTorrent')">
+
+            <!-- 每一条自己的做种状态（他 2026-10-09：「展开的列表里面每个种子都要有状态的」）。
+                 原先只有徽标那一格给汇总，具体是哪一条不对得悬停才看得到 -->
+            <a-tag :color="row.state.color">{{ row.state.text }}</a-tag>
+
+            <!-- 「基准那条下得慢，想换个站下」那一趟：一颗键做完「只发这条 + 发成了再换基准」。
+                 拆成两颗会留下一种错法：点了换基准却没发送，任务就挂在一条根本没发出去的种子上 -->
+            <a-button
+              size="small"
+              type="link"
+              :loading="sendingOf(subRecord.id) === `one:${row.index}`"
+              :disabled="!!sendingOf(subRecord.id)"
+              @click="sendOneAndPromote(subRecord as IKeepUploadTask, row.index)"
+            >
+              {{ row.index === 0 ? t("KeepUploadTask.sendThisOne") : t("KeepUploadTask.sendAndSetBase") }}
+            </a-button>
+            <a-tooltip v-if="!subRecord.baseLocal" :title="t('KeepUploadTask.setAsBaseTorrent')">
               <a-button
                 size="small"
                 type="text"
-                :disabled="index === 0"
-                @click="setAsBaseTorrent(record as IKeepUploadTask, index)"
+                :disabled="row.index === 0 || !!sendingOf(subRecord.id)"
+                @click="setAsBaseTorrent(subRecord as IKeepUploadTask, row.index)"
               >
                 <template #icon>
                   <ArrowUpOutlined />

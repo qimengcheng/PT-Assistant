@@ -122,6 +122,8 @@
     "sendSingleErrorWithReason": "发送失败：{reason}",
     "sendSingleSuccess": "发送成功",
     "sending": "正在发送 {count} 条到下载器…",
+    "sendThisOne": "只发送这一条",
+    "sendAndSetBase": "发送这一条并换它当基准",
     "sendSuccess": "发送成功",
     "setAsBaseTorrent": "设为基准种子",
     "setBaseError": "设置失败",

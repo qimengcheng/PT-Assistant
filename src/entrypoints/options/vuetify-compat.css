@@ -47,6 +47,16 @@
 .px-6 { padding-left: 24px; padding-right: 24px; }
 .py-1 { padding-top: 4px; padding-bottom: 4px; }
 
+/* ---- gap（Vuetify 3 的 ga-*；刻度与上面 spacing 同一套）----
+   这三行以前没有：KeepUploadDialog 写了三处 `d-flex ga-1` 全都没生效，
+   2026-10-09 台架量到弹窗底部那一排六颗控件间距全是 0（贴着边）。 */
+.ga-1 { gap: 4px; }
+.ga-2 { gap: 8px; }
+.ga-3 { gap: 12px; }
+.ga-4 { gap: 16px; }
+.ga-5 { gap: 20px; }
+.ga-6 { gap: 24px; }
+
 /* ---- flex ---- */
 .d-flex { display: flex; }
 .d-inline-flex { display: inline-flex; }

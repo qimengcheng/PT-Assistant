@@ -983,14 +983,15 @@ async function createKeepUploadTask() {
     </div>
 
     <template #footer>
-      <div class="d-flex align-center">
+      <div class="d-flex align-center ga-2 create-row">
         <template v-if="showCreateRow">
           <a-select
             v-model:value="selectedDownloaderId"
             :options="downloaderOptions"
             size="small"
             :placeholder="t('SearchEntity.KeepUploadDialog.setSavePath')"
-            style="max-width: 200px"
+            style="flex: 0 1 200px; min-width: 160px"
+            :popup-match-select-width="false"
             @change="resetDownloadOptions"
           />
           <a-auto-complete
@@ -998,14 +999,16 @@ async function createKeepUploadTask() {
             :options="savePathOptions"
             size="small"
             :placeholder="t('KeepUploadTask.savePath')"
-            style="max-width: 200px"
+            style="flex: 1 1 300px; min-width: 220px"
+            :popup-match-select-width="false"
           />
           <a-auto-complete
             v-model:value="torrentLabel"
             :options="labelOptions"
             size="small"
             :placeholder="t('SentToDownloaderDialog.label')"
-            style="max-width: 200px"
+            style="flex: 0 1 200px; min-width: 160px"
+            :popup-match-select-width="false"
           />
           <a-button
             type="primary"
@@ -1027,6 +1030,19 @@ async function createKeepUploadTask() {
 </template>
 
 <style scoped lang="scss">
+/* 底部这一排原先三颗都写死 `max-width: 200px`、没有下限：台架在 1024 弹窗里量到保存路径
+   实际只有 106px 宽，四条候选全被截（`category:华语电影-2024年合集` 要 191px、
+   带 `$torrent.siteName$/$torrent.title$` 宏的那条要 321px），而下拉面板默认跟输入框同宽，
+   于是面板里也一样看不全。改成「有下限 + 可生长 + 放不下就整排换行」，
+   面板另走 popup-match-select-width=false 按内容定宽。
+   换行而不是压缩：这一排里三颗都是要读得清具体名称的候选，压谁都是把问题留下。
+   ⚠️ 那三颗的尺寸写在**行内 style**，不是忘了收成 class：antdv 的 Select / AutoComplete
+   根元素拿不到本组件的 `data-v-*`（台架实测 class 落上去了、scope 属性是空的），
+   scoped 规则选不中它们。 */
+.create-row {
+  flex-wrap: wrap;
+}
+
 /* 图标 + 站点名那一栏不参与收缩：站点名是短值，让它去挤压标题列（标题本来就有 ellipsis + 悬停全文）
    比让站名被截断更好读 —— 而这一栏存在的目的正是「看清是哪个站」。 */
 .site-cell {

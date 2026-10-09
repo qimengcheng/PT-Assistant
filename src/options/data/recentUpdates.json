@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-09 16:56:46",
-  "headSha": "9ae4c2a",
+  "generatedAt": "2026-10-09 17:08:07",
+  "headSha": "0df4a86",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.58.1",
+      "date": "2026-10-09 17:21:34",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「辅种检测」弹窗底部那一排不再把候选名称截断了：保存路径那栏原先被挤得只剩 106px，`category:` 那种分类名和带 `$torrent.*$` 宏的长路径全都看不全，下拉面板又跟它一样宽。现在这栏有下限还能自己变宽，候选面板按内容定宽，窗口窄的时候整排换行而不是把谁压没；这一排的控件之间也补上了间距（原先是六颗贴在一起）。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.58.0",
       "date": "2026-10-09 17:08:07",

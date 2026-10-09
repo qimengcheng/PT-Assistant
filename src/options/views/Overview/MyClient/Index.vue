@@ -56,6 +56,7 @@ import {
   suspendedDownloaders,
   autoRefreshRunning,
   globalRefreshInterval,
+  toPercent,
   useClientRefresh,
 } from "./utils.ts";
 
@@ -631,11 +632,13 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
         <!-- progress column -->
         <template v-else-if="column.key === 'progress'">
           <a-progress
+            v-if="toPercent(record.progress) !== null"
             type="circle"
-            :percent="record.progress"
+            :percent="toPercent(record.progress) ?? 0"
             :size="36"
             :stroke-color="record.isCompleted ? '#389e0d' : '#1890ff'"
           />
+          <span v-else class="text-grey">-</span>
         </template>
 
         <!-- state column -->

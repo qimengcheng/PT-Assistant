@@ -27,6 +27,7 @@ import type {
 import { sendMessage } from "@/messages.ts";
 import { formatSize, formatDate } from "@/options/utils.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
+import { toPercent } from "./utils.ts";
 
 import TorrentStateTd from "./TorrentStateTd.vue";
 
@@ -368,7 +369,9 @@ function formatTimestamp(timestamp: number | undefined): string {
             <TorrentStateTd :item="torrent" />
           </a-descriptions-item>
           <a-descriptions-item :label="t('MyClient.table.progress')">
-            {{ torrent.progress.toFixed(2) }}%
+            <!-- 不直接 `progress.toFixed(2)`：那一格拿到过非数字的 progress，toFixed 当场抛，
+                 整张详情弹窗跟着空白。判据与列表那一格共用 utils.ts 的 toPercent。 -->
+            {{ toPercent(torrent.progress) === null ? "-" : `${toPercent(torrent.progress)}%` }}
           </a-descriptions-item>
           <a-descriptions-item :label="t('MyClient.table.size')">
             {{ formatSize(torrent.totalSize) }}

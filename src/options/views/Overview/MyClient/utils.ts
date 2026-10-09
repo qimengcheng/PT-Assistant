@@ -6,6 +6,22 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useI18n } from "vue-i18n";
 
+/**
+ * 进度只可能是「一个 0~100 的数」，不是的话就当没有（返回 null），不许替下载器编一个。
+ *
+ * 为什么要这一道：antd 的圆环把标签写成 `String(percent) + "%"`，percent 收到数组时不报错，
+ * 而是把整串数字原样画进 36px 的圆里、逗号处照换行 —— 2026-10-09 用户截图里那四行叠在一起
+ * 的数字（98.448 / 2715.7 / 41724 / 2%）就是这么来的，最后一个才是真进度。
+ * 同一份数据在「种子详情」里更狠：`progress.toFixed(2)` 直接抛 TypeError，整张详情弹窗空白。
+ */
+export function toPercent(raw: unknown): number | null {
+  const n =
+    typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : Number.NaN;
+  if (!Number.isFinite(n)) return null;
+  // 一位小数：qBittorrent 报的是 0.98448 这种原值，画成「98.448%」同样是读不出来的噪声
+  return Math.min(100, Math.max(0, Math.round(n * 10) / 10));
+}
+
 // ── module-level shared state ─────────────────────────────────────────────
 
 /** Loaded torrent map keyed by clientId, shared between Index.vue and ClientStatusDialog.vue. */

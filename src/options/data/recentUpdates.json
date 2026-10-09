@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-09 22:57:22",
-  "headSha": "719a046",
+  "generatedAt": "2026-10-09 23:11:58",
+  "headSha": "3e4b945",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.61.1",
+      "date": "2026-10-09 23:11:58",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "辅种任务展开出来的那一列种子，右边那颗「换成基准」的箭头不再跑到格子外面了（以前它会伸出列宽，把整张表顶出一条横向滚动条）；操作那一列按实测宽度加宽，英文那种更长的标签现在会在格子里换行而不是溢出去。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.61.0",
       "date": "2026-10-09 22:57:22",

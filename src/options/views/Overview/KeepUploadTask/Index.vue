@@ -120,7 +120,17 @@ const columns = computed<TableColumnsType<ITaskRow>>(() => [
     sorter: (a, b) => a.task.time - b.task.time,
     ...persistedSort("time"),
   },
-  { title: t("common.action"), key: "action", align: "center", width: 180 },
+  {
+    title: t("common.action"),
+    key: "action",
+    align: "center",
+    // 210 是量出来的，不是估的（台架 ?m=row，真 DOM）：条目行那一格最宽的是
+    // 「发送这一条并换它当基准」+ 那颗「↑」= 194px，加上上下内衬 8+8 正好 210。
+    // 原先写 180 时内容比格子宽 21px，居中对齐就把「↑」一半推到列外，
+    // 而 `.ant-table-content` 是 overflow:auto —— 伸出去的那截直接把它撑出一条横向滚动条。
+    // 英文标签更长，所以那一格另外给了 wrap（见模板里那颗 a-space）：宁可长一行也不许溢出到列外。
+    width: 210,
+  },
 ]);
 
 /**
@@ -793,7 +803,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       :loading="loading"
       :pagination="pagination"
       :expandable="{ showExpandColumn: true }"
-      :scroll="{ x: 1350 }"
+      :scroll="{ x: 1380 }"
       :row-selection="{
         selectedRowKeys: selectedTasks,
         onChange: (keys: (string | number)[]) => (selectedTasks = keys as TKeepUploadTaskKey[]),
@@ -982,7 +992,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           <!-- 条目行这一格：那颗文字键做完「只发这条 + 发成了再换基准」（拆成两颗会留下一种错法：
                点了换基准却没发送，任务就挂在一条根本没发出去的种子上），后面单独的「↑」是只换基准。
                同上面那条「按住不给点而不是藏起来」的判据：第一条本来就是基准、基准在下载器里时换基准也没有对象 -->
-          <a-space v-else :size="0">
+          <a-space v-else :size="0" wrap>
             <a-button
               size="small"
               type="link"

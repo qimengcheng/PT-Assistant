@@ -161,6 +161,24 @@ export async function getRemoteTorrentFile(options: AxiosRequestConfig = {}): Pr
 
   return {
     name: torrentName,
+    /**
+     * 下面这几项必须从 `parsedInfo` 上取。原先这里只返回 name/metadata/info，
+     * 而接口把 infoHash / files / pieces / pieceLength / length 都声明好了 —— 那句 `as ParsedTorrent`
+     * 把「一个都没返回」这件事在类型上糊掉了，所以既不进 vue-tsc 也不进构建，纯静默。
+     *
+     * 后果有两条（都在 Node 里拿自造的 torrent 量过，见 .tmp-build/probe-remote-torrent-shape.mjs）：
+     * ① 辅种任务里每条的 hash 记成空串 → 「回查做种状态」一条都对不上账；
+     * ② 清单和 piece 全空 → 多文件种的第 2 层指纹退化成「单文件 · 总大小」那一份常量。
+     *    这一条比"算不出来"更糟：任何一颗**总大小相同**的种子都会和它判成相等，
+     *    误判方向正好是 files.ts 顶部写明的最危险那一边（判成"本地已有"→ 校验失败重下）。
+     *
+     * 末尾那个 `as ParsedTorrent` 已删：留着它，下次少返回任何字段仍然只是"类型上过得了"。
+     */
+    infoHash: parsedInfo.infoHash,
+    files: parsedInfo.files,
+    length: parsedInfo.length,
+    pieceLength: parsedInfo.pieceLength,
+    pieces: parsedInfo.pieces,
     metadata: {
       arraybuffer: req.data,
       buffer: metaDataBuffer,
@@ -168,5 +186,5 @@ export async function getRemoteTorrentFile(options: AxiosRequestConfig = {}): Pr
       blob: () => new Blob([req.data], { type: "application/x-bittorrent" }),
     },
     info: parsedInfo,
-  } as ParsedTorrent;
+  };
 }

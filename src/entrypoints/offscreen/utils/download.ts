@@ -20,11 +20,7 @@ import {
 import type { ITorrent } from "@ptd/site";
 
 import { onMessage, sendMessage } from "@/messages.ts";
-import {
-  buildTitleSizeKey,
-  computeFilesFingerprint,
-  samplePieces,
-} from "@/shared/fingerprint/index.ts";
+import { buildTorrentInfoForVerification } from "./torrentVerify.ts";
 import type {
   IConfigPiniaStorageSchema,
   ITorrentDownloadMetadata,
@@ -129,46 +125,8 @@ export async function getTorrentInfoForVerification(torrent: ITorrent) {
   downloadRequestConfig.responseType = "arraybuffer";
 
   const parsedTorrent = await getRemoteTorrentFile(downloadRequestConfig);
-  const info = parsedTorrent.info;
-
-  /**
-   * 第 2 层：文件清单指纹。
-   *
-   * 单文件种（没有 info.files，只有 info.length）与多文件种必须走两条不同的
-   * 指纹格式，否则「一个 40G 的单文件」会和「一堆文件加起来 40G 的多文件种」
-   * 撞出同一个指纹。
-   *
-   * rootName 传种子名：parse-torrent 的 files[].path 是「根目录名 + 相对路径」
-   * 且用平台分隔符（Windows 上是 `\`），上层按根目录名精确剥离一层，两侧才对得上。
-   */
-  const isMultiFile = Array.isArray(info.files) && info.files.length > 0;
-  const filesFingerprint = await computeFilesFingerprint(
-    isMultiFile
-      ? {
-          rootName: parsedTorrent.name,
-          length: 0,
-          files: (parsedTorrent.files ?? []).map((f) => ({ path: f.path, length: f.length })),
-        }
-      : { rootName: parsedTorrent.name, length: info.length ?? parsedTorrent.length, files: [] },
-  );
-
-  // 第 3 层：piece 哈希抽样（权威但贵，所以只带抽样结果）
-  const piecesSample = samplePieces(parsedTorrent.pieces, { pieceLength: parsedTorrent.pieceLength });
-
-  // 返回可序列化的种子信息
-  return {
-    infoHash: parsedTorrent.infoHash ?? "",
-    name: info.name ?? "unknown",
-    length: info.length ?? 0,
-    files: (parsedTorrent.files ?? []).map((f) => ({
-      path: f.path,
-      length: f.length,
-    })),
-    // 第 1 层用站点标题（各站标题写法差异很大，归一化后跨站可比）
-    titleKey: buildTitleSizeKey(torrent.title || parsedTorrent.name, torrent.size ?? parsedTorrent.length),
-    filesFingerprint,
-    piecesSample,
-  };
+  // 三层指纹怎么算、rootName 用哪一个，都在 torrentVerify.ts（那一份能直接跑断言，见那里的注释）
+  return await buildTorrentInfoForVerification(parsedTorrent, torrent);
 }
 
 onMessage("getTorrentInfoForVerification", async ({ data: torrent }) => await getTorrentInfoForVerification(torrent));

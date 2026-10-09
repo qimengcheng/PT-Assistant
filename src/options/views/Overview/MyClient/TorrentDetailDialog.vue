@@ -433,7 +433,10 @@ function formatTimestamp(timestamp: number | undefined): string {
             </template>
           </template>
         </a-table>
-        <a-alert v-else type="info" show-icon banner>{{ t("MyClient.detail.noFiles") }}</a-alert>
+        <!-- Alert 不渲染默认插槽，正文必须放 #message（见 SentToDownloaderDialog 同一条注释） -->
+        <a-alert v-else type="info" show-icon banner>
+          <template #message>{{ t("MyClient.detail.noFiles") }}</template>
+        </a-alert>
       </div>
 
       <!-- Peers -->
@@ -462,7 +465,9 @@ function formatTimestamp(timestamp: number | undefined): string {
             <template v-else-if="column.key === 'country'">{{ record.country || "-" }}</template>
           </template>
         </a-table>
-        <a-alert v-else type="info" show-icon banner>{{ t("MyClient.detail.noPeers") }}</a-alert>
+        <a-alert v-else type="info" show-icon banner>
+          <template #message>{{ t("MyClient.detail.noPeers") }}</template>
+        </a-alert>
       </div>
 
       <!-- Tracker 管理 -->
@@ -510,7 +515,9 @@ function formatTimestamp(timestamp: number | undefined): string {
             </template>
           </template>
         </a-table>
-        <a-alert v-else type="info" show-icon banner>{{ t("MyClient.detail.noTrackers") }}</a-alert>
+        <a-alert v-else type="info" show-icon banner>
+          <template #message>{{ t("MyClient.detail.noTrackers") }}</template>
+        </a-alert>
       </div>
     </template>
   </a-modal>

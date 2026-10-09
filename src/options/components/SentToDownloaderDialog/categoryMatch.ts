@@ -1,6 +1,10 @@
 /**
  * 「按种子自己的分类，从下载器的分类目录里挑一条」的判据。
  *
+ * 弹窗调的是 `resolveCategoryFolder`：先看用户记住的关联（`categoryAssoc`），再看
+ * `matchCategoryFolder` 那三档；两半都没挑出来时把种子的分类原样叫法带回去，界面上
+ * 「要不要新建分类 / 关联到已有分类」那句提示靠它。
+ *
  * 单独成模块只为了能直接跑断言（`.tmp-build/category-path-test.mjs` 用 Node 直接 import 这两个
  * 文件，不用 loader）：这段逻辑住在弹窗组件里时，验它得起一整个 vite 台架挂真弹窗 + 假 store。
  *
@@ -82,4 +86,64 @@ export function matchCategoryFolder(
   }
 
   return hit.length === 1 ? hit[0].folder : null;
+}
+
+/** 「记住的关联」表：折过小写的原样叫法 → 该下载器的分类目录（带前缀原样串） */
+export type TCategoryAssocMap = Record<string, string>;
+
+/**
+ * 关联表的键。折小写 + 去首尾空白和三档判据里 ①② 的比法是同一条（`Movies` 与 `movies`
+ * 本来就当同一类内容），不然用户记下的那条会因为大小写差一点而重新变成「没匹配上」。
+ */
+export function categoryAssocKey(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+/** 「新建分类」要写进保存路径的那条值：前缀原样带上，发送时才由下载器适配层换成真分类 */
+export function newCategoryFolder(raw: string): string {
+  return `${CATEGORY_FOLDER_PREFIX}${raw.trim()}`;
+}
+
+/**
+ * 只有 qBittorrent 认 `category:` 前缀（`packages/downloader/entity/qBittorrent.ts` 的
+ * `category_prefix`：命中前缀会转成 `autoTMM = true` + `category = 前缀后面那段`，
+ * 分类不存在时由 qBittorrent 在添加种子那一刻建出来）。别的下载器会把整串当成路径，
+ * 所以「新建分类」这个动作对它们没有意义，提示也就不要立。
+ */
+export function supportsCategoryFolders(type?: string): boolean {
+  return type === "qBittorrent";
+}
+
+/** 这一条目录是从哪来的：用户记住的关联 / 三档判据命中 */
+export type TCategoryHitSource = "assoc" | "match";
+
+export interface ICategoryResolution {
+  folder: string | null;
+  source: TCategoryHitSource | null;
+  /** 种子的分类原样叫法；一条都没有、或彼此不一致时为 null */
+  category: string | null;
+}
+
+/**
+ * 弹窗打开 / 换下载器时那一次完整判定：**记住的关联优先于三档判据**。
+ *
+ * 关联值不要求还留在 `folders` 里 —— 那份列表只是「推荐目录」的候选（用户自己维护、
+ * 也可能一直没同步），而 qBittorrent 对不存在分类的 add 会自建。真被删了也能自愈。
+ *
+ * 没定下来目录时把 `category` 带回去，界面上那句「要不要新建分类」就靠它。
+ */
+export function resolveCategoryFolder(
+  folders: readonly string[],
+  items: readonly ICategorySource[],
+  assoc?: TCategoryAssocMap,
+  siteMapOf?: (siteId: string) => Record<string, string> | undefined,
+): ICategoryResolution {
+  const category = sharedCategoryRaw(items);
+  if (!category) return { folder: null, source: null, category: null };
+
+  const remembered = assoc?.[categoryAssocKey(category)];
+  if (remembered) return { folder: remembered, source: "assoc", category };
+
+  const folder = matchCategoryFolder(folders, items, siteMapOf);
+  return folder ? { folder, source: "match", category } : { folder: null, source: null, category };
 }

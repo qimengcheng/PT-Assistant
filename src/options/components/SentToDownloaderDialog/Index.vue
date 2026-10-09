@@ -26,7 +26,13 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
 import type { IDownloaderMetadata } from "@/shared/types.ts";
 
-import { CATEGORY_FOLDER_PREFIX, matchCategoryFolder } from "./categoryMatch.ts";
+import {
+  CATEGORY_FOLDER_PREFIX,
+  categoryAssocKey,
+  newCategoryFolder,
+  resolveCategoryFolder,
+  supportsCategoryFolders,
+} from "./categoryMatch.ts";
 import { sendTorrentToDownloader } from "./utils.ts";
 
 const showDialog = defineModel<boolean>();
@@ -162,6 +168,9 @@ const labelItems = computed<IChoiceItem[]>(() => [
  * 打开弹窗 / 换下载器时，按种子自己的分类预选一条「分类目录」
  * （用户 2026-10-08：「点击发送到下载器时，自动按种子的分类匹配下载路径的分类目录」）。
  * 判据与「同档多解就不猜」那套规则在 categoryMatch.ts（那里能直接跑断言）。
+ *
+ * 2026-10-09 又加了一半：三档都没挑出来时不再静默走过，而是问用户「新建分类」还是
+ * 「关联到已有分类」，并把他选的记到这台下载器的 `categoryAssoc` 里（记住的那条优先于三档）。
  */
 const siteCategoryMaps = computed(() => {
   const out: Record<string, Record<string, string>> = {};
@@ -172,14 +181,108 @@ const siteCategoryMaps = computed(() => {
   return out;
 });
 
+interface ICategoryDecision {
+  /** 种子的分类原样叫法 */
+  raw: string;
+  /** 已经定下来的目录（带前缀原样串），还没定下来是 null */
+  folder: string | null;
+  /** folder 来自用户记住的关联，不是三档判据 */
+  fromMemory: boolean;
+  /** 「忽略」按这一条记，含下载器 id */
+  promptKey: string;
+  /** 值得问用户「要不要新建分类」 */
+  needPrompt: boolean;
+}
+
 /** 命中就把它填成保存路径；没命中不动当前值（沿用上次记住的那一档 / 下载器默认） */
 function applyAutoCategoryPath(downloader?: IDownloaderMetadata) {
-  const hit = matchCategoryFolder(
-    (downloader ?? selectedDownloader.value)?.suggestFolders ?? [],
+  const d = downloader ?? selectedDownloader.value;
+  const res = resolveCategoryFolder(
+    d?.suggestFolders ?? [],
     torrentItems,
+    d?.categoryAssoc,
     (siteId) => siteCategoryMaps.value[siteId],
   );
-  if (hit) addTorrentOptions.value.savePath = hit;
+  if (res.folder) addTorrentOptions.value.savePath = res.folder;
+
+  const raw = res.category;
+  categoryDecision.value = raw
+    ? {
+        raw,
+        folder: res.folder,
+        fromMemory: res.source === "assoc",
+        // 带上下载器 id：「忽略」只对本台生效，换一台该重新问
+        promptKey: `${d?.id ?? ""}::${raw}`,
+        // 认分类前缀的只有 qBittorrent，别处的「新建分类」是个假动作（整串会被当路径）
+        needPrompt: !res.folder && supportsCategoryFolders(d?.type),
+      }
+    : null;
+}
+
+/**
+ * 这一趟分类判定的结论，界面上那两条提示都由它派生：
+ * 命中了记住的关联 → 一条说明（附「不再记住」）；谁都没挑出来而这个下载器又认分类前缀
+ * → 问用户「新建分类」还是「关联到已有分类」。
+ */
+const categoryDecision = ref<ICategoryDecision | null>(null);
+
+/** 用户按过「忽略」的那一条（按 promptKey 记），本次打开之内不再重复问 */
+const dismissedPromptKey = ref("");
+
+/** 「记住这个关联」的勾选，默认记住 —— 用户原话就是「并记住这个关联」 */
+const rememberCategoryAssoc = ref(true);
+
+const showCategoryPrompt = computed(
+  () => !!categoryDecision.value?.needPrompt && dismissedPromptKey.value !== categoryDecision.value.promptKey,
+);
+
+/** 「关联到已有分类」的候选：只有带前缀那几条是分类，按盘符列的具体路径不算 */
+const categoryFolderCandidates = computed(() =>
+  (selectedDownloader.value?.suggestFolders ?? [])
+    .filter((f) => f.startsWith(CATEGORY_FOLDER_PREFIX))
+    .filter((f) => f.slice(CATEGORY_FOLDER_PREFIX.length).trim() !== ""),
+);
+
+/** 用户挑定一条目录（新建的那条也算）：填进保存路径，勾了「记住」就写进这台下载器的关联表 */
+async function chooseCategoryFolder(folder: string) {
+  const decision = categoryDecision.value;
+  if (!decision) return;
+  addTorrentOptions.value.savePath = folder;
+  const remember = rememberCategoryAssoc.value;
+  if (remember) await writeCategoryAssoc(decision.raw, folder);
+  dismissedPromptKey.value = "";
+  // 记住过就改挂那条「按你记住的关联」的说明（它带着「不再记住」，是唯一的反悔入口）；
+  // 没记住就整条收掉，这次的选择仍然是有效的，只是下次还要再问。
+  categoryDecision.value = { ...decision, folder, fromMemory: remember, needPrompt: false };
+  syncChoiceFields();
+}
+
+async function writeCategoryAssoc(raw: string, folder: string) {
+  const current = selectedDownloader.value;
+  if (!current) return;
+  await metadataStore.addDownloader({
+    ...current,
+    categoryAssoc: { ...(current.categoryAssoc ?? {}), [categoryAssocKey(raw)]: folder },
+  });
+  // addDownloader 写进 store 的是新对象，本地引用得跟过去，否则读到的还是旧的那份
+  selectedDownloader.value = metadataStore.downloaders[current.id] ?? null;
+}
+
+/** 忘掉这条关联，并立刻重新判一次：可能落到三档命中（安静填上），也可能变成要问用户 */
+async function forgetCategoryAssoc() {
+  const current = selectedDownloader.value;
+  const decision = categoryDecision.value;
+  if (!current || !decision) return;
+  const next = { ...(current.categoryAssoc ?? {}) };
+  delete next[categoryAssocKey(decision.raw)];
+  await metadataStore.addDownloader({ ...current, categoryAssoc: next });
+  selectedDownloader.value = metadataStore.downloaders[current.id] ?? null;
+  applyAutoCategoryPath();
+  syncChoiceFields();
+}
+
+function dismissCategoryPrompt() {
+  if (categoryDecision.value) dismissedPromptKey.value = categoryDecision.value.promptKey;
 }
 
 /** 高级设置面板默认展开：这里存的是 a-collapse 的 activeKey */
@@ -305,6 +408,8 @@ function dialogEnter() {
   // 每次打开都回到初始形态：初值只保第一次，用户手动折叠过 / 进过编辑态会残留
   advancedActiveKeys.value = ["advanced"];
   editingPaths.value = false;
+  categoryDecision.value = null;
+  dismissedPromptKey.value = "";
 
   // 如果是默认下载发送，则直接设置为快速发送到客户端模式
   if (isDefaultSend) {
@@ -363,13 +468,18 @@ function dialogLeave() {
     :after-close="dialogLeave"
   >
 
+    <!-- Alert 只读 title / message / description 这几个具名插槽，默认插槽的内容进不了界面
+         （实测：挂一个 <a-alert>{{ x }}</a-alert> 量到 .ant-alert 里文字是空串）。
+         下面三处原本就是这么写的，所以「正在发送」「没有可用下载器」一直是只剩图标的空条。 -->
     <a-alert v-if="isSending" type="info" show-icon>
-      {{
-        t("SentToDownloaderDialog.isSending", {
-          name: selectedDownloader?.name,
-          address: selectedDownloader?.address,
-        })
-      }}
+      <template #message>
+        {{
+          t("SentToDownloaderDialog.isSending", {
+            name: selectedDownloader?.name,
+            address: selectedDownloader?.address,
+          })
+        }}
+      </template>
     </a-alert>
 
     <a-form v-else layout="vertical">
@@ -443,22 +553,26 @@ function dialogLeave() {
           </template>
         </div>
         <a-alert v-else type="warning" show-icon>
-          {{
-            currentSiteIds.length > 0 && configStore.download.allowDownloaderFilterForSite
-              ? t("SentToDownloaderDialog.noDownloaderForSite")
-              : t("SentToDownloaderDialog.noDownloader")
-          }}
+          <template #message>
+            {{
+              currentSiteIds.length > 0 && configStore.download.allowDownloaderFilterForSite
+                ? t("SentToDownloaderDialog.noDownloaderForSite")
+                : t("SentToDownloaderDialog.noDownloader")
+            }}
+          </template>
         </a-alert>
       </div>
 
       <!-- 普通下载选项 -->
       <div v-else style="padding-bottom: 0">
         <a-alert v-if="downloaderOptions.length === 0" type="warning" show-icon style="margin-bottom: 12px">
-          {{
-            currentSiteIds.length > 0 && configStore.download.allowDownloaderFilterForSite
-              ? t("SentToDownloaderDialog.noDownloaderForSite")
-              : t("SentToDownloaderDialog.noDownloader")
-          }}
+          <template #message>
+            {{
+              currentSiteIds.length > 0 && configStore.download.allowDownloaderFilterForSite
+                ? t("SentToDownloaderDialog.noDownloaderForSite")
+                : t("SentToDownloaderDialog.noDownloader")
+            }}
+          </template>
         </a-alert>
 
         <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.selectDownloader')">
@@ -549,6 +663,74 @@ function dialogLeave() {
             class="choice-input"
             :placeholder="t('SentToDownloaderDialog.customPathPlaceholder')"
           />
+
+          <!-- 三档判据和「记住的关联」都没挑出来，而这个下载器认 `category:` 前缀：不再静默走过，
+               问用户「新建分类」还是「关联到已有分类」。新建那条不需要额外调 API —— 保存路径填成
+               `category:叫法`，发送时 qBittorrent 适配层会转成 autoTMM + category，分类不存在就由
+               客户端在添加种子时建出来。 -->
+          <a-alert
+            v-if="showCategoryPrompt"
+            type="warning"
+            show-icon
+            closable
+            class="category-notice"
+            @close="dismissCategoryPrompt"
+          >
+            <template #message>
+              {{ t("SentToDownloaderDialog.categoryNoMatch", { category: categoryDecision?.raw ?? "" }) }}
+            </template>
+            <template #description>
+              <div class="category-actions">
+                <a-button
+                  type="primary"
+                  size="small"
+                  @click="chooseCategoryFolder(newCategoryFolder(categoryDecision?.raw ?? ''))"
+                >
+                  {{ t("SentToDownloaderDialog.categoryCreate", { category: categoryDecision?.raw ?? "" }) }}
+                </a-button>
+                <a-dropdown v-if="categoryFolderCandidates.length > 0" trigger="click">
+                  <a-button size="small">{{ t("SentToDownloaderDialog.categoryLink") }}</a-button>
+                  <template #popupRender>
+                    <a-menu>
+                      <!-- ⚠️ 这里不能写 @click.stop：a-menu-item 的 onClick 回调传的是 info 对象
+                           而不是原生事件（见上面「更多选项」那处注释）。 -->
+                      <a-menu-item
+                        v-for="folder in categoryFolderCandidates"
+                        :key="folder"
+                        @click="chooseCategoryFolder(folder)"
+                      >
+                        <span class="choice-mono">{{ folder }}</span>
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+                <div class="switch-item">
+                  <a-switch v-model:checked="rememberCategoryAssoc" size="small" />
+                  <span class="switch-label">{{ t("SentToDownloaderDialog.categoryRemember") }}</span>
+                </div>
+              </div>
+            </template>
+          </a-alert>
+
+          <!-- 已经按记住的关联填上了：这条说明同时是唯一的反悔入口 —— 记错了又没人能在别处删掉它，
+               不给「不再记住」就等于一次点击永久生效。 -->
+          <a-alert v-else-if="categoryDecision?.fromMemory" type="info" show-icon class="category-notice">
+            <template #message>
+              <div class="category-remembered">
+                <span>
+                  {{
+                    t("SentToDownloaderDialog.categoryRemembered", {
+                      category: categoryDecision?.raw ?? "",
+                      folder: categoryDecision?.folder ?? "",
+                    })
+                  }}
+                </span>
+                <a-button type="link" size="small" @click="forgetCategoryAssoc">
+                  {{ t("SentToDownloaderDialog.categoryForget") }}
+                </a-button>
+              </div>
+            </template>
+          </a-alert>
         </a-form-item>
 
         <a-form-item v-if="downloaderOptions.length > 0" :label="t('SentToDownloaderDialog.label')">
@@ -804,5 +986,26 @@ function dialogLeave() {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 16px;
+}
+
+// 分类那两条提示挂在「保存路径」的候选底下，和上面的按钮行留 10px 缝（全站口径：不许零间距贴边）
+.category-notice {
+  margin-top: 10px;
+}
+
+// 「新建分类」/「关联到已有分类」/「记住这个关联」排一行，窄窗口下换行而不是把按钮压扁
+.category-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+
+// 说明文字和「不再记住」那颗链接之间也要有缝
+.category-remembered {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>

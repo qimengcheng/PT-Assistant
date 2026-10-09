@@ -53,6 +53,15 @@ export interface IDownloaderMetadata extends DownloaderBaseConfig {
   suggestFolders?: string[];
   suggestTags?: string[];
 
+  /**
+   * 「种子的分类叫法 → 这台下载器的分类目录」的关联记忆：发送到下载器的弹窗里，种子分类
+   * 既没匹配上目录、用户又选了「新建分类 / 关联已有分类」并勾了「记住这个关联」时写进来。
+   *
+   * 键是折过小写、去过首尾空白的原样叫法（判据见 `categoryMatch.ts` 的 `categoryAssocKey`），
+   * 值是带 `category:` 前缀的原样串。故意按下载器存：每台客户端的分类目录是各配一套。
+   */
+  categoryAssoc?: Record<string, string>;
+
   sortIndex?: number; // 排序索引，默认值取 100
   excludedSites?: string[]; // 排除的站点列表，在该列表中的站点不会显示该下载器
   autoFlushStatus?: number; // 自动刷新状态，0: 关闭，其他数值表示刷新间隔的秒数

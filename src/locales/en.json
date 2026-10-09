@@ -611,7 +611,13 @@
     }
   },
   "SentToDownloaderDialog": {
+    "categoryCreate": "Create category \"{category}\"",
+    "categoryForget": "Forget",
     "categoryGroup": "Categories",
+    "categoryLink": "Link to an existing category",
+    "categoryNoMatch": "The torrent category \"{category}\" has no matching folder in this downloader. Create it, or link to an existing one?",
+    "categoryRemember": "Remember this association",
+    "categoryRemembered": "Torrent category \"{category}\" goes to {folder}, using the association you saved",
     "customPathPlaceholder": "Enter a path manually, $torrent.title$ placeholders supported",
     "defaultPath": "Downloader default path",
     "editPaths": "Edit saved paths",

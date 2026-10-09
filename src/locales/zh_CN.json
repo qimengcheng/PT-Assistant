@@ -611,7 +611,13 @@
     }
   },
   "SentToDownloaderDialog": {
+    "categoryCreate": "新建分类「{category}」",
+    "categoryForget": "不再记住",
     "categoryGroup": "分类目录",
+    "categoryLink": "关联到已有分类",
+    "categoryNoMatch": "种子分类「{category}」在这个下载器里没有对应的分类目录，要新建一个，还是关联到已有的？",
+    "categoryRemember": "记住这个关联",
+    "categoryRemembered": "种子分类「{category}」按你记住的关联放进 {folder}",
     "customPathPlaceholder": "手动输入路径，支持 $torrent.title$ 等占位符",
     "defaultPath": "下载器默认路径",
     "editPaths": "编辑推荐目录",

@@ -55,6 +55,8 @@ export interface IKeepUploadTask {
   id: TKeepUploadTaskKey; // 任务id
   time: number; // 创建时间
   title: string; // 任务标题（第一个种子的标题）
+  /** 副标题：任务标题那一行下面显示的第二个标题，跟搜索结果那列同一个形状。旧任务没有这一项 */
+  subTitle?: string;
   size: number; // 种子大小
   downloadOptions: IKeepUploadTaskDownloadOptions; // 下载选项
   items: IKeepUploadTaskItem[]; // 种子列表

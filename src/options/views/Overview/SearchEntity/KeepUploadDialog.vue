@@ -738,6 +738,7 @@ async function createKeepUploadTask() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       time: Date.now(),
       title: verifiedList[0].data.title || "Unknown",
+      subTitle: verifiedList[0].data.subTitle,
       size: verifiedList[0].data.size || 0,
       downloadOptions,
       // 单条模式：基准是下载器里那条，不在 items 里。任务页靠这个标记决定

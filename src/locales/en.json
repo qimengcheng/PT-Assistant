@@ -100,13 +100,13 @@
     "setBaseSuccess": "Set as base torrent successfully",
     "table": {
       "count": "Count",
+      "savePath": "Save Path",
       "site": "Site",
       "size": "Size",
       "time": "Created At",
       "title": "Title"
     },
     "title": "Reseed Tasks",
-    "torrentCount": "Torrents: ",
     "updateError": "Update failed",
     "updateSuccess": "Updated successfully",
     "warning": {

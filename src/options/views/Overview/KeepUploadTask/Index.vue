@@ -37,6 +37,7 @@ const showUsageDialog = ref(false);
 const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
   { title: t("KeepUploadTask.table.site"), key: "site", align: "center", width: 72 },
   { title: t("KeepUploadTask.table.title"), dataIndex: "title", key: "title", align: "left", ellipsis: true },
+  { title: t("KeepUploadTask.table.savePath"), key: "savePath", align: "left", width: 220 },
   {
     title: t("KeepUploadTask.table.size"),
     dataIndex: "size",
@@ -62,6 +63,16 @@ const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
   },
   { title: t("common.action"), key: "action", align: "center", width: 180 },
 ]);
+
+/** 保存路径那一列第一行：列头已经写着「保存路径」，所以这里不再重复那个前缀 */
+function savePathLine(record: IKeepUploadTask) {
+  const path = record.downloadOptions?.savePath;
+  return `${record.downloadOptions?.clientName ?? "-"} -> ${path || t("KeepUploadTask.defaultPath")}`;
+}
+
+function baseLocalLine(record: IKeepUploadTask) {
+  return `${t("KeepUploadTask.baseLocal")}${record.baseLocal?.name ?? ""}`;
+}
 
 async function loadTasks() {
   loading.value = true;
@@ -269,7 +280,11 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       </a-flex>
     </a-flex>
 
-    <!-- 面板只负责给表格一块白底表面；这页的表格没有 scroll.y，内部滚动就由面板接管 -->
+    <!-- 面板只负责给表格一块白底表面；这页的表格没有 scroll.y，内部滚动就由面板接管。
+         scroll 只给 x 不给 y：fixed 布局下标题列是唯一的自适应列，窗口比「其它列宽合计」还窄时
+         它会被压成 0 宽（实测 822px 视口下标题列 clientWidth = 0，整行看不见标题）。
+         这条 min-width 给标题留出下限，窗口再窄就横向滚动，而不是把标题挤没；
+         宽窗口下 min-width:100% 仍然铺满，标题跟着变宽。 -->
     <div class="page-panel">
     <a-table
       bordered
@@ -278,6 +293,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       :loading="loading"
       :pagination="false"
       :expandable="{ showExpandColumn: true }"
+      :scroll="{ x: 1200 }"
       :row-selection="{
         selectedRowKeys: selectedTasks,
         onChange: (keys: (string | number)[]) => (selectedTasks = keys as TKeepUploadTaskKey[]),
@@ -290,31 +306,46 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           <SiteFavicon :site-id="record.items[0]?.site" :size="18" />
         </template>
 
+        <!-- 这一格只放标题：主标题 + 副标题两行，和搜索结果那一列同一个形状。
+             保存路径 / 基准种子原先挤在这里，现在自成一列（见下面的 savePath 分支）。
+             每行外面包一层 div：a-typography 的单行省略是 inline-block，
+             两个挨在一起的 inline-block 会并排而不是换行。 -->
         <template v-else-if="column.key === 'title'">
           <div>
-            <!-- 标题可能很长：用 a-typography-text 的 ellipsis.tooltip 一步拿到「截断 + 悬停完整文案」。
-             原来是 <a class="text-truncate">，而 <a> 是 inline 元素，text-overflow 对 inline 不生效，
-             标题实际上从不截断，一直把表格单元格撑宽。 -->
-            <a-typography-text class="task-title" :ellipsis="{ tooltip: record.title }">
-              <a
-                :href="record.items[0]?.link"
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                class="text-decoration-none"
-              >
-                {{ record.title }}
-              </a>
-            </a-typography-text>
-            <div class="text-body-small text-grey text-no-wrap">
-              {{ t("KeepUploadTask.savePath") }}{{ record.downloadOptions?.clientName }} ->
-              {{ record.downloadOptions?.savePath || t("KeepUploadTask.defaultPath") }}
+            <div>
+              <a-typography-text class="task-title" :ellipsis="{ tooltip: record.title }">
+                <a
+                  :href="record.items[0]?.link"
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  class="text-decoration-none"
+                >
+                  {{ record.title }}
+                </a>
+              </a-typography-text>
+            </div>
+            <div v-if="record.subTitle">
+              <a-typography-text class="task-subtitle" :ellipsis="{ tooltip: record.subTitle }">
+                {{ record.subTitle }}
+              </a-typography-text>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="column.key === 'savePath'">
+          <div>
+            <div>
+              <a-typography-text class="task-line" :ellipsis="{ tooltip: savePathLine(record) }">
+                {{ savePathLine(record) }}
+              </a-typography-text>
             </div>
             <!-- 基准不在任务里的那种任务：数据是下载器里已有的另一条，得说清楚是哪条，
                  否则用户看到的是「只有一颗种子的辅种任务」，不知道它在往什么上挂 -->
-            <div v-if="record.baseLocal" class="text-body-small text-grey text-no-wrap">
-              {{ t("KeepUploadTask.baseLocal") }}{{ record.baseLocal.name }}
+            <div v-if="record.baseLocal">
+              <a-typography-text class="task-line" :ellipsis="{ tooltip: baseLocalLine(record) }">
+                {{ baseLocalLine(record) }}
+              </a-typography-text>
             </div>
-            <div class="text-body-small">{{ t("KeepUploadTask.torrentCount") }}{{ record.items.length }}</div>
           </div>
         </template>
 
@@ -382,6 +413,10 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
               <a :href="subItem.link" target="_blank" rel="noopener noreferrer nofollow">
                 {{ subItem.title }}
               </a>
+              <!-- 副标题：和上面主标题那一列一样，逐条也要有两行（旧任务里没这一项，就不出这一行） -->
+              <div v-if="subItem.subTitle" class="text-body-small text-grey">
+                {{ subItem.subTitle }}
+              </div>
               <div class="text-body-small text-grey">
                 {{ formatSize(subItem.size) }}, {{ t("KeepUploadTask.seeders") }}{{ subItem.seeders ?? "-" }},
                 {{ t("KeepUploadTask.leechers") }}{{ subItem.leechers ?? "-" }}
@@ -433,6 +468,15 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 .task-title {
   font-size: 14px;
   font-weight: 500;
+}
+
+/* 副标题与保存路径那两行要「比标题小一档、灰」。
+   写成带 data-v 的选择器才抢得过 antd 的 `.ant-typography`（同特异度、cssinjs 运行时注入在后面），
+   这也是上面 .task-title 能生效的同一个原因 —— 别改回挂 .text-grey / .text-body-small。 */
+.task-subtitle,
+.task-line {
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .task-items {

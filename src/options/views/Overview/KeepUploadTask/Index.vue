@@ -76,9 +76,9 @@ function persistedSort(key: string) {
 }
 
 // computed：表头有 t()，setup 里一次性求值的话切语言不会重算
-const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
+const columns = computed<TableColumnsType<ITaskRow>>(() => [
   { title: t("KeepUploadTask.table.site"), key: "site", align: "center", width: 72 },
-  { title: t("KeepUploadTask.table.title"), dataIndex: "title", key: "title", align: "left", ellipsis: true },
+  { title: t("KeepUploadTask.table.title"), key: "title", align: "left", ellipsis: true },
   { title: t("KeepUploadTask.table.savePath"), key: "savePath", align: "left", width: 220 },
   {
     title: t("KeepUploadTask.recheck.col"),
@@ -86,17 +86,17 @@ const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
     align: "center",
     width: 120,
     // 排的是结论的严重度档位，不是那一格显示的文字 —— 文字带着条数，
-    // 按字符串排会让「10 条在做种」排在「2 条在做种」前面
-    sorter: (a, b) => reseedRank(a) - reseedRank(b),
+    // 按字符串排会让「10 条在做种」排在「2 条在做种」前面。
+    // 排完只动任务行，条目行跟着自己的父行走（树形数据的排序发生在顶层）
+    sorter: (a, b) => reseedRank(a.task) - reseedRank(b.task),
     ...persistedSort("seedState"),
   },
   {
     title: t("KeepUploadTask.table.size"),
-    dataIndex: "size",
     key: "size",
     align: "right",
     width: 110,
-    sorter: (a, b) => a.size - b.size,
+    sorter: (a, b) => a.task.size - b.task.size,
     ...persistedSort("size"),
   },
   {
@@ -104,20 +104,76 @@ const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
     key: "count",
     align: "center",
     width: 80,
-    sorter: (a, b) => a.items.length - b.items.length,
+    sorter: (a, b) => a.task.items.length - b.task.items.length,
     ...persistedSort("count"),
   },
   {
     title: t("KeepUploadTask.table.time"),
-    dataIndex: "time",
     key: "time",
     align: "center",
     width: 170,
-    sorter: (a, b) => a.time - b.time,
+    sorter: (a, b) => a.task.time - b.task.time,
     ...persistedSort("time"),
   },
   { title: t("common.action"), key: "action", align: "center", width: 180 },
 ]);
+
+/**
+ * 表格行：任务行，加上它展开出来的条目行。两种行**共用同一批列**。
+ *
+ * 原先条目是 `#expandedRowRender` 里一个自由布局的 `<ul>` —— 那块内容不在 `<table>` 里，
+ * 列宽对不上，标题跑到中间、状态和按钮挤出「操作」列外（他 2026-10-09：「展开之后内容也要在
+ * 标题所在的列，现在完全乱的」）。改成 rc-table 的树形数据（`children`）后，子行由同一次
+ * flatten 渲染、和父行同一张 `<table>` 的同一批 `<col>`，对齐是结构给的，不靠抄宽度。
+ */
+type TTaskItem = IKeepUploadTask["items"][number];
+
+interface IItemRow {
+  id: string;
+  kind: "item";
+  task: IKeepUploadTask;
+  item: TTaskItem;
+  index: number;
+}
+
+interface ITaskRow {
+  id: TKeepUploadTaskKey;
+  kind: "task";
+  task: IKeepUploadTask;
+  children: IItemRow[];
+}
+
+type TTableRow = ITaskRow | IItemRow;
+
+/**
+ * 每次重新映射出新行对象，**不把 `children` 写回任务本身**：那些对象是要经
+ * `updateKeepUploadTask` 落进 IDB 的，塞进去就是往用户数据里多存一份派生字段。
+ * 所以模板里取任务一律走 `record.task`（条目行也带 `.task`，两种行同一个写法）。
+ */
+const tableRows = computed<ITaskRow[]>(() =>
+  tasks.value.map((task) => ({
+    id: task.id,
+    kind: "task" as const,
+    task,
+    children: task.items.map((item, index) => ({
+      id: `${String(task.id)}#${index}`,
+      kind: "item" as const,
+      task,
+      item,
+      index,
+    })),
+  })),
+);
+
+/** 条目行不给复选框：批量删除删的是任务，勾选一条子种子没有对应动作 */
+const rowCheckboxProps = (row: TTableRow) => (row.kind === "item" ? { style: { display: "none" } } : {});
+
+// —— 两种行共用的取值：条目行取自己那条，任务行取任务本身 ——
+const rowTitle = (row: TTableRow) => (row.kind === "item" ? row.item.title : row.task.title);
+const rowSubTitle = (row: TTableRow) => (row.kind === "item" ? row.item.subTitle : row.task.subTitle);
+const rowLink = (row: TTableRow) => (row.kind === "item" ? row.item.link : row.task.items[0]?.link);
+const rowSiteId = (row: TTableRow) => (row.kind === "item" ? row.item.site : row.task.items[0]?.site);
+const rowSize = (row: TTableRow) => (row.kind === "item" ? row.item.size : row.task.size);
 
 /** 保存路径那一列第一行：列头已经写着「保存路径」，所以这里不再重复那个前缀 */
 function savePathLine(record: IKeepUploadTask) {
@@ -553,13 +609,9 @@ function itemReseed(record: IKeepUploadTask, item: IKeepUploadTask["items"][numb
   return { color: RESEED_VERDICT_COLOR[status.verdict], text: reseedVerdictText.value[status.verdict] };
 }
 
-/** 展开列表的每一行：条目本身 + 序号 + 它在下载器那边的结论（模板里一处算好，别逐行调四遍） */
-function taskItemRows(record: IKeepUploadTask) {
-  return record.items.map((item, index) => ({ item, index, state: itemReseed(record, item) }));
-}
-
 // 发送基准种子到下载器
-function sendBaseTorrent(task: IKeepUploadTask) {  const items = task.items.slice(0, 1);
+function sendBaseTorrent(task: IKeepUploadTask) {
+  const items = task.items.slice(0, 1);
   void sendTorrentsToDownloader(task, items, "base");
 }
 
@@ -651,7 +703,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
     <a-table
       bordered
       :columns="columns"
-      :data-source="tasks"
+      :data-source="tableRows"
       :loading="loading"
       :pagination="pagination"
       :expandable="{ showExpandColumn: true }"
@@ -659,6 +711,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       :row-selection="{
         selectedRowKeys: selectedTasks,
         onChange: (keys: (string | number)[]) => (selectedTasks = keys as TKeepUploadTaskKey[]),
+        getCheckboxProps: rowCheckboxProps,
       }"
       row-key="id"
       size="small"
@@ -666,100 +719,120 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'site'">
-          <SiteFavicon :site-id="record.items[0]?.site" :size="18" />
+          <SiteFavicon :site-id="rowSiteId(record)" :size="18" />
         </template>
 
         <!-- 这一格只放标题：主标题 + 副标题两行，和搜索结果那一列同一个形状。
              保存路径 / 基准种子原先挤在这里，现在自成一列（见下面的 savePath 分支）。
-             每行外面包一层 div：a-typography 的单行省略是 inline-block，
-             两个挨在一起的 inline-block 会并排而不是换行。 -->
+             每行外面包一层 div：块级那一层才是裁切的主体（`text-overflow` 挂在不换行的块上才出省略号）。
+             条目行也走这一格（比任务标题小一档、不加粗），展开后标题就在标题列，不再另起一块。
+
+             这里刻意用 CSS 截断 + a-popover，不用 a-typography-text 的 ellipsis：Typography 的
+             ellipsis 要把子节点折成纯文本去量宽度，实测那一格渲染出来只剩一个注释占位和一段裸文本 ——
+             里面的 a 标签整个被丢掉，也就是说任务行的标题一直点不动（原先只有展开列表那颗能点）。
+             换成现在这个写法，两种行都是真链接，全文揭示也不走原生 title（同 TorrentTitleTd.vue 那处注释的理由）。
+             ⚠️ 这段注释里不许写字面的标签闭合串：模板解析器会把它当真的结束标签，整份 SFC 编译不过。 -->
         <template v-else-if="column.key === 'title'">
           <div>
-            <div>
-              <a-typography-text class="task-title" :ellipsis="{ tooltip: record.title }">
-                <a
-                  :href="record.items[0]?.link"
-                  target="_blank"
-                  rel="noopener noreferrer nofollow"
-                  class="text-decoration-none"
-                >
-                  {{ record.title }}
+            <div class="task-title text-truncate">
+              <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+                <template #content>
+                  <div class="reveal-text">{{ rowTitle(record) }}</div>
+                </template>
+                <a :href="rowLink(record)" target="_blank" rel="noopener noreferrer nofollow" class="text-decoration-none">
+                  {{ rowTitle(record) }}
                 </a>
-              </a-typography-text>
+              </a-popover>
             </div>
-            <div v-if="record.subTitle">
-              <a-typography-text class="task-subtitle" :ellipsis="{ tooltip: record.subTitle }">
-                {{ record.subTitle }}
-              </a-typography-text>
+            <div v-if="rowSubTitle(record)" class="task-subtitle text-truncate">
+              <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+                <template #content>
+                  <div class="reveal-text">{{ rowSubTitle(record) }}</div>
+                </template>
+                <span>{{ rowSubTitle(record) }}</span>
+              </a-popover>
+            </div>
+            <!-- 做种/下载人数只有条目行报得出；任务那一行看「种子数」列的条数 -->
+            <div v-if="record.kind === 'item'" class="task-subtitle">
+              {{ t("KeepUploadTask.seeders") }}{{ record.item.seeders ?? "-" }},
+              {{ t("KeepUploadTask.leechers") }}{{ record.item.leechers ?? "-" }}
             </div>
           </div>
         </template>
 
+        <!-- 保存路径是任务级的：条目行不重复父任务那一格（两行一样的字只会把行撑高） -->
         <template v-else-if="column.key === 'savePath'">
-          <div>
+          <div v-if="record.kind === 'task'">
             <div>
-              <a-typography-text class="task-line" :ellipsis="{ tooltip: savePathLine(record) }">
-                {{ savePathLine(record) }}
+              <a-typography-text class="task-line" :ellipsis="{ tooltip: savePathLine(record.task) }">
+                {{ savePathLine(record.task) }}
               </a-typography-text>
             </div>
             <!-- 基准不在任务里的那种任务：数据是下载器里已有的另一条，得说清楚是哪条，
                  否则用户看到的是「只有一颗种子的辅种任务」，不知道它在往什么上挂 -->
-            <div v-if="record.baseLocal">
-              <a-typography-text class="task-line" :ellipsis="{ tooltip: baseLocalLine(record) }">
-                {{ baseLocalLine(record) }}
+            <div v-if="record.task.baseLocal">
+              <a-typography-text class="task-line" :ellipsis="{ tooltip: baseLocalLine(record.task) }">
+                {{ baseLocalLine(record.task) }}
               </a-typography-text>
             </div>
           </div>
         </template>
 
         <template v-else-if="column.key === 'size'">
-          {{ formatSize(record.size) }}
+          {{ formatSize(rowSize(record)) }}
         </template>
 
-        <!-- 回查下载器那边折出来的结论。没查过时这一格写「没查过」而不是留空、更不是「正常」
+        <!-- 回查下载器那边折出来的结论。任务行报汇总（悬停看逐条明细），条目行报它自己那一档
+             （他 2026-10-09：「展开的列表里面每个种子都要有状态的」）。
+             没查过时这一格写「没查过」而不是留空、更不是「正常」
              —— 那一列替用户说过「没问题」而其实没看过，是会比报错更糟的谎。
              悬停看逐条明细，含客户端原样的状态串：判据要是不对，人自己能看出是哪一条折错了。 -->
         <template v-else-if="column.key === 'seedState'">
           <a-popover
-            v-if="reseedSummary(record)"
+            v-if="record.kind === 'task' && reseedSummary(record.task)"
             trigger="hover"
             placement="left"
             :mouse-enter-delay="0.4"
           >
             <template #content>
               <div class="reseed-detail">
-                <div v-for="row in reseedRows(record)" :key="row.key" class="reseed-detail-row">
+                <div v-for="row in reseedRows(record.task)" :key="row.key" class="reseed-detail-row">
                   <span class="reseed-detail-title">{{ row.title }}</span>
                   <span>{{ row.text }}</span>
                   <span v-if="row.raw" class="text-grey">{{ row.raw }}</span>
                 </div>
               </div>
             </template>
-            <a-tag :color="reseedSummary(record)?.color">{{ reseedSummary(record)?.text }}</a-tag>
+            <a-tag :color="reseedSummary(record.task)?.color">{{ reseedSummary(record.task)?.text }}</a-tag>
           </a-popover>
+          <a-tag v-else-if="record.kind === 'item'" :color="itemReseed(record.task, record.item).color">
+            {{ itemReseed(record.task, record.item).text }}
+          </a-tag>
           <span v-else class="text-body-small text-grey">{{ t("KeepUploadTask.recheck.state.idle") }}</span>
         </template>
 
         <template v-else-if="column.key === 'count'">
-          {{ record.items.length }}
+          {{ record.kind === "task" ? record.task.items.length : "" }}
         </template>
 
         <template v-else-if="column.key === 'time'">
-          {{ formatDate(record.time) }}
+          {{ record.kind === "task" ? formatDate(record.task.time) : "" }}
         </template>
 
         <template v-else-if="column.key === 'action'">
-          <a-space :size="0">
+          <a-space v-if="record.kind === 'task'" :size="0">
             <!-- baseLocal 那种任务里只有一条，而那一条就是「要挂上去的本站」，不是基准：基准在下载器里。
                  所以这两颗没有对象 —— 他 2026-10-09 要求的是**按住不给点**而不是藏起来（「这个按钮就应该是不可用的」），
                  藏起来会让人以为这一版没做这个功能，按住了 + 悬停说原因才是「这里确实不需要」。 -->
-            <a-tooltip :title="record.baseLocal ? t('KeepUploadTask.sendBaseDisabled') : t('KeepUploadTask.sendBaseTorrent')">
+            <a-tooltip
+              :title="record.task.baseLocal ? t('KeepUploadTask.sendBaseDisabled') : t('KeepUploadTask.sendBaseTorrent')"
+            >
               <a-button
                 size="small"
                 type="text"
-                :loading="sendingOf(record.id) === 'base'"
-                :disabled="!!record.baseLocal || !!sendingOf(record.id)"
-                @click="sendBaseTorrent(record)"
+                :loading="sendingOf(record.task.id) === 'base'"
+                :disabled="!!record.task.baseLocal || !!sendingOf(record.task.id)"
+                @click="sendBaseTorrent(record.task)"
               >
                 <template #icon>
                   <NumberOutlined />
@@ -767,27 +840,31 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
               </a-button>
             </a-tooltip>
             <a-tooltip
-              :title="record.baseLocal ? t('KeepUploadTask.sendOtherDisabled') : t('KeepUploadTask.sendOtherTorrents')"
+              :title="
+                record.task.baseLocal ? t('KeepUploadTask.sendOtherDisabled') : t('KeepUploadTask.sendOtherTorrents')
+              "
             >
               <a-button
                 size="small"
                 type="text"
-                :loading="sendingOf(record.id) === 'other'"
-                :disabled="!!record.baseLocal || !!sendingOf(record.id)"
-                @click="sendOtherTorrents(record)"
+                :loading="sendingOf(record.task.id) === 'other'"
+                :disabled="!!record.task.baseLocal || !!sendingOf(record.task.id)"
+                @click="sendOtherTorrents(record.task)"
               >
                 <template #icon>
                   <CopyOutlined />
                 </template>
               </a-button>
             </a-tooltip>
-            <a-tooltip :title="record.baseLocal ? t('KeepUploadTask.sendReseedOne') : t('KeepUploadTask.sendAllTorrents')">
+            <a-tooltip
+              :title="record.task.baseLocal ? t('KeepUploadTask.sendReseedOne') : t('KeepUploadTask.sendAllTorrents')"
+            >
               <a-button
                 size="small"
                 type="text"
-                :loading="sendingOf(record.id) === 'all'"
-                :disabled="!!sendingOf(record.id)"
-                @click="sendAllTorrents(record)"
+                :loading="sendingOf(record.task.id) === 'all'"
+                :disabled="!!sendingOf(record.task.id)"
+                @click="sendAllTorrents(record.task)"
               >
                 <template #icon>
                   <DownloadOutlined />
@@ -795,71 +872,48 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('KeepUploadTask.copyLinks')">
-              <a-button size="small" type="text" @click="copyLinksToClipboard(record)">
+              <a-button size="small" type="text" @click="copyLinksToClipboard(record.task)">
                 <template #icon>
                   <LinkOutlined />
                 </template>
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('common.remove')">
-              <a-button danger size="small" type="primary" @click="deleteTask(record)">
+              <a-button danger size="small" type="primary" @click="deleteTask(record.task)">
                 <template #icon>
                   <DeleteOutlined />
                 </template>
               </a-button>
             </a-tooltip>
           </a-space>
-        </template>
-      </template>
 
-      <template #expandedRowRender="{ record: subRecord }">
-        <ul class="task-items">
-          <li v-for="row in taskItemRows(subRecord as IKeepUploadTask)" :key="row.index" class="task-item">
-            <SiteFavicon :site-id="row.item.site" :size="16" />
-            <div class="task-item-main">
-              <a :href="row.item.link" target="_blank" rel="noopener noreferrer nofollow">
-                {{ row.item.title }}
-              </a>
-              <!-- 副标题：和上面主标题那一列一样，逐条也要有两行（旧任务里没这一项，就不出这一行） -->
-              <div v-if="row.item.subTitle" class="text-body-small text-grey">
-                {{ row.item.subTitle }}
-              </div>
-              <div class="text-body-small text-grey">
-                {{ formatSize(row.item.size) }}, {{ t("KeepUploadTask.seeders") }}{{ row.item.seeders ?? "-" }},
-                {{ t("KeepUploadTask.leechers") }}{{ row.item.leechers ?? "-" }}
-              </div>
-            </div>
-
-            <!-- 每一条自己的做种状态（他 2026-10-09：「展开的列表里面每个种子都要有状态的」）。
-                 原先只有徽标那一格给汇总，具体是哪一条不对得悬停才看得到 -->
-            <a-tag :color="row.state.color">{{ row.state.text }}</a-tag>
-
-            <!-- 「基准那条下得慢，想换个站下」那一趟：一颗键做完「只发这条 + 发成了再换基准」。
-                 拆成两颗会留下一种错法：点了换基准却没发送，任务就挂在一条根本没发出去的种子上 -->
+          <!-- 条目行这一格：那颗文字键做完「只发这条 + 发成了再换基准」（拆成两颗会留下一种错法：
+               点了换基准却没发送，任务就挂在一条根本没发出去的种子上），后面单独的「↑」是只换基准。
+               同上面那条「按住不给点而不是藏起来」的判据：第一条本来就是基准、基准在下载器里时换基准也没有对象 -->
+          <a-space v-else :size="0">
             <a-button
               size="small"
               type="link"
-              :loading="sendingOf(subRecord.id) === `one:${row.index}`"
-              :disabled="!!sendingOf(subRecord.id)"
-              @click="sendOneAndPromote(subRecord as IKeepUploadTask, row.index)"
+              :loading="sendingOf(record.task.id) === `one:${record.index}`"
+              :disabled="!!sendingOf(record.task.id)"
+              @click="sendOneAndPromote(record.task, record.index)"
             >
-              {{ row.index === 0 ? t("KeepUploadTask.sendThisOne") : t("KeepUploadTask.sendAndSetBase") }}
+              {{ record.index === 0 ? t("KeepUploadTask.sendThisOne") : t("KeepUploadTask.sendAndSetBase") }}
             </a-button>
-            <!-- 同一颗「按住而不是藏起来」的判据（上面操作列那两条注释）：基准在下载器里时「换基准」也没有对象 -->
             <a-tooltip :title="t('KeepUploadTask.setAsBaseTorrent')">
               <a-button
                 size="small"
                 type="text"
-                :disabled="row.index === 0 || !!subRecord.baseLocal || !!sendingOf(subRecord.id)"
-                @click="setAsBaseTorrent(subRecord as IKeepUploadTask, row.index)"
+                :disabled="record.index === 0 || !!record.task.baseLocal || !!sendingOf(record.task.id)"
+                @click="setAsBaseTorrent(record.task, record.index)"
               >
                 <template #icon>
                   <ArrowUpOutlined />
                 </template>
               </a-button>
             </a-tooltip>
-          </li>
-        </ul>
+          </a-space>
+        </template>
       </template>
 
     </a-table>
@@ -895,34 +949,25 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 }
 
 /* 副标题与保存路径那两行要「比标题小一档、灰」。
-   写成带 data-v 的选择器才抢得过 antd 的 `.ant-typography`（同特异度、cssinjs 运行时注入在后面），
-   这也是上面 .task-title 能生效的同一个原因 —— 别改回挂 .text-grey / .text-body-small。 */
+   `.task-line` 挂在 <a-typography-text> 上，写成带 data-v 的选择器才抢得过 antd 的 `.ant-typography`
+   （同特异度、cssinjs 运行时注入在后面）；标题/副标题那两格现在是自己包 div，不再需要这条，
+   但保留同一个写法 —— 别改回挂 .text-grey / .text-body-small（那两条是全局原子类，抢不过组件样式）。 */
 .task-subtitle,
 .task-line {
   font-size: 12px;
   color: #6b7280;
 }
 
-.task-items {
-  margin: 0;
-  padding: 0 0 0 40px;
-  list-style: none;
-}
-
-.task-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.task-item-main {
-  flex: 1 1 0;
-  min-width: 0;
+/* 标题浮层里的全文：换行铺开 + 宽度上限，同 TorrentTitleTd.vue 那一条（不设上限就是半屏一条长串）。
+   overflow-wrap 是给种子标题里那种无空格长串用的。 */
+.reveal-text {
+  max-width: 480px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* 回查那一列悬停里的明细：一行一条，标题吃剩下宽度并截断（种子标题动辄上百字符，
-   不截断会把浮层撑得比屏幕还宽），后面跟结论和客户端原样的状态串 */
+   不截断会把浮层撑得比屏幕还宽），后面跟结论和下载器那边原样的状态串 */
 .reseed-detail {
   max-width: 480px;
 }

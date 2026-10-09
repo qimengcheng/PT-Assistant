@@ -109,3 +109,28 @@ export function pickLocalBaseCandidates(
 export function autoSelectLocalBase(candidates: ILocalBaseCandidate[]): ILocalBaseCandidate | null {
   return candidates.find((c) => c.tier === "files" && c.pieces !== "mismatch") ?? null;
 }
+
+/** 与下载器里那条基准比对的结论。只有 same 才算「同一份数据」 */
+export type TBaseCompareVerdict = "same" | "different" | "unknown";
+
+/**
+ * 基准换成下载器里那条之后，逐条判「这条站点种子是不是同一份数据」。
+ *
+ * 口径和 [[autoSelectLocalBase]] 一致，只是方向反过来（那边是「挑哪条当基准」，
+ * 这边是「拿着基准判条目」）：
+ * - 任何一边算不出文件清单指纹 → `unknown`。**没有证据不等于不同**，界面要把它留给
+ *   人确认（对话框里那颗「添加到辅种列表」就是给出路），不能判死。
+ * - 第 3 层有反证（piece 抽样对不上）时把第 2 层的相同推翻成 `different` ——
+ *   同一套目录结构装不同内容是常事（换封面的再发布）。
+ */
+export function compareAgainstLocalBase(
+  target: IFingerprintComparable,
+  base: IFingerprintComparable,
+): { verdict: TBaseCompareVerdict; pieces: TPieceCompareResult } {
+  const pieces = comparePieceSamples(target.pieces, base.pieces);
+  const a = target.files?.fingerprint;
+  const b = base.files?.fingerprint;
+  if (!a || !b) return { verdict: "unknown", pieces };
+  if (a !== b) return { verdict: "different", pieces };
+  return { verdict: pieces === "mismatch" ? "different" : "same", pieces };
+}

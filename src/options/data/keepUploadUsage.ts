@@ -44,9 +44,9 @@ export const usageZh: IUsageDoc = {
       steps: [
         "去「搜索结果」页搜一遍，把同一部内容在几个站点上的条目用行首的复选框勾上。只勾一条也行 —— 那种情形是内容早就下完了，只要再挂上这一站。",
         "点结果列表上方那一排按钮里的分叉图标（悬停显示「辅种检测」），打开「辅种检测」对话框。",
-        "勾了多条时，对话框里排在第一条的就是「基准种子」：它是你本地已经有了、或者打算先下好的那一条；其余都是「其他种子」。",
-        "只勾一条时基准不在这一页里：对话框上方会多出一栏「基准种子（下载器里已有的那一条）」。它拿这条种子的文件清单去下载器里找，文件清单一致的那条替你选好；只按标题+大小对上的不算证据，只会列出来等你自己挑。",
-        "选下载器、填保存路径（标签可选），点「创建任务」。要让它点得动：勾多条时要验证通过并纳入的条目超过 1 条（基准 + 至少一条其他）并且下载器已经选上；只勾一条时还要已经选定一条下载器里的基准。",
+        "勾了多条时，对话框里排在第一条的就是「基准种子」：它是你本地已经有了、或者打算先下好的那一条；其余都是「其他种子」。想换一条当基准，点它那行右边的「用它当基准」（向上箭头），它会被挪到第一位，其余条目跟着按新基准重判。",
+        "基准也可以取下载器里已有的一条：对话框上方那一栏「基准种子（下载器里已有的那一条）」（勾多条时写的是「基准种子（也可以指定下载器里已有的一条）」）会拿列表第一条的文件清单去下载器里找，文件清单一致的那条替你选好；只按标题+大小对上的不算证据，只会列出来等你自己挑。指定了下载器那条之后，列表里全部条目都变成「要辅种的条目」，基准不再占其中一条。",
+        "选下载器、填保存路径（标签可选），点「创建任务」。要让它点得动：基准取列表第一条时，要验证通过并纳入的条目超过 1 条（基准 + 至少一条其他）并且下载器已经选上；基准取下载器那条时，只要有一条验证通过就行 —— 但只按标题+大小对上的基准不算证据，那一条的状态会写「算不出文件清单，需要你确认后手动加入」，点它右边的加号确认之后才点得动。",
       ],
     },
     {
@@ -65,7 +65,7 @@ export const usageZh: IUsageDoc = {
       title: "三、本地已有的那些，它不替你决定",
       points: [
         { text: "在「辅种检测」对话框里选上下载器之后，它会读一份本地种子指纹索引，把「本地已有」「同站已挂」「疑似：仅标题+大小匹配」这几类标出来。" },
-        { text: "默认只是标出来，不会悄悄把你本地已经有的那条从任务里拿掉 —— 要排除得自己勾「排除本地已有的」。" },
+        { text: "默认只是标出来，不会悄悄把你本地已经有的那条从任务里拿掉 —— 要排除得自己勾「排除本地已有的」。基准取的是下载器里那条时这颗开关会出现不了：那种任务里每一条都「本地已有」，那正是它成立的前提，照原样排除会把列表清空。" },
         { text: "「重建本地指纹索引」那颗按钮就在提示文字右边。有些下载器不支持导出文件清单，对话框上方会直接写明「该下载器不支持导出文件清单，只能按标题+大小粗筛」，这时候只能按标题+大小粗筛。" },
       ],
     },
@@ -126,9 +126,9 @@ export const usageEn: IUsageDoc = {
       steps: [
         "Go to 'Search Results', run a search, and tick the checkboxes beside the entries that are the same content on different sites. Ticking just one works too - that is the case where the data finished downloading long ago and you only need to attach this one site.",
         "Click the branch icon in the heading row above the result list (its tooltip reads 'Reseed Check') to open the 'Reseed Verification' dialog.",
-        "With several entries ticked, the one listed first is the 'Base Torrent': the one you already have, or the one you intend to download first. Everything else sits under 'Other Torrents'.",
-        "With a single entry the base is not on this page, so the dialog grows a 'Base torrent (an entry your downloader already has)' row at the top. It takes that torrent's file list and looks for the same data inside the downloader: an entry whose file list matches is selected for you. A match by title and size alone is not evidence - those are only listed for you to pick from.",
-        "Pick a downloader, set the save path (label optional), then press 'Create Task'. It only becomes pressable when more than 1 verified entry is included (the base plus at least one other) and a downloader is selected; with a single ticked entry it also needs a base picked from the downloader.",
+        "With several entries ticked, the one listed first is the 'Base Torrent': the one you already have, or the one you intend to download first. Everything else sits under 'Other Torrents'. To make a different entry the base, press 'Use this as the base' (the up arrow) beside it - it moves to first place and every other entry is re-judged against it.",
+        "The base can also be a torrent your downloader already has. The 'Base torrent (an entry your downloader already has)' row at the top (with several entries it reads 'Base torrent (optionally pick one your downloader already has)') takes the first entry's file list and looks for the same data inside the downloader: an entry whose file list matches is selected for you. A match by title and size alone is not evidence - those are only listed for you to pick from. Once a downloader entry is the base, every row in the list becomes an 'Entries to reseed' row; the base is no longer one of them.",
+        "Pick a downloader, set the save path (label optional), then press 'Create Task'. It becomes pressable when more than 1 verified entry is included (the base plus at least one other) and a downloader is selected. With a downloader entry as the base, one verified entry is enough - but an entry that only matched by title and size is not evidence: its status reads 'No file list to compare - confirm it yourself and add it', and pressing the plus beside it is what unlocks 'Create Task'.",
       ],
     },
     {
@@ -147,7 +147,7 @@ export const usageEn: IUsageDoc = {
       title: "3. What you already have is flagged, not decided for you",
       points: [
         { text: "In the 'Reseed Verification' dialog, once a downloader is selected it reads a local fingerprint index and flags entries as 'Already local', 'Seeding on same site' or 'Suspicious: title+size only'." },
-        { text: "Those are only markers. Nothing is quietly dropped from your task — to exclude them you have to tick 'Exclude already-local' yourself." },
+        { text: "Those are only markers. Nothing is quietly dropped from your task — to exclude them you have to tick 'Exclude already-local' yourself. That checkbox disappears when the base is a downloader entry: every row in that task is 'already local', which is the whole premise, so excluding them would empty the list." },
         { text: "'Rebuild local fingerprint index' sits right after that status line. Some clients cannot export a file list; then the top of the dialog says so ('This client cannot export a file list; only title+size screening') and only the title-and-size filter is available." },
       ],
     },

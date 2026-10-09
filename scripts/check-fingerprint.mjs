@@ -12,6 +12,7 @@ import {
   autoSelectLocalBase,
   buildFingerprintIndexLookup,
   buildTitleSizeKey,
+  compareAgainstLocalBase,
   comparePieceSamples,
   computeFilesFingerprint,
   decideFingerprintAction,
@@ -393,6 +394,30 @@ check(
   "diff,nofp-title,same,nofp-size",
 );
 check("目标算不出指纹时一条都不自动选中", autoSelectLocalBase(noTargetFp), null);
+
+// 基准定下来之后，逐条判「是不是同一份数据」（对话框换基准时走的就是这条）
+check("两边指纹都有且相同 → same", compareAgainstLocalBase({ files: fpB }, { files: fpA }).verdict, "same");
+check("两边指纹都有但不同 → different", compareAgainstLocalBase({ files: otherFp }, { files: fpA }).verdict, "different");
+check("目标算不出指纹 → unknown（没证据不判死）", compareAgainstLocalBase({ size: 4005 }, { files: fpA }).verdict, "unknown");
+check("基准算不出指纹 → unknown", compareAgainstLocalBase({ files: fpA }, { size: 4005 }).verdict, "unknown");
+check(
+  "piece 抽样一致时把证据记成 match",
+  compareAgainstLocalBase({ files: fpB, pieces: sample1 }, { files: fpA, pieces: sample1 }),
+  { verdict: "same", pieces: "match" },
+);
+check(
+  "piece 抽样对不上 → 把第 2 层的相同推翻成 different",
+  compareAgainstLocalBase(
+    { files: fpB, pieces: sample1 },
+    { files: fpA, pieces: samplePieces(tampered, { head: 4, tail: 4 }) },
+  ).verdict,
+  "different",
+);
+check(
+  "只有一边有抽样 → inconclusive，不影响第 2 层的 same",
+  compareAgainstLocalBase({ files: fpB, pieces: sample1 }, { files: fpA }),
+  { verdict: "same", pieces: "inconclusive" },
+);
 
 console.log(`\n通过 ${passed} 项，失败 ${failed} 项`);
 process.exit(failed === 0 ? 0 : 1);

@@ -2,6 +2,7 @@
 import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import {
+  ArrowUpOutlined,
   CheckOutlined,
   CloseOutlined,
   PlusOutlined,
@@ -18,6 +19,7 @@ import type { IKeepUploadTask, IKeepUploadTaskItem, IKeepUploadTaskDownloadOptio
 import {
   buildFingerprintIndexLookup,
   autoSelectLocalBase,
+  compareAgainstLocalBase,
   decideFingerprintAction,
   diffFileLists,
   matchLocalFingerprint,
@@ -73,7 +75,6 @@ interface IVerifiedItem {
 const verifiedItems = ref<Map<string, IVerifiedItem>>(new Map());
 const verifiedItemsOrder = ref<string[]>([]); // 保持顺序
 const baseTorrent = ref<ITorrentInfoForVerification | null>(null);
-const verifiedCount = ref(0);
 const creating = ref(false);
 /** 「怎么用」说明弹窗的开关（它挂在本弹窗的默认插槽里，见模板那条注释） */
 const showUsageDialog = ref(false);
@@ -118,12 +119,18 @@ const labelOptions = computed(() => suggestedLabels.value.map((x) => ({ value: x
 /** 只勾中一条 = 「下载器已经下完了，只要再挂这一站」那种辅种 */
 const isSingleMode = computed(() => torrentItems.length === 1);
 
-/** 单条模式下要辅的那一条。基准候选读它**下载回来的**指纹与大小，不读列表页那个约数 */
-const singleItem = computed(() => verifiedItems.value.get(verifiedItemsOrder.value[0]) ?? null);
+/**
+ * 列表里排第一的那一条。
+ *
+ * 它有两种身份：没指定下载器基准时它就是基准（其余是「其他种子」）；
+ * 只勾一条时它就是那唯一一条「要辅种的条目」。两种情形共用同一个取值处，
+ * 因为「基准候选」要找的是**已经下载回来的**那份指纹，而不是列表页的大小约数。
+ */
+const listItemBase = computed(() => verifiedItems.value.get(verifiedItemsOrder.value[0]) ?? null);
 
 /** 下载器里可能当基准的条目，按证据强度排好（files > 标题+大小 > 只大小） */
 const baseCandidates = computed(() => {
-  const info = isSingleMode.value ? singleItem.value?.torrent : null;
+  const info = listItemBase.value?.torrent;
   if (!info) return [];
   return pickLocalBaseCandidates(toComparable(info), localIndex.value);
 });
@@ -141,26 +148,51 @@ const baseOptions = computed(() =>
 /** 当前选中的那条候选（hash 已经不在候选里时是 null，下拉同时退回未选） */
 const chosenLocalBase = computed(() => baseCandidates.value.find((c) => c.entry.hash === localBaseHash.value) ?? null);
 
-// 索引与种子指纹谁后到都会重算候选。两条规矩：
+/** 生效的基准来自下载器。它压过列表第一条 —— 数据本来就在本地，不必再下一遍 */
+const useLocalBase = computed(() => !!chosenLocalBase.value);
+
+// 索引与种子指纹谁后到都会重算候选。三条规矩：
 // 1) 选中的那条没了就清空 —— 否则 a-select 会把一个内部 hash 显示在界面上；
-// 2) 只有第 2 层（文件清单）命中才代用户选，第 1 层的「疑似」一律留给人挑。
+// 2) 只有第 2 层（文件清单）命中才代用户选，第 1 层的「疑似」一律留给人挑；
+// 3) **只在只勾一条时代选**。勾了多条时「列表第一条当基准」本来就是成立的老路径，
+//    替用户改成下载器里那条会把他没选的种子当基准用，那是更难发现的错。
 watch(baseCandidates, (list) => {
-  if (!list.some((c) => c.entry.hash === localBaseHash.value)) localBaseHash.value = "";
-  if (!localBaseTouched.value && !localBaseHash.value) {
+  const before = localBaseHash.value;
+  if (!list.some((c) => c.entry.hash === before)) localBaseHash.value = "";
+  if (isSingleMode.value && !localBaseTouched.value && !localBaseHash.value) {
     localBaseHash.value = autoSelectLocalBase(list)?.entry.hash ?? "";
   }
+  // 代选一旦发生，那一条就从「免检的基准」变成「要和基准比的一条」，结论得重算
+  if (localBaseHash.value !== before) recompareAll();
 });
 
-function onLocalBaseChange(hash: string) {
+/** 下拉换了（含清空）之后所有条目的「与基准比对」结论都要重算 */
+function onLocalBaseChange(hash?: string) {
   localBaseTouched.value = true;
-  localBaseHash.value = hash;
+  localBaseHash.value = hash ?? "";
+  recompareAll();
+}
+
+/** 把列表里某一条挪到第一位当基准，其余条目的结论跟着重算 */
+function setItemBase(id: string) {
+  const index = verifiedItemsOrder.value.indexOf(id);
+  if (index <= 0) return;
+  const order = [...verifiedItemsOrder.value];
+  order.unshift(order.splice(index, 1)[0]);
+  verifiedItemsOrder.value = order;
+  baseTorrent.value = verifiedItems.value.get(id)?.torrent ?? null;
+  localBaseHash.value = "";
+  localBaseTouched.value = true;
+  recompareAll();
 }
 
 /** 基准那一档下面写的说明：靠哪一层选上的、要不要人复核 */
 const localBaseHint = computed(() => {
   const c = chosenLocalBase.value;
   if (!c) {
-    if (indexLoading.value || singleItem.value?.loading) return t("SearchEntity.KeepUploadDialog.localBase.working");
+    // 勾了多条又没选：这不是需要提醒的状态，列表第一条就是基准
+    if (!isSingleMode.value) return t("SearchEntity.KeepUploadDialog.localBase.byList");
+    if (indexLoading.value || listItemBase.value?.loading) return t("SearchEntity.KeepUploadDialog.localBase.working");
     if (baseCandidates.value.length > 0) return t("SearchEntity.KeepUploadDialog.localBase.pick");
     // 一条候选都没有，得分清是「下载器里确实没有」还是「压根没读到列表」——只有后者点重建才有救
     if ((localIndex.value?.entries.length ?? 0) === 0) return t("SearchEntity.KeepUploadDialog.localBase.noIndex");
@@ -176,13 +208,31 @@ const localBaseHint = computed(() => {
 // 是否可以创建任务
 const canCreateTask = computed(() => {
   if (!selectedDownloaderId.value) return false;
-  // 单条模式：基准来自下载器，任务里那一条就是「要挂上去的本站」，1 条就该能建
-  if (isSingleMode.value) return includedVerifiedCount.value >= 1 && !!chosenLocalBase.value;
-  return includedVerifiedCount.value > 1;
+  // 只勾一条时基准只能来自下载器：没选定基准就没有参照物，建出来的任务会把那一条当成基准再下一遍
+  if (isSingleMode.value && !useLocalBase.value) return false;
+  return includedVerifiedCount.value >= (useLocalBase.value ? 1 : 2);
 });
 
-/** 底部那一排（选下载器 / 路径 / 标签 / 创建）什么时候出现 */
-const showCreateRow = computed(() => (isSingleMode.value ? includedVerifiedCount.value >= 1 : includedVerifiedCount.value > 1));
+/**
+ * 底部那一排（选下载器 / 路径 / 标签 / 创建）什么时候出现。
+ *
+ * 判据故意**不是**「够不够条件创建」：这一排里有选下载器那颗，而本地索引要先读到才谈得上挑基准 ——
+ * 按结果藏起来会让用户挑完基准之后整排消失（看着像坏了），也没有入口去换下载器。
+ * 所以只要有一条不用再等下载就出现，能不能点由 canCreateTask 管。
+ */
+const showCreateRow = computed(() => includedItems.value.some((item) => !item.loading));
+
+/** 列表第一行上面那行小标题：基准从哪儿来，决定了「排在最前那条」到底是什么身份 */
+const firstHeaderKey = computed(() => {
+  if (isSingleMode.value) return "SearchEntity.KeepUploadDialog.reseedTarget";
+  if (useLocalBase.value) return "SearchEntity.KeepUploadDialog.reseedTargets";
+  return "SearchEntity.KeepUploadDialog.baseTorrent";
+});
+
+/** 能不能把某一条挪成基准：只有「基准取自列表第一条」那条路有意义，且它得已经拿到种子信息 */
+function canPromote(index: number, item: IVerifiedItem): boolean {
+  return index > 0 && !isSingleMode.value && !useLocalBase.value && !!item.torrent;
+}
 
 // 状态文本
 // computed：标签里有 t()，setup 里一次性求值的话切语言不会重算
@@ -194,6 +244,7 @@ const statusText = computed(() => ({
   failed: t("SearchEntity.KeepUploadDialog.status.failed"),
   downloadFailed: t("SearchEntity.KeepUploadDialog.status.downloadFailed"),
   missingFiles: t("SearchEntity.KeepUploadDialog.status.missingFiles"),
+  needManual: t("SearchEntity.KeepUploadDialog.status.needManual"),
 }));
 
 // 打开对话框时初始化
@@ -259,7 +310,9 @@ const localIndexText = computed(() => {
 
 /** 把「本地已有 / 同站已挂」的条目从待辅种列表里摘掉 */
 const excludedIds = computed(() => {
-  if (!excludeLocalDuplicates.value) return new Set<string>();
+  // 基准就在下载器里时这条开关必须失效：那种任务的**每一条**都「本地已有」——
+  // 那正是它成立的前提（拿已有的数据去挂这一站）。照原样排除会把整个列表清空。
+  if (!excludeLocalDuplicates.value || useLocalBase.value) return new Set<string>();
   return new Set(
     Array.from(verifiedItems.value.values())
       .filter((item) => item.verified && item.localDecision?.action === "exclude")
@@ -322,7 +375,6 @@ function startVerification() {
   verifiedItems.value = new Map();
   verifiedItemsOrder.value = [];
   baseTorrent.value = null;
-  verifiedCount.value = 0;
   localIndex.value = null;
   indexSupported.value = true;
   excludeLocalDuplicates.value = false;
@@ -388,6 +440,98 @@ async function getTorrent(torrent: ITorrent, id: string): Promise<ITorrentInfoFo
   }
 }
 
+/**
+ * 拿「当前基准」判某一条是不是同一份数据，结论直接写回这一条。
+ *
+ * 基准有两种来路，能用的层数不一样：
+ * - **下载器里那条**（`useLocalBase`）：只有第 2 层可用 —— 本地索引带的是算好的文件清单
+ *   指纹，不带原始文件清单，所以「逐条比对文件」那层兜底在这儿根本跑不起来。
+ *   任何一边算不出指纹就是 unknown：**没有证据不等于不是同一份**，界面把它留给人确认
+ *   （那颗「添加到辅种列表」就是出路），不能判死。
+ * - **列表第一条**（默认）：三层指纹 + 逐条兜底全都能用，而且它自己就是参照物、免检。
+ */
+function applyBaseComparison(item: IVerifiedItem) {
+  const info = item.torrent;
+  if (!info) return;
+  item.loading = false;
+  item.verified = false;
+  item.verifiedBy = undefined;
+  item.baseMatch = undefined;
+
+  if (useLocalBase.value) {
+    const base = chosenLocalBase.value!.entry;
+    const { verdict, pieces } = compareAgainstLocalBase(toComparable(info), base);
+    if (verdict === "same") {
+      item.verified = true;
+      item.verifiedBy = pieces === "match" ? "pieces" : "files";
+      item.status = statusText.value.success;
+    } else {
+      item.status = verdict === "unknown" ? statusText.value.needManual : statusText.value.failed;
+    }
+    applyLocalDecision(item);
+    return;
+  }
+
+  if (item === listItemBase.value) {
+    item.verified = true;
+    item.status = statusText.value.downloaded;
+    applyLocalDecision(item);
+    return;
+  }
+
+  const base = baseTorrent.value;
+  if (!base || !listItemBase.value?.verified) {
+    item.status = statusText.value.failed;
+    applyLocalDecision(item);
+    return;
+  }
+
+  // ── 与基准种子的比对：三层指纹 ──
+  // 把基准种子当成「本地已知的一条数据」，比对逻辑就只剩一条代码路径，
+  // 而且基准种子和候选种子都带 piece 哈希，第 3 层在这里是真能用的。
+  const baseLookup = buildFingerprintIndexLookup([toComparableEntry(base)]);
+  const baseMatch = matchLocalFingerprint(toComparable(info), baseLookup);
+  item.baseMatch = baseMatch;
+
+  if (info.infoHash && base.infoHash && info.infoHash === base.infoHash) {
+    // infohash 完全相同 —— 是同一个种子，不用再往下比
+    item.verified = true;
+    item.verifiedBy = "infoHash";
+  } else if (baseMatch.verdict === "identical") {
+    // 第 2 层（文件清单指纹）一致；抽样也对得上就是第 3 层确认过
+    item.verified = true;
+    item.verifiedBy = baseMatch.pieces === "match" ? "pieces" : "files";
+  } else {
+    // 兜底：逐条比对文件清单。
+    // ⚠️ 这里收的是 verdict !== "identical"，**包含 "different"**（即已确定不是同一份，
+    // 见 match.ts:146），而 legacyVerify 在长度一致且文件齐全时仍会返回 true、
+    // 把一个「已判定不同」的结果标成 verified。所以别把它读成「只在无结论时才走」。
+    item.verified = legacyVerify(info, base);
+    item.verifiedBy = "legacy";
+  }
+
+  item.status = item.verified
+    ? statusText.value.success
+    : // 没通过时顺手说明原因：是「基准种子更大、本地缺文件」还是压根不是同一份数据
+      hasAllFilesOf(info, base)
+      ? statusText.value.missingFiles
+      : statusText.value.failed;
+  applyLocalDecision(item);
+}
+
+/**
+ * 换基准之后重算每一条。
+ *
+ * 「换基准」有三条路：在下拉里选/清下载器那条、把列表里某条挪到第一位、以及索引晚到触发的代选。
+ * 三条都不需要重新下载种子 —— 比的是已经拿到手的指纹。
+ */
+function recompareAll() {
+  verifiedItems.value.forEach((item) => {
+    if (!item.torrent || item.loading) return;
+    applyBaseComparison(item);
+  });
+}
+
 function verification(torrent: ITorrentInfoForVerification | null, id: string) {
   // 边界检查：确保项仍然存在
   const item = verifiedItems.value.get(id);
@@ -397,86 +541,37 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
 
   if (isFirstItem) {
     // 第一个种子作为基准种子
-    if (!baseTorrent.value) {
-      baseTorrent.value = torrent;
-      item.loading = false;
+    if (baseTorrent.value) return;
+    baseTorrent.value = torrent;
+    item.loading = false;
 
-      if (torrent) {
-        item.torrent = torrent;
-        item.verified = true;
-        item.status = statusText.value.downloaded;
-        verifiedCount.value++;
-        applyLocalDecision(item);
-      } else {
-        item.verified = false;
-        item.status = statusText.value.failed;
-      }
-    }
-  } else {
-    // 等待基准种子下载完成
-    const baseItem = verifiedItems.value.get(verifiedItemsOrder.value[0]);
-    if (baseItem?.loading) {
-      setTimeout(() => verification(torrent, id), 200);
+    if (torrent) {
+      item.torrent = torrent;
+      applyBaseComparison(item);
       return;
     }
-
-    const result: Partial<IVerifiedItem> = {
-      loading: false,
-    };
-
-    if (!baseItem?.verified) {
-      result.status = statusText.value.failed;
-    }
-
-    if (!torrent || !baseItem?.verified) {
-      Object.assign(item, result);
-      return;
-    }
-
-    const baseTorrentInfo = baseTorrent.value!;
-
-    // ── 与基准种子的比对：三层指纹 ──
-    // 把基准种子当成「本地已知的一条数据」，比对逻辑就只剩一条代码路径，
-    // 而且基准种子和候选种子都带 piece 哈希，第 3 层在这里是真能用的。
-    const baseLookup = buildFingerprintIndexLookup([toComparableEntry(baseTorrentInfo)]);
-    const baseMatch = matchLocalFingerprint(toComparable(torrent), baseLookup);
-    result.baseMatch = baseMatch;
-
-    if (torrent.infoHash && baseTorrentInfo.infoHash && torrent.infoHash === baseTorrentInfo.infoHash) {
-      // infohash 完全相同 —— 是同一个种子，不用再往下比
-      result.verified = true;
-      result.verifiedBy = "infoHash";
-    } else if (baseMatch.verdict === "identical") {
-      // 第 2 层（文件清单指纹）一致；抽样也对得上就是第 3 层确认过
-      result.verified = true;
-      result.verifiedBy = baseMatch.pieces === "match" ? "pieces" : "files";
-    } else {
-      // 兜底：逐条比对文件清单。
-      // ⚠️ 原注释写「判不出来（比如两边都没算出指纹）时，**才**退回」——不对：
-      // 这里的 else 收的是 verdict !== "identical"，**包含 "different"**（即已确定不是同一份，
-      // 见 match.ts:146），而 legacyVerify 在长度一致且文件齐全时仍会返回 true、
-      // 把一个「已判定不同」的结果标成 verified。所以别把它读成「只在无结论时才走」。
-      result.verified = legacyVerify(torrent, baseTorrentInfo);
-      result.verifiedBy = "legacy";
-    }
-
-    result.torrent = torrent;
-    if (result.verified) {
-      verifiedCount.value++;
-    }
-
-    if (!result.status) {
-      result.status = result.verified
-        ? statusText.value.success
-        : // 没通过时顺手说明原因：是「基准种子更大、本地缺文件」还是压根不是同一份数据
-          hasAllFilesOf(torrent, baseTorrentInfo)
-          ? statusText.value.missingFiles
-          : statusText.value.failed;
-    }
-
-    Object.assign(item, result);
-    applyLocalDecision(item);
+    item.verified = false;
+    item.status = statusText.value.failed;
+    return;
   }
+
+  // 等待基准种子下载完成
+  const baseItem = verifiedItems.value.get(verifiedItemsOrder.value[0]);
+  if (baseItem?.loading) {
+    setTimeout(() => verification(torrent, id), 200);
+    return;
+  }
+
+  item.loading = false;
+  if (!baseItem?.verified) {
+    item.verified = false;
+    item.status = statusText.value.failed;
+    return;
+  }
+  if (!torrent) return;
+
+  item.torrent = torrent;
+  applyBaseComparison(item);
 }
 
 /** 指纹算不出来时的兜底：逐条比对文件清单（要求总大小一致） */
@@ -515,19 +610,19 @@ async function addToVerified(id: string) {
   const item = verifiedItems.value.get(id);
   if (item) {
     item.verified = true;
-    verifiedCount.value++;
     applyLocalDecision(item);
   }
 }
 
 function removeVerifiedItem(id: string) {
-  const item = verifiedItems.value.get(id);
-  if (!item) return;
-  if (item.verified) {
-    verifiedCount.value--;
-  }
+  const wasBase = verifiedItemsOrder.value[0] === id;
   verifiedItems.value.delete(id);
   verifiedItemsOrder.value = verifiedItemsOrder.value.filter((itemId) => itemId !== id);
+  // 删掉的正是基准时，剩下每一条比的都是「已经不在的那份数据」，必须按新基准重算
+  if (wasBase) {
+    baseTorrent.value = verifiedItems.value.get(verifiedItemsOrder.value[0])?.torrent ?? null;
+    recompareAll();
+  }
 }
 
 function reDownload(id: string) {
@@ -712,7 +807,7 @@ async function createKeepUploadTask() {
         </a-button>
       </a-tooltip>
       <a-checkbox
-        v-if="localLookup.entries.length > 0"
+        v-if="localLookup.entries.length > 0 && !useLocalBase"
         v-model:checked="excludeLocalDuplicates"
         class="text-body-small"
       >
@@ -720,16 +815,20 @@ async function createKeepUploadTask() {
       </a-checkbox>
     </div>
 
-    <!-- 只勾中一条：基准不在本任务里，得从下载器已有的种子里挑一条 -->
-    <div v-if="isSingleMode" class="local-base-row mb-2">
+    <!-- 基准也可以不取列表第一条：下载器里已经有同一份数据时，用它当基准就不必再下一遍。
+         只勾一条时这一栏是必需的（列表里没有第二条能当基准），多条时是可选的。 -->
+    <div v-if="selectedDownloaderId" class="local-base-row mb-2">
       <div class="text-body-small text-grey mb-1">
-        {{ t("SearchEntity.KeepUploadDialog.localBase.title") }}
+        {{
+          t(isSingleMode ? "SearchEntity.KeepUploadDialog.localBase.title" : "SearchEntity.KeepUploadDialog.localBase.optionalTitle")
+        }}
       </div>
       <a-select
         :value="localBaseHash || undefined"
         :options="baseOptions"
         :loading="indexLoading"
         :placeholder="t('SearchEntity.KeepUploadDialog.localBase.placeholder')"
+        allow-clear
         show-search
         option-filter-prop="label"
         style="width: 100%"
@@ -741,9 +840,9 @@ async function createKeepUploadTask() {
     <div class="keep-upload-list" style="max-height: 80vh">
       <template v-for="(item, index) in includedItems" :key="item.id">
         <div v-if="index === 0" class="text-body-small text-grey mb-1">
-          {{ isSingleMode ? t("SearchEntity.KeepUploadDialog.reseedTarget") : t("SearchEntity.KeepUploadDialog.baseTorrent") }}
+          {{ t(firstHeaderKey) }}
         </div>
-        <div v-if="index === 1" class="text-body-small text-grey mb-1">
+        <div v-if="index === 1 && !useLocalBase && !isSingleMode" class="text-body-small text-grey mb-1">
           {{ t("SearchEntity.KeepUploadDialog.otherTorrent") }}
         </div>
         <div class="d-flex align-center py-1">
@@ -784,13 +883,10 @@ async function createKeepUploadTask() {
           </div>
 
           <div class="d-flex ga-1">
+            <!-- 「有参照物可比」的两种来路：基准取列表第一条时要求它已经验证通过（所以只有 index>0 比得了）；
+                 基准取下载器那条时参照物一直在，第一条也允许人工确认 / 重下 -->
             <a-button
-              v-if="
-                includedItems[0]?.verified &&
-                !item.loading &&
-                !item.verified &&
-                index > 0
-              "
+              v-if="!item.loading && !item.verified && (useLocalBase || (index > 0 && includedItems[0]?.verified))"
               type="text"
               :title="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
               @click.stop="addToVerified(item.id)"
@@ -799,17 +895,21 @@ async function createKeepUploadTask() {
             </a-button>
 
             <a-button
-              v-if="
-                includedItems[0]?.verified &&
-                !item.loading &&
-                !item.torrent &&
-                index > 0
-              "
+              v-if="!item.loading && !item.torrent && (useLocalBase || (index > 0 && includedItems[0]?.verified))"
               type="text"
               :title="t('SearchEntity.KeepUploadDialog.redownload')"
               @click.stop="reDownload(item.id)"
             >
               <template #icon><SyncOutlined /></template>
+            </a-button>
+
+            <a-button
+              v-if="canPromote(index, item)"
+              type="text"
+              :title="t('SearchEntity.KeepUploadDialog.setAsBase')"
+              @click.stop="setItemBase(item.id)"
+            >
+              <template #icon><ArrowUpOutlined /></template>
             </a-button>
 
             <a-tooltip :title="item.status">

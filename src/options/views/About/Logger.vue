@@ -13,7 +13,14 @@ const logger = shallowRef<ILoggerItem[]>([]);
 
 // computed：标签里有 t()，setup 里一次性求值的话切语言不会重算
 const columns = computed<TableColumnsType<ILoggerItem>>(() => [
-  { title: "ID", dataIndex: "id", key: "id", width: 150 },
+  /**
+   * 这一格原来是 150 宽、且没有裁剪，于是 ID 直接画到 Time 列上（用户报「id 和时间列重叠」）。
+   * 数字是实测的：日志 id 是 21 位 nanoid（offscreen/utils/logger.ts:49），在本应用那套
+   * `13px system-ui / Microsoft YaHei` 下量到 151~165.4px，而 small 档内衬 8+8 只剩 134px 内容宽。
+   * 所以 190 = 最宽那条 165.4 + 内衬 16 + 余量；`ellipsis` 是兜底 ——
+   * 这张表因为 Message 带 ellipsis 已经是 fixed 布局，单元格默认不裁剪，内容再长就会溢出到邻格。
+   */
+  { title: "ID", dataIndex: "id", key: "id", width: 190, ellipsis: true },
   {
     title: "Time",
     dataIndex: "time",

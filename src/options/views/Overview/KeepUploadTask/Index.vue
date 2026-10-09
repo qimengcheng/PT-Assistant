@@ -23,6 +23,8 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
+import { withReseedSkipChecking } from "./sendOptions.ts";
+
 const { t } = useI18n();
 const runtimeStore = useRuntimeStore();
 const metadataStore = useMetadataStore();
@@ -157,13 +159,13 @@ async function sendTorrentsToDownloader(task: IKeepUploadTask, items: IKeepUploa
         "date:MM": formatDate(now, "MM"),
         "date:DD": formatDate(now, "dd"),
       };
-      const addTorrentOptions: CAddTorrentOptions = {
+      const addTorrentOptions: CAddTorrentOptions = withReseedSkipChecking({
         localDownload: true,
         // 与普通下载保持一致：是否暂停由下载器的“自动开始”设置决定。
         addAtPaused: !(downloader.feature?.DefaultAutoStart ?? true),
         savePath: task.downloadOptions.savePath || "",
         ...task.downloadOptions.addTorrentOptions,
-      };
+      });
 
       for (const key of ["savePath", "label"] as const) {
         if (!addTorrentOptions[key]) continue;

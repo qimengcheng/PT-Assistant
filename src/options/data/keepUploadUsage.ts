@@ -99,6 +99,7 @@ export const usageZh: IUsageDoc = {
       title: "五、发送时还会发生什么",
       points: [
         { text: "一添加就开始下载、还是先暂停，跟着该下载器自己的「发送种子时自动开始下载」开关走（在下载器设置里），「辅种任务」页不另做一个开关。" },
+        { text: "发出去的每一条都带着「跳过校验」：数据本来就在盘上，那一遍全量哈希只是把几十 G 再读一遍。该不该跳在创建任务那一步已经判过了 —— 只有文件清单和内容对得上的才会自动选中，对不上时要你自己确认。不认这个选项的下载器（qBittorrent 以外的）会照常校验。" },
         { text: "保存路径和标签里可以放占位符，发送时逐条替换：$torrent.title$、$torrent.subTitle$、$torrent.category$、$torrent.site$、$torrent.siteName$、$date:YYYY$、$date:MM$、$date:DD$。" },
         { text: "标题下面那行「保存路径：某下载器 -> 某路径」就是这个任务会落到哪里；没填的话那里写「默认路径」。" },
       ],
@@ -184,6 +185,7 @@ export const usageEn: IUsageDoc = {
       title: "5. What else happens when you send",
       points: [
         { text: "Whether a torrent starts immediately or is added paused follows that downloader's own 'Automatically start downloading when sending a torrent' switch (in the downloader settings). The 'Reseed Tasks' page adds no switch of its own." },
+        { text: "Every entry is sent with 'skip hash checking' on: the data is already on disk, so that pass would only reread tens of gigabytes. Whether it is safe to skip was already decided when the task was created - only entries whose file list and contents match are picked automatically, anything else needs your own confirmation. Downloaders that don't know this option (anything but qBittorrent) still check as usual." },
         { text: "The save path and label accept placeholders, substituted per entry: $torrent.title$, $torrent.subTitle$, $torrent.category$, $torrent.site$, $torrent.siteName$, $date:YYYY$, $date:MM$, $date:DD$." },
         { text: "The line under the title, 'Save Path: some downloader -> some path', is where this task will land. If nothing was set it reads 'Default Path'." },
       ],

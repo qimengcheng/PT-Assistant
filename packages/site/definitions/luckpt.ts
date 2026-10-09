@@ -21,6 +21,31 @@ export const siteMetadata: ISiteMetadata = {
 
   urls: ["https://pt.luckpt.de/"],
 
+  /**
+   * 这一站的列表皮肤不是经典 NexusPHP：表头那几列的标记从 `img.size` / `img.seeders` …
+   * 挪成了 `img.torrent-header-icon[alt="size"]`，而 NexusPHP 的「按表头猜列号」
+   * （`guessSearchFieldIndexConfig`，只认 class）对这套写法一列都猜不中 ——
+   * 于是 size / seeders / leechers / completed / comments / time 六列**根本没被指派选择器**，
+   * 界面上就是「大小 0.00 B、四个数字列空白、发布于 `-`」（不是解析错，是那几列没读）。
+   * 这一版每个数据格都带 `data-col`，直接按它点名，不再依赖表头顺序。
+   * 改前/改后各跑一次真解析链路对照：台架 .tmp-build/bench-luckpt。
+   */
+  search: {
+    ...SchemaMetadata.search,
+    selectors: {
+      ...SchemaMetadata.search!.selectors,
+      size: { selector: ['td[data-col="size"]'] },
+      seeders: { selector: ['td[data-col="seeders"]'] },
+      leechers: { selector: ['td[data-col="leechers"]'] },
+      completed: { selector: ['td[data-col="snatched"]'] },
+      comments: { selector: ['td[data-col="comments"]'] },
+      time: {
+        ...SchemaMetadata.search!.selectors!.time!,
+        selector: ['td[data-col="time"]'],
+      },
+    },
+  },
+
   levelRequirements: [
     {
       id: 0,

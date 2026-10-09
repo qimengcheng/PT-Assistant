@@ -537,7 +537,7 @@
       "title": "Reseed Verification",
       "reseedTarget": "Entry to reseed",
       "reseedTargets": "Entries to reseed",
-      "setAsBase": "Use this as the base",
+      "setAsBase": "Set as base torrent",
       "localBase": {
         "byFiles": "File lists match - selected for you",
         "byList": "Nothing picked - the first entry in the list is the base",

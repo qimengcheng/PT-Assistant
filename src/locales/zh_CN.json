@@ -537,7 +537,7 @@
       "title": "辅种检测",
       "reseedTarget": "要辅种的那一条",
       "reseedTargets": "要辅种的条目",
-      "setAsBase": "用它当基准",
+      "setAsBase": "设为基准种子",
       "localBase": {
         "byFiles": "文件清单一致，已替你选中",
         "byList": "没指定就用列表第一条当基准",

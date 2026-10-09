@@ -2,7 +2,6 @@
 import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import {
-  ArrowUpOutlined,
   CheckOutlined,
   CloseOutlined,
   PlusOutlined,
@@ -914,13 +913,15 @@ async function createKeepUploadTask() {
               <template #icon><SyncOutlined /></template>
             </a-button>
 
+            <!-- 原先是一颗向上的箭头图标，悬停才有说明：行右侧同时挂着三颗图标钮，
+                 「向上」看不出是「把这一条挪成基准」，所以直接写成文字。 -->
             <a-button
               v-if="canPromote(index, item)"
-              type="text"
+              type="link"
               :title="t('SearchEntity.KeepUploadDialog.setAsBase')"
               @click.stop="setItemBase(item.id)"
             >
-              <template #icon><ArrowUpOutlined /></template>
+              {{ t("SearchEntity.KeepUploadDialog.setAsBase") }}
             </a-button>
 
             <a-tooltip :title="item.status">

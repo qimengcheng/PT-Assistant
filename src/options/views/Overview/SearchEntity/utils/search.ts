@@ -9,6 +9,7 @@ import {
 } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";
+import { i18n } from "@/options/plugins/i18n.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
@@ -274,7 +275,10 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
     const searchSolution = await metadataStore.getSearchSolution(runtimeStore.search.searchPlanKey);
 
     if (!searchSolution) {
-      runtimeStore.showSnakebar(`搜索方案 [${searchPlanKey}] 不存在`, { color: "error" });
+      // 原来这里把方案 id 直接端进提示（`搜索方案 [nanoid] 不存在`）—— 那串 id 用户既读不懂也没法用，
+      // 而方案名在方案被删之后确实没了，所以提示只说该怎么做，id 留给控制台。
+      console.error("[SearchEntity] 搜索方案取不到: ", searchPlanKey);
+      runtimeStore.showSnakebar(i18n.t("SearchEntity.index.searchPlanGone"), { color: "error" });
       return;
     }
 
@@ -302,7 +306,10 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
     // isSearching 可能卡在 true（表格一直转圈），用户也看不到任何提示。
     console.error("[SearchEntity] doSearch failed", e);
     runtimeStore.search.isSearching = false;
-    runtimeStore.showSnakebar("搜索启动失败，请重试", { color: "error" });
+    // 原因必须进提示：这句以前只说「请重试」，而配置类错误重试一万次也不会好，
+    // 用户唯一的办法是开 F12 找那条 console。
+    const reason = e instanceof Error ? `${e.message}` : String(e);
+    runtimeStore.showSnakebar(i18n.t("SearchEntity.index.searchStartFailed", { reason }), { color: "error" });
   }
 }
 

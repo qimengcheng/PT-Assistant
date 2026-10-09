@@ -181,9 +181,21 @@ export const useMetadataStore = defineStore("metadata", {
       // 如果站点 isDead 或者 isOffline 则不返回搜索方案（ undefined ），调用该方法的地方需要额外判断
       return async (siteId: TSiteID): Promise<Record<string, ISearchEntryRequestConfig> | undefined> => {
         const siteUserConfig = state.sites[siteId];
+        /**
+         * 站点可能已经被删掉，但 `site:a,b,c` 这个作用域键、或某个已存搜索方案里还留着它的 id。
+         * 原来这里直接读 `.isOffline` 会抛 TypeError，而调用方是在 for 循环里 await 它 ——
+         * 一条脏 id 就能让整次搜索一个任务都不投，界面上只剩一句没有原因的「搜索启动失败，请重试」。
+         */
+        if (!siteUserConfig || siteUserConfig.isOffline) {
+          return;
+        }
+
+        // ⚠️ 这里**故意不包 try/catch**：取不到定义要么是扩展刚更新、旧标签页里的动态 chunk 404，
+        // 要么是这条定义真的没了。两种都必须响亮地冒到调用方去（doSearch 会把原因写进提示），
+        // 静默跳过就会把前者伪装成「请至少添加一个站点进行搜索」。
         const siteMetadata = await getDefinedSiteMetadata(siteId);
 
-        if (siteUserConfig.isOffline || siteMetadata.isDead) {
+        if (siteMetadata.isDead) {
           return;
         }
 
@@ -210,7 +222,7 @@ export const useMetadataStore = defineStore("metadata", {
     getSearchSolution(state) {
       return async (
         solutionId: TSolutionKey | `site:${string}` | "default" | "all",
-      ): Promise<ISearchSolutionMetadata> => {
+      ): Promise<ISearchSolutionMetadata | undefined> => {
         // 首先判断是否是约定的 "all"  "default"  "site:xxx,xxx" 站点搜索方案
         if (
           // 全部站点
@@ -251,7 +263,18 @@ export const useMetadataStore = defineStore("metadata", {
         }
 
         // 对于已经存在的搜索方案，其中如果有 id === "default" 的特殊情况，将其动态解开
-        const solution = state.solutions[solutionId] as ISearchSolutionMetadata;
+        const solution = state.solutions[solutionId] as ISearchSolutionMetadata | undefined;
+
+        /**
+         * 方案可能已经被删掉、而 `runtimeStore.search.searchPlanKey` 还记着它。
+         * 原来这里直接读 `solution.solutions` → TypeError → 一句没有原因的「搜索启动失败」。
+         * 返回 undefined 让调用方走它本来就有的那条「方案不存在」分支
+         * （`SetSearchSolution/Index.vue:144` 的 copySearchSolution 早就在判 undefined 了 ——
+         *   说明「取不到就返回 undefined」本来就是这个 getter 的约定）。
+         */
+        if (!solution) {
+          return;
+        }
 
         /**
          * ⚠️ 不要在 getter 里改state：

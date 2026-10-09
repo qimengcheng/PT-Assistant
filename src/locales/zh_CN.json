@@ -613,7 +613,9 @@
       "defaultSearchPlan": "默认搜索方案",
       "searchKeywordPlaceholder": "输入关键词开始搜索",
       "searchPlanSettings": "搜索方案设置",
-      "manageSnapshots": "搜索快照"
+      "manageSnapshots": "搜索快照",
+      "searchPlanGone": "刚才用的搜索方案已经不在了，请重新选一次搜索范围或搜索方案",
+      "searchStartFailed": "搜索启动失败：{reason}"
     },
     "siteFilter": {
       "all": "全部站点"

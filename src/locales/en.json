@@ -613,7 +613,9 @@
       "defaultSearchPlan": "Default search plan",
       "searchKeywordPlaceholder": "Enter keywords to start searching",
       "searchPlanSettings": "Search Plan Settings",
-      "manageSnapshots": "Search Snapshots"
+      "manageSnapshots": "Search Snapshots",
+      "searchPlanGone": "The search plan you were using no longer exists. Pick the search scope or plan again.",
+      "searchStartFailed": "Search failed to start: {reason}"
     },
     "siteFilter": {
       "all": "All Site"

@@ -100,6 +100,8 @@ export const usageZh: IUsageDoc = {
       points: [
         { text: "一添加就开始下载、还是先暂停，跟着该下载器自己的「发送种子时自动开始下载」开关走（在下载器设置里），「辅种任务」页不另做一个开关。" },
         { text: "发出去的每一条都带着「跳过校验」：数据本来就在盘上，那一遍全量哈希只是把几十 G 再读一遍。该不该跳在创建任务那一步已经判过了 —— 只有文件清单和内容对得上的才会自动选中，对不上时要你自己确认。不认这个选项的下载器（qBittorrent 以外的）会照常校验。" },
+        { text: "因为跳过了校验，「数据其实不在」不会以报错的形式出现，只会以状态的形式：所以发出去约 18 秒后，这一页会自己去下载器那边回查一次，结果写在「做种状态」那一列（把鼠标放上去能逐条看到，含客户端原样的状态串）。也能随时点工具条上的「回查做种状态」再查一遍。" },
+        { text: "回查判出来「没有正常做种」的那些（文件缺失、客户端报错、或者变成了正在下载），这一页会立刻替你把那一条暂停，并弹一条红色提示说清有几条、为什么。查不到、或还在校验中的不算失败，不会动它 —— qBittorrent 那边那份列表 15 秒才刷一次，刚发出去查不到是正常中间态。" },
         { text: "保存路径和标签里可以放占位符，发送时逐条替换：$torrent.title$、$torrent.subTitle$、$torrent.category$、$torrent.site$、$torrent.siteName$、$date:YYYY$、$date:MM$、$date:DD$。" },
         { text: "标题下面那行「保存路径：某下载器 -> 某路径」就是这个任务会落到哪里；没填的话那里写「默认路径」。" },
       ],
@@ -186,6 +188,8 @@ export const usageEn: IUsageDoc = {
       points: [
         { text: "Whether a torrent starts immediately or is added paused follows that downloader's own 'Automatically start downloading when sending a torrent' switch (in the downloader settings). The 'Reseed Tasks' page adds no switch of its own." },
         { text: "Every entry is sent with 'skip hash checking' on: the data is already on disk, so that pass would only reread tens of gigabytes. Whether it is safe to skip was already decided when the task was created - only entries whose file list and contents match are picked automatically, anything else needs your own confirmation. Downloaders that don't know this option (anything but qBittorrent) still check as usual." },
+        { text: "Because checking is skipped, 'the data actually isn't there' never surfaces as an error - only as a state. So about 18 seconds after you send, this page asks the downloader what it says about each torrent and writes the verdict into the 'Seeding' column (hover it to see every entry, including the client's own state string). You can also press 'Check seeding' in the toolbar at any time." },
+        { text: "Entries the check finds 'not seeding properly' (missing files, a client error, or turned into an actual download) are paused immediately and a red notice tells you how many and why. 'Not found' and 'still checking' don't count as failures and are left alone - qBittorrent refreshes that list only every 15 seconds, so right after sending, not finding it is a normal in-between state." },
         { text: "The save path and label accept placeholders, substituted per entry: $torrent.title$, $torrent.subTitle$, $torrent.category$, $torrent.site$, $torrent.siteName$, $date:YYYY$, $date:MM$, $date:DD$." },
         { text: "The line under the title, 'Save Path: some downloader -> some path', is where this task will land. If nothing was set it reads 'Default Path'." },
       ],

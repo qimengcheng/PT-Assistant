@@ -760,6 +760,9 @@ async function createKeepUploadTask() {
         size: item.data.size || 0,
         seeders: item.data.seeders,
         leechers: item.data.leechers,
+        // 验证阶段已经下载过这条的 .torrent，infoHash 就在手上；不记下来，任务页回查时
+        // 只能把 .torrent 再下一遍
+        hash: item.torrent?.infoHash,
       })) as IKeepUploadTaskItem[],
     };
 

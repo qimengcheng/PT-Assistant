@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { type TableColumnsType } from "antdv-next";
 import {
@@ -10,9 +10,10 @@ import {
   LinkOutlined,
   NumberOutlined,
   QuestionCircleOutlined,
+  SyncOutlined,
 } from "@antdv-next/icons";
 
-import type { CAddTorrentOptions } from "@ptd/downloader";
+import type { CAddTorrentOptions, CTorrent } from "@ptd/downloader";
 import type { IKeepUploadTask, TKeepUploadTaskKey } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
 import { formatSize, formatDate } from "@/options/utils.ts";
@@ -24,6 +25,13 @@ import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vu
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 import { withReseedSkipChecking } from "./sendOptions.ts";
+import {
+  judgeReseedTorrent,
+  shouldPauseReseed,
+  summarizeReseed,
+  type IReseedItemStatus,
+  type TReseedVerdict,
+} from "./seedVerify.ts";
 
 const { t } = useI18n();
 const runtimeStore = useRuntimeStore();
@@ -40,6 +48,7 @@ const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
   { title: t("KeepUploadTask.table.site"), key: "site", align: "center", width: 72 },
   { title: t("KeepUploadTask.table.title"), dataIndex: "title", key: "title", align: "left", ellipsis: true },
   { title: t("KeepUploadTask.table.savePath"), key: "savePath", align: "left", width: 220 },
+  { title: t("KeepUploadTask.recheck.col"), key: "seedState", align: "center", width: 120 },
   {
     title: t("KeepUploadTask.table.size"),
     dataIndex: "size",
@@ -192,6 +201,8 @@ async function sendTorrentsToDownloader(task: IKeepUploadTask, items: IKeepUploa
       }
     }
     runtimeStore.showSnakebar(t("KeepUploadTask.sendSingleSuccess"), { color: "success" });
+    // 发出去不等于在做种：跳过校验之后「数据其实不在」只会以状态的形式冒出来，所以自己回来查一趟
+    scheduleAutoRecheck(task.id);
   } catch (e) {
     const rawReason = e instanceof Error ? e.message : String(e);
     const reason = rawReason.trim() === "Fails." ? t("KeepUploadTask.qBittorrentLegacyFails") : rawReason;
@@ -218,9 +229,167 @@ async function setAsBaseTorrent(task: IKeepUploadTask, itemIndex: number) {
   }
 }
 
+/**
+ * 发送之后过一会儿自动回查一次。18 秒不是拍的：qBittorrent 那份列表走 `/sync/maindata`，
+ * 客户端实例是带缓存复用的，而它自己那条闸写死 15 秒（`qBittorrent.ts:419`）——
+ * 发完立刻查会拿到旧快照，刚加的那条根本还没进去，于是报「查不到」。
+ */
+const AUTO_RECHECK_DELAY_MS = 18_000;
+
+const rechecking = ref(false);
+/**
+ * 回查结果：taskId -> (infoHash -> 结论)。按 hash 存而不是按序号存，因为「设为基准种子」
+ * 会把 items 重排，序号存的那一份会跟着错位。
+ */
+const reseedStatuses = ref<Record<string, Record<string, IReseedItemStatus>>>({});
+const autoRecheckTimers = new Set<number>();
+
+onUnmounted(() => {
+  autoRecheckTimers.forEach((id) => window.clearTimeout(id));
+  autoRecheckTimers.clear();
+});
+
+function scheduleAutoRecheck(taskId: string) {
+  const id = window.setTimeout(() => {
+    autoRecheckTimers.delete(id);
+    recheckSeeding([taskId]);
+  }, AUTO_RECHECK_DELAY_MS);
+  autoRecheckTimers.add(id);
+}
+
+/** 这一条任务里能拿去和下载器对账的那些（旧任务没记 infoHash，就是空） */
+function trackableItems(task: IKeepUploadTask) {
+  return task.items.filter((item) => String(item.hash ?? "").trim() !== "");
+}
+
+/**
+ * 拿下载器那边报的状态回查每条发出去的种子。
+ * 结论是 `seedVerify.ts` 折的（那一份能直接跑断言）；这里只做取数、暂停、汇总。
+ */
+async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
+  const list = tasks.value.filter((task) => !only || only.includes(task.id));
+  const targets = list.flatMap((task) =>
+    trackableItems(task).map((item) => ({
+      taskId: task.id,
+      hash: String(item.hash).toLowerCase(),
+      downloaderId: task.downloadOptions.downloaderId,
+    })),
+  );
+  if (targets.length === 0) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.recheck.none"), { color: "warning" });
+    return;
+  }
+
+  // 同一台下载器只拉一次列表，多个任务共用那份
+  const byDownloader = new Map<string, typeof targets>();
+  for (const target of targets) {
+    const group = byDownloader.get(target.downloaderId) ?? [];
+    group.push(target);
+    byDownloader.set(target.downloaderId, group);
+  }
+
+  rechecking.value = true;
+  const next: Record<string, Record<string, IReseedItemStatus>> = { ...reseedStatuses.value };
+  let seeding = 0;
+  let wrong = 0;
+  let pauseFailed = 0;
+  let unreachable = 0;
+
+  try {
+    for (const [downloaderId, group] of byDownloader) {
+      let torrents: CTorrent[];
+      try {
+        torrents = await sendMessage("getClientTorrents", downloaderId);
+      } catch {
+        // 连不上只当这一台没结果，别把已经查到的那几台一起报成失败
+        unreachable++;
+        continue;
+      }
+      const index = new Map(torrents.map((t) => [String(t.infoHash).toLowerCase(), t]));
+      for (const target of group) {
+        const found = index.get(target.hash);
+        const status = judgeReseedTorrent(found ? { state: found.state, rawState: found.raw?.state } : undefined);
+        next[target.taskId] = { ...(next[target.taskId] ?? {}), [target.hash]: status };
+        if (status.verdict === "seeding") seeding++;
+        // 「校验失败要立刻暂停该种子」：判据里只有 wrong 会走到这里，中间态（正在校验、
+        // 刚发出去还没进列表）不动它
+        if (shouldPauseReseed(status.verdict)) {
+          wrong++;
+          try {
+            if (!(await sendMessage("pauseClientTorrent", { downloaderId, id: found?.id }))) pauseFailed++;
+          } catch {
+            pauseFailed++;
+          }
+        }
+      }
+    }
+    reseedStatuses.value = next;
+  } finally {
+    rechecking.value = false;
+  }
+
+  if (wrong > 0) {
+    runtimeStore.showSnakebar(
+      t(pauseFailed > 0 ? "KeepUploadTask.recheck.wrongAndPauseFailed" : "KeepUploadTask.recheck.wrong", {
+        count: wrong,
+        failed: pauseFailed,
+      }),
+      { color: "error", timeout: 12 },
+    );
+  } else if (unreachable > 0) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.recheck.unreachable", { count: unreachable }), { color: "warning" });
+  } else {
+    runtimeStore.showSnakebar(t("KeepUploadTask.recheck.summary", { total: targets.length, seeding }), {
+      color: "success",
+    });
+  }
+}
+
+const reseedVerdictText = computed<Record<TReseedVerdict, string>>(() => ({
+  seeding: t("KeepUploadTask.recheck.state.seeding"),
+  wrong: t("KeepUploadTask.recheck.state.wrong"),
+  paused: t("KeepUploadTask.recheck.state.paused"),
+  pending: t("KeepUploadTask.recheck.state.pending"),
+  notFound: t("KeepUploadTask.recheck.state.notFound"),
+}));
+
+/** 这一条任务现在最该说出口的那个结论（异常优先报出来） */
+function reseedSummary(record: IKeepUploadTask): { color: string; text: string } | null {
+  const perTask = reseedStatuses.value[record.id];
+  if (!perTask) return null;
+  const sum = summarizeReseed(
+    trackableItems(record).map((item) => perTask[String(item.hash).toLowerCase()]),
+    record.items.length - trackableItems(record).length,
+  );
+  if (sum.wrong > 0) return { color: "error", text: t("KeepUploadTask.recheck.count.wrong", { count: sum.wrong }) };
+  if (sum.notFound > 0)
+    return { color: "warning", text: t("KeepUploadTask.recheck.count.notFound", { count: sum.notFound }) };
+  if (sum.pending > 0)
+    return { color: "processing", text: t("KeepUploadTask.recheck.count.pending", { count: sum.pending }) };
+  if (sum.paused > 0) return { color: "default", text: t("KeepUploadTask.recheck.count.paused", { count: sum.paused }) };
+  if (sum.seeding > 0)
+    return { color: "success", text: t("KeepUploadTask.recheck.count.seeding", { count: sum.seeding }) };
+  if (sum.untracked > 0) return { color: "default", text: t("KeepUploadTask.recheck.state.untracked") };
+  return { color: "default", text: t("KeepUploadTask.recheck.state.notFound") };
+}
+
+/** 悬停里逐条列明：标题 + 结论 + 下载器那边那条的原样状态 */
+function reseedRows(record: IKeepUploadTask) {
+  const perTask = reseedStatuses.value[record.id] ?? {};
+  return record.items.map((item, index) => {
+    const hash = String(item.hash ?? "").toLowerCase();
+    const status = hash ? perTask[hash] : undefined;
+    return {
+      key: hash || String(index),
+      title: item.title,
+      text: hash ? reseedVerdictText.value[status?.verdict ?? "notFound"] : t("KeepUploadTask.recheck.state.untracked"),
+      raw: status?.rawState ?? "",
+    };
+  });
+}
+
 // 发送基准种子到下载器
-function sendBaseTorrent(task: IKeepUploadTask) {
-  const items = task.items.slice(0, 1);
+function sendBaseTorrent(task: IKeepUploadTask) {  const items = task.items.slice(0, 1);
   sendTorrentsToDownloader(task, items);
 }
 
@@ -273,6 +442,13 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           <span class="ml-1">{{ t("KeepUploadTask.clearAll") }}</span>
         </a-button>
 
+        <a-button :loading="rechecking" @click="recheckSeeding()">
+          <template #icon>
+            <SyncOutlined />
+          </template>
+          <span class="ml-1">{{ t("KeepUploadTask.recheck.button") }}</span>
+        </a-button>
+
         <a-button @click="showUsageDialog = true">
           <template #icon>
             <QuestionCircleOutlined />
@@ -295,7 +471,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       :loading="loading"
       :pagination="false"
       :expandable="{ showExpandColumn: true }"
-      :scroll="{ x: 1200 }"
+      :scroll="{ x: 1320 }"
       :row-selection="{
         selectedRowKeys: selectedTasks,
         onChange: (keys: (string | number)[]) => (selectedTasks = keys as TKeepUploadTaskKey[]),
@@ -353,6 +529,30 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 
         <template v-else-if="column.key === 'size'">
           {{ formatSize(record.size) }}
+        </template>
+
+        <!-- 回查下载器那边折出来的结论。没查过时这一格写「没查过」而不是留空、更不是「正常」
+             —— 那一列替用户说过「没问题」而其实没看过，是会比报错更糟的谎。
+             悬停看逐条明细，含客户端原样的状态串：判据要是不对，人自己能看出是哪一条折错了。 -->
+        <template v-else-if="column.key === 'seedState'">
+          <a-popover
+            v-if="reseedSummary(record)"
+            trigger="hover"
+            placement="left"
+            :mouse-enter-delay="0.4"
+          >
+            <template #content>
+              <div class="reseed-detail">
+                <div v-for="row in reseedRows(record)" :key="row.key" class="reseed-detail-row">
+                  <span class="reseed-detail-title">{{ row.title }}</span>
+                  <span>{{ row.text }}</span>
+                  <span v-if="row.raw" class="text-grey">{{ row.raw }}</span>
+                </div>
+              </div>
+            </template>
+            <a-tag :color="reseedSummary(record)?.color">{{ reseedSummary(record)?.text }}</a-tag>
+          </a-popover>
+          <span v-else class="text-body-small text-grey">{{ t("KeepUploadTask.recheck.state.idle") }}</span>
         </template>
 
         <template v-else-if="column.key === 'count'">
@@ -497,5 +697,26 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 .task-item-main {
   flex: 1 1 0;
   min-width: 0;
+}
+
+/* 回查那一列悬停里的明细：一行一条，标题吃剩下宽度并截断（种子标题动辄上百字符，
+   不截断会把浮层撑得比屏幕还宽），后面跟结论和客户端原样的状态串 */
+.reseed-detail {
+  max-width: 480px;
+}
+
+.reseed-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.reseed-detail-title {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

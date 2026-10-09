@@ -83,6 +83,31 @@
     "editSavePath": "Edit save path",
     "emptyNotice": "No reseed tasks yet. Select torrents from search results and click reseed check button.",
     "leechers": "Leechers: ",
+    "recheck": {
+      "button": "Check seeding",
+      "col": "Seeding",
+      "none": "These tasks recorded no infoHash for their torrents, so there is nothing to reconcile against the downloader (recreate the reseed task to get one)",
+      "summary": "Checked {total}: {seeding} are seeding normally",
+      "wrong": "{count} are not seeding properly and were paused automatically — hover that column to see the reason for each entry",
+      "wrongAndPauseFailed": "{count} are not seeding properly, but {failed} could not be paused; please stop them in the downloader by hand",
+      "unreachable": "{count} downloader(s) could not be reached, so their results were not updated",
+      "state": {
+        "idle": "Not checked",
+        "seeding": "Seeding",
+        "wrong": "Not seeding",
+        "paused": "Paused",
+        "pending": "Pending",
+        "notFound": "Not in downloader",
+        "untracked": "No infoHash recorded"
+      },
+      "count": {
+        "seeding": "{count} seeding",
+        "wrong": "{count} broken",
+        "paused": "{count} paused",
+        "pending": "{count} pending",
+        "notFound": "{count} missing"
+      }
+    },
     "qBittorrentLegacyFails": "qBittorrent rejected the torrent, but its legacy Web API returned no details; check for a duplicate torrent, validate the save path or category, and review the qBittorrent logs",
     "savePath": "Save Path: ",
     "seeders": "Seeders: ",

@@ -21,6 +21,14 @@ export interface IKeepUploadTaskItem {
   size: number; // 大小
   seeders?: number; // 上传者数量
   leechers?: number; // 下载者数量
+  /**
+   * 这颗种子自己的 infoHash —— 回查下载器时用它当对账的键（`getClientTorrents` 那条列表里
+   * 认的是 `CTorrent.infoHash`）。
+   *
+   * 建任务那一步就有这个值：每条子种子都要下载 .torrent 算三层指纹（`ITorrentInfoForVerification.infoHash`），
+   * 不记下来就得再下一遍。**旧任务没有这一项**，界面上那一条会写「没记下 infoHash」而不是假装查过。
+   */
+  hash?: string;
   [key: string]: any; // 其他属性
 }
 

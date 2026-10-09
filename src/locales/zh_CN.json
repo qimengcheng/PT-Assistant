@@ -83,6 +83,31 @@
     "editSavePath": "修改保存路径",
     "emptyNotice": "暂无辅种任务，请在搜索结果页面选择种子后点击辅种检测按钮",
     "leechers": "下载：",
+    "recheck": {
+      "button": "回查做种状态",
+      "col": "做种状态",
+      "none": "这些任务没记下种子的 infoHash，没法和下载器那边对账（重新建一次辅种任务就有了）",
+      "summary": "查了 {total} 条：{seeding} 条在正常做种",
+      "wrong": "{count} 条没有正常做种，已自动暂停 —— 把鼠标放到那一列上能看到每一条的原因",
+      "wrongAndPauseFailed": "{count} 条没有正常做种，但其中 {failed} 条没能暂停住，请去下载器里手动停",
+      "unreachable": "有 {count} 台下载器没连上，那几台的结果没有更新",
+      "state": {
+        "idle": "没查过",
+        "seeding": "在做种",
+        "wrong": "没正常做种",
+        "paused": "已暂停",
+        "pending": "待确认",
+        "notFound": "下载器里没有",
+        "untracked": "没记下 infoHash"
+      },
+      "count": {
+        "seeding": "{count} 条在做种",
+        "wrong": "{count} 条异常",
+        "paused": "{count} 条已暂停",
+        "pending": "{count} 条待确认",
+        "notFound": "{count} 条查不到"
+      }
+    },
     "qBittorrentLegacyFails": "qBittorrent 拒绝添加，但旧版 Web API 未返回具体原因；请检查是否已有相同种子、保存路径或分类是否有效，并查看 qBittorrent 日志",
     "savePath": "保存路径：",
     "seeders": "上传：",

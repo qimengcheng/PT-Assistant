@@ -601,6 +601,7 @@
       "table": {
         "category": "Category",
         "comments": "Comments",
+        "commentsLink": "Open the detail page to read comments",
         "completed": "Completed",
         "leechers": "Leechers",
         "seeders": "Seeders",

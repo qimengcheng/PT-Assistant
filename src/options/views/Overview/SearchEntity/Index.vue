@@ -44,6 +44,7 @@ import SetSearchSolutionPage from "@/options/views/Settings/SetSearchSolution/In
 
 // 主要助手方法
 import { tableCustomFilter } from "./utils/filter";
+import { countCompare, commentsHref, countText } from "@/shared/torrentCount.ts";
 import { doSearch, retrySearch, searchPlanStatus, searchQueue } from "./utils/search";
 import RecommendationMenu from "@/options/views/Layout/RecommendationMenu.vue";
 
@@ -144,10 +145,36 @@ const fullTableHeader = computed(
       // width 是给下面那条进度条留的：这一列由「大小」那一行数字定宽时只有六十来像素，
       // 图标占掉 16 之后条子只剩四十多，看着就是"进度条太短"。
       { title: t("SearchEntity.index.table.size"), key: "size", dataIndex: "size", align: "end", width: 112 },
-      { title: t("SearchEntity.index.table.seeders"), key: "seeders", dataIndex: "seeders", align: "end" },
-      { title: t("SearchEntity.index.table.leechers"), key: "leechers", dataIndex: "leechers", align: "end" },
-      { title: t("SearchEntity.index.table.completed"), key: "completed", dataIndex: "completed", align: "end" },
-      { title: t("SearchEntity.index.table.comments"), key: "comments", dataIndex: "comments", align: "end" },
+      // 这四列都要显式 compare：站点给来的原值可能是「图标字符 + 数字」的字符串（见 torrentCount.ts 顶部），
+      // 公共比较器对那种串 parseFloat 得 NaN，就退回按字符串排 —— 同一列里两种档位会各排一段
+      {
+        title: t("SearchEntity.index.table.seeders"),
+        key: "seeders",
+        dataIndex: "seeders",
+        align: "end",
+        compare: countCompare("seeders"),
+      },
+      {
+        title: t("SearchEntity.index.table.leechers"),
+        key: "leechers",
+        dataIndex: "leechers",
+        align: "end",
+        compare: countCompare("leechers"),
+      },
+      {
+        title: t("SearchEntity.index.table.completed"),
+        key: "completed",
+        dataIndex: "completed",
+        align: "end",
+        compare: countCompare("completed"),
+      },
+      {
+        title: t("SearchEntity.index.table.comments"),
+        key: "comments",
+        dataIndex: "comments",
+        align: "end",
+        compare: countCompare("comments"),
+      },
       { title: t("SearchEntity.index.table.time"), key: "time", dataIndex: "time", align: "center" },
       {
         title: t("common.action"),
@@ -817,22 +844,31 @@ const hasSearchStatus = computed<boolean>(() => {
 
             <!-- 上传人数 -->
             <template v-else-if="column.key === 'seeders'">
-              <span class="t_seeders text-no-wrap">{{ record.seeders }}</span>
+              <span class="text-no-wrap">{{ countText(record.seeders) }}</span>
             </template>
 
             <!-- 下载人数 -->
             <template v-else-if="column.key === 'leechers'">
-              <span class="t_leechers text-no-wrap">{{ record.leechers }}</span>
+              <span class="text-no-wrap">{{ countText(record.leechers) }}</span>
             </template>
 
             <!-- 完成人数 -->
             <template v-else-if="column.key === 'completed'">
-              <span class="t_completed text-no-wrap">{{ record.completed }}</span>
+              <span class="text-no-wrap">{{ countText(record.completed) }}</span>
             </template>
 
-            <!-- 评论人数 -->
+            <!-- 评论人数：有评论才给跳转，点开是站点详情页的评论区 -->
             <template v-else-if="column.key === 'comments'">
-              <span class="t_comments text-no-wrap">{{ record.comments }}</span>
+              <a
+                v-if="commentsHref(record)"
+                :href="commentsHref(record)"
+                rel="noopener noreferrer nofollow"
+                target="_blank"
+                :title="t('SearchEntity.index.table.commentsLink')"
+              >
+                <span class="text-no-wrap">{{ countText(record.comments) }}</span>
+              </a>
+              <span v-else class="text-no-wrap">{{ countText(record.comments) }}</span>
             </template>
 
             <!-- 发布日期 -->

@@ -86,7 +86,9 @@
     "recheck": {
       "button": "Check seeding",
       "col": "Seeding",
-      "none": "These tasks recorded no infoHash for their torrents, so there is nothing to reconcile against the downloader (recreate the reseed task to get one)",
+      "none": "These tasks recorded no infoHash for their torrents, and nothing in the downloader matched them uniquely either, so there is nothing to reconcile",
+      "linked": "Linked {count} automatically (the task had no infoHash recorded)",
+      "unlinked": "{count} more had no infoHash recorded and matched nothing unique in the downloader (no torrent with that name, or several of them)",
       "summary": "Checked {total}: {seeding} are seeding normally",
       "wrong": "{count} are not seeding properly and were paused automatically — hover that column to see the reason for each entry",
       "wrongAndPauseFailed": "{count} are not seeding properly, but {failed} could not be paused; please stop them in the downloader by hand",
@@ -98,7 +100,7 @@
         "paused": "Paused",
         "pending": "Pending",
         "notFound": "Not in downloader",
-        "untracked": "No infoHash recorded"
+        "untracked": "Not matched to an entry in the downloader"
       },
       "count": {
         "seeding": "{count} seeding",

@@ -8,6 +8,7 @@
  * 于是「数据其实不在」这件事不会以校验失败的形式冒出来，只会以状态的形式：要么变成正在
  * 下载（它其实没有）、要么 `missingFiles` / `error`。界面要在这时候替用户盯住并把种子暂停。
  */
+import { normalizeTitle } from "@/shared/fingerprint/title.ts";
 
 /** 下载器那边一条种子的最小输入：归一状态 + 客户端原样的状态串 */
 export interface IReseedProbe {
@@ -114,6 +115,54 @@ export function judgeReseedTorrent(probe: IReseedProbe | undefined): IReseedItem
  */
 export function shouldPauseReseed(verdict: TReseedVerdict): boolean {
   return verdict === "wrong";
+}
+
+/** 下载器列表里用来认亲的那几个字段（`CTorrent` 的窄切片，断言可以直接构造） */
+export interface ILocalTorrentForLink {
+  infoHash: string;
+  name: string;
+  totalSize?: number;
+}
+
+export type TLinkOutcome =
+  | { kind: "linked"; infoHash: string }
+  | { kind: "none" }
+  /** 同名（或同名同大小）的有好几条 —— 猜错就是把 A 站的状态记到 B 站种子头上 */
+  | { kind: "ambiguous"; count: number };
+
+/**
+ * 任务里没记 infoHash 的那一条，拿它去下载器列表中找唯一匹配。
+ *
+ * 两档，先严后松：先要「归一化标题 + 字节数」都对得上；那一档一条都没有才退到只看标题 ——
+ * 站点列表页报的 size 有时是取整过的，和客户端那份精确字节数对不上，只看标题这一档要有，
+ * 否则绝大多数旧任务永远关联不上。
+ *
+ * 两档都**要求唯一**：一部片子的两个压制组在下载器里常常归一成同一个标题，
+ * 那种情况宁可报「找不到唯一匹配」，也不替用户挑一个。
+ */
+export function linkItemToTorrent(
+  item: { title: string; size?: number },
+  torrents: readonly ILocalTorrentForLink[],
+): TLinkOutcome {
+  const title = normalizeTitle(item.title);
+  if (!title) return { kind: "none" };
+
+  const byName = torrents.filter((t) => t.infoHash && normalizeTitle(t.name) === title);
+  if (byName.length === 0) return { kind: "none" };
+
+  const size = Math.round(item.size ?? 0);
+  const both = size > 0 ? byName.filter((t) => Math.round(t.totalSize ?? 0) === size) : [];
+  const pool = both.length > 0 ? both : byName;
+
+  // 去重按小写比（infoHash 是十六进制，大小写两份是同一个种子），但**写回的是下载器原样那串** ——
+  // 任务里存的东西要能和那边一字不差地对上，别自己造一个规范化值
+  const seen = new Map<string, string>();
+  for (const t of pool) {
+    const k = t.infoHash.toLowerCase();
+    if (!seen.has(k)) seen.set(k, t.infoHash);
+  }
+  if (seen.size > 1) return { kind: "ambiguous", count: seen.size };
+  return { kind: "linked", infoHash: [...seen.values()][0] };
 }
 
 /** 任务级汇总：界面那一列只显示这一个数 */

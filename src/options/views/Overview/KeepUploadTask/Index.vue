@@ -28,6 +28,7 @@ import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import { withReseedSkipChecking } from "./sendOptions.ts";
 import {
   judgeReseedTorrent,
+  linkItemToTorrent,
   shouldPauseReseed,
   summarizeReseed,
   type IReseedItemStatus,
@@ -281,43 +282,44 @@ function scheduleAutoRecheck(taskId: string) {
   autoRecheckTimers.add(id);
 }
 
-/** 这一条任务里能拿去和下载器对账的那些（旧任务没记 infoHash，就是空） */
+/** 这一条任务里能拿去和下载器对账的那些（没记 infoHash 的要先走下面那条自动认亲） */
 function trackableItems(task: IKeepUploadTask) {
   return task.items.filter((item) => String(item.hash ?? "").trim() !== "");
 }
 
 /**
  * 拿下载器那边报的状态回查每条发出去的种子。
- * 结论是 `seedVerify.ts` 折的（那一份能直接跑断言）；这里只做取数、暂停、汇总。
+ * 结论是 `seedVerify.ts` 折的（那一份能直接跑断言）；这里只做取数、认亲、暂停、汇总。
+ *
+ * 「认亲」这一步是替用户补的：任务里没记 infoHash 的那些（旧任务、以及建任务那一步没拿到 hash 的），
+ * 光报一句「重新建一次就有了」是把活儿推回给人 —— 下载器列表里往往就有那一条，按标题（其次按大小）
+ * 能唯一对上的就把 hash 写回任务、照常对账。**对不出唯一的那条不动**：猜错等于把 A 站的状态记到
+ * B 站种子头上，那比查不到更糟。
  */
 async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
   const list = tasks.value.filter((task) => !only || only.includes(task.id));
-  const targets = list.flatMap((task) =>
-    trackableItems(task).map((item) => ({
-      taskId: task.id,
-      hash: String(item.hash).toLowerCase(),
-      downloaderId: task.downloadOptions.downloaderId,
-    })),
-  );
-  if (targets.length === 0) {
+  if (list.length === 0) {
     runtimeStore.showSnakebar(t("KeepUploadTask.recheck.none"), { color: "warning" });
     return;
   }
 
   // 同一台下载器只拉一次列表，多个任务共用那份
-  const byDownloader = new Map<string, typeof targets>();
-  for (const target of targets) {
-    const group = byDownloader.get(target.downloaderId) ?? [];
-    group.push(target);
-    byDownloader.set(target.downloaderId, group);
+  const byDownloader = new Map<string, IKeepUploadTask[]>();
+  for (const task of list) {
+    const group = byDownloader.get(task.downloadOptions.downloaderId) ?? [];
+    group.push(task);
+    byDownloader.set(task.downloadOptions.downloaderId, group);
   }
 
   rechecking.value = true;
   const next: Record<string, Record<string, IReseedItemStatus>> = { ...reseedStatuses.value };
+  let checked = 0;
   let seeding = 0;
   let wrong = 0;
   let pauseFailed = 0;
   let unreachable = 0;
+  let linked = 0;
+  let unlinked = 0;
 
   try {
     for (const [downloaderId, group] of byDownloader) {
@@ -329,20 +331,44 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
         unreachable++;
         continue;
       }
+
+      // 先认亲：这一台名下、任务里没记 hash 的那些，认上了写回任务，下面才查得到
+      const dirty = new Set<IKeepUploadTask>();
+      for (const task of group) {
+        for (const item of task.items) {
+          if (String(item.hash ?? "").trim() !== "") continue;
+          const outcome = linkItemToTorrent({ title: item.title, size: item.size }, torrents);
+          if (outcome.kind === "linked") {
+            item.hash = outcome.infoHash;
+            dirty.add(task);
+            linked++;
+          } else {
+            unlinked++;
+          }
+        }
+      }
+      for (const task of dirty) {
+        await sendMessage("updateKeepUploadTask", task);
+      }
+
       const index = new Map(torrents.map((t) => [String(t.infoHash).toLowerCase(), t]));
-      for (const target of group) {
-        const found = index.get(target.hash);
-        const status = judgeReseedTorrent(found ? { state: found.state, rawState: found.raw?.state } : undefined);
-        next[target.taskId] = { ...(next[target.taskId] ?? {}), [target.hash]: status };
-        if (status.verdict === "seeding") seeding++;
-        // 「校验失败要立刻暂停该种子」：判据里只有 wrong 会走到这里，中间态（正在校验、
-        // 刚发出去还没进列表）不动它
-        if (shouldPauseReseed(status.verdict)) {
-          wrong++;
-          try {
-            if (!(await sendMessage("pauseClientTorrent", { downloaderId, id: found?.id }))) pauseFailed++;
-          } catch {
-            pauseFailed++;
+      for (const task of group) {
+        for (const item of trackableItems(task)) {
+          const hash = String(item.hash).toLowerCase();
+          checked++;
+          const found = index.get(hash);
+          const status = judgeReseedTorrent(found ? { state: found.state, rawState: found.raw?.state } : undefined);
+          next[task.id] = { ...(next[task.id] ?? {}), [hash]: status };
+          if (status.verdict === "seeding") seeding++;
+          // 「校验失败要立刻暂停该种子」：判据里只有 wrong 会走到这里，中间态（正在校验、
+          // 刚发出去还没进列表）不动它
+          if (shouldPauseReseed(status.verdict)) {
+            wrong++;
+            try {
+              if (!(await sendMessage("pauseClientTorrent", { downloaderId, id: found?.id }))) pauseFailed++;
+            } catch {
+              pauseFailed++;
+            }
           }
         }
       }
@@ -350,6 +376,21 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
     reseedStatuses.value = next;
   } finally {
     rechecking.value = false;
+  }
+
+  if (linked > 0) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.recheck.linked", { count: linked }), { color: "info" });
+  }
+
+  if (checked === 0) {
+    // 一条都没查成。两种来路要分开说：那几台没连上 ≠ 任务没记 infoHash，
+    // 报错了原因会把人往错的方向引（台架 c=offline 那趟量出来的）
+    if (unreachable > 0) {
+      runtimeStore.showSnakebar(t("KeepUploadTask.recheck.unreachable", { count: unreachable }), { color: "warning" });
+    } else {
+      runtimeStore.showSnakebar(t("KeepUploadTask.recheck.none"), { color: "warning" });
+    }
+    return;
   }
 
   if (wrong > 0) {
@@ -363,8 +404,13 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
   } else if (unreachable > 0) {
     runtimeStore.showSnakebar(t("KeepUploadTask.recheck.unreachable", { count: unreachable }), { color: "warning" });
   } else {
-    runtimeStore.showSnakebar(t("KeepUploadTask.recheck.summary", { total: targets.length, seeding }), {
-      color: "success",
+    runtimeStore.showSnakebar(t("KeepUploadTask.recheck.summary", { total: checked, seeding }), { color: "success" });
+  }
+
+  if (unlinked > 0) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.recheck.unlinked", { count: unlinked }), {
+      color: "warning",
+      timeout: 12,
     });
   }
 }

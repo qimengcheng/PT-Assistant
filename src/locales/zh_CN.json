@@ -86,7 +86,9 @@
     "recheck": {
       "button": "回查做种状态",
       "col": "做种状态",
-      "none": "这些任务没记下种子的 infoHash，没法和下载器那边对账（重新建一次辅种任务就有了）",
+      "none": "这些任务没记下种子的 infoHash，在下载器里也没找到能唯一对上的种子，没法对账",
+      "linked": "已自动关联 {count} 条（任务里原先没记下 infoHash）",
+      "unlinked": "另有 {count} 条没记下 infoHash，在下载器里也没找到能唯一对上的（同名的一个都没有，或者有好几个）",
       "summary": "查了 {total} 条：{seeding} 条在正常做种",
       "wrong": "{count} 条没有正常做种，已自动暂停 —— 把鼠标放到那一列上能看到每一条的原因",
       "wrongAndPauseFailed": "{count} 条没有正常做种，但其中 {failed} 条没能暂停住，请去下载器里手动停",
@@ -98,7 +100,7 @@
         "paused": "已暂停",
         "pending": "待确认",
         "notFound": "下载器里没有",
-        "untracked": "没记下 infoHash"
+        "untracked": "没认出在下载器里是哪一条"
       },
       "count": {
         "seeding": "{count} 条在做种",

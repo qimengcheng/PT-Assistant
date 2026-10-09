@@ -189,7 +189,7 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
             <span>{{ t("common.dialog.next") }}</span>
             <RightOutlined class="ml-1" />
           </a-button>
-          <a-button v-if="currentStep === 1" size="small" type="text" color="green" :disabled="!isFormValid" @click="saveSite">
+          <a-button v-if="currentStep === 1" size="small" type="primary" :disabled="!isFormValid" @click="saveSite">
             <template #icon>
               <CheckCircleOutlined />
             </template>

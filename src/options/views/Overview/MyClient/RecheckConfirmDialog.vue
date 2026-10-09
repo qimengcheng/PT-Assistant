@@ -56,7 +56,7 @@ function dialogEnter() {
           </template>
           <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
         </a-button>
-        <a-button color="cyan" variant="text" icon-placement="start" :loading="isRechecking" @click="confirmRecheck">
+        <a-button type="primary" icon-placement="start" :loading="isRechecking" @click="confirmRecheck">
           <template #icon>
             <ReloadOutlined />
           </template>

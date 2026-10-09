@@ -46,7 +46,7 @@ function dialogEnter() {
           </template>
           {{ t("common.dialog.cancel") }}
         </a-button>
-        <a-button color="green" variant="text" @click="() => doLocalExport()">
+        <a-button type="primary" @click="() => doLocalExport()">
           <template #icon>
             <ExportOutlined />
           </template>

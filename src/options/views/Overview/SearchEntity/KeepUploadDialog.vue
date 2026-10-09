@@ -972,7 +972,7 @@ async function createKeepUploadTask() {
             style="max-width: 200px"
           />
           <a-button
-            type="text"
+            type="primary"
             :loading="creating"
             :disabled="!canCreateTask"
             @click="createKeepUploadTask"

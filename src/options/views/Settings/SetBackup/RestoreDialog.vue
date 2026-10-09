@@ -402,8 +402,7 @@ const quickDurations = ["PT30M", "PT1H", "PT12H", "P1D", "P1W", "P1M", "P6M", "P
         <a-button
           v-if="currentStep == 'restore'"
           :loading="isDoingRestore"
-          color="green"
-          variant="text"
+          type="primary"
           @click="doRestore"
         >
           <template #icon>

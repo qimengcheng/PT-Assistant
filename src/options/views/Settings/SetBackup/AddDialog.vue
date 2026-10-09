@@ -186,8 +186,7 @@ function resetDialog() {
           <a-button
             v-if="currentStep === 1"
             :disabled="!isBackupServerConfigValid"
-            color="green"
-            variant="text"
+            type="primary"
             @click="saveStoredBackupServerConfig"
           >
             <template #icon>

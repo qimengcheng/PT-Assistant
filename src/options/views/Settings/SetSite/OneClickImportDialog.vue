@@ -256,7 +256,7 @@ async function dialogEnter() {
         <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
       </a-button>
 
-      <a-button size="small" type="text" color="green" :disabled="importStatus.isWorking" @click="doAutoImport">
+      <a-button size="small" type="primary" :disabled="importStatus.isWorking" @click="doAutoImport">
         <template #icon>
           <ImportOutlined />
         </template>

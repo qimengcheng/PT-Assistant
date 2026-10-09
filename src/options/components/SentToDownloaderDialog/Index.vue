@@ -805,8 +805,7 @@ function dialogLeave() {
         <a-button
           :disabled="!selectedDownloader || quickSendToClient"
           :loading="isSending"
-          danger
-          type="text"
+          type="primary"
           @click="sendToDownloader"
         >
           <template #icon><CheckCircleOutlined /></template>

@@ -160,8 +160,7 @@ async function submit() {
         </a-button>
         <a-button
           :disabled="inputMode === 'url' ? !urlInput.trim() : torrentFiles.length === 0"
-          color="green"
-          variant="text"
+          type="primary"
           icon-placement="start"
           @click="submit"
         >

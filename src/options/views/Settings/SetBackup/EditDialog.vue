@@ -47,7 +47,7 @@ function editClientConfig() {
           {{ t("common.dialog.cancel") }}
         </a-button>
 
-        <a-button color="green" variant="text" @click="editClientConfig">
+        <a-button type="primary" @click="editClientConfig">
           <template #icon>
             <CheckCircleOutlined />
           </template>

@@ -86,7 +86,7 @@ async function confirmSetLimit() {
           </template>
           <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
         </a-button>
-        <a-button color="green" variant="text" icon-placement="start" @click="confirmSetLimit">
+        <a-button type="primary" icon-placement="start" @click="confirmSetLimit">
           <template #icon>
             <CheckCircleOutlined />
           </template>

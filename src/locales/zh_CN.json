@@ -530,14 +530,12 @@
           "pieces": "piece 抽样一致"
         }
       },
-      "fileCount": "文件数：",
       "keepUpload": "辅种检测",
       "noVerifiedItem": "没有验证通过的种子",
       "otherTorrent": "其他种子",
       "redownload": "重新下载种子信息",
       "removeFromKeepUpload": "从列表中移除",
       "setSavePath": "设置保存路径",
-      "size": "大小：",
       "status": {
         "downloadFailed": "下载种子失败",
         "downloaded": "种子信息已下载",
@@ -550,8 +548,14 @@
         "waiting": "等待验证..."
       },
       "title": "辅种检测",
-      "reseedTarget": "要辅种的那一条",
-      "reseedTargets": "要辅种的条目",
+      "columns": {
+        "role": "角色",
+        "site": "站点",
+        "title": "标题",
+        "size": "大小",
+        "files": "文件数",
+        "status": "状态"
+      },
       "setAsBase": "设为基准种子",
       "localBase": {
         "byFiles": "文件清单一致，已替你选中",

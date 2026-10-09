@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { type TableColumnsType } from "antdv-next";
 import {
   CheckOutlined,
   CloseOutlined,
@@ -253,11 +254,30 @@ const canCreateTask = computed(() => {
  */
 const showCreateRow = computed(() => includedItems.value.some((item) => !item.loading));
 
-/** 列表第一行上面那行小标题：基准从哪儿来，决定了「排在最前那条」到底是什么身份 */
-const firstHeaderKey = computed(() => {
-  if (isSingleMode.value) return "SearchEntity.KeepUploadDialog.reseedTarget";
-  if (useLocalBase.value) return "SearchEntity.KeepUploadDialog.reseedTargets";
-  return "SearchEntity.KeepUploadDialog.baseTorrent";
+/**
+ * 候选列表的列。原先这一整块是自由布局的 flex 行（站点名长短不一 → 每行的标题起点都在漂，
+ * 大小/文件数/状态挤成第二行一坨），他 2026-10-09 要求改成表格。
+ *
+ * 「基准 / 其他」做成一列而不是两行小标题：表格没有分组行，而这一列还有个额外好处 ——
+ * 点「设为基准种子」时能看到那颗标记真的挪到了另一行上。
+ * 基准取自下载器（`useLocalBase`）或只勾一条时，列表里没有基准这一说，整列撤掉，
+ * 留一列一模一样的「其他」标签是噪声。
+ */
+const columns = computed<TableColumnsType<IVerifiedItem>>(() => {
+  const cols: TableColumnsType<IVerifiedItem> = [];
+  if (!isSingleMode.value && !useLocalBase.value) {
+    cols.push({ title: t("SearchEntity.KeepUploadDialog.columns.role"), key: "role", align: "center", width: 78 });
+  }
+  return [
+    ...cols,
+    { title: t("SearchEntity.KeepUploadDialog.columns.site"), key: "site", width: 124 },
+    // 唯一不给 width 的那一列：fixed 布局下它吃剩余宽度（给每一列都钉死宽度会被按比例一起放大）
+    { title: t("SearchEntity.KeepUploadDialog.columns.title"), key: "title", ellipsis: true },
+    { title: t("SearchEntity.KeepUploadDialog.columns.size"), key: "size", align: "right", width: 92 },
+    { title: t("SearchEntity.KeepUploadDialog.columns.files"), key: "files", align: "center", width: 72 },
+    { title: t("SearchEntity.KeepUploadDialog.columns.status"), key: "status", width: 150 },
+    { title: t("common.action"), key: "action", align: "center", width: 170 },
+  ];
 });
 
 /** 能不能把某一条挪成基准：只有「基准取自列表第一条」那条路有意义，且它得已经拿到种子信息 */
@@ -878,72 +898,100 @@ async function createKeepUploadTask() {
     <!-- 这里不再自己当滚动容器（原先是 `style="max-height: 80vh"` + 下面那条 overflow-y）：
          弹窗 body 已经由 v0.42.4 那条 flex 链负责限高与滚动，两层都在滚就是双竖向滚动条。 -->
     <div class="keep-upload-list">
-      <template v-for="(item, index) in includedItems" :key="item.id">
-        <div v-if="index === 0" class="text-body-small text-grey mb-1">
-          {{ t(firstHeaderKey) }}
-        </div>
-        <div v-if="index === 1 && !useLocalBase && !isSingleMode" class="text-body-small text-grey mb-1">
-          {{ t("SearchEntity.KeepUploadDialog.otherTorrent") }}
-        </div>
-        <div class="d-flex align-center py-1">
+      <!-- 表格而不是逐行 flex：站点名长短不一会让每行的标题起点都在漂，大小/文件数/状态
+           又挤成第二行一坨（他 2026-10-09：「这个地方用表格啊，现在这样歪歪扭扭的好看吗」）。
+           不给 scroll.x：弹窗里再挂一条横向滚动条是双重滚动，标题列自己有截断 + 悬停全文。 -->
+      <a-table
+        bordered
+        size="small"
+        row-key="id"
+        :columns="columns"
+        :data-source="includedItems"
+        :pagination="false"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'role'">
+            <a-tag :color="index === 0 ? 'blue' : 'default'">
+              {{ index === 0 ? t("SearchEntity.KeepUploadDialog.baseTorrent") : t("SearchEntity.KeepUploadDialog.otherTorrent") }}
+            </a-tag>
+          </template>
+
           <!-- 图标旁边必须带上站点名：不少站点的 favicon 长得一样（他截图里 SBPT 和「库非」
                两颗都是同一个蓝底 N），只有图标就分不出这一条是哪个站。 -->
-          <div class="d-flex align-center ga-1 mr-2 site-cell">
-            <SiteFavicon :site-id="item.data.site" :size="18" />
-            <SiteName :site-id="item.data.site" tag="span" class="text-body-small text-grey text-no-wrap" />
-          </div>
+          <template v-else-if="column.key === 'site'">
+            <div class="d-flex align-center ga-1 site-cell">
+              <SiteFavicon :site-id="record.data.site" :size="18" />
+              <SiteName
+                :site-id="record.data.site"
+                tag="span"
+                class="text-body-small text-grey text-truncate flex-1-1-0"
+              />
+            </div>
+          </template>
 
-          <div class="flex-1-1-0 text-truncate">
-            <div class="list-item text-body-medium">
-              <!-- 标题可能很长：ellipsis.tooltip 补上原先缺的悬停提示（原先只有截断、没有 :title） -->
-              <a-typography-text :ellipsis="{ tooltip: item.data.title }">
-                <a :href="item.data.link" target="_blank" rel="noopener noreferrer nofollow">
-                  {{ item.data.title }}
+          <template v-else-if="column.key === 'title'">
+            <div class="text-truncate">
+              <!-- 刻意不用 a-typography 的 ellipsis：它要把子节点折成纯文本去量宽度，
+                   里面的 <a> 会整个丢掉（文字照样显示、只是点不动）。见 AGENTS §3.4。 -->
+              <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+                <template #content>
+                  <div class="reveal-text">{{ record.data.title }}</div>
+                </template>
+                <a :href="record.data.link" target="_blank" rel="noopener noreferrer nofollow" class="list-link">
+                  {{ record.data.title }}
                 </a>
-              </a-typography-text>
+              </a-popover>
             </div>
-            <div class="text-body-small">
-              {{ t("SearchEntity.KeepUploadDialog.size") }}{{ formatSize(item.data.size ?? 0) }},
-              {{ t("SearchEntity.KeepUploadDialog.fileCount") }}{{ getFileCount(item) }},
-              {{ t("SearchEntity.KeepUploadDialog.status.label") }}{{ item.status }}
-              <span v-if="verifiedByText(item)" class="text-grey">
-                （{{ verifiedByText(item) }}）
-              </span>
-            </div>
-            <div v-if="localBadges(item).length" class="d-flex ga-1 mt-1 flex-wrap">
+            <div v-if="localBadges(record).length" class="d-flex ga-1 mt-1 flex-wrap">
               <!-- 这里原本给 a-tag 传了 `bordered`，已删。注意它**不是死属性**（早先注释这么写是错的）：
                    Tag 声明了 bordered?: boolean 且无 @deprecated，hooks/useColor.js:16 真读它，
                    语义是降级（false → 强制 filled）—— 它造不出描边，要描边请用 variant="outlined" -->
-              <a-tag v-for="badge in localBadges(item)" :key="badge.key" :color="badge.color" :title="badge.title">
+              <a-tag v-for="badge in localBadges(record)" :key="badge.key" :color="badge.color" :title="badge.title">
                 {{ badge.text }}
               </a-tag>
               <span
-                v-for="site in item.localMatch?.match?.sites ?? []"
+                v-for="site in record.localMatch?.match?.sites ?? []"
                 :key="site"
                 class="text-body-small text-grey"
               >
                 <SiteName :site-id="site" tag="span" />
               </span>
             </div>
-          </div>
+          </template>
 
-          <div class="d-flex ga-1">
+          <template v-else-if="column.key === 'size'">
+            {{ formatSize(record.data.size ?? 0) }}
+          </template>
+
+          <template v-else-if="column.key === 'files'">
+            {{ getFileCount(record) }}
+          </template>
+
+          <!-- 判定依据单独一行：它决定这条结论有多硬，混在状态后面会被当成状态的一部分读掉 -->
+          <template v-else-if="column.key === 'status'">
+            <div>{{ record.status }}</div>
+            <div v-if="verifiedByText(record)" class="text-body-small text-grey">{{ verifiedByText(record) }}</div>
+          </template>
+
+          <template v-else-if="column.key === 'action'">
             <!-- 「有参照物可比」的两种来路：基准取列表第一条时要求它已经验证通过（所以只有 index>0 比得了）；
                  基准取下载器那条时参照物一直在，第一条也允许人工确认 / 重下 -->
             <a-button
-              v-if="!item.loading && !item.verified && (useLocalBase || (index > 0 && includedItems[0]?.verified))"
+              v-if="!record.loading && !record.verified && (useLocalBase || (index > 0 && includedItems[0]?.verified))"
               type="text"
+              size="small"
               :title="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
-              @click.stop="addToVerified(item.id)"
+              @click.stop="addToVerified(record.id)"
             >
               <template #icon><PlusOutlined /></template>
             </a-button>
 
             <a-button
-              v-if="!item.loading && !item.torrent && (useLocalBase || (index > 0 && includedItems[0]?.verified))"
+              v-if="!record.loading && !record.torrent && (useLocalBase || (index > 0 && includedItems[0]?.verified))"
               type="text"
+              size="small"
               :title="t('SearchEntity.KeepUploadDialog.redownload')"
-              @click.stop="reDownload(item.id)"
+              @click.stop="reDownload(record.id)"
             >
               <template #icon><SyncOutlined /></template>
             </a-button>
@@ -951,35 +999,32 @@ async function createKeepUploadTask() {
             <!-- 原先是一颗向上的箭头图标，悬停才有说明：行右侧同时挂着三颗图标钮，
                  「向上」看不出是「把这一条挪成基准」，所以直接写成文字。 -->
             <a-button
-              v-if="canPromote(index, item)"
+              v-if="canPromote(index, record)"
               type="link"
+              size="small"
               :title="t('SearchEntity.KeepUploadDialog.setAsBase')"
-              @click.stop="setItemBase(item.id)"
+              @click.stop="setItemBase(record.id)"
             >
               {{ t("SearchEntity.KeepUploadDialog.setAsBase") }}
             </a-button>
 
-            <a-tooltip :title="item.status">
-              <a-button
-                type="text"
-                :loading="item.loading"
-              >
-                <template v-if="item.verified" #icon>
+            <a-tooltip :title="record.status">
+              <a-button type="text" size="small" :loading="record.loading">
+                <template v-if="record.verified" #icon>
                   <CheckOutlined style="color: #52c41a" />
                 </template>
                 <template v-else #icon>
                   <CloseOutlined
                     style="color: #ff4d4f"
                     :title="t('SearchEntity.KeepUploadDialog.removeFromKeepUpload')"
-                    @click.stop="removeVerifiedItem(item.id)"
+                    @click.stop="removeVerifiedItem(record.id)"
                   />
                 </template>
               </a-button>
             </a-tooltip>
-          </div>
-        </div>
-        <a-divider v-if="index > 0" class="ml-4" />
-      </template>
+          </template>
+        </template>
+      </a-table>
     </div>
 
     <template #footer>
@@ -1043,30 +1088,26 @@ async function createKeepUploadTask() {
   flex-wrap: wrap;
 }
 
-/* 图标 + 站点名那一栏不参与收缩：站点名是短值，让它去挤压标题列（标题本来就有 ellipsis + 悬停全文）
-   比让站名被截断更好读 —— 而这一栏存在的目的正是「看清是哪个站」。 */
+/* 站点那一栏：图标不参与收缩，站名吃掉剩下的宽度并截断（列宽是钉死的，
+   让长站名出省略号比把它整栏撑宽、把标题列挤没更可读）。 */
 .site-cell {
-  flex: 0 0 auto;
-}
-
-/* 分隔线那 16px 缩进只能靠缩宽度，不能靠外边距：Divider 自带 `width:100%; min-width:100%`
-   （antdv-next dist/divider/style/index.js:34-35），再加 `.ml-4` 就把整条推到容器右沿之外 16px，
-   于是弹窗挂一条横向滚动条。真组件台架量过（.tmp-build/bench-localbase `?m=layout`，9 条）：
-   改前列表 scrollWidth 737 / clientWidth 721、8 条 divider 每条 over 16；改后 731/731、溢出 0，
-   缩进仍是 16（左 16、右 0）。只写 width 抢不过 min-width —— 实测补上 min-width:0 才从 721 变 715。 */
-.keep-upload-list :deep(.ant-divider-horizontal.ml-4) {
   min-width: 0;
-  width: calc(100% - 16px);
 }
 
-.list-item {
-  a {
-    color: #000;
-    text-decoration: none;
-  }
+/* 标题那一格：黑字、悬停变绿（沿用改成表格之前的观感，只把截断从 a-typography 换成 CSS） */
+.list-link {
+  color: #000;
+  text-decoration: none;
+}
 
-  a:hover {
-    color: #008c00;
-  }
+.list-link:hover {
+  color: #008c00;
+}
+
+/* 悬停浮层里的全文：换行铺开 + 宽度上限，同 TorrentTitleTd.vue 那一条 */
+.reveal-text {
+  max-width: 480px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 </style>

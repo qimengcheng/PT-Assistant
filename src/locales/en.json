@@ -530,14 +530,12 @@
           "pieces": "piece sample matched"
         }
       },
-      "fileCount": "Files: ",
       "keepUpload": "Reseed Check",
       "noVerifiedItem": "No verified torrents",
       "otherTorrent": "Other Torrents",
       "redownload": "Re-download torrent info",
       "removeFromKeepUpload": "Remove from list",
       "setSavePath": "Set save path",
-      "size": "Size: ",
       "status": {
         "downloadFailed": "Failed to download torrent",
         "downloaded": "Torrent info downloaded",
@@ -550,8 +548,14 @@
         "waiting": "Waiting for verification..."
       },
       "title": "Reseed Verification",
-      "reseedTarget": "Entry to reseed",
-      "reseedTargets": "Entries to reseed",
+      "columns": {
+        "role": "Role",
+        "site": "Site",
+        "title": "Title",
+        "size": "Size",
+        "files": "Files",
+        "status": "Status"
+      },
       "setAsBase": "Set as base torrent",
       "localBase": {
         "byFiles": "File lists match - selected for you",

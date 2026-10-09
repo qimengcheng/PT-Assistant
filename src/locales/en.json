@@ -108,6 +108,16 @@
         "paused": "{count} paused",
         "pending": "{count} pending",
         "notFound": "{count} missing"
+      },
+      "stage": {
+        "idle": "Not checked",
+        "baseMissing": "Base not found yet",
+        "baseDownloading": "Downloading base",
+        "baseReady": "Base complete",
+        "reseeding": "Reseeding",
+        "done": "All seeded",
+        "wrong": "{count} not seeding",
+        "untracked": "{count} without infoHash"
       }
     },
     "qBittorrentLegacyFails": "qBittorrent rejected the torrent, but its legacy Web API returned no details; check for a duplicate torrent, validate the save path or category, and review the qBittorrent logs",

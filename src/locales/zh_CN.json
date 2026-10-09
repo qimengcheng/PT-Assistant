@@ -108,6 +108,16 @@
         "paused": "{count} 条已暂停",
         "pending": "{count} 条待确认",
         "notFound": "{count} 条查不到"
+      },
+      "stage": {
+        "idle": "没查过",
+        "baseMissing": "还没看到基准",
+        "baseDownloading": "基准在下",
+        "baseReady": "基准已下完",
+        "reseeding": "辅种中",
+        "done": "辅种完成",
+        "wrong": "{count} 条没正常做种",
+        "untracked": "另有 {count} 条没记 infoHash"
       }
     },
     "qBittorrentLegacyFails": "qBittorrent 拒绝添加，但旧版 Web API 未返回具体原因；请检查是否已有相同种子、保存路径或分类是否有效，并查看 qBittorrent 日志",

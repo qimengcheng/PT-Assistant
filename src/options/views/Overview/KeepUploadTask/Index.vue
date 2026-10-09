@@ -29,9 +29,11 @@ import { skipCheckingFor, withReseedSkipChecking } from "./sendOptions.ts";
 import {
   judgeReseedTorrent,
   linkItemToTorrent,
+  reseedStage,
   shouldPauseReseed,
   summarizeReseed,
   type IReseedItemStatus,
+  type TReseedStage,
   type TReseedVerdict,
 } from "./seedVerify.ts";
 
@@ -84,10 +86,13 @@ const columns = computed<TableColumnsType<ITaskRow>>(() => [
     title: t("KeepUploadTask.recheck.col"),
     key: "seedState",
     align: "center",
-    width: 120,
+    // 150 是按这一列最长的那句量的：「基准在下 100%」+ 下面那行「1 条没正常做种」
+    width: 150,
     // 排的是结论的严重度档位，不是那一格显示的文字 —— 文字带着条数，
     // 按字符串排会让「10 条在做种」排在「2 条在做种」前面。
-    // 排完只动任务行，条目行跟着自己的父行走（树形数据的排序发生在顶层）
+    // 排完只动任务行，条目行跟着自己的父行走（树形数据的排序发生在顶层）。
+    // 注意这里排的是**结论严重度**，而界面上显示的是**进度阶段**：两套不一样是故意的
+    // （见下面 RESEED_RANK 那段），排序要的是「越该先看越靠前」，不是「走到哪一步」
     sorter: (a, b) => reseedRank(a.task) - reseedRank(b.task),
     ...persistedSort("seedState"),
   },
@@ -446,11 +451,23 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
 
       const index = new Map(torrents.map((t) => [String(t.infoHash).toLowerCase(), t]));
       for (const task of group) {
+        // 基准那条的「还在下」是进度，不是故障 —— 判成 wrong 会被下面那句自动暂停把基准停掉
+        const baseHash = task.baseLocal ? "" : String(task.items[0]?.hash ?? "").toLowerCase();
         for (const item of trackableItems(task)) {
           const hash = String(item.hash).toLowerCase();
           checked++;
           const found = index.get(hash);
-          const status = judgeReseedTorrent(found ? { state: found.state, rawState: found.raw?.state } : undefined);
+          const status = judgeReseedTorrent(
+            found
+              ? {
+                  state: found.state,
+                  rawState: found.raw?.state,
+                  progress: found.progress,
+                  isCompleted: found.isCompleted,
+                }
+              : undefined,
+            { isBase: hash !== "" && hash === baseHash },
+          );
           next[task.id] = { ...(next[task.id] ?? {}), [hash]: status };
           if (status.verdict === "seeding") seeding++;
           // 「校验失败要立刻暂停该种子」：判据里只有 wrong 会走到这里，中间态（正在校验、
@@ -515,6 +532,75 @@ const reseedVerdictText = computed<Record<TReseedVerdict, string>>(() => ({
   pending: t("KeepUploadTask.recheck.state.pending"),
   notFound: t("KeepUploadTask.recheck.state.notFound"),
 }));
+
+/**
+ * 进度阶段那一行的标签。写成 computed 而不是顶层常量：切语言要重算（AGENTS §3.4 那条）。
+ * `wrong` 那一档不在这里 —— 它的文字带着条数，见 `stageText`。
+ */
+const reseedStageLabel = computed<Record<Exclude<TReseedStage, "wrong">, string>>(() => ({
+  idle: t("KeepUploadTask.recheck.stage.idle"),
+  baseMissing: t("KeepUploadTask.recheck.stage.baseMissing"),
+  baseDownloading: t("KeepUploadTask.recheck.stage.baseDownloading"),
+  baseReady: t("KeepUploadTask.recheck.stage.baseReady"),
+  reseeding: t("KeepUploadTask.recheck.stage.reseeding"),
+  done: t("KeepUploadTask.recheck.stage.done"),
+}));
+
+const RESEED_STAGE_COLOR: Record<TReseedStage, string> = {
+  idle: "default",
+  baseMissing: "warning",
+  baseDownloading: "processing",
+  baseReady: "warning",
+  reseeding: "processing",
+  done: "success",
+  wrong: "error",
+};
+
+/**
+ * 这一条任务走到哪一步了（他 2026-10-09：「要能看到辅种进度」）。
+ * 判据本身在 `seedVerify.ts` 的 `reseedStage`（那份能直接跑断言），这里只负责把任务摊成它要的输入：
+ * 基准 = `baseLocal` 那种任务不在 items 里（基准是下载器已有的另一条），否则就是 items[0]
+ * —— 发送那颗「基准」的一直是第一颗。
+ */
+function taskStage(task: IKeepUploadTask) {
+  const perTask = reseedStatuses.value[task.id];
+  const list = trackableItems(task);
+  const baseLocal = !!task.baseLocal;
+  const statusOf = (item: IKeepUploadTask["items"][number]) => perTask?.[String(item.hash).toLowerCase()];
+  return reseedStage({
+    checked: !!perTask,
+    baseLocal,
+    base: baseLocal || !list[0] ? undefined : statusOf(list[0]),
+    others: (baseLocal ? list : list.slice(1)).map(statusOf),
+    untracked: task.items.length - list.length,
+  });
+}
+
+const stageColorOf = (task: IKeepUploadTask) => RESEED_STAGE_COLOR[taskStage(task).stage];
+
+/** 阶段那一行的文字：只有百分比和 x/y 计数接在标签后面（标签本身不带参数，切语言才重算得动） */
+function stageText(task: IKeepUploadTask): string {
+  const info = taskStage(task);
+  const stage = info.stage;
+  // wrong 那一档直接报数，不写「没正常做种」再在第二行重复一遍条数
+  if (stage === "wrong") return t("KeepUploadTask.recheck.stage.wrong", { count: info.wrongCount });
+  const label = reseedStageLabel.value[stage];
+  if (stage === "baseDownloading") return `${label} ${Math.round(info.progress ?? 0)}%`;
+  // x/y 的分母是除基准外的条数：基准是前提，不算进「辅种进度」
+  if ((stage === "reseeding" || stage === "done") && info.totalCount > 0) {
+    return `${label} ${info.doneCount}/${info.totalCount}`;
+  }
+  return label;
+}
+
+/**
+ * 第二行：阶段那个词装不下的那条信息 —— 有几条压根没记下 infoHash，连查都没法查。
+ * 不写这一行，「辅种完成 3/3」会被读成「全都对上了」，而那 2 条其实没人看过。
+ */
+function stageDetail(task: IKeepUploadTask): string {
+  const untracked = task.items.length - trackableItems(task).length;
+  return untracked > 0 ? t("KeepUploadTask.recheck.stage.untracked", { count: untracked }) : "";
+}
 
 /** 徽标报出来的那一档结论是哪一种（排序按它折权重，不按显示文字） */
 type TReseedKind = "seeding" | "paused" | "pending" | "untracked" | "notFound" | "wrong";
@@ -707,7 +793,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       :loading="loading"
       :pagination="pagination"
       :expandable="{ showExpandColumn: true }"
-      :scroll="{ x: 1320 }"
+      :scroll="{ x: 1350 }"
       :row-selection="{
         selectedRowKeys: selectedTasks,
         onChange: (keys: (string | number)[]) => (selectedTasks = keys as TKeepUploadTaskKey[]),
@@ -782,33 +868,39 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           {{ formatSize(rowSize(record)) }}
         </template>
 
-        <!-- 回查下载器那边折出来的结论。任务行报汇总（悬停看逐条明细），条目行报它自己那一档
-             （他 2026-10-09：「展开的列表里面每个种子都要有状态的」）。
-             没查过时这一格写「没查过」而不是留空、更不是「正常」
-             —— 那一列替用户说过「没问题」而其实没看过，是会比报错更糟的谎。
-             悬停看逐条明细，含客户端原样的状态串：判据要是不对，人自己能看出是哪一条折错了。 -->
+        <!-- 这一列第一行是**进度阶段**（他 2026-10-09：「要能看到现在是已发基准、基准已下完还是在辅种」）。
+             原先这一格只有折出来的结论（异常优先），报的是「有没有问题」，不是「走到哪一步」。
+             第二行只放阶段那个词装不下的数（几条没正常做种 / 几条没记 infoHash）。
+             悬停看逐条明细，含客户端原样的状态串：判据要是不对，人自己能看出是哪一条折错了。
+             没查过时老实写「没查过」而不是留空、更不是「正常」—— 替用户说过「没问题」而其实没看过，
+             是会比报错更糟的谎。 -->
         <template v-else-if="column.key === 'seedState'">
-          <a-popover
-            v-if="record.kind === 'task' && reseedSummary(record.task)"
-            trigger="hover"
-            placement="left"
-            :mouse-enter-delay="0.4"
-          >
-            <template #content>
-              <div class="reseed-detail">
-                <div v-for="row in reseedRows(record.task)" :key="row.key" class="reseed-detail-row">
-                  <span class="reseed-detail-title">{{ row.title }}</span>
-                  <span>{{ row.text }}</span>
-                  <span v-if="row.raw" class="text-grey">{{ row.raw }}</span>
-                </div>
-              </div>
-            </template>
-            <a-tag :color="reseedSummary(record.task)?.color">{{ reseedSummary(record.task)?.text }}</a-tag>
-          </a-popover>
-          <a-tag v-else-if="record.kind === 'item'" :color="itemReseed(record.task, record.item).color">
+          <div v-if="record.kind === 'task'">
+            <div>
+              <a-popover
+                v-if="reseedStatuses[record.task.id]"
+                trigger="hover"
+                placement="left"
+                :mouse-enter-delay="0.4"
+              >
+                <template #content>
+                  <div class="reseed-detail">
+                    <div v-for="row in reseedRows(record.task)" :key="row.key" class="reseed-detail-row">
+                      <span class="reseed-detail-title">{{ row.title }}</span>
+                      <span>{{ row.text }}</span>
+                      <span v-if="row.raw" class="text-grey">{{ row.raw }}</span>
+                    </div>
+                  </div>
+                </template>
+                <a-tag :color="stageColorOf(record.task)">{{ stageText(record.task) }}</a-tag>
+              </a-popover>
+              <a-tag v-else :color="stageColorOf(record.task)">{{ stageText(record.task) }}</a-tag>
+            </div>
+            <div v-if="stageDetail(record.task)" class="task-subtitle">{{ stageDetail(record.task) }}</div>
+          </div>
+          <a-tag v-else :color="itemReseed(record.task, record.item).color">
             {{ itemReseed(record.task, record.item).text }}
           </a-tag>
-          <span v-else class="text-body-small text-grey">{{ t("KeepUploadTask.recheck.state.idle") }}</span>
         </template>
 
         <template v-else-if="column.key === 'count'">

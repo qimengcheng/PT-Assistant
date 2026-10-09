@@ -126,23 +126,32 @@ function pickAssetUrl(assets: IGithubReleaseAsset[] | undefined, releaseUrl: str
  * 403「API rate limit exceeded」，同一时刻绕开代理直连是 200。这条网页跳转不占 REST 配额，
  * 302 的 Location 里就带着 tag 名，判「有没有新版本」够用。
  *
- * 代价要说清：这条路拿不到 published_at，也拿不到按浏览器分好的 zip 直链，
- * 所以 downloadUrl 就是 Release 页本身（点「前往下载页」会落到那一页，不假装是直链）。
+ * 发布时间也从这一页拿：tag 页上那一枚 `<relative-time datetime="…">` 就是 Release 的发布时间，
+ * 实测 v0.46.0 / v0.47.2 两个页面上的值与 REST 的 `published_at` 逐字符相同（页面各只有一枚，
+ * 不存在挑错哪一枚的问题）。所以这条路唯一还拿不到的是**按浏览器分好的 zip 直链** ——
+ * downloadUrl 只能是 Release 页本身（点「前往下载页」会落到那一页，不假装是直链）。
+ *
  * 拿不出版本号时返回 `ok:false`（仓库一条 Release 都没有 → 那条跳转本来就停在 /releases/latest），
  * 请求自己失败（代理只放行 api 那台、断网、超时）则抛给调用方 ——
  * 两者要告诉用户的话不一样，不能都糊成「两条路都没拿到」，所以也不拿异常当控制流。
  */
 async function fetchLatestViaHtml(
   signal: AbortSignal,
-): Promise<{ ok: true; latest: string; releaseUrl: string } | { ok: false }> {
+): Promise<{ ok: true; latest: string; releaseUrl: string; publishedAt: string } | { ok: false }> {
   const res = await fetch(LATEST_RELEASE_HTML, { method: "GET", redirect: "follow", signal, credentials: "omit" });
   const tag = /\/releases\/tag\/([^/?#]+)/.exec(res.url ?? "");
   const latest = normalizeVersion(tag ? decodeURIComponent(tag[1]) : "");
   if (!latest) {
     return { ok: false };
   }
+  // 正文只为这一枚时间戳去读；读不到（页面改版 / 这一跳被裁）就留空，不影响版本号已经拿到这件事
+  const publishedAt = await res
+    .text()
+    .then((html) => /<relative-time[^>]*\bdatetime="([^"]+)"/.exec(html)?.[1] ?? "")
+    .catch(() => "");
+
   // 用服务器给的那条最终地址（去掉查询串），不自己拼 `v<版本>` —— tag 前缀不是我们该假设的
-  return { ok: true, latest, releaseUrl: String(res.url).split(/[?#]/)[0] };
+  return { ok: true, latest, releaseUrl: String(res.url).split(/[?#]/)[0], publishedAt };
 }
 
 /**
@@ -224,7 +233,7 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
           latest = fallback.latest;
           releaseUrl = fallback.releaseUrl;
           downloadUrl = fallback.releaseUrl;
-          publishedAt = "";
+          publishedAt = fallback.publishedAt;
           via = "html";
           errorCode = "";
           httpStatus = 0;

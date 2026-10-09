@@ -1136,7 +1136,7 @@
       "fallbackNoTag": "第二条路（发布页那条跳转）走通了，但跳到的地址里没有版本号",
       "fallbackThrew": "第二条路（发布页那条跳转）本身没走通"
     },
-    "viaFallback": "这次是从 GitHub 的 Release 页跳转拿到的版本号（api.github.com 的匿名配额按出口 IP 计算，你现在这个出口用完了）。所以这一条没有「发布时间」，「前往下载页」开的也是 Release 页而不是本浏览器的安装包直链。",
+    "viaFallback": "这次是从 GitHub 的 Release 页跳转拿到的版本号（api.github.com 的匿名配额按出口 IP 计算，你现在这个出口用完了）。版本号读那条跳转的落点，发布时间读页面上的时间标记；这条路给不出的只有本浏览器的安装包直链，所以「前往下载页」开的是 Release 页。",
     "checkNow": "立即检查更新",
     "gotoRelease": "前往下载页",
     "gotoReleaseNote": "查看该版本的更新说明",

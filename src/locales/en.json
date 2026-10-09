@@ -1136,7 +1136,7 @@
       "fallbackNoTag": "The second route (the release-page redirect) resolved, but its final URL carries no version tag",
       "fallbackThrew": "The second route (the release-page redirect) itself failed"
     },
-    "viaFallback": "This version number came from the GitHub release page redirect (api.github.com rate-limits anonymous requests per exit IP, and yours is used up). So there is no publish date here, and 'Go to download page' opens the release page rather than a direct link to this browser's package.",
+    "viaFallback": "This version number came from the GitHub release page redirect (api.github.com rate-limits anonymous requests per exit IP, and yours is used up). The version is read from where that redirect lands and the publish date from the timestamp on the page; what this route cannot give is a direct link to this browser's package, so 'Go to download page' opens the release page.",
     "checkNow": "Check now",
     "gotoRelease": "Open download page",
     "gotoReleaseNote": "Read the release notes",

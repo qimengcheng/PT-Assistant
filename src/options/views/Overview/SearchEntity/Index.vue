@@ -830,15 +830,19 @@ const hasSearchStatus = computed<boolean>(() => {
             <!-- 种子大小，下载情况 -->
             <template v-else-if="column.key === 'size'">
               <div class="pa-0">
-                <div class="d-flex">
+                <!-- justify-end 不是多余的：列上的 align:"end" 只把 td 的 text-align 设成 end，
+                     而 .d-flex 是块级 flex 容器、默认 justify-content:flex-start，
+                     里面那颗 span 照样贴左沿（台架 .tmp-build/bench-size-align 量到右沿留 35~42px）。 -->
+                <div class="d-flex justify-end">
                   <span class="t_size text-no-wrap">{{ formatSize(record.size ?? 0) }}</span>
                 </div>
-                <div
+                <!-- 这里不能再套一层 d-flex：TorrentProcessTd 的根自己就是 flex 行，
+                     套上之后它变成 flex item、按 max-content 收缩，而里面那条进度条是
+                     width:100% —— 在收缩父级下算不出确定宽度，整行塌成 10px、进度条 0px。 -->
+                <TorrentProcessTd
                   v-if="record.status && (record.status as ETorrentStatus) !== ETorrentStatus.unknown"
-                  class="d-flex"
-                >
-                  <TorrentProcessTd :torrent="record" />
-                </div>
+                  :torrent="record"
+                />
               </div>
             </template>
 

@@ -66,6 +66,9 @@
   },
   "KeepUploadTask": {
     "clearAll": "Clear All",
+    "usage": {
+      "title": "How reseeding works"
+    },
     "clearConfirm": "Confirm clearing all reseed tasks?",
     "clearError": "Clear failed",
     "clearSuccess": "Cleared successfully",

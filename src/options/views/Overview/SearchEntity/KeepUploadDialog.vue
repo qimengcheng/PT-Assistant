@@ -34,6 +34,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
+import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 const showDialog = defineModel<boolean>();
@@ -72,6 +73,8 @@ const verifiedItemsOrder = ref<string[]>([]); // 保持顺序
 const baseTorrent = ref<ITorrentInfoForVerification | null>(null);
 const verifiedCount = ref(0);
 const creating = ref(false);
+/** 「怎么用」说明弹窗的开关（它挂在本弹窗的默认插槽里，见模板那条注释） */
+const showUsageDialog = ref(false);
 
 // ── 本地种子指纹索引 ──
 const localIndex = ref<ILocalFingerprintIndex | null>(null);
@@ -595,19 +598,20 @@ async function createKeepUploadTask() {
 
 <template>
   <a-modal v-model:open="showDialog" :title="t('SearchEntity.KeepUploadDialog.title')" :width="1024" :mask="{ closable: false }">
-    <!-- 「怎么用」入口原先挂在 #title 插槽里，会和右上角相撞，移到内容区顶部 -->
+    <!-- 「怎么用」入口原先挂在 #title 插槽里，会和右上角相撞，移到内容区顶部。
+       它以前是 a-button 的 href，指向上游旧项目的 wiki；现在改为打开应用内说明弹窗。 -->
     <div class="d-flex justify-end">
       <a-tooltip :title="t('common.howToUse')">
-        <a-button
-          type="text"
-          href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/keep-upload-task"
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-        >
+        <a-button type="text" @click="showUsageDialog = true">
           <template #icon><QuestionCircleOutlined /></template>
         </a-button>
       </a-tooltip>
     </div>
+
+    <!-- 必须挂在本弹窗的默认插槽里，不能当根级兄弟节点：台架量过（.tmp-build/bench-usage ?m=stack），
+         兄弟摆法两颗 wrap 的 z-index 都是 1000，先后只由 DOM 顺序决定；挂进插槽才走 antd 的
+         ZIndexProvider，内层拿到 1200。它自己仍是 portal 到 body，不会被本弹窗的滚动容器裁掉。 -->
+    <KeepUploadUsageDialog v-model="showUsageDialog" />
 
     <!-- 本地指纹索引：决定「哪些条目本地已经有了」，是辅种前的最后一道保守检查 -->
     <div class="d-flex align-center ga-2 mb-2">

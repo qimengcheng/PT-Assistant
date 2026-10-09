@@ -20,6 +20,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 const { t } = useI18n();
@@ -30,6 +31,7 @@ const tasks = ref<IKeepUploadTask[]>([]);
 // 表格 row-key 为 id，因此选中项保存的是任务ID（TKeepUploadTaskKey）而非任务对象
 const selectedTasks = ref<TKeepUploadTaskKey[]>([]);
 const loading = ref(false);
+const showUsageDialog = ref(false);
 
 // computed：表头有 t()，setup 里一次性求值的话切语言不会重算
 const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
@@ -258,11 +260,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           <span class="ml-1">{{ t("KeepUploadTask.clearAll") }}</span>
         </a-button>
 
-        <a-button
-          href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/keep-upload-task"
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-        >
+        <a-button @click="showUsageDialog = true">
           <template #icon>
             <QuestionCircleOutlined />
           </template>
@@ -417,6 +415,10 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
     </a-alert>
     </div>
   </div>
+
+  <!-- 弹窗是 portal，不参与 .page 网格布局，所以挂在根级而不是 .page 直接子节点 ——
+       后者会被排进隐式第三行、把面板那一行挤窄（同 MyData/Index.vue 的写法） -->
+  <KeepUploadUsageDialog v-model="showUsageDialog" />
 </template>
 
 <style scoped lang="scss">

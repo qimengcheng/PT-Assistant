@@ -66,6 +66,9 @@
   },
   "KeepUploadTask": {
     "clearAll": "清空全部",
+    "usage": {
+      "title": "辅种怎么用"
+    },
     "clearConfirm": "确认清空所有辅种任务吗？",
     "clearError": "清空失败",
     "clearSuccess": "清空成功",

@@ -33,3 +33,18 @@ export function withReseedSkipChecking(options: CAddTorrentOptions): CAddTorrent
     },
   };
 }
+
+/**
+ * 这一条到底该不该跳过校验（用户 2026-10-09：「点击发送基准种子的时候就别跳过校验了啊，
+ * 都是基准种子了，那说明还没下嘛」）。
+ *
+ * 只有「列表第一条 + 基准不在下载器里」那一条是真要下全量的：跳过校验等于告诉 qBittorrent
+ * 「数据我盘上已经有了」，于是那条基准可能挂着不完整的数据被当成 100%，而后面所有辅种都是拿
+ * 这份错数据去挂的 —— 比慢一点校验严重得多。
+ *
+ * 基准来自下载器（baseLocal）那种任务不适用这条：那一条根本不会发送（界面那颗是灰的），
+ * 发出去的每一条都是「内容已在盘上、只差再挂一站」，照旧跳过。
+ */
+export function skipCheckingFor(task: { baseLocal?: unknown }, item: unknown, firstListEntry: unknown): boolean {
+  return !!task.baseLocal || item !== firstListEntry;
+}

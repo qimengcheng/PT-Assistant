@@ -124,6 +124,8 @@
     "sending": "正在发送 {count} 条到下载器…",
     "sendThisOne": "只发送这一条",
     "sendAndSetBase": "发送这一条并换它当基准",
+    "sendBaseDisabled": "基准就在下载器里，这一条不用再发",
+    "sendOtherDisabled": "基准就在下载器里，这里没有「其他种子」可发",
     "sendSuccess": "发送成功",
     "setAsBaseTorrent": "设为基准种子",
     "setBaseError": "设置失败",

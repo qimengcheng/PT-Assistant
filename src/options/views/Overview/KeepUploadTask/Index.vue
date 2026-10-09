@@ -25,7 +25,7 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
-import { withReseedSkipChecking } from "./sendOptions.ts";
+import { skipCheckingFor, withReseedSkipChecking } from "./sendOptions.ts";
 import {
   judgeReseedTorrent,
   linkItemToTorrent,
@@ -209,6 +209,8 @@ async function sendTorrentsToDownloader(
   runtimeStore.showSnakebar(t("KeepUploadTask.sending", { count: items.length }), { color: "info" });
 
   try {
+    // 「列表第一条、而基准又不是下载器里那条」= 这一条真要下全量，那一条不许跳过校验（见 sendOptions.ts）
+    const baseEntry = task.baseLocal ? null : task.items[0];
     for (const item of items) {
       const now = new Date();
       const replacements: Record<string, string> = {
@@ -221,13 +223,16 @@ async function sendTorrentsToDownloader(
         "date:MM": formatDate(now, "MM"),
         "date:DD": formatDate(now, "dd"),
       };
-      const addTorrentOptions: CAddTorrentOptions = withReseedSkipChecking({
+      const plainOptions: CAddTorrentOptions = {
         localDownload: true,
         // 与普通下载保持一致：是否暂停由下载器的“自动开始”设置决定。
         addAtPaused: !(downloader.feature?.DefaultAutoStart ?? true),
         savePath: task.downloadOptions.savePath || "",
         ...task.downloadOptions.addTorrentOptions,
-      });
+      };
+      const addTorrentOptions: CAddTorrentOptions = skipCheckingFor(task, item, baseEntry)
+        ? withReseedSkipChecking(plainOptions)
+        : plainOptions;
 
       for (const key of ["savePath", "label"] as const) {
         if (!addTorrentOptions[key]) continue;
@@ -745,15 +750,15 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 
         <template v-else-if="column.key === 'action'">
           <a-space :size="0">
-            <!-- baseLocal 那种任务里只有一条，而那一条就是「要挂上去的本站」，不是基准：
-                 基准在下载器里。所以「发基准」「发其他」两颗都没有对象，直接不出现，
-                 留下「发送所有种子」= 发这一条 -->
-            <a-tooltip v-if="!record.baseLocal" :title="t('KeepUploadTask.sendBaseTorrent')">
+            <!-- baseLocal 那种任务里只有一条，而那一条就是「要挂上去的本站」，不是基准：基准在下载器里。
+                 所以这两颗没有对象 —— 他 2026-10-09 要求的是**按住不给点**而不是藏起来（「这个按钮就应该是不可用的」），
+                 藏起来会让人以为这一版没做这个功能，按住了 + 悬停说原因才是「这里确实不需要」。 -->
+            <a-tooltip :title="record.baseLocal ? t('KeepUploadTask.sendBaseDisabled') : t('KeepUploadTask.sendBaseTorrent')">
               <a-button
                 size="small"
                 type="text"
                 :loading="sendingOf(record.id) === 'base'"
-                :disabled="!!sendingOf(record.id)"
+                :disabled="!!record.baseLocal || !!sendingOf(record.id)"
                 @click="sendBaseTorrent(record)"
               >
                 <template #icon>
@@ -761,12 +766,14 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                 </template>
               </a-button>
             </a-tooltip>
-            <a-tooltip v-if="!record.baseLocal" :title="t('KeepUploadTask.sendOtherTorrents')">
+            <a-tooltip
+              :title="record.baseLocal ? t('KeepUploadTask.sendOtherDisabled') : t('KeepUploadTask.sendOtherTorrents')"
+            >
               <a-button
                 size="small"
                 type="text"
                 :loading="sendingOf(record.id) === 'other'"
-                :disabled="!!sendingOf(record.id)"
+                :disabled="!!record.baseLocal || !!sendingOf(record.id)"
                 @click="sendOtherTorrents(record)"
               >
                 <template #icon>
@@ -838,11 +845,12 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
             >
               {{ row.index === 0 ? t("KeepUploadTask.sendThisOne") : t("KeepUploadTask.sendAndSetBase") }}
             </a-button>
-            <a-tooltip v-if="!subRecord.baseLocal" :title="t('KeepUploadTask.setAsBaseTorrent')">
+            <!-- 同一颗「按住而不是藏起来」的判据（上面操作列那两条注释）：基准在下载器里时「换基准」也没有对象 -->
+            <a-tooltip :title="t('KeepUploadTask.setAsBaseTorrent')">
               <a-button
                 size="small"
                 type="text"
-                :disabled="row.index === 0 || !!sendingOf(subRecord.id)"
+                :disabled="row.index === 0 || !!subRecord.baseLocal || !!sendingOf(subRecord.id)"
                 @click="setAsBaseTorrent(subRecord as IKeepUploadTask, row.index)"
               >
                 <template #icon>

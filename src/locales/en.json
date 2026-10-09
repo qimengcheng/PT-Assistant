@@ -124,6 +124,8 @@
     "sending": "Sending {count} to the downloader…",
     "sendThisOne": "Send only this one",
     "sendAndSetBase": "Send this and make it the base",
+    "sendBaseDisabled": "The base is already in the downloader — nothing to send",
+    "sendOtherDisabled": "The base is in the downloader, so there is no \"other torrent\" to send",
     "sendSuccess": "Sent successfully",
     "setAsBaseTorrent": "Set as base torrent",
     "setBaseError": "Failed to set as base torrent",

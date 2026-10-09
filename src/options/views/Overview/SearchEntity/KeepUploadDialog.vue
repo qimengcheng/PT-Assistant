@@ -852,7 +852,12 @@ async function createKeepUploadTask() {
           {{ t("SearchEntity.KeepUploadDialog.otherTorrent") }}
         </div>
         <div class="d-flex align-center py-1">
-          <SiteFavicon :site-id="item.data.site" :size="18" class="mr-2" />
+          <!-- 图标旁边必须带上站点名：不少站点的 favicon 长得一样（他截图里 SBPT 和「库非」
+               两颗都是同一个蓝底 N），只有图标就分不出这一条是哪个站。 -->
+          <div class="d-flex align-center ga-1 mr-2 site-cell">
+            <SiteFavicon :site-id="item.data.site" :size="18" />
+            <SiteName :site-id="item.data.site" tag="span" class="text-body-small text-grey text-no-wrap" />
+          </div>
 
           <div class="flex-1-1-0 text-truncate">
             <div class="list-item text-body-medium">
@@ -986,6 +991,12 @@ async function createKeepUploadTask() {
 </template>
 
 <style scoped lang="scss">
+/* 图标 + 站点名那一栏不参与收缩：站点名是短值，让它去挤压标题列（标题本来就有 ellipsis + 悬停全文）
+   比让站名被截断更好读 —— 而这一栏存在的目的正是「看清是哪个站」。 */
+.site-cell {
+  flex: 0 0 auto;
+}
+
 /* 分隔线那 16px 缩进只能靠缩宽度，不能靠外边距：Divider 自带 `width:100%; min-width:100%`
    （antdv-next dist/divider/style/index.js:34-35），再加 `.ml-4` 就把整条推到容器右沿之外 16px，
    于是弹窗挂一条横向滚动条。真组件台架量过（.tmp-build/bench-localbase `?m=layout`，9 条）：

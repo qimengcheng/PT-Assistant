@@ -9,6 +9,7 @@
  * 用法：`node scripts/check-fingerprint.mjs`（不需要构建产物）
  */
 import {
+  autoSelectLocalBase,
   buildFingerprintIndexLookup,
   buildTitleSizeKey,
   comparePieceSamples,
@@ -16,6 +17,7 @@ import {
   decideFingerprintAction,
   matchLocalFingerprint,
   normalizeTitle,
+  pickLocalBaseCandidates,
   samplePieces,
   screenByTitleSizeKey,
 } from "../src/shared/fingerprint/index.ts";
@@ -317,6 +319,80 @@ const screened = screenByTitleSizeKey(
 check("第 1 层粗筛命中数", screened.length, 2);
 check("命中依据（标题+大小）", screened[0].matchedBy, "titleSize");
 check("退化依据（只按大小）", screened[1].matchedBy, "size");
+
+group("下载器里挑基准（只勾中一条时）");
+
+/** 造一条本地索引条目：只填被测逻辑真看的字段，其余给齐类型 */
+const mkEntry = (over) => ({
+  hash: "h",
+  name: "n",
+  size: 4005,
+  progress: 100,
+  isCompleted: true,
+  trackerHosts: [],
+  sites: [],
+  ratioLimit: -2,
+  seedingTimeLimit: -2,
+  ...over,
+});
+
+const otherFp = await computeFilesFingerprint({
+  rootName: "Totally.Other",
+  length: 0,
+  files: [{ path: ["a.mkv"], length: 4000 }, { path: ["b.mkv"], length: 5 }],
+});
+const targetTitleKey = buildTitleSizeKey("Some.Movie.2021", 4005);
+const target = { titleKey: targetTitleKey, files: fpB, pieces: sample1, size: 4005 };
+
+const baseIndex = [
+  // 第 2 层命中（根目录名不同也算命中，fpA/fpB 是同一份数据）
+  mkEntry({ hash: "same", name: "same", files: fpA, titleKey: buildTitleSizeKey("Some Movie 2021 2160p", 4005) }),
+  // 第 2 层算得出且不同 → 确定不是同一份，必须被排除
+  mkEntry({ hash: "diff", name: "diff", files: otherFp, titleKey: targetTitleKey }),
+  // 第 2 层算不出（客户端不支持导出文件清单）→ 只能靠标题+大小，算候选
+  mkEntry({ hash: "nofp-title", name: "nofp-title", files: null, titleKey: targetTitleKey }),
+  // 同上，且标题也不同 → 退到「只按大小」
+  mkEntry({ hash: "nofp-size", name: "nofp-size", files: null, titleKey: buildTitleSizeKey("Unrelated", 4050), size: 4050 }),
+  // 大小差出 2% 容差
+  mkEntry({ hash: "far", name: "far", files: null, titleKey: buildTitleSizeKey("Unrelated", 99999), size: 99999 }),
+  // 没下完的：拿它当基准就是必爆仓
+  mkEntry({ hash: "partial", name: "partial", files: fpA, isCompleted: false, progress: 60 }),
+];
+
+const baseCandidates = pickLocalBaseCandidates(target, baseIndex);
+check(
+  "候选集合：排除「指纹确定不同」「超大小容差」「没下完」",
+  baseCandidates.map((c) => c.entry.hash).join(","),
+  "same,nofp-title,nofp-size",
+);
+check("第 2 层命中的排在最前", baseCandidates[0].tier, "files");
+check("标题+大小命中的算第 1 层候选", baseCandidates[1].tier, "titleSize");
+check("只按大小进来的", baseCandidates[2].tier, "size");
+check("大小差按绝对值记下来（界面要提示）", baseCandidates[2].sizeDelta, 45);
+
+check("自动选中落在第 2 层那条", autoSelectLocalBase(baseCandidates)?.entry.hash, "same");
+check(
+  "只有第 1 层候选时不替用户决定",
+  autoSelectLocalBase(baseCandidates.slice(1)),
+  null,
+);
+
+// piece 抽样反证：文件清单相同也可能是巧合（同目录结构、不同内容）
+const mismatchEntry = mkEntry({ hash: "fp-but-pieces", name: "fp-but-pieces", files: fpA, pieces: samplePieces(tampered, { head: 4, tail: 4 }) });
+const withMismatch = pickLocalBaseCandidates(target, [mismatchEntry]);
+check("piece 不一致的那条仍在候选里（由人判，不静默丢）", withMismatch.length, 1);
+check("piece 不一致记在候选上", withMismatch[0].pieces, "mismatch");
+check("piece 不一致时不自动选中", autoSelectLocalBase(withMismatch), null);
+
+// 目标侧算不出文件清单（.torrent 下载失败 / 站点没给）→ 谁都不能算第 2 层
+const noTargetFp = pickLocalBaseCandidates({ titleKey: targetTitleKey, size: 4005 }, baseIndex);
+check("目标算不出指纹时没有第 2 层候选", noTargetFp.every((c) => c.tier !== "files"), true);
+check(
+  "目标算不出指纹时不拿指纹排除任何条目（没证据就说没证据，不假装确定不是）",
+  noTargetFp.map((c) => c.entry.hash).join(","),
+  "diff,nofp-title,same,nofp-size",
+);
+check("目标算不出指纹时一条都不自动选中", autoSelectLocalBase(noTargetFp), null);
 
 console.log(`\n通过 ${passed} 项，失败 ${failed} 项`);
 process.exit(failed === 0 ? 0 : 1);

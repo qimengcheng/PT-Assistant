@@ -309,6 +309,11 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
               {{ t("KeepUploadTask.savePath") }}{{ record.downloadOptions?.clientName }} ->
               {{ record.downloadOptions?.savePath || t("KeepUploadTask.defaultPath") }}
             </div>
+            <!-- 基准不在任务里的那种任务：数据是下载器里已有的另一条，得说清楚是哪条，
+                 否则用户看到的是「只有一颗种子的辅种任务」，不知道它在往什么上挂 -->
+            <div v-if="record.baseLocal" class="text-body-small text-grey text-no-wrap">
+              {{ t("KeepUploadTask.baseLocal") }}{{ record.baseLocal.name }}
+            </div>
             <div class="text-body-small">{{ t("KeepUploadTask.torrentCount") }}{{ record.items.length }}</div>
           </div>
         </template>
@@ -327,21 +332,24 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 
         <template v-else-if="column.key === 'action'">
           <a-space :size="0">
-            <a-tooltip :title="t('KeepUploadTask.sendBaseTorrent')">
+            <!-- baseLocal 那种任务里只有一条，而那一条就是「要挂上去的本站」，不是基准：
+                 基准在下载器里。所以「发基准」「发其他」两颗都没有对象，直接不出现，
+                 留下「发送所有种子」= 发这一条 -->
+            <a-tooltip v-if="!record.baseLocal" :title="t('KeepUploadTask.sendBaseTorrent')">
               <a-button size="small" type="text" @click="sendBaseTorrent(record)">
                 <template #icon>
                   <NumberOutlined />
                 </template>
               </a-button>
             </a-tooltip>
-            <a-tooltip :title="t('KeepUploadTask.sendOtherTorrents')">
+            <a-tooltip v-if="!record.baseLocal" :title="t('KeepUploadTask.sendOtherTorrents')">
               <a-button size="small" type="text" @click="sendOtherTorrents(record)">
                 <template #icon>
                   <CopyOutlined />
                 </template>
               </a-button>
             </a-tooltip>
-            <a-tooltip :title="t('KeepUploadTask.sendAllTorrents')">
+            <a-tooltip :title="record.baseLocal ? t('KeepUploadTask.sendReseedOne') : t('KeepUploadTask.sendAllTorrents')">
               <a-button size="small" type="text" @click="sendAllTorrents(record)">
                 <template #icon>
                   <DownloadOutlined />
@@ -379,7 +387,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                 {{ t("KeepUploadTask.leechers") }}{{ subItem.leechers ?? "-" }}
               </div>
             </div>
-            <a-tooltip :title="t('KeepUploadTask.setAsBaseTorrent')">
+            <a-tooltip v-if="!record.baseLocal" :title="t('KeepUploadTask.setAsBaseTorrent')">
               <a-button
                 size="small"
                 type="text"

@@ -42,10 +42,11 @@ export const usageZh: IUsageDoc = {
       id: "create",
       title: "一、任务在「搜索结果」页创建，不在「辅种任务」页",
       steps: [
-        "去「搜索结果」页搜一遍，把同一部内容在几个站点上的条目用行首的复选框勾上。",
-        "点结果列表上方那一排按钮里的分叉图标（悬停显示「辅种检测」），打开「辅种检测」对话框。勾中少于 2 条时那颗按钮是灰的，点不动。",
-        "对话框里排在第一条的就是「基准种子」：它是你本地已经有了、或者打算先下好的那一条；其余都是「其他种子」。",
-        "选下载器、填保存路径（标签可选），点「创建任务」。要让它点得动，得同时满足：验证通过并纳入的条目超过 1 条（也就是基准 + 至少一条其他），并且下载器已经选上。",
+        "去「搜索结果」页搜一遍，把同一部内容在几个站点上的条目用行首的复选框勾上。只勾一条也行 —— 那种情形是内容早就下完了，只要再挂上这一站。",
+        "点结果列表上方那一排按钮里的分叉图标（悬停显示「辅种检测」），打开「辅种检测」对话框。",
+        "勾了多条时，对话框里排在第一条的就是「基准种子」：它是你本地已经有了、或者打算先下好的那一条；其余都是「其他种子」。",
+        "只勾一条时基准不在这一页里：对话框上方会多出一栏「基准种子（下载器里已有的那一条）」。它拿这条种子的文件清单去下载器里找，文件清单一致的那条替你选好；只按标题+大小对上的不算证据，只会列出来等你自己挑。",
+        "选下载器、填保存路径（标签可选），点「创建任务」。要让它点得动：勾多条时要验证通过并纳入的条目超过 1 条（基准 + 至少一条其他）并且下载器已经选上；只勾一条时还要已经选定一条下载器里的基准。",
       ],
     },
     {
@@ -82,6 +83,10 @@ export const usageZh: IUsageDoc = {
           text: "把除第一条以外的全部推过去 —— 这一步才是辅种。一次推多条会先弹确认。",
         },
         { title: "发送所有种子", text: "全部推，含基准那一条。" },
+        {
+          title: "基准在下载器里的那种任务",
+          text: "从「只勾一条」那条路创建的任务，数据用的是下载器里已有的另一条种子：标题下面多出一行「基准种子（下载器里）：」写明挂在谁身上，行首展开后只有那一条要挂上去的本站条目。这种任务里「发送基准种子」「发送其他种子」「设为基准种子」都不出现，只留一颗「发送这一条去辅种」。",
+        },
         { title: "复制下载链接", text: "把这一任务里所有种子的下载链接按行复制到剪贴板，方便你自己粘到别处。" },
         {
           title: "删除 / 清空全部",
@@ -119,10 +124,11 @@ export const usageEn: IUsageDoc = {
       id: "create",
       title: "1. Tasks are created on the 'Search Results' page, not on 'Reseed Tasks'",
       steps: [
-        "Go to 'Search Results', run a search, and tick the checkboxes beside the entries that are the same content on different sites.",
-        "Click the branch icon in the heading row above the result list (its tooltip reads 'Reseed Check') to open the 'Reseed Verification' dialog. With fewer than 2 ticked that button stays disabled.",
-        "The entry listed first there is the 'Base Torrent': the one you already have, or the one you intend to download first. Everything else sits under 'Other Torrents'.",
-        "Pick a downloader, set the save path (label optional), then press 'Create Task'. It only becomes pressable when more than 1 verified entry is included (the base plus at least one other) and a downloader is selected.",
+        "Go to 'Search Results', run a search, and tick the checkboxes beside the entries that are the same content on different sites. Ticking just one works too - that is the case where the data finished downloading long ago and you only need to attach this one site.",
+        "Click the branch icon in the heading row above the result list (its tooltip reads 'Reseed Check') to open the 'Reseed Verification' dialog.",
+        "With several entries ticked, the one listed first is the 'Base Torrent': the one you already have, or the one you intend to download first. Everything else sits under 'Other Torrents'.",
+        "With a single entry the base is not on this page, so the dialog grows a 'Base torrent (an entry your downloader already has)' row at the top. It takes that torrent's file list and looks for the same data inside the downloader: an entry whose file list matches is selected for you. A match by title and size alone is not evidence - those are only listed for you to pick from.",
+        "Pick a downloader, set the save path (label optional), then press 'Create Task'. It only becomes pressable when more than 1 verified entry is included (the base plus at least one other) and a downloader is selected; with a single ticked entry it also needs a base picked from the downloader.",
       ],
     },
     {
@@ -159,6 +165,10 @@ export const usageEn: IUsageDoc = {
           text: "Sends everything except the first entry. This is the reseed step. Sending several at once asks for confirmation.",
         },
         { title: "Send all torrents", text: "Sends everything, including the base entry." },
+        {
+          title: "Tasks whose base lives in the downloader",
+          text: "A task created from the 'one ticked entry' route seeds onto a different torrent your downloader already has: an extra line under the title reads 'Base torrent (in downloader): ' and says which, and expanding the row shows only that one site entry to attach. Those tasks have no 'Send base torrent', no 'Send other torrents' and no 'Set as base torrent' - only 'Send this entry to reseed'.",
+        },
         {
           title: "Copy download links",
           text: "Copies every download link in the task to the clipboard, one per line.",

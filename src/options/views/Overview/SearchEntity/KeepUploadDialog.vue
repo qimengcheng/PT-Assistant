@@ -17,9 +17,11 @@ import type { ITorrentInfoForVerification } from "@/messages.ts";
 import type { IKeepUploadTask, IKeepUploadTaskItem, IKeepUploadTaskDownloadOptions } from "@/shared/types.ts";
 import {
   buildFingerprintIndexLookup,
+  autoSelectLocalBase,
   decideFingerprintAction,
   diffFileLists,
   matchLocalFingerprint,
+  pickLocalBaseCandidates,
   type IFingerprintComparable,
   type IFingerprintIndexLookup,
   type IFingerprintMatchResult,
@@ -76,6 +78,19 @@ const creating = ref(false);
 /** 「怎么用」说明弹窗的开关（它挂在本弹窗的默认插槽里，见模板那条注释） */
 const showUsageDialog = ref(false);
 
+/**
+ * 只勾中一条时的「基准种子」—— 存的是下载器那条种子的 hash。
+ *
+ * 为什么要有这一档：常见情形是内容早就在下完的那颗种子里了，只想再挂上这一站。
+ * 这种任务里没有第二条可以拿来当基准，所以基准只能从下载器的本地索引里挑。
+ *
+ * 存 hash 而不是整条 entry：换下载器、重建索引之后旧 hash 那条自然挑不中，
+ * 选择会退回「未选」。拿一条已经不存在的种子当基准去辅种是必爆仓的。
+ */
+const localBaseHash = ref("");
+/** 用户自己挑过之后就不再替他改（自动选中只在「一次都没挑过」时发生） */
+const localBaseTouched = ref(false);
+
 // ── 本地种子指纹索引 ──
 const localIndex = ref<ILocalFingerprintIndex | null>(null);
 const indexLoading = ref(false);
@@ -100,10 +115,74 @@ const downloaderOptions = computed(() =>
 const savePathOptions = computed(() => suggestedSavePaths.value.map((x) => ({ value: x, label: x })));
 const labelOptions = computed(() => suggestedLabels.value.map((x) => ({ value: x, label: x })));
 
+/** 只勾中一条 = 「下载器已经下完了，只要再挂这一站」那种辅种 */
+const isSingleMode = computed(() => torrentItems.length === 1);
+
+/** 单条模式下要辅的那一条。基准候选读它**下载回来的**指纹与大小，不读列表页那个约数 */
+const singleItem = computed(() => verifiedItems.value.get(verifiedItemsOrder.value[0]) ?? null);
+
+/** 下载器里可能当基准的条目，按证据强度排好（files > 标题+大小 > 只大小） */
+const baseCandidates = computed(() => {
+  const info = isSingleMode.value ? singleItem.value?.torrent : null;
+  if (!info) return [];
+  return pickLocalBaseCandidates(toComparable(info), localIndex.value);
+});
+
+/** a-select 的 options：{ value, label }。label 一律是人看得懂的名字，不放 hash（§3.5） */
+const baseOptions = computed(() =>
+  baseCandidates.value.map((c) => ({
+    value: c.entry.hash,
+    label: c.entry.savePath
+      ? `${c.entry.name} · ${formatSize(c.entry.size)} · ${c.entry.savePath}`
+      : `${c.entry.name} · ${formatSize(c.entry.size)}`,
+  })),
+);
+
+/** 当前选中的那条候选（hash 已经不在候选里时是 null，下拉同时退回未选） */
+const chosenLocalBase = computed(() => baseCandidates.value.find((c) => c.entry.hash === localBaseHash.value) ?? null);
+
+// 索引与种子指纹谁后到都会重算候选。两条规矩：
+// 1) 选中的那条没了就清空 —— 否则 a-select 会把一个内部 hash 显示在界面上；
+// 2) 只有第 2 层（文件清单）命中才代用户选，第 1 层的「疑似」一律留给人挑。
+watch(baseCandidates, (list) => {
+  if (!list.some((c) => c.entry.hash === localBaseHash.value)) localBaseHash.value = "";
+  if (!localBaseTouched.value && !localBaseHash.value) {
+    localBaseHash.value = autoSelectLocalBase(list)?.entry.hash ?? "";
+  }
+});
+
+function onLocalBaseChange(hash: string) {
+  localBaseTouched.value = true;
+  localBaseHash.value = hash;
+}
+
+/** 基准那一档下面写的说明：靠哪一层选上的、要不要人复核 */
+const localBaseHint = computed(() => {
+  const c = chosenLocalBase.value;
+  if (!c) {
+    if (indexLoading.value || singleItem.value?.loading) return t("SearchEntity.KeepUploadDialog.localBase.working");
+    if (baseCandidates.value.length > 0) return t("SearchEntity.KeepUploadDialog.localBase.pick");
+    // 一条候选都没有，得分清是「下载器里确实没有」还是「压根没读到列表」——只有后者点重建才有救
+    if ((localIndex.value?.entries.length ?? 0) === 0) return t("SearchEntity.KeepUploadDialog.localBase.noIndex");
+    return t("SearchEntity.KeepUploadDialog.localBase.none");
+  }
+  if (c.pieces === "mismatch") return t("SearchEntity.KeepUploadDialog.localBase.piecesMismatch");
+  if (c.tier === "files") return t("SearchEntity.KeepUploadDialog.localBase.byFiles");
+  return t(
+    c.tier === "titleSize" ? "SearchEntity.KeepUploadDialog.localBase.byTitleSize" : "SearchEntity.KeepUploadDialog.localBase.bySize",
+  );
+});
+
 // 是否可以创建任务
 const canCreateTask = computed(() => {
-  return includedVerifiedCount.value > 1 && selectedDownloaderId.value;
+  if (!selectedDownloaderId.value) return false;
+  // 单条模式：基准来自下载器，任务里那一条就是「要挂上去的本站」，1 条就该能建
+  if (isSingleMode.value) return includedVerifiedCount.value >= 1 && !!chosenLocalBase.value;
+  return includedVerifiedCount.value > 1;
 });
+
+/** 底部那一排（选下载器 / 路径 / 标签 / 创建）什么时候出现 */
+const showCreateRow = computed(() => (isSingleMode.value ? includedVerifiedCount.value >= 1 : includedVerifiedCount.value > 1));
 
 // 状态文本
 // computed：标签里有 t()，setup 里一次性求值的话切语言不会重算
@@ -247,6 +326,8 @@ function startVerification() {
   localIndex.value = null;
   indexSupported.value = true;
   excludeLocalDuplicates.value = false;
+  localBaseHash.value = "";
+  localBaseTouched.value = false;
 
   const remembered = configStore.download.saveLastDownloader ? metadataStore.lastKeepUpload : undefined;
   const rememberedDownloaderExists = remembered?.downloaderId && metadataStore.downloaders[remembered.downloaderId];
@@ -564,6 +645,15 @@ async function createKeepUploadTask() {
       title: verifiedList[0].data.title || "Unknown",
       size: verifiedList[0].data.size || 0,
       downloadOptions,
+      // 单条模式：基准是下载器里那条，不在 items 里。任务页靠这个标记决定
+      // 「发送基准种子」那两颗要不要出现，并把基准的名字显示出来。
+      baseLocal: chosenLocalBase.value
+        ? {
+            hash: chosenLocalBase.value.entry.hash,
+            name: chosenLocalBase.value.entry.name,
+            savePath: chosenLocalBase.value.entry.savePath,
+          }
+        : undefined,
       items: verifiedList.map((item) => ({
         site: item.data.site,
         title: item.data.title || "",
@@ -630,10 +720,28 @@ async function createKeepUploadTask() {
       </a-checkbox>
     </div>
 
+    <!-- 只勾中一条：基准不在本任务里，得从下载器已有的种子里挑一条 -->
+    <div v-if="isSingleMode" class="local-base-row mb-2">
+      <div class="text-body-small text-grey mb-1">
+        {{ t("SearchEntity.KeepUploadDialog.localBase.title") }}
+      </div>
+      <a-select
+        :value="localBaseHash || undefined"
+        :options="baseOptions"
+        :loading="indexLoading"
+        :placeholder="t('SearchEntity.KeepUploadDialog.localBase.placeholder')"
+        show-search
+        option-filter-prop="label"
+        style="width: 100%"
+        @change="onLocalBaseChange"
+      />
+      <div class="text-body-small text-grey mt-1">{{ localBaseHint }}</div>
+    </div>
+
     <div class="keep-upload-list" style="max-height: 80vh">
       <template v-for="(item, index) in includedItems" :key="item.id">
         <div v-if="index === 0" class="text-body-small text-grey mb-1">
-          {{ t("SearchEntity.KeepUploadDialog.baseTorrent") }}
+          {{ isSingleMode ? t("SearchEntity.KeepUploadDialog.reseedTarget") : t("SearchEntity.KeepUploadDialog.baseTorrent") }}
         </div>
         <div v-if="index === 1" class="text-body-small text-grey mb-1">
           {{ t("SearchEntity.KeepUploadDialog.otherTorrent") }}
@@ -729,7 +837,7 @@ async function createKeepUploadTask() {
 
     <template #footer>
       <div class="d-flex align-center">
-        <template v-if="includedVerifiedCount > 1">
+        <template v-if="showCreateRow">
           <a-select
             v-model:value="selectedDownloaderId"
             :options="downloaderOptions"

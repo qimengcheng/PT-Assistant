@@ -138,11 +138,13 @@ function openKeepUploadDialog() {
         <template #icon><SaveOutlined /></template>
       </a-button>
     </a-tooltip>
-    <!-- 辅种检测 -->
+    <!-- 辅种检测。原先要勾中 ≥2 条才点得动，因为基准取的是列表里第一条；
+         现在 1 条也能进 —— 那种情形是「下载器早就下完了，只要再挂这一站」，
+         基准改从下载器的本地索引里挑（见 KeepUploadDialog 的 isSingleMode 那一档） -->
     <a-tooltip :title="t('SearchEntity.KeepUploadDialog.keepUpload')">
       <a-button
         v-if="showKeepUploadBtn"
-        :disabled="torrentItems.length < 2"
+        :disabled="torrentItems.length < 1"
         type="text"
         @click="openKeepUploadDialog"
       >

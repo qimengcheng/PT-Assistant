@@ -35,6 +35,20 @@ export interface IKeepUploadTaskDownloadOptions {
 }
 
 /**
+ * 「基准种子在下载器里」时记下的那一条本地种子。
+ *
+ * 为什么要有这一块：只勾中一颗站点种子来辅种时，数据早就在下完的那颗种子里了，
+ * 基准不是本任务的任何一条 items —— 任务里那一条要发的就是「拿已有数据去挂这一站」。
+ * 没有这个标记的话，任务页会按老规矩把 items[0] 当基准再发一遍（那就是重复添加）。
+ * 只存展示与对账要用的三样：hash 用来日后回查下载器，name/savePath 用来说清是哪条。
+ */
+export interface IKeepUploadTaskLocalBase {
+  hash: string;
+  name: string;
+  savePath?: string;
+}
+
+/**
  * 辅种任务
  */
 export interface IKeepUploadTask {
@@ -44,6 +58,8 @@ export interface IKeepUploadTask {
   size: number; // 种子大小
   downloadOptions: IKeepUploadTaskDownloadOptions; // 下载选项
   items: IKeepUploadTaskItem[]; // 种子列表
+  /** 有这一项 = 基准种子是下载器里已有的那条，不在 items 里 */
+  baseLocal?: IKeepUploadTaskLocalBase;
 }
 
 /**

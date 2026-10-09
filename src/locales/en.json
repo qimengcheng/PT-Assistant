@@ -115,7 +115,9 @@
       "item3": "Users are responsible for any issues caused by failed reseeding!",
       "title": "Warning:"
     },
-    "downloaderNotFound": "Downloader not found"
+    "downloaderNotFound": "Downloader not found",
+    "baseLocal": "Base torrent (in downloader): ",
+    "sendReseedOne": "Send this entry to reseed"
   },
   "Logger": {
     "action": {
@@ -502,7 +504,20 @@
         "success": "Verification passed",
         "waiting": "Waiting for verification..."
       },
-      "title": "Reseed Verification"
+      "title": "Reseed Verification",
+      "reseedTarget": "Entry to reseed",
+      "localBase": {
+        "byFiles": "File lists match - selected for you",
+        "bySize": "This one only matches by size, which is not enough evidence - check it yourself",
+        "byTitleSize": "This one only matches by title and size, which is not enough evidence - check it yourself",
+        "noIndex": "The torrent list from this downloader has not been read yet. Try 'Rebuild local fingerprint index' above",
+        "none": "No entry in the downloader has a matching size. Make sure that data really is downloaded, or pick another downloader",
+        "pick": "Nothing matched by file list. The entries below only match by title and size - check them yourself before picking one",
+        "piecesMismatch": "Piece samples disagree: identical file lists can still be different content, so do not use it as the base",
+        "placeholder": "Pick an entry the downloader already has",
+        "title": "Base torrent (an entry your downloader already has)",
+        "working": "Looking for the same data in the downloader..."
+      }
     },
     "SaveSnapshotDialog": {
       "snapshotName": "Snapshot Name"

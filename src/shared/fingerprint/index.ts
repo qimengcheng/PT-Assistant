@@ -17,3 +17,4 @@ export * from "./title.ts";
 export * from "./files.ts";
 export * from "./pieces.ts";
 export * from "./match.ts";
+export * from "./localBase.ts";

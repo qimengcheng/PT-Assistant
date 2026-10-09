@@ -4,9 +4,11 @@ import { useI18n } from "vue-i18n";
 import { message } from "antdv-next";
 
 const showDialog = defineModel<boolean>();
-const { toDeleteIds, confirmDelete: confirmDeleteFn } = defineProps<{
+const { toDeleteIds, confirmDelete: confirmDeleteFn, width } = defineProps<{
   toDeleteIds: Id[];
   confirmDelete: (toDeleteId: Id) => Promise<void> | void;
+  /** 调用点要塞列表（而不是只有一句「删除 N 项」）时才需要加宽，不给就保持原来的窄确认框 */
+  width?: number;
 }>();
 const emits = defineEmits<{
   (e: "allDelete"): void;
@@ -52,7 +54,7 @@ async function dialogEnter() {
     v-model:open="showDialog"
     :title="t('common.dialog.title.confirmAction')"
     wrap-class-name="modal-title--danger"
-    :width="340"
+    :width="width ?? 340"
     :mask="{ closable: !isDeleting }"
     :closable="!isDeleting"
     :keyboard="!isDeleting"

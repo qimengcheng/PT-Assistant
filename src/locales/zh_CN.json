@@ -256,7 +256,9 @@
       "copyFailed": "复制失败"
     },
     "dialog": {
-      "removeData": "同时删除数据"
+      "removeData": "同时删除数据",
+      "deletingList": "删除的是这几条：",
+      "removeDataIgnored": "其中 {count} 条在群晖 Download Station 上：那边只调「删任务」这一个接口，这个勾选对它不起作用。"
     },
     "label": {
       "batchBtn": "批量设置标签",

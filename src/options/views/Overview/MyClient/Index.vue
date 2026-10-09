@@ -777,6 +777,7 @@ function handleTableChange(pagination: any, _filters: any, sorter: any) {
   <DeleteDialog
     v-model="showDeleteDialog"
     :to-delete-ids="toDeleteTorrents.map((t) => torrentKey(t))"
+    :torrents="toDeleteTorrents"
     :confirm-delete="confirmDeleteTorrent"
     @all-delete="loadTorrents"
   />

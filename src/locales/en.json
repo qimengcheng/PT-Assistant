@@ -256,7 +256,9 @@
       "copyFailed": "Copy failed"
     },
     "dialog": {
-      "removeData": "Also remove data"
+      "removeData": "Also remove data",
+      "deletingList": "These are the ones to delete:",
+      "removeDataIgnored": "{count} of them are on Synology Download Station: that API only has one “delete task” call, so this checkbox does nothing for them."
     },
     "label": {
       "batchBtn": "Set Label",

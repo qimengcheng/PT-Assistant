@@ -46,6 +46,16 @@ const loading = ref(false);
 const showUsageDialog = ref(false);
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 
+/**
+ * 正在发送的那一颗：任务 id → 哪一路。
+ * 发送是页内手写的 sendMessage("downloadTorrent")，一条要等后台下载 + add 完才回来（几秒），
+ * 期间界面原先什么都不动 —— 他 2026-10-09 报「点了没反应，过了几秒才提示发送成功，会以为功能失效」。
+ * 记到「哪一路」是为了只让被点的那颗转圈，同时把同任务其它发送键暂时按住（三路发的集合有重叠）。
+ */
+type TSendKind = "base" | "other" | "all";
+const sending = ref<Record<string, TSendKind | undefined>>({});
+const sendingOf = (id: string) => sending.value[id];
+
 const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("KeepUploadTask", {
   // 这一档必须等于 config.ts 里 tableBehavior.KeepUploadTask.itemsPerPage，
   // 否则「他挑过一档没有」判错（见 AGENTS.md §3.4 那条）
@@ -180,14 +190,23 @@ async function clearAllTasks() {
 }
 
 // 发送种子到下载器
-async function sendTorrentsToDownloader(task: IKeepUploadTask, items: IKeepUploadTask["items"]) {
+async function sendTorrentsToDownloader(
+  task: IKeepUploadTask,
+  items: IKeepUploadTask["items"],
+  kind: TSendKind,
+) {
   if (items.length === 0) return;
+  if (sending.value[task.id]) return;
 
   const downloader = metadataStore.downloaders[task.downloadOptions.downloaderId];
   if (!downloader) {
     runtimeStore.showSnakebar(t("KeepUploadTask.downloaderNotFound"), { color: "error" });
     return;
   }
+
+  sending.value[task.id] = kind;
+  // 点下去就得有东西动：这一趟要等后台把 .torrent 下回来再 add，通常好几秒
+  runtimeStore.showSnakebar(t("KeepUploadTask.sending", { count: items.length }), { color: "info" });
 
   try {
     for (const item of items) {
@@ -241,6 +260,8 @@ async function sendTorrentsToDownloader(task: IKeepUploadTask, items: IKeepUploa
     const rawReason = e instanceof Error ? e.message : String(e);
     const reason = rawReason.trim() === "Fails." ? t("KeepUploadTask.qBittorrentLegacyFails") : rawReason;
     runtimeStore.showSnakebar(t("KeepUploadTask.sendSingleErrorWithReason", { reason }), { color: "error" });
+  } finally {
+    sending.value[task.id] = undefined;
   }
 }
 
@@ -502,8 +523,9 @@ function reseedRows(record: IKeepUploadTask) {
 }
 
 // 发送基准种子到下载器
-function sendBaseTorrent(task: IKeepUploadTask) {  const items = task.items.slice(0, 1);
-  sendTorrentsToDownloader(task, items);
+function sendBaseTorrent(task: IKeepUploadTask) {
+  const items = task.items.slice(0, 1);
+  void sendTorrentsToDownloader(task, items, "base");
 }
 
 // 发送其他种子到下载器
@@ -511,14 +533,14 @@ async function sendOtherTorrents(task: IKeepUploadTask) {
   if (task.items.length <= 1) return;
   if (!(await confirmDanger(t("KeepUploadTask.sendConfirm", { count: task.items.length - 1 })))) return;
   const items = task.items.slice(1);
-  sendTorrentsToDownloader(task, items);
+  void sendTorrentsToDownloader(task, items, "other");
 }
 
 // 发送所有种子到下载器
 async function sendAllTorrents(task: IKeepUploadTask) {
   if (!(await confirmDanger(t("KeepUploadTask.sendConfirm", { count: task.items.length })))) return;
   const items = task.items.slice(0);
-  sendTorrentsToDownloader(task, items);
+  void sendTorrentsToDownloader(task, items, "all");
 }
 
 // 复制下载链接
@@ -683,21 +705,39 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                  基准在下载器里。所以「发基准」「发其他」两颗都没有对象，直接不出现，
                  留下「发送所有种子」= 发这一条 -->
             <a-tooltip v-if="!record.baseLocal" :title="t('KeepUploadTask.sendBaseTorrent')">
-              <a-button size="small" type="text" @click="sendBaseTorrent(record)">
+              <a-button
+                size="small"
+                type="text"
+                :loading="sendingOf(record.id) === 'base'"
+                :disabled="!!sendingOf(record.id)"
+                @click="sendBaseTorrent(record)"
+              >
                 <template #icon>
                   <NumberOutlined />
                 </template>
               </a-button>
             </a-tooltip>
             <a-tooltip v-if="!record.baseLocal" :title="t('KeepUploadTask.sendOtherTorrents')">
-              <a-button size="small" type="text" @click="sendOtherTorrents(record)">
+              <a-button
+                size="small"
+                type="text"
+                :loading="sendingOf(record.id) === 'other'"
+                :disabled="!!sendingOf(record.id)"
+                @click="sendOtherTorrents(record)"
+              >
                 <template #icon>
                   <CopyOutlined />
                 </template>
               </a-button>
             </a-tooltip>
             <a-tooltip :title="record.baseLocal ? t('KeepUploadTask.sendReseedOne') : t('KeepUploadTask.sendAllTorrents')">
-              <a-button size="small" type="text" @click="sendAllTorrents(record)">
+              <a-button
+                size="small"
+                type="text"
+                :loading="sendingOf(record.id) === 'all'"
+                :disabled="!!sendingOf(record.id)"
+                @click="sendAllTorrents(record)"
+              >
                 <template #icon>
                   <DownloadOutlined />
                 </template>

@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-09 13:02:07",
-  "headSha": "aab9829",
+  "generatedAt": "2026-10-09 13:21:53",
+  "headSha": "bfabb11",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.56.3",
+      "date": "2026-10-09 13:59:53",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「基础设置」页底下那条横向滚动条没了 —— 八组设置并成一列之后，读数那一列自己就是滚动区，而里面几处两列 / 三列的排版会在左右各探出 12px，于是窗口多宽都挂着一条只能挪 12px 的横条。现在这一列给自己留足了那 12px，横向不再能滚，小标题和它下面的控件仍然对齐。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.56.2",
       "date": "2026-10-09 13:21:53",

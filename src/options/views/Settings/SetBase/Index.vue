@@ -287,7 +287,12 @@ onUnmounted(() => {
 .set-base-content {
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: 32px;
+  /* 12px 不是留白，是 a-row :gutter="24" 的负外边距（左右各 −12）的兜底：
+     这一列自己就是滚动容器，而 overflow-y:auto 会让 overflow-x 一并变成 auto
+     （规范里 visible 不能跟 auto 配对），所以那 12px 溢出会当场画出一条横向滚动条。
+     四节（界面 / 用户信息 / 搜索 / 社交信息）各有一到两个 a-row，实测从 900 到 2400
+     窗口宽、中英两语都稳定溢出 12px。台架 .tmp-build/bench-setbase-overflow。 */
+  padding: 0 12px 32px;
 }
 
 /* 八节排一列：每节一个标题 + 一条下分隔线，节与节之间 28px。

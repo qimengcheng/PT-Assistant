@@ -70,7 +70,16 @@ const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
   { title: t("KeepUploadTask.table.site"), key: "site", align: "center", width: 72 },
   { title: t("KeepUploadTask.table.title"), dataIndex: "title", key: "title", align: "left", ellipsis: true },
   { title: t("KeepUploadTask.table.savePath"), key: "savePath", align: "left", width: 220 },
-  { title: t("KeepUploadTask.recheck.col"), key: "seedState", align: "center", width: 120 },
+  {
+    title: t("KeepUploadTask.recheck.col"),
+    key: "seedState",
+    align: "center",
+    width: 120,
+    // 排的是结论的严重度档位，不是那一格显示的文字 —— 文字带着条数，
+    // 按字符串排会让「10 条在做种」排在「2 条在做种」前面
+    sorter: (a, b) => reseedRank(a) - reseedRank(b),
+    ...persistedSort("seedState"),
+  },
   {
     title: t("KeepUploadTask.table.size"),
     dataIndex: "size",
@@ -423,24 +432,58 @@ const reseedVerdictText = computed<Record<TReseedVerdict, string>>(() => ({
   notFound: t("KeepUploadTask.recheck.state.notFound"),
 }));
 
+/** 徽标报出来的那一档结论是哪一种（排序按它折权重，不按显示文字） */
+type TReseedKind = "seeding" | "paused" | "pending" | "untracked" | "notFound" | "wrong";
+
 /** 这一条任务现在最该说出口的那个结论（异常优先报出来） */
-function reseedSummary(record: IKeepUploadTask): { color: string; text: string } | null {
+function reseedSummary(
+  record: IKeepUploadTask,
+): { color: string; text: string; kind: TReseedKind } | null {
   const perTask = reseedStatuses.value[record.id];
   if (!perTask) return null;
   const sum = summarizeReseed(
     trackableItems(record).map((item) => perTask[String(item.hash).toLowerCase()]),
     record.items.length - trackableItems(record).length,
   );
-  if (sum.wrong > 0) return { color: "error", text: t("KeepUploadTask.recheck.count.wrong", { count: sum.wrong }) };
+  if (sum.wrong > 0)
+    return { kind: "wrong", color: "error", text: t("KeepUploadTask.recheck.count.wrong", { count: sum.wrong }) };
   if (sum.notFound > 0)
-    return { color: "warning", text: t("KeepUploadTask.recheck.count.notFound", { count: sum.notFound }) };
+    return { kind: "notFound", color: "warning", text: t("KeepUploadTask.recheck.count.notFound", { count: sum.notFound }) };
   if (sum.pending > 0)
-    return { color: "processing", text: t("KeepUploadTask.recheck.count.pending", { count: sum.pending }) };
-  if (sum.paused > 0) return { color: "default", text: t("KeepUploadTask.recheck.count.paused", { count: sum.paused }) };
+    return {
+      kind: "pending",
+      color: "processing",
+      text: t("KeepUploadTask.recheck.count.pending", { count: sum.pending }),
+    };
+  if (sum.paused > 0)
+    return { kind: "paused", color: "default", text: t("KeepUploadTask.recheck.count.paused", { count: sum.paused }) };
   if (sum.seeding > 0)
-    return { color: "success", text: t("KeepUploadTask.recheck.count.seeding", { count: sum.seeding }) };
-  if (sum.untracked > 0) return { color: "default", text: t("KeepUploadTask.recheck.state.untracked") };
-  return { color: "default", text: t("KeepUploadTask.recheck.state.notFound") };
+    return { kind: "seeding", color: "success", text: t("KeepUploadTask.recheck.count.seeding", { count: sum.seeding }) };
+  if (sum.untracked > 0)
+    return { kind: "untracked", color: "default", text: t("KeepUploadTask.recheck.state.untracked") };
+  return { kind: "notFound", color: "default", text: t("KeepUploadTask.recheck.state.notFound") };
+}
+
+/**
+ * 「做种状态」列的排序权重。
+ *
+ * 这套序**不是**上面那条「最该说出口」的优先级：那条在有正常项时会让「在做种」盖过少数派
+ * （4 条正常 + 1 条认不出 → 徽标报在做种），而排序要的是「越该先看的排前面」，
+ * 所以「认不出」（等于完全没法判）压在「在做种」之上。两套混成一套会有一边说谎。
+ * 「没查过」单独给最低一档：它不是一个结论，不该挤在结论中间。
+ */
+const RESEED_RANK: Record<TReseedKind, number> = {
+  seeding: 1,
+  paused: 2,
+  pending: 3,
+  untracked: 4,
+  notFound: 5,
+  wrong: 6,
+};
+
+function reseedRank(record: IKeepUploadTask): number {
+  const sum = reseedSummary(record);
+  return sum ? RESEED_RANK[sum.kind] : 0;
 }
 
 /** 悬停里逐条列明：标题 + 结论 + 下载器那边那条的原样状态 */

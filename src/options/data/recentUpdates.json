@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-09 15:37:11",
-  "headSha": "3fc6b4e",
+  "generatedAt": "2026-10-09 16:05:51",
+  "headSha": "a09614e",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.57.0",
+      "date": "2026-10-09 16:12:41",
+      "added": [
+        "「辅种任务」的「做种状态」这一列现在可以点表头排序了：想先看有问题的，就把没正常做种的排到最前面；顺序记得住，重新打开还是那一档。"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.56.9",
       "date": "2026-10-09 16:05:51",

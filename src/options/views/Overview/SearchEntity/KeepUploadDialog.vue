@@ -841,7 +841,9 @@ async function createKeepUploadTask() {
       <div class="text-body-small text-grey mt-1">{{ localBaseHint }}</div>
     </div>
 
-    <div class="keep-upload-list" style="max-height: 80vh">
+    <!-- 这里不再自己当滚动容器（原先是 `style="max-height: 80vh"` + 下面那条 overflow-y）：
+         弹窗 body 已经由 v0.42.4 那条 flex 链负责限高与滚动，两层都在滚就是双竖向滚动条。 -->
+    <div class="keep-upload-list">
       <template v-for="(item, index) in includedItems" :key="item.id">
         <div v-if="index === 0" class="text-body-small text-grey mb-1">
           {{ t(firstHeaderKey) }}
@@ -984,8 +986,14 @@ async function createKeepUploadTask() {
 </template>
 
 <style scoped lang="scss">
-.keep-upload-list {
-  overflow-y: auto;
+/* 分隔线那 16px 缩进只能靠缩宽度，不能靠外边距：Divider 自带 `width:100%; min-width:100%`
+   （antdv-next dist/divider/style/index.js:34-35），再加 `.ml-4` 就把整条推到容器右沿之外 16px，
+   于是弹窗挂一条横向滚动条。真组件台架量过（.tmp-build/bench-localbase `?m=layout`，9 条）：
+   改前列表 scrollWidth 737 / clientWidth 721、8 条 divider 每条 over 16；改后 731/731、溢出 0，
+   缩进仍是 16（左 16、右 0）。只写 width 抢不过 min-width —— 实测补上 min-width:0 才从 721 变 715。 */
+.keep-upload-list :deep(.ant-divider-horizontal.ml-4) {
+  min-width: 0;
+  width: calc(100% - 16px);
 }
 
 .list-item {

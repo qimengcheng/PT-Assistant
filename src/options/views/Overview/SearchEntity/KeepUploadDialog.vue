@@ -186,12 +186,14 @@ const useLocalBase = computed(() => !!chosenLocalBase.value);
 // 索引与种子指纹谁后到都会重算候选。三条规矩：
 // 1) 选中的那条没了就清空 —— 否则 a-select 会把一个内部 hash 显示在界面上；
 // 2) 只有第 2 层（文件清单）命中才代用户选，第 1 层的「疑似」一律留给人挑；
-// 3) **只在只勾一条时代选**。勾了多条时「列表第一条当基准」本来就是成立的老路径，
-//    替用户改成下载器里那条会把他没选的种子当基准用，那是更难发现的错。
+// 3) **单条、多条都代选**（2026-10-09 用户口径：「像这种明显已经有在做种的种子的时候，一起添加辅种的
+//    时候，这个正在做种的就应该自动成为基准才对啊」）。原先只在单条时代选，理由是「替他换会把他没选的
+//    种子当基准用」—— 那条顾虑在第 2 层命中的前提下不成立：文件清单一致就是同一份数据的证据，
+//    而下载器那条只当参照物、不进 items，不会被重复发一遍。第 1 层的「疑似」照旧留给人挑（规矩 2）。
 watch(baseCandidates, (list) => {
   const before = localBaseHash.value;
   if (!list.some((c) => c.entry.hash === before)) localBaseHash.value = "";
-  if (isSingleMode.value && !localBaseTouched.value && !localBaseHash.value) {
+  if (!localBaseTouched.value && !localBaseHash.value) {
     localBaseHash.value = autoSelectLocalBase(list)?.entry.hash ?? "";
   }
   // 代选一旦发生，那一条就从「免检的基准」变成「要和基准比的一条」，结论得重算

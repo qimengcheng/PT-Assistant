@@ -135,12 +135,8 @@ function pickPtppFile(file: File) {
 </template>
 
 <style scoped>
-/* 与同目录 NativeBridgeWindow 同一档：控件收进 720 这一列。
-   不然三步说明被整条 1280 竖栏拉成一行读到头。这一列由 SetBase/Index.vue 那条
-   `.set-base .backup-window { margin-inline: auto }` 居中，不贴竖栏左沿。 */
-.backup-window {
-  max-width: 720px;
-}
+/* 这一节原先自己收在 720 并由 SetBase/Index.vue 居中；八节并成一条长页之后，
+   右边那一列只有约 1080，跟其余五节同宽，不再单开一档（口径见 Index.vue 末尾那条注释）。 */
 
 .key-input {
   flex: 1 1 auto;

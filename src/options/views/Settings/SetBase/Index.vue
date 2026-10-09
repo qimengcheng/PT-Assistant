@@ -1,12 +1,22 @@
 <script setup lang="ts">
 /**
- * 基础设置页容器：a-tabs 组织各设置窗口。
+ * 基础设置页容器：八组设置项排在同一条长页里，左边一列目录点哪条滚到哪条。
+ *
+ * 为什么不再是 a-tabs：八档各开一页时，「改一处要跳三页」，而且每一页的宽度口径不一样
+ * （五档铺满竖栏、三档自己收在 720），看着像八个页面而不是一个设置。用户 2026-10-09：
+ * 「把整个设置做成一个长的滚动的页面，卡片悬浮式目录放到左边，一点就滚动到相应的部分。
+ * 顺便把整个设置的风格和宽度统一一下」。
+ *
+ * 目录那一列不参与滚动（滚的只有右边那一列）：这是新手引导页 v0.40.2 已经定过的口径 ——
+ * 「目录不能被滚动滚走，应该一直都能完整看到」。那页试过「整页滚 + 目录 sticky」，
+ * 滚到底时 sticky 被容器底边顶回去、目录头几条被切掉，所以这里不再走那条路。
+ *
  * 各窗口直接 v-model 绑定 configStore 字段；config store 开启了 persistWebExt
  * 自动持久化（每次变更自动 $save），无需手动保存按钮。
  */
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { MutationType } from "pinia";
 import { useDebounceFn } from "@vueuse/core";
 import { App } from "antdv-next";
@@ -24,8 +34,8 @@ import UpdateWindow from "./UpdateWindow.vue";
 
 const { t } = useI18n();
 
-// computed：label 里有 t()，setup 里一次性求值的话切语言不会重算
-const tabs = computed(
+/** 顺序 = 页面上的先后 = 目录的先后。key 沿用原来 a-tabs 的那八个，`?tab=` 的老链接才不失效 */
+const sections = computed(
   () =>
     [
       { key: "ui", label: t("SetBase.Index.tabUi"), component: UiWindow },
@@ -44,14 +54,83 @@ const tabs = computed(
 );
 
 const route = useRoute();
-const router = useRouter();
+const scroller = ref<HTMLElement | null>(null);
+/** 当前高亮的那一条。初值取地址栏的 ?tab=，认不出来就落回第一条 */
+const activeKey = ref<string>(pickKey(route.query.tab));
 
-const activeKey = ref<string>(route.query.tab === "backup" ? "backup" : (route.query.tab as string) || "ui");
+function pickKey(q: unknown): string {
+  const k = typeof q === "string" ? q : "";
+  return sections.value.some((s) => s.key === k) ? k : sections.value[0].key;
+}
 
-// tab 状态同步到地址栏，方便从别处（如备份页）跳转定位
-watch(activeKey, (key) => {
-  router.replace({ query: { ...route.query, tab: key === "ui" ? undefined : key } });
+const sectionId = (key: string) => `set-${key}`;
+
+/**
+ * 点目录 / 深链跳转都走这里。
+ *
+ * spyPaused 是必需的：平滑滚动一路上会经过中间那几条，滚轮监听会把高亮改成正在路过的条目，
+ * 于是「点最后一条、高亮停在第三条」。所以跳转期间让高亮听人的，落地后再交还给滚轮。
+ * 时长取 900ms：这段距离用 smooth 滚到底实测没超过它，而超时兜底比等 scrollend 可靠
+ * （scrollend 在部分内核上仍是要开 flag 的）。
+ */
+let spyPaused = false;
+let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+
+function jumpTo(key: string, smooth = true) {
+  const el = document.getElementById(sectionId(key));
+  if (!el) return;
+  activeKey.value = key;
+  spyPaused = true;
+  clearTimeout(resumeTimer);
+  el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+  resumeTimer = setTimeout(() => (spyPaused = false), 900);
+}
+
+/**
+ * 滚轮跟踪：取「顶沿已经越过读数线」的最后一条。读数线在滚动区顶边往下 12px。
+ *
+ * 滚到底那一条要特判：最后一节往往比一屏矮，滚到底时它的顶沿还在读数线下面，
+ * 按上面那条判据它永远亮不起来 —— 台架量过（滚到底，高亮停在倒数第二条）。
+ * 于是「已经滚到底」直接算最后一节，其余照旧。
+ */
+function spy() {
+  if (spyPaused) return;
+  const box = scroller.value;
+  if (!box) return;
+  const keys = sections.value;
+  if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) {
+    activeKey.value = keys[keys.length - 1].key;
+    return;
+  }
+  const line = box.getBoundingClientRect().top;
+  let cur = activeKey.value;
+  for (const node of box.querySelectorAll<HTMLElement>(".set-section")) {
+    if (node.getBoundingClientRect().top - line <= 12) cur = node.dataset.key ?? cur;
+    else break;
+  }
+  if (cur !== activeKey.value) activeKey.value = cur;
+}
+
+onMounted(() => {
+  scroller.value?.addEventListener("scroll", spy, { passive: true });
+  // 从别处跳进来（RestoreDialog 推 ?tab=backup）：直接落到位，不要来一段平滑滚动
+  const key = pickKey(route.query.tab);
+  if (key !== sections.value[0].key) nextTick(() => jumpTo(key, false));
 });
+
+onBeforeUnmount(() => {
+  scroller.value?.removeEventListener("scroll", spy);
+  clearTimeout(resumeTimer);
+});
+
+// 已经在这一页时再被推 ?tab=xxx（组件不重挂载），也要滚过去
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (route.name !== "SetBase") return;
+    nextTick(() => jumpTo(pickKey(tab), false));
+  },
+);
 
 // ===== 「改完就报已保存」：顶栏那句静态提示的替代品 =====
 const configStore = useConfigStore();
@@ -64,11 +143,14 @@ const { message } = App.useApp();
  * 三条边界都是实测来的，少一条就会凭空弹 toast：
  * 1) 订阅要等 $onReady —— 水合那次 store.$patch 本身是一次 mutation（虽然它走 patchObject，
  *    见下条），但 afterRestore 里的废弃项清理是直接改 state，不等就会在打开页面时报一次「已保存」。
- * 2) 只认 MutationType.direct —— 本页 7 个窗口全是裸 v-model（实测：三层嵌套字段赋值报 direct）；
+ * 2) 只认 MutationType.direct —— 本页 8 个窗口全是裸 v-model（实测：三层嵌套字段赋值报 direct）；
  *    而水合与跨上下文同步（chrome.storage.onChanged → $patch）报的是 patch object，
  *    不按这个过滤，别的窗口改一下配置这边就会跟着弹。
  * 3) 必须合并 —— 文本框逐字符写 store，不合并就是每敲一个字一条 toast。
  *    延后报不会说谎：插件是每次 mutation 立刻 $save，没有 debounce。
+ *
+ * 改成单页之后这条更要紧：八组同时挂着，任何一个窗口写 store 都会报，
+ * 而用户可能在滚着看另一组 —— 所以只在 direct（真有人碰了控件）时报，不在 patch 时报。
  */
 const announceSaved = useDebounceFn(() => message.success(t("SetBase.Index.savedToast")), 600);
 let stopConfigWatch: (() => void) | undefined;
@@ -94,12 +176,36 @@ onUnmounted(() => {
 <template>
   <div class="set-base page-fill">
     <div class="set-base-body page-fill-grow">
-      <div class="set-base-inner">
-        <a-tabs v-model:activeKey="activeKey" type="card" size="small">
-          <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label">
-            <component :is="tab.component" />
-          </a-tab-pane>
-        </a-tabs>
+      <div class="set-base-layout">
+        <nav class="set-base-toc">
+          <span class="set-base-toc-label">{{ t("SetBase.Index.toc") }}</span>
+          <!-- 按钮 + scrollIntoView，不用 <a href="#x">：这个应用走 hash 路由
+               （createWebHashHistory），href="#x" 会被路由吃掉并跳到一个不存在的页。同 GuideView -->
+          <a-button
+            v-for="s in sections"
+            :key="s.key"
+            type="text"
+            block
+            class="set-base-toc-item"
+            :class="{ 'set-base-toc-item--on': activeKey === s.key }"
+            @click="jumpTo(s.key)"
+          >
+            {{ s.label }}
+          </a-button>
+        </nav>
+
+        <div ref="scroller" class="set-base-content">
+          <section
+            v-for="s in sections"
+            :id="sectionId(s.key)"
+            :key="s.key"
+            :data-key="s.key"
+            class="set-section"
+          >
+            <h2 class="set-section-title">{{ s.label }}</h2>
+            <component :is="s.component" />
+          </section>
+        </div>
       </div>
     </div>
   </div>
@@ -110,20 +216,119 @@ onUnmounted(() => {
    整页收进一块白表面、分组用分隔线区分、开关两列排布。
    以前是「灰底上摊着几张白卡」，卡片只有 960 宽，右边和下面整片都是灰 —— 现在换成
    与列表页 .page-panel 同档的一整块白面板（同 border / 同 10px 圆角）。 */
+/* 根上这条是「内层那一列能滚」的前提：.page-fill 只给 min-height，父级高度不确定时
+   子元素的 height:100% 会退成 auto，于是 grid 拿不到高度、右边那列永远不滚。
+   同 GuideView 的 .guide-view（那页 v0.40.2 就是这么改的）。 */
+.set-base {
+  height: 100%;
+}
+
 .set-base .set-base-body {
   padding: 8px 16px 16px;
   background: #fff;
   border: 1px solid var(--pt-color-border-light);
   border-radius: 10px;
+  /* 滚动交给右边那一列，面板自己不滚 */
+  min-height: 0;
+  overflow: hidden;
+  /* 目录收不收成一列，看的是这块读书区有多宽，不是整个视口有多宽（同 GuideView） */
+  container-type: inline-size;
 }
 
-/* 面板铺满内容区（高度靠根上的 .page-fill + 本块的 .page-fill-grow 撑到视口底）。
-   这里**原来还有一条 `.ant-tabs { max-width: 960px }`**（v0.7.0 antdv 迁移期留下的），
-   它把下面那条 1280 居中竖栏从里面夹回 960、并且贴住竖栏左沿 —— 于是整块内容看着偏左
-   160 CSS px（=(1280−960)/2）。2026-10-08 他第二次报「还是没在正中间」时量出来的：
-   输入框左右竖边在 490.4 / 1449.6 CSS px，宽度 959.2 = 那条 960 上限；
-   而竖栏自己 489.6..1769.6 是居中的（左右各 244.6）—— 也就是「容器对了、被旧上限夹住」。
-   宽度口径从此只有下面 `.set-base-inner` 一处。 */
+/* 两列：目录 168 + 32 缝 + 内容。整块铺满面板高度，所以两列各自到边、只有右列能滚。
+   1480 = 168 + 32 + 1280，竖栏那一档沿用原来的 .set-base-inner（量出来的 1280，
+   见下面那条注释），只是现在左边多挂了一列目录；窗口更宽时整块居中，不再往两边摊。 */
+.set-base-layout {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0 32px;
+  height: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+.set-base-toc {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.set-base-toc-label {
+  margin-bottom: 4px;
+  font-weight: 600;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+/* 目录这一列用 type="text" 的按钮，不是随手挑的：antd 的 Button 只在「有边框那几档」上
+   才会把两个汉字的标签拆成「搜 索」（Button.js:121 的 isUnBorderedButtonVariant 判据），
+   而这一列标签里「搜索 / 下载 / 备份」正好是两个字 —— 用默认档就会跟右边那节的标题
+   写成两种样子。同 GuideView 的目录（那页也是 type="link" 的无边框档）。 */
+.set-base-toc .ant-btn {
+  justify-content: flex-start;
+  padding-inline: 8px;
+}
+
+/* 当前在哪一节：跟着左侧导航那一档选中色（同 --pt-color-bg-selected / primary-text），
+   不再造一套高亮。
+   两条选择器都要写：antd 的 `.ant-btn-text:hover` 是 (0,2,0) 且由 cssinjs 运行时注入，
+   排在静态样式之后 —— 只给 (0,1,0) 的同特异度抢不过它，鼠标悬停时选中态会被冲掉。 */
+.set-base-toc .set-base-toc-item--on,
+.set-base-toc .set-base-toc-item--on:hover {
+  background: var(--pt-color-bg-selected);
+  color: var(--pt-color-primary-text);
+  font-weight: 600;
+}
+
+.set-base-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 32px;
+}
+
+/* 八节排一列：每节一个标题 + 一条下分隔线，节与节之间 28px。
+   原来这层分隔是 a-tabs 的卡片头给的，现在由标题自己承担。 */
+.set-section {
+  padding-top: 4px;
+  scroll-margin-top: 8px;
+}
+
+.set-section + .set-section {
+  margin-top: 28px;
+}
+
+.set-section-title {
+  margin: 0 0 14px;
+  padding-bottom: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  border-bottom: 1px solid var(--pt-color-border-light);
+}
+
+/* 窄到放不下两列（读书区 720px 以下）时收回成一列：目录回到正文上方横排，仍然不滚 */
+@container (max-width: 720px) {
+  .set-base-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .set-base-toc {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 16px;
+    overflow-y: visible;
+  }
+
+  .set-base-toc .ant-btn {
+    width: auto;
+  }
+}
 
 .set-base .group {
   margin-bottom: 14px;
@@ -179,24 +384,10 @@ onUnmounted(() => {
   width: 260px;
 }
 
-/* 八个 tab 的内容收成一条居中的竖栏：面板很宽时表单原先全贴在最左边，右边一大片是空的
-   （用户口径「放到页面中间吧」）。1280 是量出来的：他那张「用户信息」截图里第一行三格
-   控件从 x=306 排到 x=1505（输入框竖边 27px → 这张图 DPR=1，即 1199 CSS px），
-   留一点余量，收这一档不会把任何一行挤成换行。
-   外层 .set-base-body 仍是滚动容器，这里只加一个普通块级子元素，不动 flex/contain 那条链。 */
-.set-base-inner {
-  max-width: 1280px;
-  margin: 0 auto;
-}
-
-/* 备份 / 原生通信桥 / 检查更新这三页自己把内容收在 720（长句子和提示条按这个宽度读着合适，
-   不是可以拉满的东西）。拉满那条改掉之后它们会贴住 1280 竖栏的左沿、右边空 560 —— 同一句
-   「没在正中间」会以另一档尺寸复发，所以在这三个根节点上补 auto 边距。
-   按类名列出来而不是写 `.ant-tabs-tabpane > div`：后者要赌 antd 的 tabpane 下面不再包一层，
-   而这条规则错了不报错，只会静默变回左对齐。 */
-.set-base .backup-window,
-.set-base .native-bridge-window,
-.set-base .update-window {
-  margin-inline: auto;
-}
+/* 八节都铺满右边那一列，不再有三档自己收在 720：
+   原来是 a-tabs 一次只挂一档，收 720 是在「面板很宽、内容只有一小条」的前提下把读距收住；
+   现在右边这一列本身只有约 1080（1480 减去目录那一列），已经和新手引导页那条 1060 的
+   读书栏同档，再各自收一层就变成「八节里五节满宽、三节贴左半截」——
+   用户要的「宽度统一」指的就是这个不一致。三条窗口里原来的 max-width 与居中边距一起删了。 */
 </style>
+

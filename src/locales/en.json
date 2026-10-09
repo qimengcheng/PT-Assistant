@@ -836,6 +836,7 @@
     },
     "Index": {
       "savedToast": "Changes saved",
+      "toc": "Contents",
       "tabUi": "Interface & Content Script",
       "tabUserInfo": "User Info",
       "tabSearch": "Search",

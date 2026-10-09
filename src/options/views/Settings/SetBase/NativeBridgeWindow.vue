@@ -242,9 +242,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.native-bridge-window {
-  max-width: 720px;
-}
+/* 原先这一节自己收在 720 并由 Index.vue 居中；并成长页后与其余各节同宽，不再单开一档 */
 
 .bridge-switch {
   display: flex;

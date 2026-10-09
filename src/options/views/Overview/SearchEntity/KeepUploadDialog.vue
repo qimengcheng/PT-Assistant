@@ -38,6 +38,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
+import { resolveCategoryFolder } from "@/options/components/SentToDownloaderDialog/categoryMatch.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 const showDialog = defineModel<boolean>();
@@ -114,6 +115,37 @@ const downloaderOptions = computed(() =>
 /** a-auto-complete 的 options 走的是 SelectProps.options，形如 { value, label } */
 const savePathOptions = computed(() => suggestedSavePaths.value.map((x) => ({ value: x, label: x })));
 const labelOptions = computed(() => suggestedLabels.value.map((x) => ({ value: x, label: x })));
+
+/** 站点自己的分类覆盖表（ISiteUserConfig.categoryMap），与「发送到下载器」读同一份 */
+const siteCategoryMaps = computed(() => {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [id, cfg] of Object.entries(metadataStore.sites ?? {})) {
+    const map = cfg.categoryMap;
+    if (map && Object.keys(map).length) out[id] = map;
+  }
+  return out;
+});
+
+/**
+ * 按这几条种子自己的分类预选保存路径。他 2026-10-09：「辅种的时候应该自动选择分类，现在还没有这个功能」——
+ * 辅种发送走的是页内手写的 `sendMessage("downloadTorrent")`，不经过 sendTorrentToDownloader，
+ * 所以 v0.45.0 给「发送到下载器」做的预选一直盖不到这里，这一栏只能手填。
+ *
+ * 判据整个复用 categoryMatch.ts（同一档剩两条候选就不猜、认分类前缀的只有 qBittorrent 那套规则），
+ * 这里不另写一份字符串匹配（AGENTS §3.8）。没挑出来时**不动当前值**：那是「记住的上次路径」或下载器默认，
+ * 比留一个空白格好用。
+ */
+function applyAutoCategoryPath() {
+  const d = metadataStore.downloaders[selectedDownloaderId.value];
+  if (!d) return;
+  const res = resolveCategoryFolder(
+    d.suggestFolders ?? [],
+    torrentItems,
+    d.categoryAssoc,
+    (siteId) => siteCategoryMaps.value[siteId],
+  );
+  if (res.folder) savePath.value = res.folder;
+}
 
 /** 只勾中一条 = 「下载器已经下完了，只要再挂这一站」那种辅种 */
 const isSingleMode = computed(() => torrentItems.length === 1);
@@ -391,6 +423,7 @@ function startVerification() {
   torrentLabel.value = rememberedDownloaderExists
     ? remembered?.label || ""
     : metadataStore.defaultDownloader?.tags || "";
+  applyAutoCategoryPath();
 
   // 本地指纹索引与辅种检测并行，两者互不阻塞
   void loadLocalIndex();
@@ -646,6 +679,8 @@ function closeDialog() {
 function resetDownloadOptions() {
   savePath.value = "";
   torrentLabel.value = "";
+  // 换了一台下载器，它的分类目录是另一套；清完立刻按种子分类重新预选
+  applyAutoCategoryPath();
 }
 
 // 获取种子文件数量

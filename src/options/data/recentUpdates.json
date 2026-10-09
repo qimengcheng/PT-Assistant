@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-09 16:50:48",
-  "headSha": "ef76aa5",
+  "generatedAt": "2026-10-09 16:56:46",
+  "headSha": "9ae4c2a",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.58.0",
+      "date": "2026-10-09 17:08:07",
+      "added": [
+        "「辅种检测」弹窗底部的保存路径现在会按这几条种子自己的分类自动填好下载器的分类目录（和「发送到下载器」同一套判据，换一台下载器也跟着重算），不用再自己对着 `category:` 那种串手打；拿不准该填哪个时仍然留着你上次那一条，不替你猜。"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.57.3",
       "date": "2026-10-09 16:56:46",

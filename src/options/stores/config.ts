@@ -270,6 +270,9 @@ export const useConfigStore = defineStore("config", {
       SetSearchSolution: {
         itemsPerPage: 10,
       },
+      KeepUploadTask: {
+        itemsPerPage: 25,
+      },
       SetSite: {
         itemsPerPage: -1,
         sortBy: [{ key: "userConfig.sortIndex", order: "desc" }],

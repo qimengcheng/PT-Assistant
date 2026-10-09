@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { type TableColumnsType } from "antdv-next";
 import {
@@ -17,6 +17,7 @@ import type { CAddTorrentOptions, CTorrent } from "@ptd/downloader";
 import type { IKeepUploadTask, TKeepUploadTaskKey } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
 import { formatSize, formatDate } from "@/options/utils.ts";
+import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
@@ -42,6 +43,26 @@ const tasks = ref<IKeepUploadTask[]>([]);
 const selectedTasks = ref<TKeepUploadTaskKey[]>([]);
 const loading = ref(false);
 const showUsageDialog = ref(false);
+const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
+
+const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("KeepUploadTask", {
+  // 这一档必须等于 config.ts 里 tableBehavior.KeepUploadTask.itemsPerPage，
+  // 否则「他挑过一档没有」判错（见 AGENTS.md §3.4 那条）
+  defaultPageSize: 25,
+  size: "small",
+  // 一页放得下就不出分页条（用户 2026-10-07 的全站口径）
+  totalRows: () => tasks.value.length,
+  // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
+  autoFit: { container: () => pagePanel.value, rows: () => tasks.value },
+  // 这页没有默认排序档，所以「点第三下取消」要真能取消，否则存的档会把箭头按回去
+  clearOnEmpty: true,
+});
+
+/** 没存过排序时整条 sortOrder 都不带：显式给 null 会被 antd 判成受控，点了不排 */
+function persistedSort(key: string) {
+  const order = sortOrderOf(key);
+  return order ? { sortOrder: order } : {};
+}
 
 // computed：表头有 t()，setup 里一次性求值的话切语言不会重算
 const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
@@ -56,6 +77,7 @@ const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
     align: "right",
     width: 110,
     sorter: (a, b) => a.size - b.size,
+    ...persistedSort("size"),
   },
   {
     title: t("KeepUploadTask.table.count"),
@@ -63,6 +85,7 @@ const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
     align: "center",
     width: 80,
     sorter: (a, b) => a.items.length - b.items.length,
+    ...persistedSort("count"),
   },
   {
     title: t("KeepUploadTask.table.time"),
@@ -71,6 +94,7 @@ const columns = computed<TableColumnsType<IKeepUploadTask>>(() => [
     align: "center",
     width: 170,
     sorter: (a, b) => a.time - b.time,
+    ...persistedSort("time"),
   },
   { title: t("common.action"), key: "action", align: "center", width: 180 },
 ]);
@@ -463,13 +487,13 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
          它会被压成 0 宽（实测 822px 视口下标题列 clientWidth = 0，整行看不见标题）。
          这条 min-width 给标题留出下限，窗口再窄就横向滚动，而不是把标题挤没；
          宽窗口下 min-width:100% 仍然铺满，标题跟着变宽。 -->
-    <div class="page-panel">
+    <div ref="pagePanel" class="page-panel">
     <a-table
       bordered
       :columns="columns"
       :data-source="tasks"
       :loading="loading"
-      :pagination="false"
+      :pagination="pagination"
       :expandable="{ showExpandColumn: true }"
       :scroll="{ x: 1320 }"
       :row-selection="{
@@ -478,6 +502,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       }"
       row-key="id"
       size="small"
+      @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'site'">

@@ -145,7 +145,18 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
       key: String(item.columnKey),
       order: item.order === "descend" ? ("desc" as const) : ("asc" as const),
     }));
-    configStore.updateTableBehavior(tableKey, "sortBy", multiSort ? next : next.slice(0, 1));
+    const resolved = multiSort ? next : next.slice(0, 1);
+    // 翻页 / 改每页条数也会带着「当前排序」回来（rc-table 的 triggerOnChange 一并递出来），
+    // 排序没变就别再写一次：开了 clearOnEmpty 的页每次翻页都会把同一个值重写进 configStore，
+    // 而每次写都跟着 $save 落盘（辅种任务页实测：点一下第 2 页就落一条 sortBy=[]）
+    const current = sortBy.value;
+    if (
+      resolved.length === current.length &&
+      resolved.every((s, i) => s.key === current[i]?.key && s.order === current[i]?.order)
+    ) {
+      return;
+    }
+    configStore.updateTableBehavior(tableKey, "sortBy", resolved);
   }
 
   return {

@@ -133,14 +133,33 @@ async function saveConfig() {
     }
   }
 
-  if (isEditMode.value && editingId.value) {
-    metadataStore.mediaServers[editingId.value] = { ...metadataStore.mediaServers[editingId.value], ...config };
-  } else {
-    metadataStore.mediaServers[config.id!] = { ...config } as IMediaServerMetadata;
+  // ⚠️ 原先是「先改 store、再 await $save」，$save 抛错（存储配额满 / 扩展被禁用
+  // 存储）时既没有 catch 也没有回滚 —— 界面上这一条还在，但刷新后就没了，
+  // 用户看到「添加成功」却丢配置。这里记下旧值并在 catch 里恢复。
+  const targetId = isEditMode.value ? editingId.value : config.id!;
+  const previous = targetId ? metadataStore.mediaServers[targetId] : undefined;
+
+  try {
+    if (isEditMode.value && editingId.value) {
+      metadataStore.mediaServers[editingId.value] = { ...metadataStore.mediaServers[editingId.value], ...config };
+    } else {
+      metadataStore.mediaServers[config.id!] = { ...config } as IMediaServerMetadata;
+    }
+    await metadataStore.$save();
+    message.success(isEditMode.value ? t("SetMediaServer.index.updated") : t("SetMediaServer.index.added"));
+    showEditDialog.value = false;
+  } catch (e) {
+    // 回滚到落库前的状态，别让界面显示一条实际没存进去的服务器
+    if (targetId) {
+      if (previous) {
+        metadataStore.mediaServers[targetId] = previous;
+      } else {
+        delete metadataStore.mediaServers[targetId];
+      }
+    }
+    message.error(t("SetMediaServer.index.saveFailed"));
+    console.error("[SetMediaServer] save failed, rolled back", e);
   }
-  await metadataStore.$save();
-  message.success(isEditMode.value ? t("SetMediaServer.index.updated") : t("SetMediaServer.index.added"));
-  showEditDialog.value = false;
 }
 
 function confirmDelete(row: IMediaServerMetadata) {
@@ -151,9 +170,21 @@ function confirmDelete(row: IMediaServerMetadata) {
     okText: t("common.remove"),
     cancelText: t("common.dialog.cancel"),
     onOk: async () => {
+      // ⚠️ 同上：删除也是先改 store 再落库，$save 抛错时这条会被永久删掉
+      // （用户刷新后发现服务器还在，但配置/密码丢了）。先留一份副本。
+      const removed = metadataStore.mediaServers[row.id];
       delete metadataStore.mediaServers[row.id];
-      await metadataStore.$save();
-      message.success(t("SetMediaServer.index.deleted"));
+      try {
+        await metadataStore.$save();
+        message.success(t("SetMediaServer.index.deleted"));
+      } catch (e) {
+        if (removed) {
+          metadataStore.mediaServers[row.id] = removed;
+        }
+        message.error(t("SetMediaServer.index.saveFailed"));
+        console.error("[SetMediaServer] delete failed, rolled back", e);
+        throw e;
+      }
     },
   });
 }
@@ -182,8 +213,17 @@ async function testConnection(row: IMediaServerMetadata) {
 }
 
 async function toggleEnabled(row: IMediaServerMetadata, enabled: boolean) {
+  // ⚠️ 原先这里连 try 都没有：$save 抛错就是一个 unhandled rejection，
+  // 开关停在用户拨过去的位置但实际没存 —— 下次进来又是旧值，看起来「自己弹回去了」。
+  const previous = row.enabled;
   row.enabled = enabled;
-  await metadataStore.$save();
+  try {
+    await metadataStore.$save();
+  } catch (e) {
+    row.enabled = previous;
+    message.error(t("SetMediaServer.index.saveFailed"));
+    console.error("[SetMediaServer] toggle enabled failed, rolled back", e);
+  }
 }
 
 const columns = computed(() => [

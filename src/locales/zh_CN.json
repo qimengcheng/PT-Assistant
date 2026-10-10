@@ -45,7 +45,8 @@
       "downloader": "下载器"
     },
     "ReDownloadSelectDialog": {
-      "oldMethod": "按原下载方式重试",
+      "partiallyFailed": "有 {n} 条重下失败，请检查下载器后重试",
+        "oldMethod": "按原下载方式重试",
       "selectDownloader": "选择下载服务器",
       "title": "重新下载 {0} 条记录"
     },
@@ -315,7 +316,8 @@
     "resumeSelected": "开始",
     "searchPlaceholder": "搜索种子名称、Hash、标签、路径",
     "speedLimit": {
-      "batchBtn": "批量限速",
+      "partiallyFailed": "已设置 {succeeded} 个，{failed} 个失败",
+        "batchBtn": "批量限速",
       "download": "下载限速（KiB/s，0 表示不限速）",
       "emptyLimit": "请至少填写上传或下载限速中的一个",
       "success": "已设置 {count} 个种子的限速",
@@ -1201,7 +1203,8 @@
       "title": "添加媒体服务器"
     },
     "index": {
-      "title": "媒体服务器",
+      "saveFailed": "保存失败，已撤销本次改动",
+        "title": "媒体服务器",
       "needName": "请填写媒体服务器名称",
       "needAddress": "请填写媒体服务器地址",
       "needAuthField": "请填写认证字段「{0}」",

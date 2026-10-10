@@ -35,8 +35,17 @@ export const tableCustomFilter = useTableCustomFilter({
 
 // 使用 setTimeout 监听下载状态变化
 const watchingMap = reactive<Record<TTorrentDownloadKey, number>>({});
+// ⚠️ 世代号：clearWatchingMap() 只能清掉**已经排上**的定时器，清不掉
+// 已经在飞的那个回调。那个回调 await 完之后会无条件再排一个 1s 定时器 ——
+// 于是组件卸载 / 页面刷新之后，轮询会「复活」并一直每秒读一次 IndexedDB，
+// 而且 clearWatchingMap 里再也清不掉它（它不在 map 里了）。
+// 每次 clearWatchingMap 递增世代，在飞回调回来时发现世代变了就放弃续排。
+let watchingGeneration = 0;
 function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
+  const generation = watchingGeneration;
   watchingMap[downloadHistoryId] = setTimeout(async () => {
+    // 已经从 map 里摘掉（被 clearWatchingMap 清了）就不再续排
+    if (watchingMap[downloadHistoryId] === undefined) return;
     try {
       // 直连 IndexedDB 读，不再 sendMessage 绕 background → offscreen 一跳：
       // 这条是**每个下载中的种子每 1 秒**跑一次的轮询，N 个任务就是每秒 N 次跨上下文往返，
@@ -55,6 +64,12 @@ function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
       // 不触发任何响应式更新，下载状态会永远停在「下载中」。
       // 整体替换既触发更新又保持条目不被深度代理（当初选 shallowRef 就是为了这个）。
       downloadHistory.value = { ...downloadHistory.value, [downloadHistoryId]: history };
+      // ⚠️ 关键判据：await 期间可能已经 clearWatchingMap() 过（卸载 / 刷新 /
+      // 上一条 loadDownloadHistory 自己就调了一次）。世代变了说明这次轮询
+      // 已被作废，绝不能续排 —— 否则就是卸载后仍在每秒读 IndexedDB。
+      if (generation !== watchingGeneration) {
+        return;
+      }
       if (history.downloadStatus == "downloading" || history.downloadStatus == "pending") {
         watchDownloadHistory(downloadHistoryId);
       } else {
@@ -69,6 +84,8 @@ function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
 }
 
 export function clearWatchingMap() {
+  // 先作废所有在飞回调（世代 +1），再清已排的定时器
+  watchingGeneration++;
   for (const key of Object.keys(watchingMap)) {
     clearTimeout(watchingMap[key as unknown as number]);
     delete watchingMap[key as unknown as number];
@@ -94,9 +111,20 @@ async function loadDownloadHistory() {
     // 表格只能靠后续副作用碰巧刷新，且中途会短暂闪成空表。
     const historyMap: Record<TTorrentDownloadKey, ITorrentDownloadMetadata> = {};
     history.forEach((item) => {
-      historyMap[item.id!] = item;
+      // ⚠️ id 在类型上是可选的（写入时还没落库、由 store 的 keyPath
+      // autoIncrement 补上），但下面这四行都当它必有：`historyMap[undefined]`
+      // 会把所有无 id 的记录塌成同一条、watchDownloadHistory(undefined) 会去
+      // 轮询一条永远不存在的记录，而界面上 row-key="id" + record.id!
+      // 又会让多行共用一个 undefined key（选中/删除会串行）。
+      // 正常数据一定有 id（keyPath 保证），这里只是把「万一」变成一条
+      // 明确日志 + 跳过，而不是让下游拿着 undefined 猜。
+      if (typeof item.id !== "number") {
+        console.error("[DownloadHistory] 跳过没有 id 的下载历史记录", item);
+        return;
+      }
+      historyMap[item.id] = item;
       if (item.downloadStatus == "downloading" || item.downloadStatus == "pending") {
-        watchDownloadHistory(item.id!);
+        watchDownloadHistory(item.id);
       }
     });
     downloadHistory.value = historyMap;

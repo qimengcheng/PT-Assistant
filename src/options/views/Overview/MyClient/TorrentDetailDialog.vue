@@ -14,6 +14,8 @@ import {
   SyncOutlined,
 } from "@antdv-next/icons";
 
+// 这一页的提示一律走 runtimeStore.showSnakebar（同文件原有的复制磁链反馈就是它），
+// 不在同一个弹窗里混两种浮层。
 import type { TableColumnsType } from "antdv-next";
 import type {
   CTorrent,
@@ -173,12 +175,18 @@ async function updateFilePriority(file: CTorrentFile, priority: TorrentFilePrior
       torrent,
       selections: [{ index: file.index, priority }],
     });
-    if (ok) {
-      file.priority = priority;
-      file.wanted = priority !== "skip";
+    if (!ok) {
+      useRuntimeStore().showSnakebar(t("MyClient.detail.updateFilePriorityFailure"), { color: "error" });
+      return;
     }
-  } catch {
-    // 静默失败，优先级保持原值
+    file.priority = priority;
+    file.wanted = priority !== "skip";
+    useRuntimeStore().showSnakebar(t("MyClient.detail.updateFilePrioritySuccess"), { color: "success" });
+  } catch (e) {
+    // 原先这里是空 catch + 「静默失败」注释：优先级下拉点了没反应，
+    // 用户既不知道成没成，也无法分辨是自己没选对还是下载器拒绝了。
+    useRuntimeStore().showSnakebar(t("MyClient.detail.updateFilePriorityFailure"), { color: "error" });
+    console.error("[MyClient] set file priority failed", e);
   }
 }
 
@@ -216,15 +224,20 @@ async function addTracker() {
   const url = trackerInput.value.trim();
   try {
     const ok = await sendMessage("addClientTorrentTracker", { downloaderId: torrent.clientId, torrent, url });
-    if (ok) {
-      trackers.value = await sendMessage("getClientTorrentTrackersDetail", {
-        downloaderId: torrent.clientId,
-        torrent,
-      });
-      trackerInput.value = "";
+    if (!ok) {
+      useRuntimeStore().showSnakebar(t("MyClient.detail.addTrackerFailure"), { color: "error" });
+      return;
     }
-  } catch {
-    // 静默失败
+    trackers.value = await sendMessage("getClientTorrentTrackersDetail", {
+      downloaderId: torrent.clientId,
+      torrent,
+    });
+    trackerInput.value = "";
+    useRuntimeStore().showSnakebar(t("MyClient.detail.addTrackerSuccess"), { color: "success" });
+  } catch (e) {
+    // 原先空 catch：加完 Tracker 界面上什么变化都没有，用户只能再点一次
+    useRuntimeStore().showSnakebar(t("MyClient.detail.addTrackerFailure"), { color: "error" });
+    console.error("[MyClient] add tracker failed", e);
   }
 }
 
@@ -236,14 +249,19 @@ async function removeTracker(tracker: CTorrentTracker) {
       torrent,
       url: tracker.url,
     });
-    if (ok) {
-      trackers.value = await sendMessage("getClientTorrentTrackersDetail", {
-        downloaderId: torrent.clientId,
-        torrent,
-      });
+    if (!ok) {
+      useRuntimeStore().showSnakebar(t("MyClient.detail.removeTrackerFailure"), { color: "error" });
+      return;
     }
-  } catch {
-    // 静默失败
+    trackers.value = await sendMessage("getClientTorrentTrackersDetail", {
+      downloaderId: torrent.clientId,
+      torrent,
+    });
+    useRuntimeStore().showSnakebar(t("MyClient.detail.removeTrackerSuccess"), { color: "success" });
+  } catch (e) {
+    // 原先空 catch：Tracker 删不掉 / 删错了都看不出来
+    useRuntimeStore().showSnakebar(t("MyClient.detail.removeTrackerFailure"), { color: "error" });
+    console.error("[MyClient] remove tracker failed", e);
   }
 }
 
@@ -507,8 +525,11 @@ function formatTimestamp(timestamp: number | undefined): string {
             <template v-else-if="column.key === 'lastAnnounce'">{{ formatTimestamp(record.lastAnnounce) }}</template>
             <template v-else-if="column.key === 'action'">
               <a-tooltip :title="t('MyClient.detail.removeTracker')">
+                <!-- 删除类动作：实心红（AGENTS.md §3.4）。原先 type="text"
+                     只是描边，在白底表格里跟背景融成一片，等于没强调。 -->
                 <a-button
-                  type="text"
+                  type="primary"
+                  danger
                   size="small"
                   @click="removeTracker(record)"
                 >

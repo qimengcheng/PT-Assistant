@@ -45,7 +45,8 @@
       "downloader": "Downloader"
     },
     "ReDownloadSelectDialog": {
-      "oldMethod": "Retry with original method",
+      "partiallyFailed": "{n} torrent(s) failed to re-download. Check the client and retry.",
+        "oldMethod": "Retry with original method",
       "selectDownloader": "Select Downloader",
       "title": "Re-download {0} records"
     },
@@ -315,7 +316,8 @@
     "resumeSelected": "Resume",
     "searchPlaceholder": "Search by name, hash, label, or path",
     "speedLimit": {
-      "batchBtn": "Speed Limit",
+      "partiallyFailed": "{succeeded} applied, {failed} failed",
+        "batchBtn": "Speed Limit",
       "download": "Download Limit (KiB/s, 0 = unlimited)",
       "emptyLimit": "Please fill in at least one of upload or download limit",
       "success": "Limited {count} torrent(s)",
@@ -1201,7 +1203,8 @@
       "title": "Add Media Server"
     },
     "index": {
-      "title": "Media Server",
+      "saveFailed": "Save failed, the change was reverted",
+        "title": "Media Server",
       "needName": "Please enter the media server name",
       "needAddress": "Please enter the media server address",
       "needAuthField": "Please fill in the authentication field \"{0}\"",

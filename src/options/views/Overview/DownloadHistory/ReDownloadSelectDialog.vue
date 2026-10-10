@@ -2,6 +2,7 @@
 import { computed, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { CloudDownloadOutlined, ReloadOutlined, SaveOutlined } from "@antdv-next/icons";
+import { message } from "antdv-next";
 import type { Component } from "vue";
 
 import type { CAddTorrentOptions } from "@ptd/downloader";
@@ -74,7 +75,26 @@ function reDownload(reDownloadType: TReDownloadType) {
       }
     }
 
-    Promise.all(promises).finally(() => {
+    // ⚠️ Promise.all 会短路：只要有一条 reject，后面的还没跑完就被判失败，而
+    // 那个 .finally 照样关窗 + emit(reDownloadComplete) —— 父组件收到通知就
+    // 刷新列表，用户看到「重下完成」实际可能一个都没下进去。
+    // 参照 DeleteDialog 的正确范式：allSettled 统计失败项，明确告知，
+    // 弹窗保持打开让用户决定是否重试。
+    Promise.allSettled(promises).then((results) => {
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > 0) {
+        console.error(
+          "[PTD] re-download partially failed",
+          failed.map((r) => (r as PromiseRejectedResult).reason),
+        );
+        // ⚠️ 这条键的占位符是命名的 `{n}`，所以参数必须给对象：
+        // `t(key, [x])` 走的是列表插值（只填 `{0}`），实测那样 `{n}` 会被整个吞掉，
+        // 界面渲染成「有  条重下失败」—— 数字没了还不报错。
+        message.error(t("DownloadHistory.ReDownloadSelectDialog.partiallyFailed", { n: failed.length }));
+        isReDownloading.value[reDownloadType] = false;
+        return;
+      }
+
       submitDownloadFinish(reDownloadType);
     });
   }

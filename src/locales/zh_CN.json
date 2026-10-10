@@ -859,15 +859,6 @@
       "tagLabel": "标签筛选",
       "treatTTQueryAsImdbSearch": "是否将 tt\\d\\{7,8\\} 的搜索词直接视为 IMDb 搜索"
     },
-    "tab": {
-      "backup": "备份恢复",
-      "download": "下载",
-      "native-bridge": "原生通信桥",
-      "search-entity": "@:common.search",
-      "social-information": "媒体评分",
-      "ui": "界面UI",
-      "user-info": "用户信息"
-    },
     "ui": {
       "allowDragLink": "允许拖拽链接到侧边栏按钮",
       "allowExceptionSites": "允许设置不启用侧边栏的例外站点（启用后需在站点设置中对应关闭）",
@@ -916,18 +907,31 @@
     "Index": {
       "savedToast": "修改已保存",
       "toc": "目录",
-      "tabUi": "界面与内容脚本",
-      "tabUserInfo": "用户信息",
-      "tabSearch": "搜索",
-      "tabDownload": "下载",
-      "tabBackup": "备份",
-      "tabSocialInformation": "社交信息",
-      "tabNativeBridge": "原生通信桥",
-      "tabUpdate": "检查更新"
+      "tierDaily": "天天用得上",
+      "tierWhenNeeded": "按需调整",
+      "tierOnce": "一次配好",
+      "secSearch": "搜索",
+      "secDownload": "下载与推送",
+      "secSitePage": "在站点网页上",
+      "secAccount": "账号与流量",
+      "secAppearance": "外观与表格",
+      "secSocial": "百科与评分信息",
+      "secBackup": "备份与数据迁移",
+      "secUpdate": "检查更新",
+      "secAdvanced": "高级与诊断",
+      "descSearch": "一次搜多个站点时发生的事：并发、要不要记住上次的筛选、结果上的标签，以及和媒体服务器的联动。下载器本身在左侧「下载器」那一页配。",
+      "descDownload": "勾完种子往下载器推的那一路：用什么方式取到种子文件、推送时问不问、记不记住上次的下载器和保存路径。",
+      "descSitePage": "插件注入到各站点页面的那部分：划词搜索、下载按钮的排布与确认方式、拖拽推送，以及浏览器右键菜单。",
+      "descAccount": "各站点的魔力、流量、等级怎么刷，登录态怎么保活，「我的数据」里显示哪些站。站点列表本身在左侧「站点管理」那一页。",
+      "descAppearance": "插件自己这套界面：语言，以及各页的表格要不要记住你上次挑的排序和每页条数。",
+      "descSocial": "搜索结果里那些豆瓣 / IMDb / Bangumi / AniDB 卡片的数据来源、站点凭据与缓存时长。",
+      "descBackup": "备份包的加密密钥，以及从 PT-Plugin-Plus 导入旧数据。备份服务器和定时备份不在这里，它们在左侧「数据备份」那一页。",
+      "descUpdate": "每天查一次仓库有没有新版本、要不要弹通知。这里也能手动查一次。",
+      "descAdvanced": "平时不用碰的两档：开发者选项（放开「站点定义」「调试」这些内部页面的入口），和本机 ptd CLI 的通信桥。"
     },
     "UiWindow": {
       "interfaceLanguage": "界面语言",
-      "groupTableAndVersion": "表格与版本",
+      "groupTable": "表格行为",
       "saveTableBehavior": "记住表格的显示列配置",
       "enableTableMultiSort": "允许多列排序",
       "groupDeveloper": "开发者选项",
@@ -1256,7 +1260,7 @@
       "granted": "已授权",
       "notGranted": "未授权",
       "revoke": "撤销权限",
-      "title": "权限"
+      "title": "原生通信桥的权限"
     }
   },
   "SetSearchSolution": {

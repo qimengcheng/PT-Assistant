@@ -859,15 +859,6 @@
       "tagLabel": "Tags Filter",
       "treatTTQueryAsImdbSearch": "Treat tt\\d\\{7,8\\} search terms directly as IMDb search"
     },
-    "tab": {
-      "backup": "Backup & Restore",
-      "download": "Download",
-      "native-bridge": "Native Bridge",
-      "search-entity": "@:common.search",
-      "social-information": "Social Rating",
-      "ui": "Option UI",
-      "user-info": "UserInfo"
-    },
     "ui": {
       "allowDragLink": "Allow dragging links to the sidebar button",
       "allowExceptionSites": "Allow setting exception sites without sidebar (enable in site settings)",
@@ -916,18 +907,31 @@
     "Index": {
       "savedToast": "Changes saved",
       "toc": "Contents",
-      "tabUi": "Interface & Content Script",
-      "tabUserInfo": "User Info",
-      "tabSearch": "Search",
-      "tabDownload": "Download",
-      "tabBackup": "Backup",
-      "tabSocialInformation": "Social Info",
-      "tabNativeBridge": "Native Bridge",
-      "tabUpdate": "Updates"
+      "tierDaily": "Day to day",
+      "tierWhenNeeded": "When needed",
+      "tierOnce": "Set once",
+      "secSearch": "Search",
+      "secDownload": "Download & send",
+      "secSitePage": "On site pages",
+      "secAccount": "Accounts & traffic",
+      "secAppearance": "Appearance & tables",
+      "secSocial": "Metadata & ratings",
+      "secBackup": "Backup & migration",
+      "secUpdate": "Updates",
+      "secAdvanced": "Advanced & diagnostics",
+      "descSearch": "What happens when you search several sites at once: concurrency, whether the last filter is remembered, tags on the results, and the media-server linkage. The download clients themselves are configured on the 'Downloaders' page in the sidebar.",
+      "descDownload": "The leg from 'ticked a torrent' to 'it is in the client': how the torrent file is fetched, whether sending asks first, and whether the last downloader and save path are remembered.",
+      "descSitePage": "The part this extension injects into site pages: text-selection search, how download buttons are laid out and confirmed, drag-to-send, and the browser context menu.",
+      "descAccount": "How each site's bonus points, traffic and class are refreshed, how the login is kept alive, and which sites show up in 'My data'. The site list itself is on the 'Sites' page in the sidebar.",
+      "descAppearance": "This plugin's own interface: the language, and whether tables remember the sort and rows-per-page you last picked.",
+      "descSocial": "Where the Douban / IMDb / Bangumi / AniDB cards in search results get their data, plus site credentials and how long results are cached.",
+      "descBackup": "The encryption key for backup files, and importing data from PT-Plugin-Plus. Backup servers and scheduled backups are not here - they live on the 'Backup' page in the sidebar.",
+      "descUpdate": "Check the repository once a day for a new release and decide whether to notify. You can also check here right now.",
+      "descAdvanced": "The two things you don't touch normally: developer mode (which reveals the 'Site definitions' and 'Debugger' pages) and the native bridge to the local ptd CLI."
     },
     "UiWindow": {
       "interfaceLanguage": "Interface language",
-      "groupTableAndVersion": "Table & Version",
+      "groupTable": "Table behavior",
       "saveTableBehavior": "Remember the displayed columns of tables",
       "enableTableMultiSort": "Allow multi-column sorting",
       "groupDeveloper": "Developer",
@@ -1256,7 +1260,7 @@
       "granted": "Permission Granted",
       "notGranted": "Permission Not Granted",
       "revoke": "Revoke Permission",
-      "title": "Permission"
+      "title": "Native bridge permission"
     }
   },
   "SetSearchSolution": {

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 /**
- * 用户信息设置：自动刷新队列、并发数、cookie 自动延长、死亡站点显示。
+ * 账号与流量（这一节原先在目录里叫「用户信息」）：自动刷新队列、并发数、cookie 自动延长、死亡站点显示。
+ *
+ * 「流量 / 登录态」是 PT 站最在意又最容易坏的两件事，所以这一节排在「天天用得上」那三档之后、
+ * 其余之前：它不每天改，但一旦要改通常是有站点掉登录或数字不更新了。
  */
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -71,20 +74,6 @@ const afterTimeOptions = computed(() => {
       </div>
 
       <div class="group">
-        <div class="group-title">{{ t("SetBase.UserInfoWindow.groupDisplay") }}</div>
-        <div class="switch-grid">
-          <div class="switch-item">
-            <a-switch v-model:checked="configStore.userInfo.alwaysPickLastUserInfo" size="small" />
-            <span class="label">{{ t("SetBase.UserInfoWindow.alwaysPickLastUserInfo") }}</span>
-          </div>
-          <div class="switch-item">
-            <a-switch v-model:checked="configStore.userInfo.showDeadSiteInOverview" size="small" />
-            <span class="label">{{ t("SetBase.UserInfoWindow.showDeadSiteInOverview") }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="group">
         <div class="group-title">{{ t("SetBase.UserInfoWindow.groupCookie") }}</div>
         <div class="switch-item" style="margin-bottom: 10px">
           <a-switch v-model:checked="configStore.autoExtendCookies.enabled" size="small" />
@@ -102,6 +91,22 @@ const afterTimeOptions = computed(() => {
             </a-form-item>
           </a-col>
         </a-row>
+      </div>
+
+      <!-- 「展示」排最后：那两颗只改总览页看起来是什么样，不会让登录态或数据出问题，
+           而上面两组（刷新、Cookie 延长）是「为什么我的站点没更新 / 怎么掉登录了」那类问题的现场 -->
+      <div class="group">
+        <div class="group-title">{{ t("SetBase.UserInfoWindow.groupDisplay") }}</div>
+        <div class="switch-grid">
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.userInfo.alwaysPickLastUserInfo" size="small" />
+            <span class="label">{{ t("SetBase.UserInfoWindow.alwaysPickLastUserInfo") }}</span>
+          </div>
+          <div class="switch-item">
+            <a-switch v-model:checked="configStore.userInfo.showDeadSiteInOverview" size="small" />
+            <span class="label">{{ t("SetBase.UserInfoWindow.showDeadSiteInOverview") }}</span>
+          </div>
+        </div>
       </div>
     </a-form>
   </div>

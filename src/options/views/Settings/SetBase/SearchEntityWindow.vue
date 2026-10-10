@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /**
- * 搜索设置：搜索并发、结果筛选行为、标签折叠、媒体服务器联动。
+ * 搜索（重排之后它是基础设置的第一节）：搜索并发、结果筛选行为、标签折叠、媒体服务器联动。
+ *
+ * 排第一是因为他就是每天的第一件事：搜 → 挑 → 推。挑完怎么推在下一节「下载与推送」。
  */
 import { useI18n } from "vue-i18n";
 import { useConfigStore } from "@/options/stores/config.ts";

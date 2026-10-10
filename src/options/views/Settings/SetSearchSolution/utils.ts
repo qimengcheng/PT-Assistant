@@ -6,6 +6,14 @@ import type { IAdvancedSearchRequestConfig, ISearchCategories, TSelectSearchCate
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import type { ISearchSolution } from "@/shared/types/storages/metadata.ts";
 
+/**
+ * 取不到分类元数据时的显示名。
+ *
+ * 故意**不是**内部 key：那串标识（category / type / video / audio…）是站点定义
+ * 的字段名，用户看不懂也没法据此做任何事，按 AGENTS.md §3.5 属零容忍项。
+ */
+export const UNKNOWN_CATEGORY_NAME = "—";
+
 const metadataStore = useMetadataStore();
 
 export const radioDefault = Symbol("default");
@@ -94,7 +102,11 @@ function getCategory(siteMetaCategory: ISearchCategories[], key: string) {
 }
 
 export function getCategoryName(siteMetaCategory: ISearchCategories[], key: string) {
-  return getCategory(siteMetaCategory, key)?.name ?? key;
+  // ⚠️ 原来兜底是把内部 key 原样返回：站点定义取不到（扩展刚更新、旧 chunk 404）
+  // 时 siteMetaCategory 是空数组，于是方案那一列直接显示出 "category" / "type"
+  // 这类内部标识 —— AGENTS.md §3.5 的零容忍项（内部 id 不进 UI）。
+  // 兜底改成「保留原样但不区分」：交给调用方用未知分类的中性名渲染。
+  return getCategory(siteMetaCategory, key)?.name ?? UNKNOWN_CATEGORY_NAME;
 }
 
 export function getCategoryOptionName(

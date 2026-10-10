@@ -112,7 +112,12 @@ export async function sendTorrentToDownloader(
       downloaderId: downloaderId,
       addTorrentOptions: realAddTorrentOptions as CAddTorrentOptions,
     }).catch((x) => {
-      runtimeStore.showSnakebar(`[${torrent.title}] 发送到下载器失败！错误信息： ${x}`, { color: "error" });
+      // ⚠️ 原来这里是模板字符串拼的中文，切到英文界面仍然显示中文
+      // （AGENTS.md §3.5 的 i18n 零容忍项）。走 i18n。
+      runtimeStore.showSnakebar(
+        i18nInstance.global.t("SentToDownloaderDialog.sendFailedWithReason", [torrent.title, String(x)]),
+        { color: "error" },
+      );
     });
   });
 
@@ -123,13 +128,21 @@ export async function sendTorrentToDownloader(
     const failedCount = status.filter((x) => x?.downloadStatus === "failed").length;
     const color = failedCount > 0 ? "warning" : "success";
 
+    // 三段拼装改成一条消息 + 参数：中文语序与英文不同，硬拼会在英文界面留下
+    // 「3 个任务发送失败，有在下载队列中」这种读不通的句子。
+    // 但整句版在最常见的「全成功、队列也清空」时会带上「0 个在下载队列中），0 个发送失败」，
+    // 那是原来没有的噪声 —— 所以按有没有非零值分两条整句，语序仍由各语言自己定。
     runtimeStore.showSnakebar(
-      `成功发送 ${status.length - failedCount} 个任务到下载器` +
-        (pendingCount > 0 ? `（${pendingCount}在下载队列中）` : "") +
-        (failedCount > 0 ? `，有 ${failedCount} 个任务发送失败` : ""),
+      pendingCount === 0 && failedCount === 0
+        ? i18nInstance.global.t("SentToDownloaderDialog.sendSuccessOnly", { succeeded: status.length })
+        : i18nInstance.global.t("SentToDownloaderDialog.sendSummary", {
+            succeeded: status.length - failedCount,
+            pending: pendingCount,
+            failed: failedCount,
+          }),
       { color },
     );
   } else {
-    runtimeStore.showSnakebar("似乎并没有任务发送到下载器", { color: "warning" });
+    runtimeStore.showSnakebar(i18nInstance.global.t("SentToDownloaderDialog.nothingSent"), { color: "warning" });
   }
 }

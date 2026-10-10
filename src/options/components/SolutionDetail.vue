@@ -26,7 +26,7 @@ const { t } = useI18n();
  * （扩展刚更新、旧 chunk 404）就是一个 unhandled rejection；② prop 变化时不重取 ——
  * 这个组件用在列表里，行复用后还显示着上一个站点的分类名。
  * 改成跟随 siteId 的 watch，且带 try/catch（取不到就退回空数组，
- * getCategoryName 会走 `?? key` 兜底，不至于把组件打挂）。
+ * 分类名由 getCategoryName 兜成中性占位 `—`，不至于把组件打挂）。
  */
 watch(
   () => props.solution?.siteId,

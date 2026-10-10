@@ -353,6 +353,9 @@
     }
   },
   "MyData": {
+    "fetchUserInfoFailed": "Failed to fetch user info for {name}",
+    "loadFailed": "Failed to load user data",
+    "refreshCanceled": "User info refresh queue canceled",
     "messages": {
       "badgeTip": "Read site messages",
       "loading": "Loading...",
@@ -618,6 +621,8 @@
       "title": "Search Status of [{0}]"
     },
     "index": {
+      "needSite": "Add at least one site before searching",
+      "nothingToRetry": "There is no search plan to retry",
       "snapshotLoadFailed": "Failed to load the snapshot — it may have been deleted",
       "action": {
         "cancel": "Cancel current waiting search",
@@ -716,6 +721,7 @@
     "noDownloader": "No downloaders available. Please add a downloader in settings.",
     "noDownloaderForSite": "No downloaders available for this site. Check the site filter settings in downloader configuration.",
     "noLabel": "No label",
+    "nothingSent": "Nothing was sent to the download client",
     "otherGroup": "Other paths",
     "pauseOnAdd": "Pause on add by default",
     "placeholderInput": "Enter the value to replace <...> in {0}:",
@@ -724,6 +730,9 @@
     "savePath": "Save Path",
     "selectDownloader": "Select Downloader",
     "selectDownloaderFirst": "Please select a downloader first",
+    "sendFailedWithReason": "[{0}] failed to send to the download client: {1}",
+    "sendSuccessOnly": "Sent {succeeded} torrent(s) to the download client",
+    "sendSummary": "Sent {succeeded} torrent(s) ({pending} still queued), {failed} failed",
     "title": "Select downloader for {0} torrents"
   },
   "SetBackup": {

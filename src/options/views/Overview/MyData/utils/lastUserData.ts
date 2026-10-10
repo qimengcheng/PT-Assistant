@@ -8,6 +8,8 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 
+import { tOutside } from "@/options/i18nOutside.ts";
+
 import { fixUserInfo } from "./format.ts";
 import { allAddedSiteMetadata, loadAllAddedSiteMetadata } from "./siteMetadata.ts";
 
@@ -47,7 +49,7 @@ export const addedSiteIds = computedAsync<string[]>(
       // 这条保证原来在 initTableData 的外层 catch 里，改成派生链时差点被顺手删掉。
       // （loadAllAddedSiteMetadata 内部对单站点已 catch + allSettled，所以这里基本只会兜到前置异常）
       console.error("[MyData] 站点数据加载失败", e);
-      useRuntimeStore().showSnakebar("加载用户数据失败", { color: "error" });
+      useRuntimeStore().showSnakebar(tOutside("MyData.loadFailed"), { color: "error" });
     }
     return siteIds;
   },
@@ -141,7 +143,7 @@ export function flushSiteLastUserInfo(sites: TSiteID[]) {
         if (runtimeStore.userInfo.flushPlan[site]) {
           // 面向用户的提示一律用站点名，不暴露内部 id（AGENTS.md §3.5）
           const siteName = allAddedSiteMetadata[site]?.siteName ?? site;
-          runtimeStore.showSnakebar(`获取站点 [${siteName}] 用户信息失败`, { color: "error" });
+          runtimeStore.showSnakebar(tOutside("MyData.fetchUserInfoFailed", { name: siteName }), { color: "error" });
           console.error(e);
         }
       })
@@ -164,7 +166,8 @@ export async function cancelFlushSiteLastUserInfo() {
     console.error("cancelUserInfoQueue failed", e);
   }
 
-  runtimeStore.showSnakebar(`用户信息刷新队列已取消`, { color: "error" });
+  // 队列取消不是错误（原先用了 color: error，红色报错条说「已取消」纯属吓人），走 info 档。
+  runtimeStore.showSnakebar(tOutside("MyData.refreshCanceled"), { color: "info" });
 }
 
 export async function loadSiteHistoryData(siteId: TSiteID): Promise<Array<IUserInfo & { date: string }>> {

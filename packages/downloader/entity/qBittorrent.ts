@@ -24,7 +24,7 @@ import {
   CTrackerState,
   type TorrentFilePriority,
 } from "../types";
-import { type AxiosRequestConfig, type AxiosResponse } from "axios";
+import { type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import urlJoin from "url-join";
 import { axios, getRemoteTorrentFile } from "../utils";
 import { merge } from "es-toolkit";
@@ -297,6 +297,8 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
   private syncData: rawSyncMaindata = { rid: 0 };
   private lastSyncTimestamp: number = 0;
   private webApiVersion: string | null = null;
+  /** 单飞重登用（见 request 的 403 分支），同一时刻只允许一个重登在进行 */
+  private _reloginPromise: Promise<void> | null = null;
 
   constructor(options: Partial<TorrentClientConfig> = {}) {
     super({ ...clientConfig, ...options });
@@ -387,33 +389,65 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
       await this.ping();
     }
 
-    if (config.method?.toLowerCase() === "post") {
-      config.headers = {
-        ...(config.headers ?? {}),
-        "content-type": "application/x-www-form-urlencoded",
-      };
-    }
+    const send = async () => {
+      if (config.method?.toLowerCase() === "post") {
+        config.headers = {
+          ...(config.headers ?? {}),
+          "content-type": "application/x-www-form-urlencoded",
+        };
+      }
 
-    if (this.isApiKeyAuth) {
-      config.headers = {
-        ...(config.headers ?? {}),
-        Authorization: `Bearer ${this.config.password}`,
-      };
-    }
+      if (this.isApiKeyAuth) {
+        config.headers = {
+          ...(config.headers ?? {}),
+          Authorization: `Bearer ${this.config.password}`,
+        };
+      }
 
-    if (this.bypassCSRF) {
-      config.headers = {
-        ...(config.headers ?? {}),
-        origin: "", // 空字符串哨兵：replaceUnsafeHeader 拦截器会将其转为移除 Origin 头
-      };
-    }
+      if (this.bypassCSRF) {
+        config.headers = {
+          ...(config.headers ?? {}),
+          origin: "", // 空字符串哨兵：replaceUnsafeHeader 拦截器会将其转为移除 Origin 头
+        };
+      }
 
-    return await axios.request<T>({
-      baseURL: this.config.address,
-      url: urlJoin("/api/v2", path),
-      timeout: this.config.timeout,
-      ...config,
-    });
+      return await axios.request<T>({
+        baseURL: this.config.address,
+        url: urlJoin("/api/v2", path),
+        timeout: this.config.timeout,
+        ...config,
+      });
+    };
+
+    try {
+      return await send();
+    } catch (e) {
+      // qbt 的会话默认 3600s 过期，而本实例在 offscreen 里按 id 长驻缓存，
+      // isLogin 只在 null 时才 ping 一次 —— 运行一小时后全链路 403 且永不自愈。
+      // 这里捕获 403 重登一次再重试；单飞（复用同一个 promise）避免并发请求各登一次。
+      const isForbidden = (e as AxiosError)?.response?.status === 403;
+      if (!isForbidden || this.isApiKeyAuth) throw e;
+      // 登录接口本身 403 不能重试，否则无限递归
+      if (path.startsWith("/auth/login")) throw e;
+
+      await this.reloginOnce();
+      return await send();
+    }
+  }
+
+  /** 单飞重登：并发 403 时只真正登录一次，其余调用复用同一个 promise */
+  private reloginOnce(): Promise<void> {
+    if (!this._reloginPromise) {
+      this._reloginPromise = (async () => {
+        this.isLogin = null;
+        try {
+          await this.ping();
+        } finally {
+          this._reloginPromise = null;
+        }
+      })();
+    }
+    return this._reloginPromise;
   }
 
   private async getSyncData(fullSync: boolean = false) {

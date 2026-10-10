@@ -253,6 +253,13 @@ export default class UTorrent extends AbstractBittorrentClient<TorrentClientConf
           t: Date.now().toString(),
           ...params,
         },
+        // ⚠️ 必须带 auth：uTorrent WebUI 开了认证后每个请求都要 Basic Auth，
+        // token 只是 CSRF 的一部分、不替代它。login() 与 addTorrent() 都带了，
+        // 只有这里漏了 —— 症状是登录成功、种子列表/暂停/限速等全部 401。
+        auth: {
+          username: this.config.username,
+          password: this.config.password,
+        },
         responseType: "json",
         timeout: this.config.timeout,
       })

@@ -173,7 +173,8 @@ interface rawTask {
 export default class Aria2 extends AbstractBittorrentClient {
   readonly version = "v0.1.0";
 
-  private _wsClient: WebSocket;
+  /** null 表示当前没有可用连接（断线后由 ensureWsClient 懒重连重建） */
+  private _wsClient: WebSocket | null = null;
   private _msgId = 0;
 
   get msgId() {
@@ -191,10 +192,65 @@ export default class Aria2 extends AbstractBittorrentClient {
     this.config.address = address;
 
     // https -> wss , http -> ws
+    // 构造即连接，但不立刻发消息：下面的 waitForOpen 会等 open 事件。
+    // 没有这一步的话远程地址首测时 socket 还在 CONNECTING，send 抛
+    // InvalidStateError —— 表现为「ping 恒false，功能整个不可用」。
     this._wsClient = new WebSocket(address.replace(/^http/, "ws"));
+    // 断线后不重连的话，这个长驻实例（offscreen 按 id 缓存）就永久失效了。
+    // close 事件里把句柄置空，下次 methodSend 会走懒重连。
+    this._wsClient.addEventListener("close", () => {
+      this._wsClient = null;
+    });
+  }
+
+  /**
+   * 等 socket 真的 open，顺便兼顾「还没连上」与「连上后掉了」两种情况。
+   * 单飞：并发调用共用同一个连接/等待，不各连一条。
+   */
+  private ensureWsClient(): Promise<WebSocket> {
+    if (!this._wsClient) {
+      // https -> wss , http -> ws
+      this._wsClient = new WebSocket(this.config.address.replace(/^http/, "ws"));
+      this._wsClient.addEventListener("close", () => {
+        this._wsClient = null;
+      });
+    }
+
+    const ws = this._wsClient;
+    if (ws.readyState === WebSocket.OPEN) return Promise.resolve(ws);
+
+    return new Promise<WebSocket>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Aria2 WebSocket 打开超时 (readyState=${ws.readyState})`));
+      }, this.config.timeout ?? 30e3);
+
+      const onOpen = () => {
+        cleanup();
+        resolve(ws);
+      };
+      const onError = () => {
+        cleanup();
+        // 连不上就丢弃这个句柄，下次调用重新建
+        if (this._wsClient === ws) this._wsClient = null;
+        reject(new Error("Aria2 WebSocket 连接失败"));
+      };
+      const cleanup = () => {
+        clearTimeout(timer);
+        ws.removeEventListener("open", onOpen);
+        ws.removeEventListener("error", onError);
+      };
+
+      ws.addEventListener("open", onOpen);
+      ws.addEventListener("error", onError);
+    });
   }
 
   private async methodSend<T>(methodName: METHODS, params: any[] = []): Promise<jsonRPCResponse<T>> {
+    // 先确保连接可用（顺带兼顾重连），再挂监听发消息 ——
+    // 原先直接 send，socket 还在 CONNECTING 时抛 InvalidStateError。
+    const ws = await this.ensureWsClient();
+
     return new Promise((resolve, reject) => {
       let postParams;
       if (methodName === "system.multicall") {
@@ -240,15 +296,17 @@ export default class Aria2 extends AbstractBittorrentClient {
         reject(new Error(`Aria2 ${methodName} timeout (id=${msgId})`));
       }, this.config.timeout ?? 30e3);
 
+      // 用上面 ensureWsClient 返回的那一个 ws，而不是重新读 this._wsClient ——
+      // 并发重连时字段可能已被换成新句柄，那样监听就挂到没人 send 的那条上了。
       const cleanup = () => {
         clearTimeout(timer);
-        this._wsClient.removeEventListener("message", onMessage as EventListener);
+        ws.removeEventListener("message", onMessage as EventListener);
       };
 
-      this._wsClient.addEventListener("message", onMessage as EventListener);
+      ws.addEventListener("message", onMessage as EventListener);
 
       try {
-        this._wsClient.send(
+        ws.send(
           JSON.stringify({
             method: methodName,
             id: msgId,

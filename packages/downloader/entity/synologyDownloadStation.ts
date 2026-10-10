@@ -620,11 +620,23 @@ export default class SynologyDownloadStation extends AbstractBittorrentClient<To
       params.id = filter.ids;
     }
 
-    const req = (await this.requestEntryCGI(params)) as SynologySuccessResponse<{
+    // ⚠️ 不能 `as SynologySuccessResponse<…>` 把失败分支抹掉：sid 过期时 DS 回
+    // {success:false, error:{code:105}}，那时 req.data 是 undefined，
+    // 下面 req.data.task 直接 TypeError —— 表现为「种子列表整个打不开」而不是
+    // 可诊断的会话失效。这里显式判 success。
+    const req = await this.requestEntryCGI<{
       offset: number;
       task: rawTask[];
       total: number;
-    }>;
+    }>(params);
+
+    if (!req.success) {
+      // 105/106 = sid 无效/过期，清掉会话让下一次调用重新登录后自愈
+      if (req.error.code === 105 || req.error.code === 106) {
+        this._sessionId = undefined;
+      }
+      throw new Error(`Synology DownloadStation list failed: code=${req.error.code}`);
+    }
 
     return req.data.task
       .filter((s) => s.type === "bt" /** 只选择bt种子返回 */)

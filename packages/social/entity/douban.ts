@@ -179,12 +179,20 @@ export async function fetchInformation(
       responseType: "document",
       timeout: config.timeout ?? 10e3,
     });
-    let ld_json = JSON.parse(
-      (data.querySelector('head > script[type="application/ld+json"]')?.textContent ?? "{}").replace(
-        /(\r\n|\n|\r|\t)/gm,
-        "",
-      ),
-    );
+    // ⚠️ ld+json 的解析必须与 DOM 解析分开兜底：豆瓣反爬页/改版时那个 script 可能是空的、
+    // 或者内容不是合法 JSON，JSON.parse 直接抛 —— 而它和下面那行 DOM 取标题在同一个 try 里，
+    // 于是连标题一起丢（整条信息全空）。ld+json 只用来补海报/评分/简介，缺了不影响标题。
+    let ld_json: Record<string, any> = {};
+    try {
+      ld_json = JSON.parse(
+        (data.querySelector('head > script[type="application/ld+json"]')?.textContent ?? "{}").replace(
+          /(\r\n|\n|\r|\t)/gm,
+          "",
+        ),
+      );
+    } catch (e) {
+      console.warn("[douban] ld+json parse failed, fall back to DOM only", e);
+    }
 
     resDict.title = pageParser$1(data).titles.join(" / ");
 

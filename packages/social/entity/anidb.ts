@@ -59,6 +59,10 @@ export async function fetchInformation(
         clientver = parseInt(clientVersion, 10);
       }
 
+      // 只能是 http：AniDB 在 9001 上没有 TLS 监听（实测 5 个 anidb 域名在 9001 做 TLS
+      // 握手全部无响应，同端口明文 GET 返回 200）；443 上那张 Let's Encrypt 证书的 SAN
+      // 里没有 api.anidb.net，而带证书的 www.anidb.net:443 只有 Cloudflare 挑战页、没有
+      // httpapi。所以「改 https 就能绕开 mixed content」这条路不存在。
       const apiReq = await axios.get("http://api.anidb.net:9001/httpapi", {
         params: { request: "anime", client, clientver, protover: 1, aid: realId },
         timeout: config.timeout ?? 10e3,
@@ -69,7 +73,9 @@ export async function fetchInformation(
           .map((x) => x.textContent)
           .filter(Boolean),
       ).join(" / ");
-      const poster = Sizzle("picture", apiReq.data)[0]?.textContent;
+      // ⚠️ textContent 可能带换行/空白（XML 节点排版），不 trim 就拼出一个
+      // 带空格的非法 URL，海报直接裂图。
+      const poster = Sizzle("picture", apiReq.data)[0]?.textContent?.trim();
       if (poster) {
         resDict.poster = "https://cdn.anidb.net/images/main/" + poster;
       }

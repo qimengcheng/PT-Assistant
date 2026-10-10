@@ -44,6 +44,13 @@ export function getBaseId(idOrUrl: string): string {
   return parse(idOrUrl).match(/^(movie\/\d+|tv\/\d+)/)?.[1] ?? "";
 }
 
+/**
+ * 这几个辅助请求拿不到 config（它们不接收参数），但**不能没有超时**：
+ * 站点挂起时既不 resolve 也不 reject，单页解析就永久 pending，批量抓取时
+ * 请求数还翻倍。与主请求的 10s 保持同一档。
+ */
+const HELPER_REQUEST_TIMEOUT = 10e3;
+
 function buildTmdbExternalIdsUrl(docUrl: string): string {
   const baseId = getBaseId(docUrl);
   if (!baseId) {
@@ -81,6 +88,7 @@ async function fetchTmdbExternalIds(docUrl: string): Promise<{ imdb?: string; tv
     const { data: extDoc } = await axios.get<Document>(externalIdsUrl, {
       responseType: "document",
       withCredentials: true,
+      timeout: HELPER_REQUEST_TIMEOUT,
     });
     const imdb = extDoc.querySelector<HTMLInputElement>("#imdb_id")?.value?.trim() || undefined;
     const tvdb = extDoc.querySelector<HTMLInputElement>("#tvdb_id")?.value?.trim() || undefined;
@@ -102,6 +110,7 @@ async function fetchTmdbSeriesOgTitleFromSeasons(docUrl: string): Promise<string
     const { data: seasonsDoc } = await axios.get<Document>(seasonsUrl, {
       responseType: "document",
       withCredentials: true,
+      timeout: HELPER_REQUEST_TIMEOUT,
     });
     return seasonsDoc.querySelector('meta[property="og:title"]')?.getAttribute("content")?.trim() || undefined;
   } catch (error) {
@@ -120,6 +129,7 @@ async function fetchTmdbBaseTitles(docUrl: string): Promise<{ displayTitle?: str
     const { data: baseDoc } = await axios.get<Document>(baseUrl, {
       responseType: "document",
       withCredentials: true,
+      timeout: HELPER_REQUEST_TIMEOUT,
     });
     const displayTitle =
       baseDoc.querySelector('meta[property="og:title"]')?.getAttribute("content")?.trim() || undefined;

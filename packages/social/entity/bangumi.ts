@@ -154,7 +154,9 @@ export async function fetchInformation(
 
     const titles = [data.name_cn ?? "", data.name ?? ""];
     // 处理 infobox 中的别名
-    const aka = data.infobox
+    // ⚠️ infobox 可能是空数组或缺失（条目没有别名栏时），
+    // 原先直接 .filter 会抛，而它在 try 里 —— 标题与评分一起丢光。
+    const aka = (data.infobox ?? [])
       .filter((item) => item.key === "别名")
       .flatMap((item) => {
         if (typeof item.value === "string") {

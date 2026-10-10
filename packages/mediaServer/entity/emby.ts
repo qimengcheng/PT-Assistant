@@ -48,7 +48,11 @@ export default class Emby extends AbstractEmbyCompatibleServer<IEmbyConfig> {
   get apiBaseUrl() {
     let serverAddress = this.config.address;
     if (!serverAddress.includes("/emby/")) {
-      serverAddress = serverAddress.replace(/\/web\/index.html#.+/, "");
+      // 与 Jellyfin 同一套剥法：用户粘的可能是 `/web`、`/web/`、`/web/index.html`、
+      // `/web/index.html#!/home`、`/web/#/...`，原来只吃最后带 index.html+# 的那一种，
+      // 其余形态会拼出 `/web/index.html/emby/` 这种必然 404 的地址。
+      // `$` 锚尾保证 `webhook`/`swagger` 这类同前缀路径不被误剥。
+      serverAddress = serverAddress.replace(/\/web(?:\/(?:index\.html)?)?(?:[#!/].*)?$/, "");
       serverAddress = urlJoin(serverAddress, "/emby/");
     }
 
@@ -57,7 +61,10 @@ export default class Emby extends AbstractEmbyCompatibleServer<IEmbyConfig> {
 
   get webBaseUrl() {
     let serverAddress = this.config.address;
-    serverAddress = serverAddress.replace(/\/web\/index.html#.+/, "");
+    // 这里要的是「回到服务根，再挂网页端入口」，所以剥法和 apiBaseUrl 必须同一条：
+    // 地址填 `/web` 或 `/web/index.html`（不带 hash，粘地址栏就有）时，原来那条
+    // 要求 `#` 的式子匹配不上，于是拼出 `/web/web/index.html#!/item?id=` 这种 404。
+    serverAddress = serverAddress.replace(/\/web(?:\/(?:index\.html)?)?(?:[#!/].*)?$/, "");
     return urlJoin(serverAddress, "/web/index.html");
   }
 

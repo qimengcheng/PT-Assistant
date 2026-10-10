@@ -54,7 +54,11 @@ export default class Jellyfin extends AbstractEmbyCompatibleServer<IJellyfinConf
    */
   get apiBaseUrl() {
     let serverAddress = this.config.address;
-    serverAddress = serverAddress.replace(/web\/(#\/home.html.+)?/, "");
+    // 用户在网页地址栏里停的位置不同，粘出来的形态就不同：`/web`、`/web/`、
+    // `/web/index.html`、`/web/index.html#!/home.html`、`/web/#/details/...` 都见得到，
+    // 一个都不剥就会拼出 `/web/.../System/Info` 这种必然 404 的 API 地址。
+    // 靠 `$` 锚住尾巴，`webhook`/`swagger`/`jellyfin-web` 这类同前缀的路径不受影响。
+    serverAddress = serverAddress.replace(/\/web(?:\/(?:index\.html)?)?(?:[#!/].*)?$/, "");
 
     return serverAddress;
   }

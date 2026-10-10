@@ -167,6 +167,11 @@
   "Logger": {
     "action": {
       "details": "详细信息"
+    },
+    "table": {
+      "id": "ID",
+      "message": "消息",
+      "time": "时间"
     }
   },
   "MediaServerEntity": {
@@ -1327,6 +1332,8 @@
       "showDeadSite": "展示已死亡站点"
     },
     "Editor": {
+      "typeInternal": "内部站点（需填写 passkey / 令牌）",
+      "typePublic": "公开站点",
       "downloadInterval": "下载间隔",
       "downloadIntervalHint": "影响该站点的下载间隔时间（为了安全考虑，插件不会严格遵守该设置，实际间隔总是会略大于等于设置的间隔）",
       "downloadLinkSuffix": "下载链接后缀",

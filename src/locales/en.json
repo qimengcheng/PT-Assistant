@@ -167,6 +167,11 @@
   "Logger": {
     "action": {
       "details": "Details"
+    },
+    "table": {
+      "id": "ID",
+      "message": "Message",
+      "time": "Time"
     }
   },
   "MediaServerEntity": {
@@ -1327,6 +1332,8 @@
       "showDeadSite": "Show dead sites"
     },
     "Editor": {
+      "typeInternal": "Internal site (passkey / token required)",
+      "typePublic": "Public site",
       "downloadInterval": "Download Interval",
       "downloadIntervalHint": "Affects the download interval for this site (for safety, the plugin will not strictly follow this setting; the actual interval is always slightly greater than or equal to the set interval)",
       "downloadLinkSuffix": "Download Link Suffix",

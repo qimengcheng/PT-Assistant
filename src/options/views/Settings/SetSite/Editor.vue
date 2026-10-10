@@ -38,6 +38,11 @@ const siteMetaData = ref<ISiteMetadata>({} as unknown as ISiteMetadata);
  */
 const siteUserConfig = inject<Ref<ISiteUserConfig>>("storedSiteUserConfig", ref({} as ISiteUserConfig));
 
+/** 站点类型的展示文案（internal = 需要用户自己填 passkey/token 的私有站） */
+const siteTypeText = computed(() =>
+  siteMetaData.value.type === "private" ? t("SetSite.Editor.typeInternal") : t("SetSite.Editor.typePublic"),
+);
+
 const siteName = computed({
   get: () => siteUserConfig.value.merge?.name ?? siteMetaData.value.name,
   set: (value: string) => set(siteUserConfig.value, "merge.name", value),
@@ -268,7 +273,10 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
       </a-col>
       <a-col :span="8">
         <a-form-item :label="t('common.type')">
-          <a-input :value="siteMetaData.schema" size="small" disabled />
+          <!-- 原来这里显示 siteMetaData.schema —— 那是内部类名（AbstractPrivateSite /
+               AbstractBittorrentSite…），用户既读不懂也没法用（AGENTS.md §3.5）。
+               改显示真正有意义的 public/private。 -->
+          <a-input :value="siteTypeText" size="small" disabled />
         </a-form-item>
       </a-col>
       <a-col :span="8">

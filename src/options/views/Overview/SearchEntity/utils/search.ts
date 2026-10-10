@@ -30,6 +30,34 @@ const globalExistingIds = new Set<string>();
 export const searchQueue = new PQueue({ concurrency: 1 }); // 默认设置为 1，避免并发搜索
 
 /**
+ * 搜索世代（generation）。
+ *
+ * ⚠️ `searchQueue.clear()` 只清**还没开始**的排队任务，**不影响已经在跑的那个** ——
+ * 它会继续跑完并把结果追加进表格、回写 status/count。所以「取消」之后仍会不断冒出新结果，
+ * 而 isSearching 已经被打回 false，界面状态是脱节的。
+ *
+ * 这里给每轮搜索发一个世代号：取消或发起新一轮搜索时 +1；任务在每个 await 之后
+ * 校验自己是否还属于当前世代，不是就直接放弃（不再写任何状态）。这样在途任务
+ * 的迟到结果不会污染新一轮。
+ */
+let searchGeneration = 0;
+
+/** 开始新一轮搜索：作废所有在途任务的后续写入 */
+export function bumpSearchGeneration(): number {
+  return ++searchGeneration;
+}
+
+/** 任务入队时领一个世代号（此刻的当前世代） */
+export function currentSearchGeneration(): number {
+  return searchGeneration;
+}
+
+/** 世代是否仍然有效 —— 取消/重新搜索后旧任务据此自行放弃 */
+export function isSearchGenerationAlive(generation: number): boolean {
+  return generation === searchGeneration;
+}
+
+/**
  * 把配置里的并发数同步进队列（队列构造时是 1，配置默认是 5）。
  *
  * ⚠️ 只能在**投递任务之前**调用，绝不能放在 searchQueue 的事件回调里（原先写在 active 里）：
@@ -146,9 +174,16 @@ export async function doSearchEntity(
   console.log(`Add search ${solutionKey} to queue.`);
   runtimeStore.search.searchPlan[solutionKey].queueAt = Date.now();
 
+  // 领世代号放在**投递时**（不是任务体里）：.catch 回调也要用到它来判断
+  // 「这次失败是否还属于当前这轮搜索」
+  const generation = currentSearchGeneration();
+
   searchQueue
     .add(
       async () => {
+      // 世代在投递时就领好了；下面每个 await 之后都要校验 —— 世代过期就放弃本次写入
+      const alive = () => isSearchGenerationAlive(generation);
+
       const startAt = (runtimeStore.search.searchPlan[solutionKey].startAt = Date.now());
       console.log(`search ${solutionKey} start at ${startAt}`);
       runtimeStore.search.searchPlan[solutionKey].status = EResultParseStatus.working;
@@ -172,6 +207,14 @@ export async function doSearchEntity(
         siteId,
         searchEntry,
       });
+
+      // 请求回来时可能已经被取消了（或已经开始了新一轮搜索）—— 这时它的结果
+      // 不该再进表格，也不该回写 status/count
+      if (!alive()) {
+        console.debug(`[SearchEntity] search ${solutionKey} 已取消，丢弃返回结果`);
+        return;
+      }
+
       console.log(
         `success get search ${solutionKey} result, with code ${searchStatus}: ${searchStatusMsg ?? ""}`,
         searchResult,
@@ -229,6 +272,10 @@ export async function doSearchEntity(
       // rejection 会让该方案的 status 永远停在 working、endAt/costTime 不写、
       // 排队计数不降（按钮一直显示「排队中」），甚至 idle 事件不触发导致 isSearching 卡在 true。
       console.error(`[SearchEntity] search failed: ${solutionKey}`, e);
+
+      // 世代已过期 = 这轮搜索已被取消/替换，别把「失败」写到新一轮的方案上
+      if (!isSearchGenerationAlive(generation)) return;
+
       const plan = runtimeStore.search.searchPlan[solutionKey];
       if (plan) {
         const failedAt = Date.now();
@@ -295,6 +342,8 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
 
     runtimeStore.search.startAt = Date.now();
     runtimeStore.search.isSearching = true;
+    // 新一轮搜索：作废上一轮所有在途任务的后续写入（它们返回后不该再往这张表里追加）
+    bumpSearchGeneration();
 
     for (const { siteId, searchEntries } of searchSolution.solutions) {
       for (const [searchEntryName, searchEntry] of Object.entries(searchEntries)) {

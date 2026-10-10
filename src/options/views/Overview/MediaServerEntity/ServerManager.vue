@@ -57,6 +57,15 @@ const editingConfig = ref<IMediaServerMetadata>({} as IMediaServerMetadata);
 const currentAuthFields = computed(() => typeMetaMap.value[editingConfig.value.type]?.auth_field ?? []);
 const currentWarnings = computed(() => typeMetaMap.value[editingConfig.value.type]?.warning ?? []);
 
+/**
+ * 类型展示名。元数据里没有 name，只有 description（一句话介绍，如「媒体服务器 / 群晖…」）——
+ * 表格这一列太窄放不下一句介绍，所以退回首字母大写的 type（emby → Emby）。
+ * 目的是不把内部字面量直接摆上台面（AGENTS.md §3.5）。
+ */
+function typeDisplayName(type: string): string {
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 function normalizeAuthField(field: string | { name: string; required?: boolean; message?: string }) {
   return typeof field === "string" ? { name: field, required: true } : { required: true, ...field };
 }
@@ -213,7 +222,8 @@ const columns = computed(() => [
         </template>
 
         <template v-else-if="column.key === 'type'">
-          <a-tag color="purple">{{ record.type }}</a-tag>
+          <!-- 用元数据里的展示名（Emby / Jellyfin / Plex…）而不是内部 type 字面量 -->
+          <a-tag color="purple">{{ typeDisplayName(record.type) }}</a-tag>
         </template>
 
         <template v-else-if="column.key === 'enabled'">
@@ -315,10 +325,6 @@ const columns = computed(() => [
 
         <!-- 连通性测试：上游 Editor.vue 里由 ConnectCheckButton 承担，这里补回同一能力 -->
         <ConnectCheckButton :check-fn="checkConnect" :reset-timeout="3000" />
-
-        <a-form-item v-if="isEditMode && editingConfig.id" :label="t('SetMediaServer.index.configId')">
-          <span class="text-body-small">{{ editingConfig.id }}</span>
-        </a-form-item>
       </a-form>
     </a-modal>
   </div>

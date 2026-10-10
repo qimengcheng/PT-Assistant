@@ -45,7 +45,7 @@ import SetSearchSolutionPage from "@/options/views/Settings/SetSearchSolution/In
 // 主要助手方法
 import { tableCustomFilter } from "./utils/filter";
 import { countCompare, commentsHref, countText } from "@/shared/torrentCount.ts";
-import { doSearch, retrySearch, searchPlanStatus, searchQueue } from "./utils/search";
+import { bumpSearchGeneration, doSearch, retrySearch, searchPlanStatus, searchQueue } from "./utils/search";
 import RecommendationMenu from "@/options/views/Layout/RecommendationMenu.vue";
 
 // 本文件名为 Index.vue，与 MyData/Index.vue 同名；<script setup> 推断出的
@@ -491,6 +491,9 @@ function startSearchQueue() {
 function cancelSearchQueue() {
   console.log("cancelSearchQueue", searchQueue);
   searchQueue.clear(); // 清空搜索队列
+  // clear() 只清「还没开始」的排队任务，正在跑的那个照旧跑完并把结果追加进表格 ——
+  // 世代号让它回来后自行放弃，否则界面表现是「已取消却还在冒新结果」而 isSearching 已 false。
+  bumpSearchGeneration();
   // 将搜索队列中状态设置为跳过
   for (const key of Object.keys(runtimeStore.search.searchPlan)) {
     // @ts-ignore

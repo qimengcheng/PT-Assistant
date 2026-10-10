@@ -609,12 +609,11 @@ function dialogLeave() {
           >
             <a-radio-button v-for="opt in downloaderOptions" :key="opt.value" :value="opt.value">
               <span class="choice-with-icon">
-                <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.type" />
+                <img class="downloader-avatar" :src="getDownloaderIcon(opt.raw.type)" :alt="opt.raw.name" />
                 <span>{{ opt.raw.name }}</span>
                 <a-tooltip :title="opt.raw.address">
                   <LinkOutlined class="choice-address-icon" />
                 </a-tooltip>
-                <a-tag color="blue">{{ opt.raw.type }}</a-tag>
               </span>
             </a-radio-button>
           </a-radio-group>

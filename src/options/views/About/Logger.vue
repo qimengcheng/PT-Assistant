@@ -14,22 +14,20 @@ const logger = shallowRef<ILoggerItem[]>([]);
 // computed：标签里有 t()，setup 里一次性求值的话切语言不会重算
 const columns = computed<TableColumnsType<ILoggerItem>>(() => [
   /**
-   * 这一格原来是 150 宽、且没有裁剪，于是 ID 直接画到 Time 列上（用户报「id 和时间列重叠」）。
-   * 数字是实测的：日志 id 是 21 位 nanoid（offscreen/utils/logger.ts:49），在本应用那套
-   * `13px system-ui / Microsoft YaHei` 下量到 151~165.4px，而 small 档内衬 8+8 只剩 134px 内容宽。
-   * 所以 190 = 最宽那条 165.4 + 内衬 16 + 余量；`ellipsis` 是兜底 ——
-   * 这张表因为 Message 带 ellipsis 已经是 fixed 布局，单元格默认不裁剪，内容再长就会溢出到邻格。
+   * 原来第一列是 21 位 nanoid 的日志 id（用户报「id 和时间列重叠」，于是加宽到 190）。
+   * 但那串 id 用户既读不懂也没法用，而「详细信息」弹窗里 JSON.stringify(logData)
+   * 本来就带着 id —— 表格这列是重复的内部标识，按 AGENTS.md §3.5 撤掉。
+   * row-key 仍用 id（rc-table 只要 key 存在即可，不要求有对应列）。
    */
-  { title: "ID", dataIndex: "id", key: "id", width: 190, ellipsis: true },
   {
-    title: "Time",
+    title: t("Logger.table.time"),
     dataIndex: "time",
     key: "time",
     width: 170,
     defaultSortOrder: "descend",
     sorter: (a, b) => (a.time ?? 0) - (b.time ?? 0),
   },
-  { title: "Message", dataIndex: "msg", key: "msg", ellipsis: true },
+  { title: t("Logger.table.message"), dataIndex: "msg", key: "msg", ellipsis: true },
   { title: t("common.action"), key: "action", width: 100, align: "center" },
 ]);
 
@@ -133,11 +131,7 @@ onUnmounted(() => {
         size="small"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'id'">
-            <code class="text-no-wrap">{{ record.id }}</code>
-          </template>
-
-          <template v-else-if="column.key === 'time'">
+          <template v-if="column.key === 'time'">
             <span class="text-no-wrap">{{ formatDate(record.time ?? 0) }}</span>
           </template>
 

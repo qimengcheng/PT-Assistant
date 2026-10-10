@@ -428,8 +428,15 @@ async function downloadTorrentToLocalFile(
   if (localDownloadMethod === "web") {
     if (downloadMethod.toUpperCase() === "GET" && isEmpty(downloadHeaders)) {
       logger({ msg: `Download torrent file with web method: ${downloadUri}` });
-      window.open(downloadUri, "_blank");
-      return { downloadStatus: await setDownloadStatus(downloadId, "completed"), errorMessage };
+      // ⚠️ 这一段跑在 offscreen 的**隐藏文档**里，弹窗基本必被拦，window.open 返回 null。
+      // 原先不看返回值就标 completed —— 用户那边什么都没下，下载历史却是「已完成」。
+      // 拿不到窗口就回落 extension（走 chrome.downloads），别假装成功。
+      const opened = window.open(downloadUri, "_blank");
+      if (opened) {
+        return { downloadStatus: await setDownloadStatus(downloadId, "completed"), errorMessage };
+      }
+      logger({ msg: "window.open was blocked in offscreen document, falling back to extension method" });
+      localDownloadMethod = "extension";
     } else {
       localDownloadMethod = "extension"; // 如果是不能直接使用 window.open 方法的情况，直接使用 extension 方法
     }

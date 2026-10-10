@@ -166,9 +166,11 @@ export async function exportBackupData(
 
     // 更新最后一次备份时间
     if (backupStatus) {
-      const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
-      metadataStore.backupServers[backupServerId].lastBackupAt = new Date().getTime();
-      await extStore.setItem("metadata", metadataStore);
+      // ⚠️ 用 patchItem 按路径写，而不是「读整块 metadata → 改一个字段 → 写回整块」。
+      // metadata 这个 blob 同时被 SW（alarms 的自动刷新/备份时间）与本上下文读写，
+      // 而 writeQueues 只在单上下文内互斥（storage.ts 自述）—— 两个 immediate job
+      // 时间窗一重叠，整块写回就会把对方刚写的字段覆盖掉。
+      await extStore.patchItem("metadata", `backupServers.${backupServerId}.lastBackupAt`, new Date().getTime());
 
       // 备份成功后，按照保留策略清理历史备份
       await applyBackupRetention(backupServerId, backupFilename).catch((e) => {

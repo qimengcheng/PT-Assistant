@@ -132,15 +132,21 @@ export function piniaWebExtPersistencePlugin(context: PiniaPluginContext) {
   const $onReady = async (callback?: () => void) => {
     const promise = restorePromise || Promise.resolve();
     if (callback) {
-      promise.then(callback);
+      // 原先 then 无 catch：restorePromise 一旦 reject（水合失败），这里就多一条
+      // unhandled rejection，而调用方以为「等到了水合」
+      promise.then(callback).catch(() => {});
     }
     return promise;
   };
 
   function onChanged(changes: Record<string, chrome.storage.StorageChange>, areaName: string) {
-    if (areaName === storageArea && Object.hasOwn(changes, key)) {
-      store.$patch(changes[key].newValue as Parameters<typeof store.$patch>[0]);
-    }
+    if (areaName !== storageArea || !Object.hasOwn(changes, key)) return;
+
+    const newValue = changes[key].newValue;
+    // 键被移除时 newValue 是 undefined，而 $patch(undefined) 会抛
+    // （patch 器按对象遍历）。这整个监听器没有 try/catch，抛出去就成了
+    // storage.onChanged 的未捕获错误。改成回落到 state 本身。
+    store.$patch((newValue ?? {}) as Parameters<typeof store.$patch>[0]);
   }
 
   chrome.storage.onChanged.addListener(onChanged);

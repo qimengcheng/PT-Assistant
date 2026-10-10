@@ -85,8 +85,11 @@ function autoFlushUserInfo(retryIndex: number = 0) {
      * /utils/userInfo.ts），所以失败的站点当天没有记录、照旧会重试，刚刷成功的记录还新、不会被重刷。
      */
     const dueSites: TSiteID[] = [];
-    metadataStore = (await extStore.getItem("metadata"))!; // 遍历 metadataStore 中添加的站点
-    for (const [siteId, siteConfig] of Object.entries(metadataStore.sites)) {
+    // ⚠️ 不能用 `!`：空库（还没装过站点）时 getItem 返回 null，这里直接 TypeError，
+    // 于是这个 job 每轮都在同一处崩、lastUserInfoAutoFlushAt 永远推不进去。
+    // 没有可刷的站点就正常收尾（对齐下面 autoBackup 的守卫写法）。
+    metadataStore = ((await extStore.getItem("metadata")) ?? {}) as IMetadataPiniaStorageSchema;
+    for (const [siteId, siteConfig] of Object.entries(metadataStore.sites ?? {})) {
       if (siteConfig.isOffline || !siteConfig.allowQueryUserInfo) continue;
       try {
         const thisSiteUserInfo = (await sendMessage("getSiteUserInfo", siteId as TSiteID)) ?? {};

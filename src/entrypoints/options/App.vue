@@ -27,6 +27,7 @@ import { antdLocaleMap } from "@/options/plugins/antd.ts";
 import { i18nInstance } from "@/options/plugins/i18n.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
+import { moveNavItem, navOrderChanged, orderNavByPaths } from "@/options/navOrder.ts";
 
 const version = browser.runtime.getManifest().version;
 const route = useRoute();
@@ -84,6 +85,59 @@ const navItems = computed(() => {
   // 直链 /debugger 仍然进得去，出问题时不必为了进去先改配置。
   return items.filter((item) => !item.dev || configStore.developerMode);
 });
+
+/**
+ * 界面上真正列出来的那一份 = 默认那份按用户拖出来的顺序排。
+ * 走 `orderNavByPaths` 而不是直接照存档筛：新版本加的页面、刚打开的开发者那两项，
+ * 都没在存档里记过，照存档筛会把它们整个变没（「文件在、路由在、菜单里没有」是本仓库的老坑）。
+ */
+const shownNav = computed(() => orderNavByPaths(navItems.value, configStore.navOrder));
+
+/** 正在拖的那一条 / 此刻悬停在谁身上（只为了画那条插入位置线） */
+const dragFrom = ref<string | null>(null);
+const dragOver = ref<string | null>(null);
+
+function onNavDragStart(path: string, event: DragEvent) {
+  dragFrom.value = path;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    // Firefox 上 setData 不调一下的话 dragstart 直接不生效（拖不起来，也不报错）
+    event.dataTransfer.setData("text/plain", path);
+  }
+}
+
+function onNavDragOver(path: string, event: DragEvent) {
+  const from = dragFrom.value;
+  if (!from || from === path) return;
+  // 不 preventDefault 的话浏览器认为这里不接受放置，drop 一次都不会触发
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  dragOver.value = path;
+}
+
+function onNavDrop(path: string, event: DragEvent) {
+  event.preventDefault();
+  const from = dragFrom.value;
+  endNavDrag();
+  if (!from || from === path) return;
+  // 吃的是**此刻显示的**那份顺序（含刚补出来的新项），不是存档原样
+  const next = moveNavItem(
+    shownNav.value.map((item) => item.path),
+    from,
+    path,
+  );
+  configStore.navOrder = navOrderChanged(navItems.value.map((item) => item.path), next) ? next : [];
+}
+
+function endNavDrag() {
+  dragFrom.value = null;
+  dragOver.value = null;
+}
+
+/** 恢复默认：把存档那份清掉，`orderNavByPaths` 于是原样返回代码里那份顺序 */
+function resetNavOrder() {
+  configStore.navOrder = [];
+}
 
 /**
  * 需要缓存的路由组件名，对应各 Index.vue 里的 defineOptions({ name })。
@@ -182,10 +236,22 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
             <!-- 导航项本体是 router-link 渲染的 <a>：整行可点，且保留
                  「ctrl/中键 → 新标签页打开」。所以不用 a-menu 的 @click 自己 push
                  —— 一旦改由菜单事件跳转，这两个修饰键点击就退化成静默无效。
-                 选中态由 :selected-keys 受控，a-menu 不参与路由。 -->
+                 选中态由 :selected-keys 受控，a-menu 不参与路由。
+                 顺序 = shownNav（默认那份按用户拖出来的次序排过）；拖动挂在同一个 <a> 上，
+                 它本来就是浏览器默认可拖的链接，所以这里只需把拖出的数据换成「移动」。 -->
             <a-menu mode="inline" :selected-keys="[activePath]">
-              <a-menu-item v-for="item in navItems" :key="item.path">
-                <router-link :to="item.path" class="nav-link">
+              <a-menu-item v-for="item in shownNav" :key="item.path">
+                <router-link
+                  :to="item.path"
+                  class="nav-link"
+                  :class="{ 'is-dragging': dragFrom === item.path, 'is-drop-target': dragOver === item.path && dragFrom !== item.path }"
+                  draggable="true"
+                  @dragstart="onNavDragStart(item.path, $event)"
+                  @dragover="onNavDragOver(item.path, $event)"
+                  @dragleave="dragOver === item.path && (dragOver = null)"
+                  @drop="onNavDrop(item.path, $event)"
+                  @dragend="endNavDrag"
+                >
                   <component :is="item.icon" style="font-size: 14px" />
                   <span>{{ item.label }}</span>
                   <a-tag v-if="item.dev" color="blue" style="margin-left: auto">{{ t("layout.nav.devTag") }}</a-tag>
@@ -198,6 +264,12 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
             <span v-if="backgroundOk === true" class="status ok">● {{ t("layout.nav.backgroundOk") }}</span>
             <span v-else-if="backgroundOk === false" class="status bad">● {{ t("layout.nav.backgroundFailed") }}</span>
             <span v-else class="status">● {{ t("layout.nav.backgroundConnecting") }}</span>
+            <!-- 没拖过的时候给一句怎么用；拖过之后那句话没意义了，换成唯一的反悔入口
+                 （顺序只能在界面上拖，没有别的地方能改，不给这条就等于一次误拖永久生效） -->
+            <span v-if="configStore.navOrder.length === 0" class="nav-hint">{{ t("layout.nav.dragHint") }}</span>
+            <a-button v-else type="link" size="small" class="nav-reset" @click="resetNavOrder">
+              {{ t("layout.nav.resetOrder") }}
+            </a-button>
           </footer>
         </a-layout-sider>
 

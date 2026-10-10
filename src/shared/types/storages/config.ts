@@ -22,6 +22,11 @@ export interface IConfigPiniaStorageSchema {
   isNavBarOpen: boolean;
   // 窗口大小变化（display 断点变化）时，是否自动展开/收起 Navigation 侧边栏
   autoToggleNavBarOnDisplayChange: boolean;
+  /**
+   * 左侧导航的用户自定义顺序（存的是一串 path，见 `src/options/navOrder.ts` 为什么不用下标）。
+   * 空数组 = 从没拖过，界面按代码里那份默认顺序走；新加的页面永远补在后面，不会因为这个存档而消失。
+   */
+  navOrder: string[];
 
   ignoreWrongPixelRatio: boolean;
 

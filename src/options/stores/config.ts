@@ -171,6 +171,8 @@ export const useConfigStore = defineStore("config", {
     theme: "light",
     isNavBarOpen: true,
     autoToggleNavBarOnDisplayChange: true,
+    // 空 = 从没拖过导航。存量用户拿的就是这一份默认值（persistWebExt 的 $patch 只覆盖存档里有的键）
+    navOrder: [],
 
     ignoreWrongPixelRatio: false,
 

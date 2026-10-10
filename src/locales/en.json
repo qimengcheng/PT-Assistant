@@ -1720,7 +1720,9 @@
       "devTag": "Debug",
       "backgroundOk": "background OK",
       "backgroundFailed": "background not responding",
-      "backgroundConnecting": "connecting to background…"
+      "backgroundConnecting": "connecting to background…",
+      "dragHint": "Drag a menu item to reorder",
+      "resetOrder": "Reset order"
     }
   },
   "levelRequirement": {

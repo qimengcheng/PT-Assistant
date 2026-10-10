@@ -242,6 +242,35 @@ body {
   margin-top: auto;
   padding: 12px 14px;
   border-top: 1px solid var(--pt-color-border-light);
+  /* 这一行现在有两块（后台状态 + 那句拖拽提示 / 那颗「恢复默认顺序」）：竖排并留缝，
+     不许零间距贴边（全站口径是相邻块之间至少 4~8px）。 */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.nav-hint {
+  color: var(--pt-color-text-secondary);
+  font-size: 12px;
+}
+
+/* a-button 的 link 档自带 32px 高和内衬，在这一行里比那句提示高出一截 */
+.nav-reset {
+  height: auto;
+  padding: 0;
+  font-size: 12px;
+}
+
+/* 拖起来的那一条：压暗，让人看得见「它现在在手上」而不是还留在这儿 */
+.nav-link.is-dragging {
+  opacity: 0.4;
+}
+
+/* 悬停到的那一条：把插入位置画成上沿一条线。用 inset 阴影而不是 border —— 加边框会把这一行
+   撑高 2px，整列菜单会跟着抖一下。 */
+.nav-link.is-drop-target {
+  box-shadow: inset 0 2px 0 var(--pt-color-primary);
 }
 
 .status {

@@ -1720,7 +1720,9 @@
       "devTag": "调试",
       "backgroundOk": "background 正常",
       "backgroundFailed": "background 未响应",
-      "backgroundConnecting": "正在连接 background…"
+      "backgroundConnecting": "正在连接 background…",
+      "dragHint": "按住菜单项拖动可调整顺序",
+      "resetOrder": "恢复默认顺序"
     }
   },
   "levelRequirement": {

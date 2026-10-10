@@ -934,8 +934,17 @@ export default class NexusPHP extends PrivateSite {
           }
 
           trAnothers.forEach((trAnother) => {
-            const sizeSelector = Sizzle(`td:eq(${sizeIndex})`, trAnother)[0] as HTMLElement;
-            seedStatus.seedingSize += parseSizeString(sizeSelector.innerText.trim());
+            const sizeSelector = Sizzle(`td:eq(${sizeIndex})`, trAnother)[0] as HTMLElement | undefined;
+            // ⚠️ 一行缺格（站点改版）时这里取到 undefined，原先直接 `.innerText` 抛
+            // TypeError —— 这一条才是真会崩的那条。
+            // 顺带换成 textContent：本文件这层既可能是站点真实页面的 document，也可能是
+            // fetch 回来交给 DOMParser 的文档，后者不保证有渲染树，textContent 不依赖排版。
+            //（实测过 innerText 在 DOMParser 文档里并非「不存在」，但它在 display:none/
+            // 未排版时按规范退化成 textContent 的变体，读法比 textContent 多一层不确定。）
+            if (!sizeSelector) return;
+            const sizeText = (sizeSelector.textContent ?? "").trim();
+            if (!sizeText) return;
+            seedStatus.seedingSize += parseSizeString(sizeText);
           });
         }
       }

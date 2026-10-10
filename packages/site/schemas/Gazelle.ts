@@ -64,7 +64,10 @@ export const GazelleUtils = {
     return (row: HTMLElement): string => {
       // 匹配信息格
       const cell = row.querySelector(tdSelector);
-      const clone = cell!.cloneNode(true) as HTMLElement;
+      // ⚠️ 不能用非空断言：站点改版少一格就整个解析抛掉（一行坏导致整页列表空）。
+      // 下面 torrentLink 已有同样的守卫，这里对齐 —— 取不到就当这行没有标签。
+      if (!cell) return "";
+      const clone = cell.cloneNode(true) as HTMLElement;
 
       // 对于 Gazelle，一般第一个种子页链接对应的 <a> 会包含标题
       const torrentLink = clone.querySelector("a[href*='torrents.php?id=']");
@@ -173,12 +176,30 @@ export const top10PageList: TList = {
        * 为了保证这些行都能被搜索方法解析，统一替换为单种行的 class
        */
       filter: (rows: HTMLElement[] | null): HTMLElement[] | null => {
-        if (Array.isArray(rows)) {
-          rows.forEach((row) => {
-            row.className = "torrent";
-          });
-        }
-        return rows;
+        if (!Array.isArray(rows)) return rows;
+        // ⚠️ 这里拿到的是 content-script 传入的**真实页面行**（merge 路径早就改成 cloneNode
+        // 了，filter 路径没跟上）：直接覆写 className 会改掉用户页面上那些行的样式。
+        // 但也不能只克隆单行 —— Gazelle 的字段选择器里有 `+tr span.time` 这种兄弟相对路径
+        //（见 detailPageList.time），行一旦脱离父节点，下一行里的时间就永远取不到。
+        // 也不能 replaceWith：那样克隆件进了活页面（等于还是改了），而交回下游的却是
+        // 被摘出去的原行 —— 归一化和兄弟选择器两头都落空。
+        // 所以连父层一起克隆：每个父节点只 clone 一次，按下标取回对应那一行。
+        const clonedParents = new Map<HTMLElement, HTMLElement>();
+        return rows.map((row) => {
+          if (row.className === "torrent") return row; // 上游已经是单种行 class，不用再动
+          const parent = row.parentElement;
+          if (!parent) return row;
+          let parentClone = clonedParents.get(parent);
+          if (!parentClone) {
+            parentClone = parent.cloneNode(true) as HTMLElement;
+            clonedParents.set(parent, parentClone);
+          }
+          const idx = Array.from(parent.children).indexOf(row);
+          const rowClone = idx >= 0 ? (parentClone.children[idx] as HTMLElement | undefined) : undefined;
+          if (!rowClone) return row;
+          rowClone.className = "torrent";
+          return rowClone;
+        });
       },
     },
   },

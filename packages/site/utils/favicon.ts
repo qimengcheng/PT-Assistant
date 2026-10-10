@@ -144,8 +144,19 @@ async function getFaviconFromUrl(url: string): Promise<Blob> {
       }>(manifestElement.href, { responseType: "json", timeout: FAVICON_TIMEOUT });
 
       manifest.icons.forEach(({ sizes, src }) => {
+        // ⚠️ manifest 里的 src 允许是相对路径（icons/192.png、./favicon.ico
+        // 这种），原样请求会打到扩展自己的 origin 上 → 必 404，而那个空 catch
+        // 又把失败吞了，于是「用站点 manifest 的图标」这条永远静默失效。
+        // 基准必须是 manifest 自身的 URL。
+        let href = src;
+        try {
+          href = new URL(src, manifestElement.href).href;
+        } catch {
+          console.warn(`[favicon] manifest icon src 无法解析为 URL，跳过：${src}`);
+          return;
+        }
         favicons.push({
-          href: src,
+          href,
           sizes,
           source: "manifest",
         });

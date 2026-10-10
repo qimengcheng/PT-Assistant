@@ -534,7 +534,14 @@ export default class AvistazNetwork extends PrivateSite {
         ...flushUserInfo,
         status: EResultParseStatus.passParse,
         name: this.userConfig.inputSetting?.username,
-        levelName: "应站点要求，不启用用户数据获取",
+        // 原来这里写死中文「应站点要求，不启用用户数据获取」（从上游平移带过来的），
+        // 而 VITE_ENABLE_AVISTAZ_USER_INFO_FETCHING 在本仓没有任何地方设过 —— 全仓 grep
+        // 只有下面这句判据自己，所以这个分支是**每个构建都走**的那条，英文界面也会照抄这句。
+        // 违反 AGENTS.md §3.5 的取向（内部说明不进 UI）与 §「缺 key 才显示中文」那类问题。
+        // IUserInfo 没有能承载这句说明的展示字段（levelName 的类型是站点等级名），所以不填：
+        // 「我的数据」的等级格是 `<span v-if="userInfo.levelName">`，不填就整格空白 ——
+        // 少一句解释，但不再把一句内部说明钉在界面上。
+        // 想知道原因的人去看 enableAvistazUserInfoFetching（本页顶部）。
       };
     }
 

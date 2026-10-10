@@ -123,12 +123,13 @@ const columns = computed<TableColumnsType<ITaskRow>>(() => [
     title: t("common.action"),
     key: "action",
     align: "center",
-    // 210 是量出来的，不是估的（台架 ?m=row，真 DOM）：条目行那一格最宽的是
-    // 「发送这一条并换它当基准」+ 那颗「↑」= 194px，加上上下内衬 8+8 正好 210。
-    // 原先写 180 时内容比格子宽 21px，居中对齐就把「↑」一半推到列外，
-    // 而 `.ant-table-content` 是 overflow:auto —— 伸出去的那截直接把它撑出一条横向滚动条。
-    // 英文标签更长，所以那一格另外给了 wrap（见模板里那颗 a-space）：宁可长一行也不许溢出到列外。
-    width: 210,
+    // 140 是量出来的，不是估的（台架 ?m=row，真 DOM）：这一格最宽的是**父行**那 5 颗图标键 = 120px，
+    // 加左右内衬 8+8 是 136，再留 4px 给亚像素取整；条目行那三颗只有 72px。
+    // 这一条从 180 → 210 → 140 的来回都是同一件事的两端：内容比格子宽时，居中对齐会把两侧一起
+    // 推到列外，而 `.ant-table-content` 是 overflow:auto —— 伸出去的那截直接把它撑出一条横向滚动条
+    // （v0.61.1 那次事故就是「↑」伸出去 21px）。那时那一格要装三个汉字的文字键（194px），
+    // 2026-10-10 换成图标键之后就只需要装图标了。
+    width: 140,
   },
 ]);
 
@@ -809,7 +810,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       :loading="loading"
       :pagination="pagination"
       :expandable="{ showExpandColumn: true }"
-      :scroll="{ x: 1380 }"
+      :scroll="{ x: 1310 }"
       :row-selection="{
         selectedRowKeys: selectedTasks,
         onChange: (keys: (string | number)[]) => (selectedTasks = keys as TKeepUploadTaskKey[]),
@@ -995,43 +996,52 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
             </a-tooltip>
           </a-space>
 
-          <!-- 条目行这一格三颗：只发送 / 只换基准 / 发送并换基准。
-               他 2026-10-09：「应该还可以单独发送和单独换基准」—— 原先只有一颗合并键
-               「发送这一条并换它当基准」+ 一颗没人认得的「↑」，两件事没法各做各的。
-               标签压到三个汉字是宽度预算：这一格实测只有 194px 可用（见上面 columns 那条注释），
-               完整说法挂在每颗的 tooltip 上。合并那颗仍然留着 —— 它保证「先发成功、再挪基准」，
-               比让人自己记这个顺序可靠（顺序反了一旦发送失败，基准就挂在一条根本没发出去的种子上）。
+          <!-- 条目行这一格三颗图标键：只发送 / 只换基准 / 发送并换基准。
+               他 2026-10-09：「应该还可以单独发送和单独换基准」—— 原先只有一颗合并键 + 一颗没人认得的「↑」。
+               他 2026-10-10 看了那排文字键的截图：「把文字换成图标吧，文字放在 popover 里面」—— 三个汉字
+               在一格里会把整排撑成两行，而父行那 5 颗本来就是「图标 + 悬停说法」，这一格跟着同一套写法。
+               图标不另造一套语义，按**同一列父行已有的**复用：DownloadOutlined 在那边就是「发到下载器」，
+               NumberOutlined 在那边就是「基准」，所以第三颗是两枚并排（发 + 基准）。
                按住不给点而不是藏起来：第一条本来就是基准、基准在下载器里时换基准也没有对象。 -->
-          <a-space v-else :size="0" wrap>
+          <a-space v-else :size="0">
             <a-tooltip :title="t('KeepUploadTask.sendThisOne')">
               <a-button
                 size="small"
-                type="link"
+                type="text"
                 :loading="sendingOf(record.task.id) === `one:${record.index}`"
                 :disabled="!!sendingOf(record.task.id)"
                 @click="sendOneOnly(record.task, record.index)"
               >
-                {{ t("KeepUploadTask.sendOne") }}
+                <template #icon>
+                  <DownloadOutlined />
+                </template>
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('KeepUploadTask.setAsBaseTorrent')">
               <a-button
                 size="small"
-                type="link"
+                type="text"
                 :disabled="record.index === 0 || !!record.task.baseLocal || !!sendingOf(record.task.id)"
                 @click="setAsBaseTorrent(record.task, record.index)"
               >
-                {{ t("KeepUploadTask.promoteOnly") }}
+                <template #icon>
+                  <NumberOutlined />
+                </template>
               </a-button>
             </a-tooltip>
             <a-tooltip :title="t('KeepUploadTask.sendAndSetBase')">
               <a-button
                 size="small"
-                type="link"
+                type="text"
                 :disabled="record.index === 0 || !!record.task.baseLocal || !!sendingOf(record.task.id)"
                 @click="sendOneAndPromote(record.task, record.index)"
               >
-                {{ t("KeepUploadTask.sendAndPromote") }}
+                <template #icon>
+                  <span class="dual-icon">
+                    <DownloadOutlined />
+                    <NumberOutlined />
+                  </span>
+                </template>
               </a-button>
             </a-tooltip>
           </a-space>
@@ -1068,6 +1078,14 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 .task-title {
   font-size: 14px;
   font-weight: 500;
+}
+
+/* 「发送并换基准」那颗是两枚图标并排（发到下载器 + 设为基准），缝收到 1px：
+   按钮的 #icon 那一档内衬本来就窄，两枚之间再留 anticon 默认的空白就会让这颗比旁边两颗宽一截。 */
+.dual-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
 }
 
 /* 副标题与保存路径那两行要「比标题小一档、灰」。

@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-10 08:54:06",
-  "headSha": "8ea0288",
+  "generatedAt": "2026-10-10 09:20:37",
+  "headSha": "b5dc23f",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.62.3",
+      "date": "2026-10-10 09:41:04",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "辅种任务展开出来的每一行，右边那三颗按钮换成了图标（发到下载器 / 设为基准种子 / 两件事一起做），完整的说法改成鼠标悬停才显示 —— 之前那三个汉字的标签把每一行都撑成两行，整列看着很高。操作那一列跟着窄了一截，省下的宽度还给标题。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.62.2",
       "date": "2026-10-10 09:20:37",

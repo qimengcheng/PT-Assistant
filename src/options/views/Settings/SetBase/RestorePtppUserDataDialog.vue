@@ -260,28 +260,34 @@ function toggleAll(checked: boolean) {
       </a-space>
     </a-space>
 
-    <a-row :gutter="[8, 8]">
-      <a-col v-for="(data, host) in ptppUserData" :key="host" :span="12">
-        <div class="site-card" :class="{ unsupported: !allSupportedSiteHost.includes(host as string) }">
-          <a-checkbox
-            v-model:checked="toImportSite"
-            :value="host"
-            :disabled="!allSupportedSiteHost.includes(host as string)"
-          />
-          <span class="site-host">{{ host }}</span>
-          <template v-if="allSupportedSiteHost.includes(host as string)">
-            <span class="arrow">→</span>
-            <SiteFavicon :site-id="allSupportedSiteHostMap[host as string]" />
-            <SiteName :site-id="allSupportedSiteHostMap[host as string]" class="site-name" />
-          </template>
-          <a-tooltip :title="statusInfo(host as string).title">
-            <a-tag :color="statusInfo(host as string).color" style="margin-left: auto">
-              {{ t("SetBase.RestorePtppUserDataDialog.recordCount", { n: Object.keys(data).length - 1 }) }}
-            </a-tag>
-          </a-tooltip>
-        </div>
-      </a-col>
-    </a-row>
+    <!-- ⚠️ 必须是 a-checkbox-group + 内部 a-checkbox :value 的写法。
+         原来是一个独立 a-checkbox 绑 `v-model:checked="toImportSite"`（ref<string[]>）
+         还带 :value —— 没有 group 时 antdv-next 走 isValueEqual(currentValue, true)
+         分支，勾选后 emit 出来的是布尔值，整个数组被覆盖成 true/false，
+         随后的 .includes 直接抛 TypeError，这条 PTPP 迁移路径实际不可用。 -->
+    <a-checkbox-group v-model:value="toImportSite">
+      <a-row :gutter="[8, 8]">
+        <a-col v-for="(data, host) in ptppUserData" :key="host" :span="12">
+          <div class="site-card" :class="{ unsupported: !allSupportedSiteHost.includes(host as string) }">
+            <a-checkbox
+              :value="host"
+              :disabled="!allSupportedSiteHost.includes(host as string)"
+            />
+            <span class="site-host">{{ host }}</span>
+            <template v-if="allSupportedSiteHost.includes(host as string)">
+              <span class="arrow">→</span>
+              <SiteFavicon :site-id="allSupportedSiteHostMap[host as string]" />
+              <SiteName :site-id="allSupportedSiteHostMap[host as string]" class="site-name" />
+            </template>
+            <a-tooltip :title="statusInfo(host as string).title">
+              <a-tag :color="statusInfo(host as string).color" style="margin-left: auto">
+                {{ t("SetBase.RestorePtppUserDataDialog.recordCount", { n: Object.keys(data).length - 1 }) }}
+              </a-tag>
+            </a-tooltip>
+          </div>
+        </a-col>
+      </a-row>
+    </a-checkbox-group>
 
     <div class="overwrite-row">
       <a-switch v-model:checked="overwriteExistUserInfo" size="small" :disabled="isImporting" />

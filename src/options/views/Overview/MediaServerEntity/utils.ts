@@ -19,6 +19,30 @@ const runtimeStore = useRuntimeStore();
 const configStore = useConfigStore();
 const metadataStore = useMetadataStore();
 
+/**
+ * 非组件模块拿不到 useI18n 注入，按 configStore.lang 直接取对应语言的那份文案
+ * （口径同 DownloadHistory/utils.ts 的 i18nLoadErrorText）。
+ * 提示文案直接进 UI，写死中文会让英文界面显示中文（AGENTS.md §3.5 零容忍）。
+ */
+const MESSAGES = {
+  zh_CN: {
+    checkAuth: "请检查认证信息",
+    unknownError: "未知错误",
+    updateFailed: "媒体服务器 {name} [{address}] 更新失败：{reason}",
+  },
+  en: {
+    checkAuth: "Please check the credentials",
+    unknownError: "Unknown error",
+    updateFailed: "Media server {name} [{address}] update failed: {reason}",
+  },
+} as const;
+
+function t(key: keyof (typeof MESSAGES)["zh_CN"], params?: Record<string, string>): string {
+  const raw: string = MESSAGES[configStore.lang === "en" ? "en" : "zh_CN"][key];
+  if (!params) return raw;
+  return raw.replace(/\{(\w+)\}/g, (_, k: string) => params[k] ?? `{${k}}`);
+}
+
 export const formatSize = (size: number | string) => {
   try {
     return filesize(Number(size), { base: 2, round: 2, pad: true });
@@ -124,12 +148,17 @@ export async function doSearch(option: { searchKey?: string; loadMore?: boolean 
       if (searchResult.status !== EResultParseStatus.success) {
         const mediaServerDetail = metadataStore.mediaServers[mediaServerId];
         // 只有认证类失败才提示检查认证信息，其余（超时/网络不可达/解析异常）展示真实原因（#1396）
+        // 非组件模块拿不到 useI18n，按 configStore.lang 选双语（口径同 DownloadHistory/utils.ts）
         const failReason =
           searchResult.status === EResultParseStatus.needLogin
-            ? "请检查认证信息"
-            : (searchResult.errorMessage ?? "未知错误");
+            ? t("checkAuth")
+            : (searchResult.errorMessage ?? t("unknownError"));
         runtimeStore.showSnakebar(
-          `媒体服务器 ${mediaServerDetail.name} [${mediaServerDetail.address}] 更新失败：${failReason}`,
+          t("updateFailed", {
+            name: mediaServerDetail.name,
+            address: mediaServerDetail.address,
+            reason: failReason,
+          }),
           {
             color: "error",
           },

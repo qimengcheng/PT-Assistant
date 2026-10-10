@@ -574,6 +574,13 @@ async function setDownloadStatus(
   return downloadStatus;
 }
 
+// SW 侧 alarms.ts 在「种子冷却重推」失败时发这条消息，之前只有 messages.ts 的声明与
+// 两处调用、没有任何处理器 —— 消息发出去石沉大海，下载历史永远停在 pending。
+// 声明里这条消息的返回是 void（调用方也不取返回值），所以不回传 status
+onMessage("setDownloadHistoryStatus", async ({ data: { downloadId, status } }) => {
+  await setDownloadStatus(downloadId, status);
+});
+
 export async function deleteDownloadHistoryById(downloadId: TTorrentDownloadKey) {
   return await (await ptdIndexDb()).delete("download_history", downloadId);
 }

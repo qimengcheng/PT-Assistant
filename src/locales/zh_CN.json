@@ -57,6 +57,12 @@
     "reDownload": "重新下载",
     "refresh": "刷新下载记录列表",
     "searchTorrent": "全站搜索此种子",
+    "status": {
+      "completed": "已完成",
+      "downloading": "下载中",
+      "failed": "错误",
+      "pending": "等待中"
+    },
     "table": {
       "downloadAt": "下载时间",
       "downloader": "下载服务器",
@@ -702,6 +708,7 @@
     "otherGroup": "其他路径",
     "pauseOnAdd": "添加时默认暂停",
     "placeholderInput": "请输入替换 {0} 中的 <...> 的内容：",
+    "canceledInput": "已取消推送：未填写 {0} 中 <...> 的内容",
     "removePath": "删除该路径",
     "savePath": "保存路径",
     "selectDownloader": "选择下载器",
@@ -1678,7 +1685,8 @@
     "quickSearch": "快捷搜索"
   },
   "downloaderLabel": {
-    "localDownload": "本地下载"
+    "localDownload": "本地下载",
+    "configDeleted": "下载器配置已删除"
   },
   "layout": {
     "header": {

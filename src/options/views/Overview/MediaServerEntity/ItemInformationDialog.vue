@@ -88,7 +88,7 @@ function formatDuration(rawSeconds: number) {
         <div v-if="item.duration" class="info-row">
           <span class="info-label">{{ t("MediaServerEntity.ItemInformationDialog.duration") }}</span>
           <a-tag color="green">
-            <ClockCircleOutlined />
+            <template #icon><ClockCircleOutlined /></template>
             {{ formatDuration(item.duration ?? 0) }}
           </a-tag>
         </div>
@@ -96,7 +96,7 @@ function formatDuration(rawSeconds: number) {
         <div v-if="item.size" class="info-row">
           <span class="info-label">{{ t("MediaServerEntity.ItemInformationDialog.size") }}</span>
           <a-tag color="purple">
-            <HddOutlined />
+            <template #icon><HddOutlined /></template>
             {{ formatSize(item.size ?? 0) }}
           </a-tag>
         </div>
@@ -105,18 +105,18 @@ function formatDuration(rawSeconds: number) {
           <span class="info-label">{{ t("MediaServerEntity.ItemInformationDialog.mediaInfo") }}</span>
           <a-space :size="4" wrap>
             <a-tag v-if="item.format" color="blue">
-              <BlockOutlined />
+              <template #icon><BlockOutlined /></template>
               {{ item.format?.toUpperCase() }}
             </a-tag>
 
             <a-tag v-if="videoStreams.length > 0" color="blue">
-              <VideoCameraOutlined />
+              <template #icon><VideoCameraOutlined /></template>
               {{ videoStreams[0].title }}
             </a-tag>
 
             <a-popover v-if="audioStreams.length > 0" trigger="hover">
               <a-tag color="blue" class="cursor-pointer">
-                <SoundOutlined />
+                <template #icon><SoundOutlined /></template>
                 {{ audioStreams.length }}
               </a-tag>
               <template #content>

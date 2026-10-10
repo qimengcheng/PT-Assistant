@@ -308,7 +308,7 @@ function isAllDefaultRow(record: any): record is IAllDefaultRow {
           <template v-if="isAllDefaultRow(record)">
             <template v-if="column.key === 'solution'">
               <a-tag color="blue">
-                <ThunderboltOutlined />
+                <template #icon><ThunderboltOutlined /></template>
                 {{ t("SetSearchSolution.table.autoGenerate") }}
               </a-tag>
             </template>

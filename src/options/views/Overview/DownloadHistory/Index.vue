@@ -227,7 +227,7 @@ onUnmounted(() => {
             @click="() => viewDownloadDetail(record)"
           >
             <template #icon><component :is="statusOf(record)!.icon" /></template>
-            {{ statusOf(record)!.title }}
+            {{ t(statusOf(record)!.titleKey) }}
           </a-tag>
         </template>
 

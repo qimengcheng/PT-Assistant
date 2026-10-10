@@ -21,6 +21,9 @@ import {
   getMediaServerMetaData,
   type IMediaServerMetadata as PkgMediaServerMetadata,
 } from "@ptd/mediaServer";
+// 走深路径而不是 @ptd/site 根入口：那个 barrel 会把整片工具链（含 sizzle）拖进来，
+// types/base.ts 自身零 import（AGENTS.md §3.2）
+import { EResultParseStatus } from "@ptd/site/types/base.ts";
 import { nanoid } from "nanoid";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -156,7 +159,9 @@ async function testConnection(row: IMediaServerMetadata) {
       keywords: "test",
       options: {},
     });
-    if (result?.status !== 0) {
+    // ⚠️ 枚举里 success = 3、unknownError = 0，原来的 `!== 0` 把「成功」判成失败 ——
+    // 测试连接功能整个反向，真连上反而报「连接失败」。用枚举而不是裸数字。
+    if (result?.status !== EResultParseStatus.success) {
       throw new Error(result?.errorMessage ?? t("SetMediaServer.index.mediaSearchFailed"));
     }
     message.success(t("SetMediaServer.index.connectSuccess", [result.items?.length ?? 0]));

@@ -57,6 +57,12 @@
     "reDownload": "Re-download",
     "refresh": "Refresh download history list",
     "searchTorrent": "Search this torrent across all sites",
+    "status": {
+      "completed": "Completed",
+      "downloading": "Downloading",
+      "failed": "Error",
+      "pending": "Pending"
+    },
     "table": {
       "downloadAt": "Download Time",
       "downloader": "Downloader",
@@ -702,6 +708,7 @@
     "otherGroup": "Other paths",
     "pauseOnAdd": "Pause on add by default",
     "placeholderInput": "Enter the value to replace <...> in {0}:",
+    "canceledInput": "Sending canceled: no value entered for <...> in {0}",
     "removePath": "Remove this path",
     "savePath": "Save Path",
     "selectDownloader": "Select Downloader",
@@ -1678,7 +1685,8 @@
     "quickSearch": "Quick Search"
   },
   "downloaderLabel": {
-    "localDownload": "Local Download"
+    "localDownload": "Local Download",
+    "configDeleted": "Downloader config deleted"
   },
   "layout": {
     "header": {

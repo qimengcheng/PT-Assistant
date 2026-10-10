@@ -127,10 +127,12 @@ export default class GoogleDrive extends AbstractBackupServer<GoogleDriveConfig>
     };
 
     try {
-      return axios.request<T>(config);
+      // ⚠️ 这里必须 await：少了它 promise 就不是rejection，catch 永远进不来，
+      // 下面的限流重试与错误归一化全是死代码（v0.18.1 起一直是坏的）
+      return await axios.request<T>(config);
     } catch (e) {
-      const response = (e as AxiosError<ErrorResponse>).response!;
-      if (response.data) {
+      const response = (e as AxiosError<ErrorResponse>).response;
+      if (response?.data) {
         const errorMsg = response.data?.error?.message;
         if (errorMsg === "Rate Limit Exceeded" && retry > 0) {
           await sleep(2e3);
@@ -138,7 +140,7 @@ export default class GoogleDrive extends AbstractBackupServer<GoogleDriveConfig>
         }
       }
 
-      throw Error(`Network Error: ${response.status} ${response.statusText || ""}`.trim());
+      throw Error(`Network Error: ${response?.status ?? ""} ${response?.statusText || ""}`.trim());
     }
   }
 
@@ -216,8 +218,10 @@ export default class GoogleDrive extends AbstractBackupServer<GoogleDriveConfig>
       });
       return true;
     } catch (e) {
-      const response = (e as AxiosError<ErrorResponse>).response!;
-      if (response.data?.error?.message?.startsWith("File not found: ")) {
+      // ⚠️ 离线/超时时 axios 不带 response，非空断言会在 catch 里二次抛错：
+      // 后面的 return false 不可达，异常直接冒到批量删除的调用方
+      const response = (e as AxiosError<ErrorResponse>).response;
+      if (response?.data?.error?.message?.startsWith("File not found: ")) {
         return true;
       }
     }
@@ -254,7 +258,7 @@ export default class GoogleDrive extends AbstractBackupServer<GoogleDriveConfig>
       params.orderBy = orderBy;
     }
 
-    let pageToken;
+    let pageToken: string | undefined;
     do {
       if (pageToken) {
         params.pageToken = pageToken;
@@ -275,9 +279,9 @@ export default class GoogleDrive extends AbstractBackupServer<GoogleDriveConfig>
         });
       }
 
-      if (data.nextPageToken) {
-        pageToken = data.nextPageToken;
-      }
+      // 每轮无条件覆盖：末页没有 nextPageToken 时若保留旧值，while(pageToken) 会拿同一个
+      // token 反复请求同一页 —— 超过一页的备份永远列不完（清理/恢复列表卡死）
+      pageToken = data.nextPageToken ?? undefined;
     } while (pageToken);
 
     return files;

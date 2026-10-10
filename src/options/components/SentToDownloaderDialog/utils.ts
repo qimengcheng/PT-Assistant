@@ -33,7 +33,13 @@ export async function sendTorrentToDownloader(
         // @ts-ignore
         addTorrentOptions[key] = (addTorrentOptions[key] as string).replace("<...>", userInput.trim());
       } else {
-        return Promise.reject(`因取消输入 ${key} 中的 <...> 的内容而停止推送`); // 用户取消输入，则跳过该任务
+        // 用户取消输入 → 整个推送取消。原先走 Promise.reject，而调用方只挂了 finally，
+        // 结果是「照样关窗 + emit done」，还多一条 unhandled rejection。改成早退并提示。
+        runtimeStore.showSnakebar(
+          i18nInstance.global.t("SentToDownloaderDialog.canceledInput", [key]),
+          { color: "warning" },
+        );
+        return;
       }
     }
   }
@@ -55,70 +61,75 @@ export async function sendTorrentToDownloader(
     baseReplaceMap["search:plan"] = metadataStore.getSearchSolutionName(runtimeStore.search.searchPlanKey);
   }
 
-  return new Promise(async (resolve) => {
-    const promises = [];
+  // ⚠️ 这里必须是普通 async 函数而不是 `new Promise(async …)`：
+  // 原来的 executor 里 await（metadataStore.getSiteName），一旦它在循环中 reject，
+  // 外层 Promise 既不 resolve 也不 reject —— 调用方 Index.vue 的 isSending 永久 true，
+  // 弹窗的 mask/closable/keyboard 全锁住，只能刷新页面。
+  // 约定：这个函数**永远不抛**（调用方只挂了 finally，靠 reject 走不通），
+  // 取消输入也走 early return + 提示。
+  const buildOptionsForTorrent = async (torrent: ITorrent): Promise<Partial<CAddTorrentOptions>> => {
+    const realAddTorrentOptions: Partial<CAddTorrentOptions> = { ...addTorrentOptions };
 
-    for (const torrent of torrentItems) {
-      const realAddTorrentOptions: Partial<CAddTorrentOptions> = { ...addTorrentOptions };
+    const replaceMap: Record<string, string> = {
+      "torrent.title": torrent.title ?? "",
+      "torrent.subTitle": torrent.subTitle ?? "",
+      "torrent.category": (torrent.category as string) ?? "",
+      ...baseReplaceMap,
+    };
 
-      const replaceMap: Record<string, string> = {
-        "torrent.title": torrent.title ?? "",
-        "torrent.subTitle": torrent.subTitle ?? "",
-        "torrent.category": (torrent.category as string) ?? "",
-        ...baseReplaceMap,
-      };
+    if (torrent.site) {
+      replaceMap["torrent.site"] = torrent.site;
+      replaceMap["torrent.siteName"] = await metadataStore.getSiteName(torrent.site);
+    }
 
-      if (torrent.site) {
-        replaceMap["torrent.site"] = torrent.site;
-        replaceMap["torrent.siteName"] = await metadataStore.getSiteName(torrent.site);
-      }
-
-      for (const key of ["savePath", "label"] as (keyof typeof realAddTorrentOptions)[]) {
-        if (realAddTorrentOptions[key]) {
-          if (realAddTorrentOptions[key] === "") {
-            delete realAddTorrentOptions[key];
-          } else {
-            for (const [replaceKey, value] of Object.entries(replaceMap)) {
-              // @ts-ignore
-              realAddTorrentOptions[key] = (realAddTorrentOptions[key]! as string).replace(`$${replaceKey}$`, value);
-            }
+    for (const key of ["savePath", "label"] as (keyof typeof realAddTorrentOptions)[]) {
+      if (realAddTorrentOptions[key]) {
+        if (realAddTorrentOptions[key] === "") {
+          delete realAddTorrentOptions[key];
+        } else {
+          for (const [replaceKey, value] of Object.entries(replaceMap)) {
+            // @ts-ignore
+            realAddTorrentOptions[key] = (realAddTorrentOptions[key]! as string).replace(`$${replaceKey}$`, value);
           }
         }
       }
-
-      promises.push(
-        sendMessage("downloadTorrent", {
-          torrent,
-          downloaderId: downloaderId,
-          addTorrentOptions: realAddTorrentOptions as CAddTorrentOptions,
-        }).catch((x) => {
-          runtimeStore.showSnakebar(`[${torrent.title}] 发送到下载器失败！错误信息： ${x}`, { color: "error" });
-        }),
-      );
     }
 
-    Promise.all(promises)
-      .then((status) => {
-        if (status.length > 0) {
-          const pendingCount = status.filter((x) => x?.downloadStatus === "pending").length;
-          const failedCount = status.filter((x) => x?.downloadStatus === "failed").length;
-          const color = failedCount > 0 ? "warning" : "success";
+    return realAddTorrentOptions;
+  };
 
-          runtimeStore.showSnakebar(
-            `成功发送 ${status.length - failedCount} 个任务到下载器` +
-              (pendingCount > 0 ? `（${pendingCount}在下载队列中）` : "") +
-              (failedCount > 0 ? `，有 ${failedCount} 个任务发送失败` : ""),
-            { color },
-          );
-        } else {
-          runtimeStore.showSnakebar("似乎并没有任务发送到下载器", { color: "warning" });
-        }
-      })
-      .catch((x) => {
-        runtimeStore.showSnakebar("有任务发送到下载器失败，请在下载历史页面重试", { color: "error" });
-      })
-      .finally(() => {
-        resolve();
-      });
+  const optionsList = await Promise.all(
+    torrentItems.map((torrent) =>
+      buildOptionsForTorrent(torrent).catch(() => null),
+    ),
+  );
+
+  const promises = torrentItems.map((torrent, i) => {
+    const realAddTorrentOptions = optionsList[i];
+    if (!realAddTorrentOptions) return Promise.resolve(undefined);
+    return sendMessage("downloadTorrent", {
+      torrent,
+      downloaderId: downloaderId,
+      addTorrentOptions: realAddTorrentOptions as CAddTorrentOptions,
+    }).catch((x) => {
+      runtimeStore.showSnakebar(`[${torrent.title}] 发送到下载器失败！错误信息： ${x}`, { color: "error" });
+    });
   });
+
+  const status = (await Promise.all(promises)).filter((x) => x !== undefined);
+
+  if (status.length > 0) {
+    const pendingCount = status.filter((x) => x?.downloadStatus === "pending").length;
+    const failedCount = status.filter((x) => x?.downloadStatus === "failed").length;
+    const color = failedCount > 0 ? "warning" : "success";
+
+    runtimeStore.showSnakebar(
+      `成功发送 ${status.length - failedCount} 个任务到下载器` +
+        (pendingCount > 0 ? `（${pendingCount}在下载队列中）` : "") +
+        (failedCount > 0 ? `，有 ${failedCount} 个任务发送失败` : ""),
+      { color },
+    );
+  } else {
+    runtimeStore.showSnakebar("似乎并没有任务发送到下载器", { color: "warning" });
+  }
 }

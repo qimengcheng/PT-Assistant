@@ -232,14 +232,23 @@ function doReDownloadTorrent(downloadOption: IDownloadTorrentOption) {
 }
 
 onMessage("reDownloadTorrent", async ({ data }) => {
+  // 把下载历史标成 failed：写的是 IndexedDB，经 offscreen 代写。
+  // 这里必须 catch —— 裸发的 sendMessage 在 offscreen 未就绪时会 reject，
+  // 而它已经在.catch 回调里，再抛就成了 SW 的 unhandled rejection。
+  // ⚠️  handler 不能省：实测 `p.catch()`（不传参）等价于 then(undefined, undefined)，
+  // 派生出来的那个 promise 照样带着同一个 rejection 没人管，等于没接。
+  const markFailed = () => {
+    if (data.downloadId === undefined) return;
+    void sendMessage("setDownloadHistoryStatus", {
+      downloadId: data.downloadId,
+      status: "failed",
+    }).catch(() => {});
+  };
+
   // 如果需要等待的时间小于 30s，那么直接在 service worker 中等待
   if ((data.leftInterval ?? 0) < 30 * 1000) {
     await sleep(data.leftInterval ?? 0);
-    doReDownloadTorrent(data)().catch(() => {
-      if (data.downloadId !== undefined) {
-        void sendMessage("setDownloadHistoryStatus", { downloadId: data.downloadId, status: "failed" });
-      }
-    });
+    doReDownloadTorrent(data)().catch(markFailed);
   } else {
     jobs
       .scheduleJob({
@@ -248,10 +257,6 @@ onMessage("reDownloadTorrent", async ({ data }) => {
         date: Date.now() + 1000 * 30, // 0.5 minute later
         execute: doReDownloadTorrent(data),
       })
-      .catch(() => {
-        if (data.downloadId !== undefined) {
-          void sendMessage("setDownloadHistoryStatus", { downloadId: data.downloadId, status: "failed" });
-        }
-      });
+      .catch(markFailed);
   }
 });

@@ -79,37 +79,40 @@ export async function setCookie(cookie: chrome.cookies.SetDetails, force: boolea
     }
   });
 
-  new_cookie.url = buildCookieUrl(cookie.secure!, cookie.domain!, cookie.path!);
+  // ⚠️ 整个函数体都要在 try 里：原先只有 chrome.cookies.set 被包住，而它前面的
+  // buildCookieUrl(cookie.domain!, …) 与 chrome.cookies.get 都在 try 之外 ——
+  // 一条缺 domain/path 的坏 cookie 就在这里抛，冒到调用方的 Promise.all 上整批 reject，
+  // 恢复停在半恢复态（config 等已经落盘了）。一次恢复可能有上千个 cookie，
+  // 单个失败只记日志继续。
+  try {
+    new_cookie.url = buildCookieUrl(cookie.secure!, cookie.domain!, cookie.path!);
 
-  let allowSet = false;
-  const now = new Date().getTime() / 1000;
+    let allowSet = false;
+    const now = new Date().getTime() / 1000;
 
-  if (force) {
-    // 如果强制设置，直接允许
-    allowSet = true;
-  } else {
-    // 尝试获取当前站点已存在的Cookie
-    const exist_cookie = await chrome.cookies.get({ url: new_cookie.url, name: new_cookie.name! });
-    if (exist_cookie === null) {
-      // 如果当前站点没有这个Cookies，则允许设置
+    if (force) {
+      // 如果强制设置，直接允许
       allowSet = true;
-    } else if ((exist_cookie.expirationDate ?? 0) < now) {
-      // 如果站点存在这个Cookies，但已过期，允许设置
-      allowSet = true;
+    } else {
+      // 尝试获取当前站点已存在的Cookie
+      const exist_cookie = await chrome.cookies.get({ url: new_cookie.url, name: new_cookie.name! });
+      if (exist_cookie === null) {
+        // 如果当前站点没有这个Cookies，则允许设置
+        allowSet = true;
+      } else if ((exist_cookie.expirationDate ?? 0) < now) {
+        // 如果站点存在这个Cookies，但已过期，允许设置
+        allowSet = true;
+      }
     }
-  }
 
-  if (allowSet) {
-    try {
+    if (allowSet) {
       await chrome.cookies.set(new_cookie);
-    } catch (error) {
-      // 单个 cookie 失败不能中断整批恢复（一次恢复可能有上千个 cookie），
-      // 只记日志继续，否则一个坏 cookie 会让整个导入失败。
-      sendMessage("logger", {
-        msg: `Failed to set cookie ${cookie.name} for url ${new_cookie.url}`,
-        level: "error",
-      }).catch();
     }
+  } catch {
+    sendMessage("logger", {
+      msg: `Failed to set cookie ${cookie.name} for url ${cookie.url ?? new_cookie.url ?? ""}`,
+      level: "error",
+    }).catch(() => {});
   }
 }
 

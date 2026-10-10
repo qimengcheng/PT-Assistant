@@ -117,15 +117,19 @@ function i18nLoadErrorText(): string {
 export const throttleLoadDownloadHistory = throttle(loadDownloadHistory, 1e3);
 
 export interface IDownloadStatusMeta {
-  title: string;
+  /**
+   * i18n 键而不是文案本身：这是非组件模块，拿不到 useI18n，写死中文会让英文界面
+   * 显示中文（AGENTS.md §3.5 零容忍）。由调用方用 t() 解析。
+   */
+  titleKey: string;
   icon: Component;
   /** antd Tag 的颜色字面量（预置名或 16 进制） */
   color: string;
 }
 
 export const downloadStatusMap: Record<ITorrentDownloadMetadata["downloadStatus"], IDownloadStatusMeta> = {
-  downloading: { title: "下载中", icon: DownloadOutlined, color: "processing" },
-  pending: { title: "等待中", icon: ClockCircleOutlined, color: "warning" },
-  completed: { title: "已完成", icon: CheckCircleOutlined, color: "success" },
-  failed: { title: "错误", icon: CloseCircleOutlined, color: "error" },
+  downloading: { titleKey: "DownloadHistory.status.downloading", icon: DownloadOutlined, color: "processing" },
+  pending: { titleKey: "DownloadHistory.status.pending", icon: ClockCircleOutlined, color: "warning" },
+  completed: { titleKey: "DownloadHistory.status.completed", icon: CheckCircleOutlined, color: "success" },
+  failed: { titleKey: "DownloadHistory.status.failed", icon: CloseCircleOutlined, color: "error" },
 };

@@ -44,8 +44,11 @@ export default defineContentScript({
     if (!(configStore?.contentScript?.enabled ?? true)) return;
 
     // ① 社交站点（bangumi / douban / imdb ...）
+    // 这一步要经SW/offscreen 代查，浏览器刚启动时它们可能还没起来而 reject。
+    // 不接住的话异常会逃出 main()，下面的 PT 站点匹配与 loadApp 全都不执行 ——
+    // 表现是「刚打开 PT 站时悬浮球静默不挂载」，且没有任何重试，只能手动刷新。
     if (configStore?.contentScript?.enabledAtSocialSite ?? true) {
-      const socialSite = await sendMessage("matchSocialPage", window.location.href);
+      const socialSite = await sendMessage("matchSocialPage", window.location.href).catch(() => undefined);
       if (socialSite) {
         console.debug(`[PTD] Social site detected: ${socialSite}, loading app...`);
         await loadApp({ socialSite });

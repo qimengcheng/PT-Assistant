@@ -14,18 +14,22 @@ const { downloader } = defineProps<{
 const { t } = useI18n();
 const metadataStore = useMetadataStore();
 
-const downloaderConfig = metadataStore.downloaders[downloader];
+// ⚠️ 必须是 computed：metadataStore 是 persistWebExt 的异步水合 store，水合完成前
+// downloaders 是 {}。原来在 setup 顶层一次性取值，那个快照既不是响应式也不会更新——
+// 水合慢时整列显示「配置已删除」的灰云 + 内部 key，下载器改名/删除/跨 tab 变更后永不刷新。
+const downloaderConfig = computed(() => metadataStore.downloaders[downloader]);
 
 /**
  * 三种形态：本地下载（图标）/ 已配置的下载器（品牌图）/ 配置已被删除（灰色云图标）。
  * 拆成两个 computed 而不是返回联合类型，方便模板里做互斥分支而不必对对象做 `in` 收窄。
  */
-const iconImage = computed(() =>
-  downloader !== "local" && downloaderConfig ? getDownloaderIcon(downloaderConfig.type) : null,
-);
+const iconImage = computed(() => {
+  const config = downloaderConfig.value;
+  return downloader !== "local" && config ? getDownloaderIcon(config.type) : null;
+});
 const IconComponent = computed<Component | null>(() => {
   if (downloader === "local") return DownloadOutlined;
-  if (!downloaderConfig) return CloudOutlined;
+  if (!downloaderConfig.value) return CloudOutlined;
   return null;
 });
 const iconColor = computed(() => (downloader === "local" ? "#faad14" : "#9e9e9e"));
@@ -42,8 +46,9 @@ const iconColor = computed(() => (downloader === "local" ? "#faad14" : "#9e9e9e"
         <span class="font-weight-bold">
           <template v-if="downloader === 'local'">{{ t("downloaderLabel.localDownload") }}</template>
           <template v-else-if="downloaderConfig">{{ downloaderConfig.name }}</template>
+          <!-- 配置被删除时不要把内部 key（nanoid）渲染出来 —— AGENTS.md §3.5 零容忍项 -->
           <template v-else>
-            <span class="text-decoration-line-through text-no-wrap">[{{ downloader }}]</span>
+            <span class="text-decoration-line-through text-no-wrap">{{ t("downloaderLabel.configDeleted") }}</span>
           </template>
         </span>
         <template v-if="downloaderConfig">

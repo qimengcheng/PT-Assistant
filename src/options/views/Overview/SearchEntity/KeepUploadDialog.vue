@@ -651,11 +651,15 @@ function applyBaseComparison(item: IVerifiedItem) {
     // 第 2 层（文件清单指纹）一致；抽样也对得上就是第 3 层确认过
     item.verified = true;
     item.verifiedBy = baseMatch.pieces === "match" ? "pieces" : "files";
+  } else if (baseMatch.verdict === "different") {
+    // 指纹已判定「不是同一份」，绝不能落到legacy 兜底 —— legacyVerify 只比总长度与
+    // 文件齐全与否，异种数据同样可能通过，标成 verified 会被当成同数据辅种
+    // （做种校验失败 / H&R 风险）。
+    item.verified = false;
+    item.verifiedBy = undefined;
   } else {
-    // 兜底：逐条比对文件清单。
-    // ⚠️ 这里收的是 verdict !== "identical"，**包含 "different"**（即已确定不是同一份，
-    // 见 match.ts:146），而 legacyVerify 在长度一致且文件齐全时仍会返回 true、
-    // 把一个「已判定不同」的结果标成 verified。所以别把它读成「只在无结论时才走」。
+    // 只有「判不出结论」（absent / unavailable，指纹算不出来）才退回逐条比对文件清单。
+    // 注意 candidate 也归到这里：它表示「疑似」，不是确认，由文件清单再兜一层。
     item.verified = legacyVerify(info, base);
     item.verifiedBy = "legacy";
   }

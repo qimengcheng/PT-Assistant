@@ -725,6 +725,11 @@
     "title": "Select downloader for {0} torrents"
   },
   "SetBackup": {
+    "edit": {
+      "notFound": "Backup server not found — it may have been deleted",
+      "saveFailed": "Failed to save the backup server config",
+      "title": "Edit Backup Server"
+    },
     "AddDialog": {
       "title": "Add Backup Server",
       "selectTypePlaceholder": "Select a backup server type"
@@ -1150,6 +1155,8 @@
       "text": "Are you sure to delete these {0} Download Servers?"
     },
     "edit": {
+      "notFound": "Downloader not found — it may have been deleted",
+      "saveFailed": "Failed to save the downloader config",
       "title": "Edit Download Server"
     },
     "editor": {

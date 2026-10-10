@@ -33,6 +33,14 @@ const metadataStore = useMetadataStore();
 const currentStep = ref<0 | 1>(0);
 
 /**
+ * 表单有效性：Editor 里 name / address 有 rules，但 a-form 不会自动把结果回写，
+ * 也不参与提交路径 —— 原先 OK 键直接 addDownloader，空名称 / 非法 URL 可落库，
+ * 之后连接必然失败而用户要等到真用上才发现。
+ * 由 Editor 的 @update:form-valid 驱动，Step2 的 OK 键据此禁用。
+ */
+const isFormValid = ref<boolean>(false);
+
+/**
  * antdv-next 的 Steps 只有 `items` 写法（1.5.6 注册名里根本没有 `a-step`，
  * 全量 install 也只有 ASteps），照 Vuetify 的 v-stepper 那样写子组件会渲染成
  * 未知元素、步骤条整条空白。
@@ -120,7 +128,11 @@ const selectedDescription = computed(() => {
     </div>
 
     <div v-show="currentStep === 1">
-      <Editor v-if="storedDownloaderConfig.type" v-model="storedDownloaderConfig" />
+      <Editor
+        v-if="storedDownloaderConfig.type"
+        v-model="storedDownloaderConfig"
+        @update:form-valid="(v: boolean) => (isFormValid = v)"
+      />
     </div>
 
     <template #footer>
@@ -173,7 +185,12 @@ const selectedDescription = computed(() => {
               <RightOutlined />
             </template>
           </a-button>
-          <a-button v-if="currentStep === 1" type="primary" @click="saveStoredDownloaderConfig">
+          <a-button
+            v-if="currentStep === 1"
+            type="primary"
+            :disabled="!isFormValid"
+            @click="saveStoredDownloaderConfig"
+          >
             <template #icon>
               <CheckCircleOutlined />
             </template>

@@ -725,6 +725,11 @@
     "title": "为 {0} 个种子选择下载器"
   },
   "SetBackup": {
+    "edit": {
+      "notFound": "找不到该备份服务器，可能已被删除",
+      "saveFailed": "保存备份服务器配置失败",
+      "title": "编辑备份服务器"
+    },
     "AddDialog": {
       "title": "添加备份服务器",
       "selectTypePlaceholder": "请选择备份服务器类型"
@@ -1150,6 +1155,8 @@
       "text": "确认删除这 {0} 个下载服务器吗？"
     },
     "edit": {
+      "notFound": "找不到该下载器，可能已被删除",
+      "saveFailed": "保存下载器配置失败",
       "title": "编辑下载服务器"
     },
     "editor": {

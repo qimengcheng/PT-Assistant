@@ -120,7 +120,11 @@ try {
     .map((rec) => rec.replace(/^\s+/, "").trim())
     .filter(Boolean);
 } catch (e) {
+  // ⚠️ 原先只打一行日志就继续往下走，最后 exit 0 —— 于是生成出一份
+  // **空更新**照样被 CI 拿去发布，用户在更新页上看到「本次没有变更」。
+  // 读不到提交列表是硬失败，必须让调用方（CI）拿到非零。
   console.error(`读取提交列表失败：${e.message}`);
+  process.exit(1);
 }
 
 /**
@@ -147,12 +151,24 @@ function parse(record) {
  */
 function parseDetails(body) {
   const merged = [];
+  // ⚠️ 续行合并必须由**空行复位**：commit 正文里 bullet 列表之后往往还跟着
+  // 一两段正文（补充说明、结论）。原先空行只是 continue，`merged.length > 0`
+  // 一直成立，于是那一整段正文被拼进**最后一条明细**的尾巴上
+  // （实测「补充说明：上面两条都改完了，另有一处需要你确认。 Signed-off-by: …」
+  // 全被塞进第 2 条）。只有紧跟在 bullet 后面、还没空行隔开的那些折行才算续行。
+  let inBullet = false;
   for (const rawLine of body.split("\n")) {
     const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
+    if (!line) {
+      // 空行 = 段落结束，续行合并到此为止
+      inBullet = false;
+      continue;
+    }
+    if (line.startsWith("#")) continue;
     if (/^[-*]\s+\S/.test(line)) {
       merged.push(line.replace(/^[-*]\s+/, ""));
-    } else if (merged.length > 0) {
+      inBullet = true;
+    } else if (merged.length > 0 && inBullet) {
       // 续行：只在上一条 bullet 还没写完时并入，正文首段的散句一律忽略。
       // 两端都是中日韩字符就不补空格 —— 中文正文折行处本来没有空格，
       // 硬加一个会在词中间留缝（实测「永久钉成 空白」）。

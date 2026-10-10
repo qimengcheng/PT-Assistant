@@ -60,6 +60,9 @@ const piniaStoreName: Array<{ label: string; value: string }> = Object.keys(pini
 }));
 const selectedPiniaStore = ref();
 
+/** 防重：确认框在 loading 期间已经挡住点击，这里再挡一次重复调用 */
+const resetting = ref(false);
+
 const metadataStore = useMetadataStore();
 
 const simpleServer = ref<Record<string, { selected: string; piniaKey: keyof typeof metadataStore; getFn: Function }>>({
@@ -197,8 +200,22 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
     content: t("Debugger.dangerWarning"),
     okType: "danger",
     onOk: async () => {
-      await resetFn();
-      message.success(t("Debugger.resetSuccess"));
+      // ⚠️ 原先 onOk 里既没有 catch 也没有闸：resetFn 抛错时 antd 会
+      // 把它当成 onOk 返回的 Promise rejection 挂起（确认框卡在 loading
+      // 不消失），控制台一条红，用户既不知道成没成也关不掉这个框。
+      // 这七条动作都是不可逆的清空，出错必须说出来。
+      if (resetting.value) return;
+      resetting.value = true;
+      try {
+        await resetFn();
+        message.success(t("Debugger.resetSuccess"));
+      } catch (e) {
+        message.error(t("Debugger.resetFailed"));
+        console.error("[Debugger] reset failed", e);
+        // 不 rethrow：rethrow 会让确认框卡在 loading 不消失
+      } finally {
+        resetting.value = false;
+      }
     },
   });
 }
@@ -312,7 +329,14 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
             <a-alert type="error" show-icon :title="t('Debugger.dangerWarning')" />
             <div class="debugger-reset">
               <div v-for="item in resetItems" :key="item.title" class="debugger-reset-item">
-                <a-button danger @click="() => resetFnWrapper(item.resetFn)">{{ t("common.dialog.reset") }}</a-button>
+                <!-- 删除/清空数据的按钮一律实心红（AGENTS.md §3.4）。
+                     原先只写 danger 是描边红，在这一排里跟旁边普通按钮融在一起，
+                     看不出这七颗是不可逆的清空入口。
+                     这里不绑 :loading：确认框自己带遮罩，跑起来时这排按钮根本点不到；
+                     而 resetting 是一个共享标志，绑上去会变成「按一颗、七颗一起转」。 -->
+                <a-button type="primary" danger @click="() => resetFnWrapper(item.resetFn)">
+                  {{ t("common.dialog.reset") }}
+                </a-button>
                 <div class="debugger-reset-text">
                   <div class="debugger-reset-title">{{ item.title }}</div>
                   <div v-if="item.subTitle" class="debugger-reset-subtitle">{{ item.subTitle }}</div>

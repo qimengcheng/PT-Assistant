@@ -3,11 +3,11 @@
  * 项目参考与引用页（antdv-next 平移）。
  * PT 助手历代项目时间线 + 依赖清单（localStorage 缓存，异步补全 npm homepage）。
  *
- * ⚠️ 原注释说「**当前** package.json 依赖清单」——与实现不符，实际是个**只增不减的历史并集**：
- *  - :49 用 `??=`，从 package.json 里删掉的依赖会永远留在表里，不会消失；
- *  - :67 的 finally **无条件**写 version，查询失败的条目也被永久标记为「已同步」，
- *    下一轮不再重查，「保留 npmjs 兜底链接」实际上是**永久停在兜底**。
- * 所以这张表只会越积越多、也修不回来 —— 当成「看过的依赖的并集」，别当现状清单。
+ * 这张表是「**当前** package.json 依赖清单」+ 几个常驻的关联项目（见 SEED_ITEMS）：
+ *  - 依赖以 package.json 为准，每轮重新对齐 —— 从 package.json 里删掉的依赖会跟着消失
+ *    （原先用 `??=` 累加，删掉的包永远留在表里，表只会越积越多）；
+ *  - homepage 查询失败**不写 version**，下一轮还会重试（原先在 finally 里无条件写，
+ *    一次失败就把该条目永久标记成「已同步」，此后永远停在 npmjs 兜底链接）。
  */
 import axios from "axios";
 import { computed } from "vue";
@@ -41,41 +41,62 @@ interface ITData {
   url: string;
 }
 
-const technologyData = useLocalStorage<Record<ITDataName, ITData>>("PTD_TechnologyData", {
+const technologyData = useLocalStorage<Record<ITDataName, ITData>>("PTD_TechnologyData", {});
+
+const npmjsPrefix = "https://www.npmjs.com/package/";
+
+/** 常驻条目：不是 package.json 的依赖，但与本项目相关（当初就写在 localStorage 初始值里） */
+const SEED_ITEMS: Record<ITDataName, ITData> = {
   Jackett: {
     name: "Jackett",
     version: "latest",
     url: "https://github.com/Jackett/Jackett",
   },
-});
+};
 
-const npmjsPrefix = "https://www.npmjs.com/package/";
+const deps: Record<string, string> = { ...pkg.dependencies, ...pkg.devDependencies };
 
-// 从 package.json 载入依赖；版本变化时异步向 npm registry 查询 homepage
-Object.entries({ ...pkg.dependencies, ...pkg.devDependencies }).forEach(([name, version]) => {
-  technologyData.value[name] ??= {
+// 把表对齐到「当前 package.json 的依赖 + 常驻条目」。
+// 原先用 `??=` 逐个累加、从不清掉已删的依赖 —— 换掉一个包之后它永远留在表里，
+// 而这张表的标题写的是「依赖清单」，用户会当成现状清单看。
+const synced: Record<ITDataName, ITData> = { ...SEED_ITEMS };
+
+Object.entries(deps).forEach(([name, version]) => {
+  // 沿用上轮查到的 homepage（若它不是兜底链接），但 version 以 package.json 为准
+  const prev = technologyData.value[name];
+  synced[name] = {
     name,
-    version: "",
-    url: `${npmjsPrefix}${name}`,
+    version: prev?.version ?? "",
+    url: prev?.url ?? `${npmjsPrefix}${name}`,
   };
 
-  if (
-    technologyData.value[name].version !== version &&
-    (technologyData.value[name].url ?? "").startsWith(npmjsPrefix)
-  ) {
-    axios
-      .get(`https://registry.npmjs.org/${name}`)
-      .then(({ data }) => {
-        technologyData.value[name].url = data?.homepage ?? `${npmjsPrefix}${name}`;
-      })
-      .catch(() => {
-        // 查询失败时保留 npmjs 兜底链接
-      })
-      .finally(() => {
-        technologyData.value[name].version = version;
-      });
+  // version 已是这一档、且 homepage 已不是兜底链接 → 无需再查
+  if (synced[name].version === version && !synced[name].url.startsWith(npmjsPrefix)) {
+    return;
   }
+
+  axios
+    .get(`https://registry.npmjs.org/${name}`, { timeout: 10e3 })
+    .then(({ data }) => {
+      // ⚠️ 必须走 technologyData.value 改，不能改上面那个 synced：
+      // `technologyData.value = synced` 之后 ref 存的是 reactive(synced) 这个**代理**，
+      // 而 deep watch 的依赖是顺着代理收集的 —— 实测（.tmp-build/reactive-raw-test.mjs）
+      // 写代理触发一次、写 raw 的 synced 一次都不触发。所以照作者那样写的话，
+      // 查回来的 homepage 既不重渲染也不落 localStorage：这张表永远停在兜底链接，
+      // 而且 version 也存不下，每次进页面都把全部依赖重查一遍。
+      const entry = technologyData.value[name];
+      entry.url = data?.homepage ?? `${npmjsPrefix}${name}`;
+      // ⚠️ 只在**成功**时写 version：原先在 finally 里无条件写，于是网络抖一下
+      // 就把这个版本号永久标记成「已同步」，此后每次进来都跳过查询 ——
+      // 「查询失败时保留 npmjs 兜底链接」实际上变成「永久停在兜底」。
+      entry.version = version;
+    })
+    .catch(() => {
+      // 查询失败：保留兜底链接，且**不写 version** —— 下一轮还会重试
+    });
 });
+
+technologyData.value = synced;
 
 const columns = computed(() => [
   { title: t("common.name"), dataIndex: "name", key: "name", sorter: (a: ITData, b: ITData) => a.name.localeCompare(b.name), defaultSortOrder: "ascend" as const },

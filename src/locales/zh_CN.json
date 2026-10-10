@@ -4,6 +4,7 @@
     "keywordWarning": "右键推送链接时，部分 下载路径或标签的 关键字功能可能无法正常工作！"
   },
   "Debugger": {
+    "resetFailed": "重置失败，已保留原数据",
     "addServerFirst": "请先在 Set{serverType} 页面添加服务器",
     "confirmReset": "确定要重置吗？",
     "consoleOutput": "所有输出均在console面板！！！",

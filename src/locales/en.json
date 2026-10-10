@@ -4,6 +4,7 @@
     "keywordWarning": "When pushing links via right-click, some keyword features for download paths or labels may not work correctly!"
   },
   "Debugger": {
+    "resetFailed": "Reset failed, the original data was kept",
     "addServerFirst": "Please add a server on the Set{serverType} page first",
     "confirmReset": "Are you sure you want to reset?",
     "consoleOutput": "All output is in the console panel!!!",

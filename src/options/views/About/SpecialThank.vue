@@ -141,7 +141,11 @@ const logoOf = (name: string) => {
 
 /** 没配到 logo（或图挂了）的兜底：英文取各词首字母，中文取首字。 */
 const initialsOf = (name: string) => {
-  const cjk = name.match(/[一-龥]/g);
+  // ⚠️ [一-龥] 是 U+4E00–U+9FA5，只覆盖基本区：CJK 扩展 A（U+3400–U+4DBF）
+  // 和扩展 B 及以后的补充平面（𠀀 这类，起于 U+20000）全都不在内，于是那些名字
+  // 会落到下面的英文分支、切出空字符串（该格只剩一个空圆形徽章）。
+  // 用 Unicode 属性 \p{Script=Han} 一次覆盖全部汉字区段。
+  const cjk = name.match(/\p{Script=Han}/gu);
   if (cjk) return cjk[0];
   return name
     .split(/[^A-Za-z0-9]+/)
@@ -152,7 +156,16 @@ const initialsOf = (name: string) => {
 };
 
 const fmt = (n: number) => n.toLocaleString("en-US");
-const share = (n: number, max: number) => Math.max(3, Math.round((n / max) * 100));
+const share = (n: number, max: number) => {
+  // ⚠️ max 可能是 0（整组的提交数/手写行数全为 0，那一行还没有数据时），
+  // 0/0 是 NaN、5/0 是 Infinity —— 拼进 style 就是 `width: NaN%`，
+  // 整条 CSS 声明被浏览器丢掉，进度条直接没有宽度（不是显示成 0，是没有）。
+  // max<=0 时无比例可言，返回下限那个宽度即可。
+  if (!Number.isFinite(max) || max <= 0) {
+    return 3;
+  }
+  return Math.max(3, Math.round((n / max) * 100));
+};
 
 const spanLine = computed(() =>
   t("SpecialThank.spanSummary", {

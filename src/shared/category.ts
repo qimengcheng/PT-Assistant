@@ -15,6 +15,7 @@
  *  - 纪录片 在 电视剧 之前 ——「纪录片」里有「剧」字，反过来会被判成电视剧
  *  - 动漫 在 电视剧/电影 之前 —— Anime Series / Anime Movies 都该归动漫
  *  - 综艺 在 电视剧 之前 —— 同时带两类字样的叫法（Variety TV / 综艺剧集）归综艺
+ * 顺序之外还有一道闸：括号里的**排除子句**（「不含…」）在匹配前整段删掉，见 EXCLUSION。
  * 判据在 scripts/check-category-map.mjs（自动进 check-all 聚合），改 RULES 前必跑。
  */
 
@@ -200,9 +201,18 @@ function hitAlias(rawLower: string, alias: string): boolean {
   return rawLower.includes(alias);
 }
 
+/**
+ * 排除子句：括号里带「不含 / 不包括 / 除外」的那一段，声明的是这一类**不**包括什么，
+ * 不是它是什么，所以折类前先整段删掉。
+ * 真出事的样子：PTTime 的 `Movies(电影、电影短片(不含动漫))` —— 含 CJK 的别名走子串匹配，
+ * 括号里那个「动漫」被 anime 认领（它又排在 movie 前面），一列里这部电影就显示成「动漫」。
+ * 只认这三个多字标记：收进单个「无」会把 `FLAC(无损音乐)` 这类**类别词本来就在括号里**的写法削空。
+ */
+const EXCLUSION = /[(（][^)）]*(?:不含|不包括|除外)[^)）]*[)）]/g;
+
 /** 规则层：任意叫法 → 规范类别；一条都不命中则 other */
 export function categorizeByRule(raw: string): TCategoryKind {
-  const s = String(raw ?? "").trim().toLowerCase();
+  const s = String(raw ?? "").trim().toLowerCase().replace(EXCLUSION, "");
   if (!s) return "other";
   for (const { kind, alias } of MATCH_RULES) {
     if (alias.some((a) => hitAlias(s, a))) return kind;

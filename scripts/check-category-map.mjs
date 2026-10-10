@@ -73,6 +73,16 @@ eq("空串 → other", categorizeByRule(""), "other");
 eq("undefined → other", categorizeByRule(undefined), "other");
 eq("没见过的写法不猜，归 other", categorizeByRule("Random Stuff 2026"), "other");
 
+console.log("2b) 括号里的「不含 / 不包括 / 除外」是排除子句，不是类别词（用户 2026-10-10 截图：Free Guy 显示成动漫）");
+eq("Movies(电影、电影短片(不含动漫)) 归电影", categorizeByRule("Movies(电影、电影短片(不含动漫))"), "movie");
+eq("整族都修掉：电视剧(…(不含综艺、动漫)) 归电视剧", categorizeByRule("电视剧(电视剧、电视系列剧(不含综艺、动漫))"), "tv");
+eq("排除子句里的词不许反过来赢：综艺(不含纪录片)", categorizeByRule("综艺(不含纪录片)"), "variety");
+eq("主名自己在外层时不受影响：动漫(不含三次元)", categorizeByRule("动漫(不含三次元)"), "anime");
+eq("全角括号 + 空格也照删：免费（不含 VIP）", categorizeByRule("免费（不含 VIP）"), "other");
+// 反证：标记表只收「不含/不包括/除外」这三个多字串。收进单个「无」，下面这条括号里
+// 唯一的类别词会被整段削掉，判成 other —— 这类写法（无损/无删减）在音乐类里很常见。
+eq("括号里才是类别词时不许削：FLAC(无损音乐)", categorizeByRule("FLAC(无损音乐)"), "music");
+
 console.log("3) 站点覆盖优先于规则，且非法值要回落");
 const siteMap = { "电视剧": "movie", "综艺": "not_a_kind" };
 eq("本站把「电视剧」标成 movie 时按站点走", categorizeCategory("电视剧", siteMap), "movie");

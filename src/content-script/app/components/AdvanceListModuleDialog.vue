@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, inject, nextTick, onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue";
+import { ref, computed, inject, nextTick, onBeforeUnmount, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   CloudDownloadOutlined,
@@ -55,24 +55,37 @@ function recalcTableScrollY() {
   if (next !== tableScrollY.value) tableScrollY.value = next;
 }
 
-// ResizeObserver 在 observe 时会先投递一次观测，所以首帧那一量也归它管
+// ⚠️ 挂观察器这件事不能在 onMounted 一次做完：这个组件是随页面常驻挂载的
+// （SiteListPage.vue:203 没有 v-if），而 antdv 的 Modal 内容是**第一次打开时**才渲染的，
+// onMounted 那一刻 ref 还是 null —— 照原写法会静默退化成「永远用写死的 320」，
+// 看着像改了、其实什么都没改。改由 enterDialog()（跟着 after-open-change）挂，且做成幂等。
 let tableResizeObserver: ResizeObserver | null = null;
-onMounted(() => {
+let observedWrapper: HTMLElement | null = null;
+
+function ensureTableObserver() {
   const el = tableWrapperRef.value;
-  if (!el) return;
+  if (!el || el === observedWrapper) return;
+  tableResizeObserver?.disconnect();
+  observedWrapper = el;
+  // ResizeObserver 在 observe 时会先投递一次观测，所以首帧那一量也归它管
   tableResizeObserver = new ResizeObserver(() => nextTick(recalcTableScrollY));
   tableResizeObserver.observe(el);
-});
+}
+
 onBeforeUnmount(() => tableResizeObserver?.disconnect());
-// 结果集变化时分页器/表头高度会变，跟着重量一次
-watch(
-  () => torrentItems.length,
-  () => nextTick(recalcTableScrollY),
-);
 
 const { torrentItems } = defineProps<{
   torrentItems: ITorrent[];
 }>();
+
+// ⚠️ 必须写在 defineProps 之后：watch 的 source 在**注册那一刻**就同步求值一次
+// （node 实测：source 里读一个还没初始化的绑定会当场抛，Vue 还会打 "execution of
+// watcher getter" 的警告），放在前面就等于整个组件 setup 当场死掉、弹窗开不了。
+// 结果集变化时分页器/表头高度会变，跟着重量一次。
+watch(
+  () => torrentItems.length,
+  () => nextTick(recalcTableScrollY),
+);
 
 const runtimeStore = useRuntimeStore();
 const metadataStore = useMetadataStore();
@@ -105,26 +118,27 @@ const localDownloadMultiStatus = ref<boolean>(false);
 async function handleLocalDownloadMulti() {
   localDownloadMultiStatus.value = true;
   try {
-    // ⚠️ 逐条 catch 并汇总：原先串行 await 且只有外层一个 catch，
-    // 第一个失败的种子就把整批中断（后面选中的再也下不到），提示还误用
-    // 「页面解析失败」文案。参照 SiteListPage 的逐条处理。
-    const results = await Promise.allSettled(
-      selectedTorrents.value.map((torrent) =>
-        sendMessage("downloadTorrent", { torrent, downloaderId: "local" }),
-      ),
-    );
-    const failed = results.filter((r) => r.status === "rejected");
-    for (const f of failed) {
-      console.error("[PTD] download torrent failed", (f as PromiseRejectedResult).reason);
+    // ⚠️ 逐条 catch 并汇总，但**保持一条一条下**：原先串行 await 且只有外层一个 catch，
+    // 第一个失败的种子就把整批中断（后面选中的再也下不到），提示还误用「页面解析失败」文案。
+    // 改成 allSettled 也能解决中断问题，但那会同时对同一个站点发 N 个下载请求 ——
+    // PT 站按下载间隔计（站点设置里那条 downloadInterval，以及站方的连下规则），
+    // 一次勾选几十条时并发比串行更容易被判违规，所以这里保留节奏、只把隔离做对。
+    let okCount = 0;
+    const total = selectedTorrents.value.length;
+    for (const torrent of selectedTorrents.value) {
+      try {
+        await sendMessage("downloadTorrent", { torrent, downloaderId: "local" });
+        okCount++;
+      } catch (e) {
+        console.error("[PTD] download torrent failed", torrent.title, e);
+      }
     }
 
-    const total = results.length;
-    const okCount = total - failed.length;
+    const failedCount = total - okCount;
     if (okCount > 0) {
-      runtimeStore.showSnakebar(
-        t("contentScript.downloadMultiDone", { ok: okCount, total }),
-        { color: failed.length > 0 ? "warning" : "success" },
-      );
+      runtimeStore.showSnakebar(t("contentScript.downloadMultiDone", { ok: okCount, total }), {
+        color: failedCount > 0 ? "warning" : "success",
+      });
     } else if (total > 0) {
       runtimeStore.showSnakebar(t("contentScript.downloadMultiAllFailed", { total }), { color: "error" });
     }
@@ -177,6 +191,8 @@ function handleSelectNotSeeding() {
 
 function enterDialog() {
   selectedTorrentIds.value = torrentItems.map((x) => x.id);
+  // 内容这时才在 DOM 里，观察器在这里挂（见 ensureTableObserver 的注释）
+  void nextTick(ensureTableObserver);
 }
 
 /** antd 的受控行选择：selectedRowKeys 与 v-data-table 的 v-model 等价 */

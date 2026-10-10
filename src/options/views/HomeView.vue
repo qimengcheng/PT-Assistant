@@ -131,7 +131,9 @@ const releasesUrl = `${REPO_URL}/releases`;
       <p v-if="!updates.length" class="updates-empty">{{ t("HomeView.updatesEmpty") }}</p>
 
       <p class="updates-note">
-        {{ t("HomeView.updatesNote", { sha: recentUpdates.headSha, date: recentUpdates.generatedAt }) }}
+        <!-- headSha 是仓库内部标识（AGENTS.md §3.5 零容忍），不渲染给用户；
+             出处信息保留生成时间就够了。headSha 字段本身留给排障时看控制台。 -->
+        {{ t("HomeView.updatesNote", { date: recentUpdates.generatedAt }) }}
       </p>
     </section>
   </div>

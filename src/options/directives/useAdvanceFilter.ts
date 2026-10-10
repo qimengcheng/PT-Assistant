@@ -187,10 +187,15 @@ export function getThisDateUnitRange(
 
 export function generateRangeField(data: (number | undefined)[]): IRangedField {
   const numData = data.filter((x) => !isNaN(x as unknown as number)) as number[];
+  // ⚠️ ticks 也要过滤：numData 滤了 undefined，ticks 没滤 —— undefined 混进去后
+  // rc-slider 拿到 NaN，range 与 min/max 对不上，整条 range 滑块直接失效。
+  const ticks = Array.from(new Set(numData));
 
   return {
-    range: numData.length > 0 ? [Math.min(...numData), Math.max(...numData)] : [-Infinity, Infinity],
-    ticks: Array.from(new Set(data)) as number[],
+    // 空数据时给 [0, 0] 而不是 [-Infinity, Infinity]：后者原样绑给 a-slider 会让
+    // rc-slider 算出 NaN（Infinity - Infinity）
+    range: numData.length > 0 ? [Math.min(...numData), Math.max(...numData)] : [0, 0],
+    ticks,
   };
 }
 
@@ -242,10 +247,16 @@ export function checkRangeValue(
   if (filter[keyword] && typeof itemValue !== "undefined") {
     const valueFormat = getValueFormat(keyword, format);
     const value = valueFormat.parse(itemValue) as number;
-    const from = valueFormat.parse((filter[keyword] as any).from || -Infinity) as number;
-    const to = valueFormat.parse((filter[keyword] as any).to || Infinity) as number;
+    // ⚠️ 边界不能用 `||` 兜底：from/to 为 0 时（0 做种、0 完成、0 字节…）
+    // `0 || -Infinity` 得到 -Infinity、`0 || Infinity` 得到 Infinity ——
+    // 那个 0 边界等于永远表达不出来，滑块拖到 0 的条件恒不成立。
+    // 这里只在 null/undefined（用户没填）时才取默认。
+    const rawFrom = (filter[keyword] as any).from;
+    const rawTo = (filter[keyword] as any).to;
+    const from = valueFormat.parse(rawFrom ?? -Infinity) as number;
+    const to = valueFormat.parse(rawTo ?? Infinity) as number;
 
-    return Boolean(from && value >= from && to && value <= to);
+    return value >= from && value <= to;
   }
 }
 
@@ -371,9 +382,10 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
     ranges.forEach((key) => {
       const valueFormat = getValueFormat(key, format);
 
+      // 同上：用 ?? 而不是真值判断，from/to 为 0 时不能被当成「没填」
       advanceFilterDictRef.value[key] = [
-        parsedFilter[key]?.from ? valueFormat.parse(parsedFilter[key].from) : -Infinity,
-        parsedFilter[key]?.to ? valueFormat.parse(parsedFilter[key].to) : Infinity,
+        parsedFilter[key]?.from != null ? valueFormat.parse(parsedFilter[key].from) : -Infinity,
+        parsedFilter[key]?.to != null ? valueFormat.parse(parsedFilter[key].to) : Infinity,
       ];
     });
   }
@@ -401,7 +413,8 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
       const range = (advanceItemPropsRef.value[key] as unknown as IRangedField).range;
       const value = (advanceFilterDictRef.value[key] as unknown as [number, number]).map(valueFormat.parse);
 
-      if ((value[0] && value[0] !== -Infinity) || (value[1] && value[1] !== Infinity)) {
+      // 同上：value 为 0（用户真把上界拖到 0）时不能被当成「没动过」而整条丢弃
+      if ((value[0] !== -Infinity && value[0] !== undefined) || (value[1] !== Infinity && value[1] !== undefined)) {
         filters[key] = {
           from: valueFormat.build(Math.max(range[0], value[0], -Infinity)),
           to: valueFormat.build(Math.min(range[1], value[1], Infinity)),

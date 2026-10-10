@@ -405,19 +405,37 @@ export default class Deluge extends AbstractBittorrentClient {
 
     try {
       const result = await this.request<any>(method, params);
-      if (result !== null && options.label) {
-        try {
-          const torrentHash = result[0][1];
-          await this.request("label.set_torrent", [torrentHash, options.label]);
-        } catch (e) {} // 即使失败了也没关系
-      }
-
       addResult.success = result !== null;
+
+      if (addResult.success && options.label) {
+        // ⚠️ 两个方法的返回形状不一样，原先一律取 result[0][1] 两边都错：
+        //   core.add_torrent_file → [success, hash, errmsg]，hash 在 [1]
+        //   core.add_torrent_url  → 直接就是 hash 字符串
+        // 取不到就设不上标签（原先静默失败，用户看不到标签却以为设了）。
+        const torrentHash =
+          method === "core.add_torrent_file" ? (Array.isArray(result) ? result[1] : result) : result;
+        if (torrentHash) {
+          try {
+            await this.request("label.set_torrent", [torrentHash, options.label]);
+          } catch (e) {
+            // 标签设不上不影响种子本身已经加进去，只记日志
+            console.error(`[Deluge] set label failed for ${torrentHash}`, e);
+          }
+        } else {
+          console.error(`[Deluge] unexpected add result shape, cannot set label:`, result);
+        }
+      }
 
       if (!addResult.success) {
         addResult.message = result;
       }
-    } catch (e) {}
+    } catch (e) {
+      // 静默 catch 会让「添加失败」既没有消息也没有日志 —— 用户只看到没加上，
+      // 界面上也没有任何说明。至少记一条，并把原因带进 addResult。
+      console.error(`[Deluge] add torrent failed via ${method}`, e);
+      addResult.success = false;
+      addResult.message = e instanceof Error ? e.message : String(e);
+    }
 
     return addResult;
   }
@@ -464,6 +482,9 @@ export default class Deluge extends AbstractBittorrentClient {
         downloadSpeed: torrent.download_payload_rate,
         totalUploaded: torrent.total_uploaded,
         totalDownloaded: torrent.total_done,
+        // label 明明在 torrentRequestField 里请求了，却没映射进 CTorrent ——
+        // 于是 getClientLabels 永远返回空，标签列整列没有内容
+        label: torrent.label ?? "",
         raw: torrent,
         clientId: this.config.id,
       } as CTorrent<DelugeRawTorrent>;

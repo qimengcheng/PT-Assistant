@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { FileSearchOutlined } from "@antdv-next/icons";
 import type { TableColumnsType, TablePaginationConfig } from "antdv-next";
+import { message } from "antdv-next";
 
 import { sendMessage } from "@/messages.ts";
 import { type ILoggerItem } from "@/shared/types.ts";
@@ -70,17 +71,38 @@ function isSameLogBatch(prev: ILoggerItem[], next: ILoggerItem[]) {
   return lastPrev === undefined || (lastPrev.id === lastNext?.id && lastPrev.time === lastNext?.time);
 }
 
+/**
+ * 失败提示只给一次。⚠️ 这条闸不能省：这个 catch 在**每秒轮询**的路径上，
+ * 而「列表还是空的」在下一次成功之前恒成立 —— 不设闸就是每秒弹一条 error toast，
+ * 界面被自己的提示淹没（原写法就是这么坏的）。成功后复位，所以下次真的坏了还会说一次。
+ */
+let loadFailureNotified = false;
+
 function loadLogger() {
+  // ⚠️ hasLoadedOnce 必须在**请求之前**置位，不能只在 then 里。
+  // a-table 的 loading 是整表套一层 Spin（opacity .5 + pointer-events:none），
+  // 而这个页面每秒轮询一次 —— 首屏那一次失败（offscreen 还没起来）时，
+  // hasLoadedOnce 一直是 false，于是之后每秒都把整表罩住又放开，
+  // 正是该文件注释里自称「已消灭」的闪烁在失败路径上复活。
   if (!hasLoadedOnce) {
     isLoadingLogger.value = true;
+    hasLoadedOnce = true;
   }
   sendMessage("getLogger", undefined)
     .then((res) => {
-      hasLoadedOnce = true;
+      loadFailureNotified = false;
       // 没新日志就别换引用：换一次就是整表（含排序、50 行渲染）重新 diff 一遍，每秒白做。
       if (!isSameLogBatch(logger.value, res)) {
         logger.value = res;
       }
+    })
+    .catch((e) => {
+      // 首屏失败要给一句话，不能静默 —— 否则界面停在「没有日志」且没人知道为什么
+      if (logger.value.length === 0 && !loadFailureNotified) {
+        loadFailureNotified = true;
+        message.error(t("Logger.loadFailed"));
+      }
+      console.error("[PTD] load logger failed", e);
     })
     .finally(() => {
       isLoadingLogger.value = false;

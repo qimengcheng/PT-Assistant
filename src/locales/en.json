@@ -168,6 +168,7 @@
     "action": {
       "details": "Details"
     },
+    "loadFailed": "Failed to load logs",
     "table": {
       "id": "ID",
       "message": "Message",
@@ -1548,6 +1549,7 @@
     "siteIsOffline": "Site is currently offline"
   },
   "common": {
+    "unknown": "Unknown",
     "AdvanceFilterGenerateDialog": {
       "date": "Date",
       "dateUnit": {
@@ -1931,7 +1933,7 @@
     "updatesEmpty": "No updates to show yet",
     "updatesExpandAll": "Show all {total} updates",
     "updatesCollapse": "Show only the latest {recent}",
-    "updatesNote": "These are update notes built into the extension, up to commit {sha} ({date})",
+    "updatesNote": "These are update notes built into the extension, generated at {date}",
     "updateAvailableLabel": "Update available"
   },
   "SiteDefinitions": {

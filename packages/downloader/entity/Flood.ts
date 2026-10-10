@@ -292,8 +292,11 @@ export default class Flood extends AbstractBittorrentClient {
       }
 
       return {
+        // ⚠️ id 与 infoHash 必须同大小写：基类 getTorrentHash 优先取 infoHash，
+        // 而界面各处是拿 id 反查的 —— id 小写、infoHash 保持 Flood 返回的大写，
+        // 两者对不上，于是按 id 找种子永远 undefined（操作按钮全部失灵）。
         id: infoHash.toLowerCase(),
-        infoHash,
+        infoHash: infoHash.toLowerCase(),
         name: rawTorrent.name,
         dateAdded: rawTorrent.dateAdded,
         state,

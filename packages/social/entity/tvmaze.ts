@@ -71,14 +71,18 @@ export async function fetchInformation(
   } as ISocialInformation;
 
   try {
-    const { data } = await axios.get<ITVMazeApiResp>(`https://api.tvmaze.com/shows/${id}`, {
+    // ⚠️ 用 realId 而不是形参 id：调用方传进来的是页面 URL（其它 5 个实体都先 parse），
+    // 直接拼进 API 路径必然 404。
+    const { data } = await axios.get<ITVMazeApiResp>(`https://api.tvmaze.com/shows/${realId}`, {
       timeout: config.timeout ?? 10e3,
       responseType: "json",
     });
 
     resDict.title = data.name;
-    resDict.poster = data.image.medium ?? data.image.original ?? "";
-    resDict.ratingScore = data.rating.average ?? 0;
+    // ⚠️ image 对「无图剧集」是 null（这是它的正常响应，不是异常），
+    // 直接 .medium 会连带把标题和评分一起丢掉 —— 整条信息全空。
+    resDict.poster = data.image?.medium ?? data.image?.original ?? "";
+    resDict.ratingScore = data.rating?.average ?? 0;
   } catch (error) {
     console.warn(error);
   } finally {

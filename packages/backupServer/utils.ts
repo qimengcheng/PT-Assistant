@@ -214,7 +214,14 @@ export async function jsZipBlobToBackupData(blob: Blob, encryptionKey?: string):
     // 只解出 manifest 中记录的其他文件
     for (const [fileKey, manifestFileData] of Object.entries(omit(manifest.files ?? {}, ["manifest"]))) {
       const { name: fileName, hash: manifestFileHash } = manifestFileData;
-      const fileContent = await zipContent.file(fileName)?.async("string");
+      const zipFile = zipContent.file(fileName);
+      // ⚠️ manifest 声明了、但 zip 里没有的条目，原先被 if (fileContent) 静默跳过 ——
+      // 恢复流程照样走完并报「成功」，用户却发现 cookies/settings 没回来。
+      // 这里显式抛错，让调用方能报出「恢复失败」而不是给一份残缺的数据。
+      if (!zipFile) {
+        throw new Error(`Backup file missing in archive: ${fileName} (key: ${fileKey})`);
+      }
+      const fileContent = await zipFile.async("string");
       if (fileContent) {
         const fileContentHash = CryptoJS.MD5(fileContent).toString();
         if (fileKey != "manifest" && fileContentHash !== manifestFileHash) {

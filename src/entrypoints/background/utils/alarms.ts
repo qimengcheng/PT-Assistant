@@ -138,9 +138,10 @@ function autoFlushUserInfo(retryIndex: number = 0) {
 
     // 将刷新时间存入 metadataStore：走到这里说明这一轮真的刷过站点
     // （这个字段的名字就是"上次刷新时间"，所以没刷的那轮不能推进它 —— 上面已经提前 return 了）
-    metadataStore = (await extStore.getItem("metadata"))!;
-    metadataStore.lastUserInfoAutoFlushAt = new Date().getTime(); // 刷新时间应该是实际完成时间
-    await extStore.setItem("metadata", metadataStore);
+    // ⚠️ 按路径写而不是「读整块 → 改一个字段 → 写回整块」：metadata 同时被 offscreen
+    // （lastUserInfo / lastBackupAt）读写，而 writeQueues 只在单上下文内互斥，
+    // 两个 10 分钟 immediate job 的时间窗一重叠就会互相丢字段。
+    await extStore.patchItem("metadata", "lastUserInfoAutoFlushAt", new Date().getTime()); // 刷新时间应该是实际完成时间
 
     // 如果本次有失败的刷新操作，则设置重试
     if (failFlushSites.length > 0 && retryIndex < retryMax) {

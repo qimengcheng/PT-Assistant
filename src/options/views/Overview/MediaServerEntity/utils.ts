@@ -117,6 +117,10 @@ export async function doSearch(option: { searchKey?: string; loadMore?: boolean 
   const { searchKey = "", loadMore = false } = option;
 
   if (searchKey != runtimeStore.mediaServerSearch.searchKey) {
+    // ⚠️ 换关键词必须把队列里**还没开始**的任务也丢掉：它们带的还是旧关键词，
+    // 跑完会把旧结果 push 进已经重置过的新结果里（界面上是「新词搜出来的却是旧内容」）。
+    // clear() 只清排队任务、已经在跑的那个照旧跑完 —— 那种由下面的关键词校验兜住。
+    searchQueue.clear();
     runtimeStore.resetMediaServerSearchData();
   }
 
@@ -140,13 +144,24 @@ export async function doSearch(option: { searchKey?: string; loadMore?: boolean 
         options: searchOptions,
       });
 
+      // 请求在飞的时候用户可能已经换了关键词（或删了这个服务器）：
+      // 这份结果属于上一轮，不该写进当前状态，也不该弹提示
+      if (searchKey !== runtimeStore.mediaServerSearch.searchKey) {
+        console.debug(`[MediaServerEntity] ${mediaServerId} 结果已过期（关键词已变），丢弃`);
+        return;
+      }
+      const mediaServerDetail = metadataStore.mediaServers[mediaServerId];
+      if (!mediaServerDetail) {
+        console.debug(`[MediaServerEntity] ${mediaServerId} 已被删除，丢弃结果`);
+        return;
+      }
+
       runtimeStore.mediaServerSearch.searchStatus[mediaServerId] = {
         ...omit(searchResult, ["items"]),
         canLoadMore: false,
       };
 
       if (searchResult.status !== EResultParseStatus.success) {
-        const mediaServerDetail = metadataStore.mediaServers[mediaServerId];
         // 只有认证类失败才提示检查认证信息，其余（超时/网络不可达/解析异常）展示真实原因（#1396）
         // 非组件模块拿不到 useI18n，按 configStore.lang 选双语（口径同 DownloadHistory/utils.ts）
         const failReason =
@@ -176,6 +191,12 @@ export async function doSearch(option: { searchKey?: string; loadMore?: boolean 
           runtimeStore.mediaServerSearch.searchStatus[mediaServerId].canLoadMore = true;
         }
       }
-    });
+    })
+      .catch((e) => {
+        // 队列任务必须兜底 catch：服务器不可达 / 扩展重载都会让
+        // getMediaServerSearchResult 抛错，而这里原先无人接手 ——
+        // rejection 会让该服务器的状态永远停在上一轮的值、界面一直转圈。
+        console.error(`[MediaServerEntity] search failed: ${mediaServerId}`, e);
+      });
   }
 }

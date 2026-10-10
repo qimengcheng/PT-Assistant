@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-09 23:11:58",
-  "headSha": "cc5f73a",
+  "generatedAt": "2026-10-10 08:49:44",
+  "headSha": "30d1f5a",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.62.1",
+      "date": "2026-10-10 08:54:06",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "辅种检测弹窗底部那一排（下载器 / 保存路径 / 标签）现在和旁边的「创建任务」一样高了 —— 以前那三颗比按钮矮一截，同一排里两样高。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.62.0",
       "date": "2026-10-10 08:49:44",

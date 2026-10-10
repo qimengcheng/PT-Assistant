@@ -1031,11 +1031,14 @@ async function createKeepUploadTask() {
 
     <template #footer>
       <div class="d-flex align-center ga-2 create-row">
+        <!-- 这一排故意不写 size="small"：旁边那颗「创建任务」是默认档 32px，三颗输入框 24px
+             挨着它就是一行两样高（他 2026-10-10：「这三个控件高度不够啊，不应该用 small」）。
+             AGENTS §3.4 那条「弹层里照旧 small」的例外盖的是 popover 面板 / 筛选面板那种
+             自成一行紧凑控件的地方，不盖「和默认档主操作并排」的这一排。 -->
         <template v-if="showCreateRow">
           <a-select
             v-model:value="selectedDownloaderId"
             :options="downloaderOptions"
-            size="small"
             :placeholder="t('SearchEntity.KeepUploadDialog.setSavePath')"
             style="flex: 0 1 200px; min-width: 160px"
             :popup-match-select-width="false"
@@ -1044,7 +1047,6 @@ async function createKeepUploadTask() {
           <a-auto-complete
             v-model:value="savePath"
             :options="savePathOptions"
-            size="small"
             :placeholder="t('KeepUploadTask.savePath')"
             style="flex: 1 1 300px; min-width: 220px"
             :popup-match-select-width="false"
@@ -1052,7 +1054,6 @@ async function createKeepUploadTask() {
           <a-auto-complete
             v-model:value="torrentLabel"
             :options="labelOptions"
-            size="small"
             :placeholder="t('SentToDownloaderDialog.label')"
             style="flex: 0 1 200px; min-width: 160px"
             :popup-match-select-width="false"

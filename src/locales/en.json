@@ -152,12 +152,6 @@
     "title": "Reseed Tasks",
     "updateError": "Update failed",
     "updateSuccess": "Updated successfully",
-    "warning": {
-      "item1": "Please confirm that the download client has disabled 'auto start download' option before reseeding.",
-      "item2": "The assistant only performs simple verification on torrent files, reseeding success is not guaranteed!",
-      "item3": "Users are responsible for any issues caused by failed reseeding!",
-      "title": "Warning:"
-    },
     "downloaderNotFound": "Downloader not found",
     "baseLocal": "Base torrent (in downloader): ",
     "sendReseedOne": "Send this entry to reseed"

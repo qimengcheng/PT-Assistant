@@ -125,10 +125,10 @@ export const usageZh: IUsageDoc = {
     {
       id: "risk",
       title: "七、风险与责任边界",
-      lead: "「辅种任务」页底部那条「警告：」的三条就是这功能的责任边界，动手前先读那三条。这里再补几条排查用的：",
+      lead: "下面这几条就是这个功能的责任边界，动手前先读一遍。",
       points: [
         { text: "辅种前确认下载器没有开着「自动开始下载」这一类选项（有的话先关掉）。让下载器先暂停、你确认文件真的都在位之后再开始，是最稳的。" },
-        { text: "助手只对种子文件做简单验证，不保证辅种成功；因辅种失败造成的爆仓由用户自行负责，那条警告里写明了这两句。" },
+        { text: "助手只对种子文件做简单验证，不保证辅种成功；因辅种失败造成的爆仓由用户自行负责。" },
         { text: "qBittorrent 有时只回一个 Fails. 不给原因。这种情况下提示会让你去检查：是不是已经有同一个种子在里面、保存路径或分类是否有效，并翻 qBittorrent 自己的日志。" },
       ],
     },
@@ -229,10 +229,10 @@ export const usageEn: IUsageDoc = {
     {
       id: "risk",
       title: "7. Risk and responsibility",
-      lead: "The three-item warning at the bottom of the 'Reseed Tasks' page is the boundary of what this feature promises. A few practical notes on top of it:",
+      lead: "The few lines below are the boundary of what this feature promises — read them before you start.",
       points: [
         { text: "Before reseeding, make sure your download client has 'auto start download' turned off. Adding paused, confirming the files really are where they should be, then starting is the safe order." },
-        { text: "The assistant only performs a simple verification on the torrent files and does not guarantee that reseeding succeeds. The warning spells out that any fallout from a failed reseed is the user's own responsibility." },
+        { text: "The assistant only performs a simple verification on the torrent files and does not guarantee that reseeding succeeds; any fallout from a failed reseed is the user's own responsibility." },
         { text: "qBittorrent sometimes replies with just 'Fails.' and no details. When that happens the message points you at what to check: a duplicate torrent already present, an invalid save path or category, and qBittorrent's own logs." },
       ],
     },

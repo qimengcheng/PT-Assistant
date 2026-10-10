@@ -16,7 +16,7 @@ import { defineJobScheduler } from "@webext-core/job-scheduler";
 import type { CTorrent } from "@ptd/downloader";
 
 import { extStore } from "@/storage.ts";
-import { sendMessage } from "@/messages.ts";
+import { onMessage, sendMessage } from "@/messages.ts";
 import type { IKeepUploadTask, IKeepUploadTaskItem, IMetadataPiniaStorageSchema } from "@/shared/types.ts";
 
 import {
@@ -293,11 +293,52 @@ async function autoReseedTick() {
   }
 }
 
+/**
+ * 跑一轮，且**一轮没跑完不起第二轮**：定时器那一轮和用户催的这一轮会撞在一起
+ * （两边都去拉下载器列表、都往同一批任务上写进度）。
+ *
+ * 正在跑时不是「丢掉这次」而是记下来补跑一轮 —— 刚建好的任务很可能正是在那一轮取完任务列表
+ * 之后才落盘的，不补跑就还是「等下一分钟」。
+ */
+let running: Promise<void> | null = null;
+let again = false;
+
+function runAutoReseedTick(): Promise<void> {
+  if (running) {
+    again = true;
+    return running;
+  }
+  // `running = null` 写在函数体末尾而不是 `.finally()`：那样它在这轮真正结束前就已生效，
+  // 不会有人拿着一个已经 settle 的 promise 以为「排上了」
+  const job = (async () => {
+    try {
+      do {
+        again = false;
+        try {
+          await autoReseedTick();
+        } catch (e) {
+          // 一轮失败不影响补跑，也不让定时器就此哑掉（下一分钟照常再来）
+          void sendMessage("logger", { msg: `Auto-reseed: tick failed (${e instanceof Error ? e.message : e})` });
+        }
+      } while (again);
+    } finally {
+      running = null;
+    }
+  })();
+  running = job;
+  return job;
+}
+
+// 建完任务那一侧催的（判据仍只有 `autoReseedTick` 这一份，这里只是把触发时刻提前）
+onMessage("runAutoReseedTick", () => {
+  void runAutoReseedTick();
+});
+
 // noinspection JSIgnoredPromiseFromCall
 jobs.scheduleJob({
   id: JOB_ID,
   type: "interval",
   duration: TICK_MS,
   immediate: true,
-  execute: autoReseedTick,
+  execute: () => runAutoReseedTick(),
 });

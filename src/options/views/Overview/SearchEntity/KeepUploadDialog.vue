@@ -927,6 +927,10 @@ async function createKeepUploadTask() {
     };
 
     await sendMessage("createKeepUploadTask", task);
+    // 催后台立刻走一轮自动辅种。不催的话这条新任务要等下一次定时（最多 1 分钟）才被看到，
+    // 用户视角就是「勾了自动辅种，基准却过了一分钟才推下去」。
+    // fire-and-forget：这一趟要等下载器回包（几秒），弹窗不该为它停在「创建中」。
+    if (autoReseed.value) void sendMessage("runAutoReseedTick", undefined).catch(() => {});
     if (configStore.download.saveLastDownloader) {
       metadataStore.lastKeepUpload = {
         downloaderId: selectedDownloaderId.value,

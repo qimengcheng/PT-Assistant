@@ -121,6 +121,16 @@ export interface ProtocolMap {
    */
   checkForUpdate(): IUpdateCheckState;
 
+  // ===== 1.4 立刻跑一轮自动辅种（background）=====
+  /**
+   * 催后台马上走一轮「自动辅种」的判据，不等那每分钟一次的定时器。
+   *
+   * 为什么要有这一条：刚建好的任务要等下一轮才被看到，用户视角就是「我勾了自动辅种，
+   * 基准却过了一分钟才推下去」。建任务那一侧在 `autoReseed === true` 时催一次。
+   * 判据本身仍只有一份（后台那个 tick），这里只是把它的**触发时刻**提前，不另起一条发送路径。
+   */
+  runAutoReseedTick(): void;
+
   // ===== 2. offscreen：站点基础 ( utils/site ) =====
   getSiteList(): Array<{ id: string; name: string; url: string; offline: boolean }>;
   getSiteUserConfig(data: { siteId: TSiteID; flush?: boolean }): ISiteUserConfig;

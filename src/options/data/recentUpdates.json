@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-10 15:39:56",
-  "headSha": "51c58c3",
+  "generatedAt": "2026-10-10 15:54:58",
+  "headSha": "498ecd0",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.66.2",
+      "date": "2026-10-10 16:05:49",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "勾着「自动辅种」建完任务，基准种子当场就推下去了，不用再等最多一分钟才到的那一次后台定时。把「自动辅种」关掉的任务仍然不会被动它 —— 那一轮只替开了开关的任务跑。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.66.1",
       "date": "2026-10-10 15:54:58",

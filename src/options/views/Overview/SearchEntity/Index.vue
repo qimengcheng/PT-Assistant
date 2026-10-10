@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { message } from "antdv-next";
 import {
   AlertOutlined,
   CameraOutlined,
@@ -437,14 +438,44 @@ watch(
  * 现在这一页就是搜索页，就地装载，不再多一次导航。
  */
 function applySnapshot(snapshotId: string) {
-  metadataStore.getSearchSnapshotData(snapshotId).then((data) => {
-    if (!data) return;
-    runtimeStore.search = { ...data, snapshot: snapshotId };
-    // 如果启用了快速站点筛选，则重置一下筛选器，以防止快速站点筛选中无站点数据
-    if (configStore.searchEntity.quickSiteFilter) {
-      buildAdvanceItemPropsFn();
-    }
-  });
+  // ⚠️ 原来只有 .then 没有 .catch：快照数据损坏（IndexedDB 里的记录被截断 /
+  // 结构对不上）时 getSearchSnapshotData reject，就是一个 unhandled rejection，
+  // 界面上毫无反馈 —— 用户点了「查看快照」看到的是「什么也没发生」，
+  // 连地址栏都还带着 snapshot 参数却空着一片。
+  metadataStore
+    .getSearchSnapshotData(snapshotId)
+    .then((data) => {
+      if (!data) {
+        // 快照不存在（被删了 / 外部旧书签指过来）：装载失败要说出来。
+        // ⚠️ 提示里不带 snapshotId —— 那是 nanoid() 生成的存储键（metadata.ts:542），
+        // 上屏就是内部标识进 UI；出处只进控制台。
+        message.error(t("SearchEntity.index.snapshotLoadFailed"));
+        console.error(`[SearchEntity] snapshot not found: ${snapshotId}`);
+        return;
+      }
+      runtimeStore.search = { ...data, snapshot: snapshotId };
+      // 如果启用了快速站点筛选，则重置一下筛选器，以防止快速站点筛选中无站点数据
+      if (configStore.searchEntity.quickSiteFilter) {
+        buildAdvanceItemPropsFn();
+      }
+    })
+    .catch((e) => {
+      message.error(t("SearchEntity.index.snapshotLoadFailed"));
+      console.error(`[SearchEntity] load snapshot failed: ${snapshotId}`, e);
+    });
+}
+
+/**
+ * 快照显示名。
+ *
+ * ⚠️ 原来直接 `metadataStore.snapshots[id].name` 裸取：快照在另一个页面被删掉、
+ * 或地址栏带着一条早已不存在的 snapshot 参数进来（外部链接 / 旧书签），
+ * 就在渲染期读 undefined.name —— 整页白屏，而这只是个提示条。
+ * 兜底成空串：提示条少一个方括号里的名字，其余照常。
+ */
+function snapshotNameOf(snapshotId: string | undefined): string {
+  if (!snapshotId) return "";
+  return metadataStore.snapshots[snapshotId]?.name ?? "";
 }
 
 /** 快照管理弹窗里点「查看」：就地装载，然后把弹窗收掉 —— 他要的是回到结果列表看这份快照 */
@@ -602,7 +633,7 @@ const hasSearchStatus = computed<boolean>(() => {
             <template v-else>
               <template v-if="runtimeStore.search.snapshot">
                 {{ t("SearchEntity.index.alert.snapshot") }}
-                [{{ metadataStore.snapshots[runtimeStore.search.snapshot].name }}]，
+                [{{ snapshotNameOf(runtimeStore.search.snapshot) }}]，
               </template>
               <template v-else>
                 {{ t("SearchEntity.index.alert.plan") }}

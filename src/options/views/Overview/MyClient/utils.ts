@@ -133,12 +133,41 @@ export function useClientRefresh() {
     }
   }
 
+  /** 勾选变化后把新进入范围的下载器拉起来，并为它挂上自动刷新。 */
+  async function ensureLoadedAndScheduled(id: string) {
+    if (suspendedDownloaders.value.has(id)) return;
+    // 只拉还没有数据的那个：已经拉过的（torrents 里有 key）不重复请求
+    if (Object.prototype.hasOwnProperty.call(torrents.value, id)) {
+      if (autoRefreshRunning.value) scheduleDownloaderRefresh(id);
+      return;
+    }
+    await load(id, true);
+    if (autoRefreshRunning.value) scheduleDownloaderRefresh(id);
+  }
+
+  /**
+   * 勾选变化时补齐数据。
+   *
+   * ⚠️ 原来 selectedDownloaderIds 只是被 activeDownloaderIds 读，
+   * 而那一处只用来算「自动刷新给谁挂表」——且只在 startAutoRefresh 时算一次。
+   * 于是：在弹窗里勾一个还没加载过的下载器，那一行静默空白（0 条种子），
+   * 直到用户点「全部刷新」才出数据；而 clearDownloaderFilter 反而会 load，
+   * 于是「清空筛选 → 有数据」与「勾一个 → 没数据」正好相反。
+   * 这里把新进入范围的下载器立刻拉一次并挂上表。
+   */
+  async function syncActiveDownloaders() {
+    const ids = activeDownloaderIds.value;
+    await Promise.all(ids.map((id) => ensureLoadedAndScheduled(id)));
+  }
+
   function startAutoRefresh() {
     if (globalRefreshInterval.value <= 0) return;
     autoRefreshRunning.value = true;
     for (const id of activeDownloaderIds.value) {
       scheduleDownloaderRefresh(id);
     }
+    // 勾选范围内的还没拉过的，立刻补一次（不阻塞开关本身）
+    void syncActiveDownloaders();
   }
 
   function stopAutoRefresh() {
@@ -158,6 +187,7 @@ export function useClientRefresh() {
     enabledDownloaders,
     activeDownloaderIds,
     loadSingleDownloader,
+    syncActiveDownloaders,
     clearDownloaderTimer,
     scheduleDownloaderRefresh,
     stopAllTimers,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { type TableColumnsType } from "antdv-next";
 import {
@@ -521,6 +521,8 @@ function toComparableEntry(info: ITorrentInfoForVerification): ILocalTorrentFing
 }
 
 function startVerification() {
+  // 作废上一轮还在飞的等待回调（换基准 / 重开弹窗时它们还在每 200ms 轮询）
+  cancelAllPendingVerifications();
   verifiedItems.value = new Map();
   verifiedItemsOrder.value = [];
   baseTorrent.value = null;
@@ -686,6 +688,25 @@ function recompareAll() {
   });
 }
 
+/**
+ * 验证轮次的世代号：每次重置（换基准 / 清空列表 / 卸载）就 +1，
+ * 让上一轮还在飞的 `setTimeout` 全部作废。
+ */
+let verificationRound = 0;
+
+/** 每个 id 至多一个在飞的等待定时器，卸载时统一清掉 */
+const pendingVerificationTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function cancelAllPendingVerifications() {
+  verificationRound++;
+  for (const timer of pendingVerificationTimers.values()) {
+    clearTimeout(timer);
+  }
+  pendingVerificationTimers.clear();
+}
+
+onUnmounted(cancelAllPendingVerifications);
+
 function verification(torrent: ITorrentInfoForVerification | null, id: string) {
   // 边界检查：确保项仍然存在
   const item = verifiedItems.value.get(id);
@@ -712,7 +733,24 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
   // 等待基准种子下载完成
   const baseItem = verifiedItems.value.get(verifiedItemsOrder.value[0]);
   if (baseItem?.loading) {
-    setTimeout(() => verification(torrent, id), 200);
+    // ⚠️ 这个递归 setTimeout 原来既不保存句柄也不带世代号：
+    //  - 卸载 / 关闭弹窗 / 清空列表之后，旧回调照样醒来继续跑，
+    //    每 200ms 一次直到基准种子的 loading 变 false —— 而那时 map 里
+    //    那条早就没了，函数开头的 !item 提前 return 才把它拦住，
+    //    但那是「靠数据消失兜底」，不是有意的取消；
+    //  - 更糟的是「换基准」/「清空列表」后同一个 id 重新加进来时，
+    //    上一轮的回调与新一轮的判定会互相覆盖 verified / status。
+    // 这里记住句柄用于卸载时清干净，并让每轮携带一个世代号，
+    // 世代一变（旧一轮）就不再续排。
+    const myRound = verificationRound;
+    pendingVerificationTimers.set(
+      id,
+      setTimeout(() => {
+        pendingVerificationTimers.delete(id);
+        if (myRound !== verificationRound) return;
+        verification(torrent, id);
+      }, 200),
+    );
     return;
   }
 

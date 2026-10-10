@@ -319,6 +319,8 @@ async function sendTorrentsToDownloader(
   }
 
   sending.value[task.id] = kind;
+  /** 本趟逐条的失败明细，跑完统一汇总（见下面的 sendPartiallyFailed） */
+  const failedItems: { title: string; reason: string }[] = [];
   // 点下去就得有东西动：这一趟要等后台把 .torrent 下回来再 add，通常好几秒
   runtimeStore.showSnakebar(t("KeepUploadTask.sending", { count: items.length }), { color: "info" });
 
@@ -336,28 +338,58 @@ async function sendTorrentsToDownloader(
         siteName: await metadataStore.getSiteName(item.site),
       });
 
-      const result = await sendMessage("downloadTorrent", {
-        torrent: {
-          site: item.site,
-          // 站点自己的种子 id：yemapt / mteam 那 7 个站拿它换下载链接，不传就是 `{success:false}`
-          // 一句兜底文案，看不出是少字段。判据见 IKeepUploadTaskItem.id。
-          id: item.id,
+      // ⚠️ 原来循环体里一条失败就 throw，整批中断：前 N-1 条已经推进下载器了，
+      // 第 N 条失败后剩下的根本没发，而提示里只有一个失败原因 ——
+      // 用户看到「发了 1 条」却不知道实际发了 3 条、剩 2 条没发。
+      // 改成逐条收集成败，跑完整批再一次性报「几条成功 / 几条失败」。
+      try {
+        const result = await sendMessage("downloadTorrent", {
+          torrent: {
+            site: item.site,
+            // 站点自己的种子 id：yemapt / mteam 那 7 个站拿它换下载链接，不传就是 `{success:false}`
+            // 一句兜底文案，看不出是少字段。判据见 IKeepUploadTaskItem.id。
+            id: item.id,
+            title: item.title,
+            subTitle: item.subTitle,
+            link: item.url,
+            // item.link 是详情页；下载链接为空时，后台需要它来动态解析真实下载地址。
+            url: item.link,
+            size: item.size,
+          },
+          downloaderId: task.downloadOptions.downloaderId,
+          addTorrentOptions,
+        });
+        if (result.downloadStatus === "failed") {
+          throw new Error(result.errorMessage || item.title);
+        }
+      } catch (itemError) {
+        const raw = itemError instanceof Error ? itemError.message : String(itemError);
+        failedItems.push({
           title: item.title,
-          subTitle: item.subTitle,
-          link: item.url,
-          // item.link 是详情页；下载链接为空时，后台需要它来动态解析真实下载地址。
-          url: item.link,
-          size: item.size,
-        },
-        downloaderId: task.downloadOptions.downloaderId,
-        addTorrentOptions,
-      });
-      if (result.downloadStatus === "failed") {
-        throw new Error(result.errorMessage || item.title);
+          reason: raw.trim() === "Fails." ? t("KeepUploadTask.qBittorrentLegacyFails") : raw,
+        });
       }
     }
-    runtimeStore.showSnakebar(t("KeepUploadTask.sendSingleSuccess"), { color: "success" });
-    // 发出去不等于在做种：跳过校验之后「数据其实不在」只会以状态的形式冒出来，所以自己回来查一趟
+
+    const succeededCount = items.length - failedItems.length;
+    if (failedItems.length === 0) {
+      runtimeStore.showSnakebar(t("KeepUploadTask.sendSingleSuccess"), { color: "success" });
+      // 发出去不等于在做种：跳过校验之后「数据其实不在」只会以状态的形式冒出来，所以自己回来查一趟
+      scheduleAutoRecheck(task.id);
+      return true;
+    }
+
+    console.error(`[KeepUploadTask] send partially failed: ${JSON.stringify(failedItems)}`);
+    runtimeStore.showSnakebar(
+      t("KeepUploadTask.sendPartiallyFailed", {
+        succeeded: succeededCount,
+        failed: failedItems.length,
+        firstReason: failedItems[0]!.reason || failedItems[0]!.title,
+      }),
+      { color: succeededCount > 0 ? "warning" : "error" },
+    );
+    // 全军覆没才算这一趟没成；部分成功时基准该挪还是要挪（用户看的是列表顺序）
+    if (succeededCount === 0) return false;
     scheduleAutoRecheck(task.id);
     return true;
   } catch (e) {
@@ -385,7 +417,14 @@ async function setAsBaseTorrent(task: IKeepUploadTask, itemIndex: number) {
     await sendMessage("updateKeepUploadTask", task);
     runtimeStore.showSnakebar(t("KeepUploadTask.setBaseSuccess"), { color: "success" });
   } catch (e) {
+    // ⚠️ 乐观更新失败没有回滚：列表里基准已经挪了（界面上是新的顺序），
+    // 而存储里还是旧顺序。用户下次进页面看到的是旧基准，
+    // 而「发送并换为基准」「自动回查」这一路又是按新顺序算的 ——
+    // 两边对不上。失败就把顺序挪回去，并明确说这次没改成。
+    task.items.splice(0, 1);
+    task.items.splice(itemIndex, 0, item);
     runtimeStore.showSnakebar(t("KeepUploadTask.setBaseError"), { color: "error" });
+    console.error("[KeepUploadTask] set base torrent failed, order reverted", e);
   }
 }
 

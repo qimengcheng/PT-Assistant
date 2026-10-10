@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   ArrowDownOutlined,
@@ -24,7 +24,8 @@ import {
 const showDialog = defineModel<boolean>();
 
 const { t } = useI18n();
-const { enabledDownloaders, resumeDownloaderRefresh, clearDownloaderTimer } = useClientRefresh();
+const { enabledDownloaders, resumeDownloaderRefresh, clearDownloaderTimer, syncActiveDownloaders } =
+  useClientRefresh();
 
 const clientStatuses = ref<Record<string, TorrentClientStatus>>({});
 const clientVersions = ref<Record<string, string>>({});
@@ -49,6 +50,13 @@ function toggleDownloaderFilter(id: string) {
     selectedDownloaderIds.value.push(id);
   }
 }
+
+// ⚠️ 勾选变化要把新进入范围的下载器拉起来：原来这里只改 selectedDownloaderIds，
+// 而它只影响 activeDownloaderIds（算「自动刷新给谁挂表」，且只在
+// startAutoRefresh 时算一次）。于是勾一个**没加载过**的下载器，那一行静默空白
+// （0 条种子），用户看着像「这台没有种子」；而「清空筛选」反而会 load，
+// 两者正好相反 —— 同一页里两个动作的行为不一致，非常费解。
+watch(selectedDownloaderIds, () => void syncActiveDownloaders(), { deep: true });
 
 function torrentCountFor(id: string) {
   return (torrents.value[id] ?? []).length;

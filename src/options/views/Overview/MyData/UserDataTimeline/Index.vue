@@ -122,6 +122,13 @@ const favicon = (config: TKonvaConfig) => {
 
   const siteConfig = allAddedSiteMetadata[config.site];
 
+  // ⚠️ allAddedSiteMetadata 来自 allSettled，缺 entry 是可能的（定义分片取不到 /
+  // 站点已被删除）。原来这里直接 siteConfig.faviconElement —— 在 konva 的
+  // image 配置阶段抛 TypeError，整张时间线图（不只是那一个站点）都渲染不出来。
+  // 取不到就返回 undefined 而非 null：vk-image 的 config 属性类型是
+  // Record<string, any> | undefined，null 传不进去。
+  if (!siteConfig) return undefined;
+
   let imageElement: HTMLImageElement | OffscreenCanvas = siteConfig.faviconElement;
 
   if (siteConfig.isDead) {
@@ -493,7 +500,7 @@ function saveControl() {
                         :config="
                           text({
                             y: 0,
-                            text: `${allAddedSiteMetadata[userInfo.site]?.isDead ? '󰖛' : ''}${allAddedSiteMetadata[userInfo.site].siteName}`,
+                            text: `${allAddedSiteMetadata[userInfo.site]?.isDead ? '󰖛' : ''}${allAddedSiteMetadata[userInfo.site]?.siteName ?? userInfo.site}`,
                             fill: allAddedSiteMetadata[userInfo.site]?.isDead ? '#9E9E9E' : '#fff',
                             fontFamily: allAddedSiteMetadata[userInfo.site]?.isDead
                               ? 'Material Design Icons For PTD'

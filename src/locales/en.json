@@ -73,6 +73,7 @@
     }
   },
   "KeepUploadTask": {
+    "sendPartiallyFailed": "{succeeded} sent, {failed} failed ({firstReason})",
     "clearAll": "Clear All",
     "usage": {
       "title": "How reseeding works"
@@ -617,6 +618,7 @@
       "title": "Search Status of [{0}]"
     },
     "index": {
+      "snapshotLoadFailed": "Failed to load the snapshot — it may have been deleted",
       "action": {
         "cancel": "Cancel current waiting search",
         "displayPreferences": "Search Results Display Preferences",

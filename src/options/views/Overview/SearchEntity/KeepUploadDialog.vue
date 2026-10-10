@@ -908,6 +908,10 @@ async function createKeepUploadTask() {
         : undefined,
       items: verifiedList.map((item) => ({
         site: item.data.site,
+        // 这一站的种子 id 要一起记下来：有 7 个站靠它换下载链接（yemapt / mteam 那批），
+        // 少了它发送会失败，而站点回的是不带原因的 `{success:false}`，看着像账号或网络坏了。
+        // 判据在 IKeepUploadTaskItem.id 那条注释。
+        id: item.data.id,
         title: item.data.title || "",
         subTitle: item.data.subTitle,
         category: item.data.category,

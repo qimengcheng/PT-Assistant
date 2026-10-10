@@ -18,6 +18,17 @@ export type TKeepUploadTaskKey = string;
  */
 export interface IKeepUploadTaskItem {
   site: TSiteID; // 站点id
+  /**
+   * 这颗种子在**它自己那个站上**的 id。
+   *
+   * 必须有：有 7 个站的下载链接不是从详情页 `link` 拿的，而是拿这个 id 去换
+   * （`yemapt` / `mteam` / `yzyy` / `exttorrents` / `hhanclub` / `secretcinema` / `sjtu`，
+   * 判据见各站定义的 `getTorrentDownloadLink`）。没记这一项时它们发送会失败，
+   * 而站点回的是 `{ success: false }` 不带原因，界面上只剩一句兜底的 "xxx API request failed"
+   * —— 看着像账号或网络坏了，其实是我们少传了一个字段（他 2026-10-10 那条 yemapt 就是这个）。
+   * 这一版之前建的任务没有它，补不出来（只能重建那一条任务）。
+   */
+  id?: string | number;
   title: string; // 标题
   subTitle?: string; // 副标题
   category?: string | number; // 分类（用于展开下载路径和标签模板）

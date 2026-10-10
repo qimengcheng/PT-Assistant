@@ -69,6 +69,9 @@ async function sendOne(task: IKeepUploadTask, item: IKeepUploadTaskItem, downloa
   const result = await sendMessage("downloadTorrent", {
     torrent: {
       site: item.site,
+      // 与设置页那颗手动发送一样：yemapt / mteam 那 7 个站的下载链接是拿这个 id 换的，
+      // 少了它站点只回 `{success:false}`，日志里就是一句看不出原因的 "API request failed"
+      id: item.id,
       title: item.title,
       subTitle: item.subTitle,
       // item.link 是详情页、item.url 是种子下载链接；这里键名按 downloadTorrent 那侧的叫法摆，

@@ -339,6 +339,9 @@ async function sendTorrentsToDownloader(
       const result = await sendMessage("downloadTorrent", {
         torrent: {
           site: item.site,
+          // 站点自己的种子 id：yemapt / mteam 那 7 个站拿它换下载链接，不传就是 `{success:false}`
+          // 一句兜底文案，看不出是少字段。判据见 IKeepUploadTaskItem.id。
+          id: item.id,
           title: item.title,
           subTitle: item.subTitle,
           link: item.url,

@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-10 15:17:00",
-  "headSha": "eefcf16",
+  "generatedAt": "2026-10-10 15:39:56",
+  "headSha": "51c58c3",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.66.1",
+      "date": "2026-10-10 15:54:58",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "从「辅种任务」推送种子到下载器时，YemaPT、M-Team 这类**要靠站点自己的种子编号换下载链接**的站点不再一句「API request failed」就失败 —— 任务里现在记着那个编号（这一版之前建的任务仍然缺它，把那一条删掉重建即可，基准不用重下）。搜索页直接推送一直是好的，只有从辅种任务推才会坏。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.66.0",
       "date": "2026-10-10 15:39:56",

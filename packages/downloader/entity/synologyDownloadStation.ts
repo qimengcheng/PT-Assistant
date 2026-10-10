@@ -620,6 +620,11 @@ export default class SynologyDownloadStation extends AbstractBittorrentClient<To
       params.id = filter.ids;
     }
 
+    // ⚠️ filter.complete 原先被整个忽略：DS 的 list 接口没有「只看已完成」这个开关，
+    // 只能取回后在本地筛（Deluge 那边就是转成 state=Seeding，我们对应 completed_time>0）。
+    // 不筛的话「已完成」筛选器会返回全部种子。
+    const completedOnly = filter.complete === true;
+
     // ⚠️ 不能 `as SynologySuccessResponse<…>` 把失败分支抹掉：sid 过期时 DS 回
     // {success:false, error:{code:105}}，那时 req.data 是 undefined，
     // 下面 req.data.task 直接 TypeError —— 表现为「种子列表整个打不开」而不是
@@ -719,6 +724,12 @@ export default class SynologyDownloadStation extends AbstractBittorrentClient<To
         const upload = task.additional!.transfer!.size_uploaded;
         const download = task.additional!.transfer!.size_downloaded;
 
+        // 上面 switch 算出的 state 不含「已完成」这一档的完整语义，
+        // 而 completed_only 要按 isCompleted 筛，所以先算出来在这里过滤
+        if (completedOnly && !isCompleted) {
+          return null;
+        }
+
         return {
           id: task.id,
           infoHash: task.id, // 注意DS的返回信息中没有info_hash，故使用id替代
@@ -738,7 +749,9 @@ export default class SynologyDownloadStation extends AbstractBittorrentClient<To
           raw: task,
           clientId: this.config.id,
         } as CTorrent<rawTask>;
-      });
+      })
+      // map 里 completedOnly 过滤掉了未完成的，会留 null
+      .filter((t): t is CTorrent<rawTask> => t !== null);
   }
 
   async pauseTorrent(id: string): Promise<boolean> {

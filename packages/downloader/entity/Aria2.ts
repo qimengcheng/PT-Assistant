@@ -380,7 +380,15 @@ export default class Aria2 extends AbstractBittorrentClient {
     }
 
     try {
-      const gid = await this.methodSend<string>(method, params);
+      // ⚠️ methodSend 返回的是完整的 JSON-RPC 响应体 {jsonrpc, id, result}，
+      // GID 在 result 里 —— 原先直接把整个响应对象当 GID 传给
+      // aria2.changeOption，必然失败，而那个空 catch 又把失败吞了，
+      // 于是「推送时带限速」这个选项一直静默失效。
+      const resp = await this.methodSend<string>(method, params);
+      const gid = (resp as { result?: string })?.result ?? (resp as unknown as string);
+      if (!gid || typeof gid !== "string") {
+        throw new Error(`Aria2 add torrent returned unexpected shape: ${JSON.stringify(resp)}`);
+      }
 
       // 设置上传速度限制 - 必须在添加后使用 aria2.changeOption
       if (options.uploadSpeedLimit && options.uploadSpeedLimit > 0) {
@@ -391,11 +399,17 @@ export default class Aria2 extends AbstractBittorrentClient {
               "max-upload-limit": `${options.uploadSpeedLimit * 1024}K`,
             },
           ]);
-        } catch (e) {}
+        } catch (e) {
+          // 限速设不上不影响种子已经加进去，但要说出来而不是静默
+          console.error(`[Aria2] set upload speed limit failed for ${gid}`, e);
+        }
       }
 
       addResult.success = true;
-    } catch (e) {}
+    } catch (e) {
+      console.error(`[Aria2] add torrent failed via ${method}`, e);
+      addResult.message = e instanceof Error ? e.message : String(e);
+    }
 
     return addResult;
   }

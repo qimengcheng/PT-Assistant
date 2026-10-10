@@ -104,6 +104,10 @@ export function extractMagnetHash(magnetUri: string): string | null {
 
 export async function getRemoteTorrentFile(options: AxiosRequestConfig = {}): Promise<ParsedTorrent> {
   const req = await axios.request({
+    // ⚠️ 必须给默认超时：站点不可达时既不 resolve 也不 reject，
+    // 「添加到下载器」的整个流程就永久卡住（界面上 loading 不消失）。
+    // 放在 ...options 之前，调用方显式传了 timeout 时以它的为准。
+    timeout: 30 * 1e3,
     ...options,
     responseType: "arraybuffer", // 统一以 ArrayBuffer 形式获取，方便后面转化
   });

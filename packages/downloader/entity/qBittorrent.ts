@@ -235,6 +235,20 @@ const convertMaps: [string, keyof TorrentClientStatus][] = [
   ["up_info_speed", "upSpeed"],
 ];
 
+/**
+ * 取路径最后一段作为文件名。
+ *
+ * CTorrentFile 的契约是「name 不含路径」，而 qBittorrent 的 `/torrents/files` 回的是
+ * `种子目录/子目录/文件` —— 原样当 name 用，列表里每行都带一遍路径。
+ * Deluge（`file.path.split(/[/\\]/).pop()`）和 ruTorrent 早就是这条规则，qBittorrent
+ * 是这批里唯一没剥的那个，所以按同一条收口，而不是另发明一种「只剥顶层」的判法：
+ * 嵌套目录（`种子目录/CD1/track01.flac`）只剥第一段的话 name 里仍然留着斜杠。
+ * path 字段不动 —— 第二层种子指纹吃的就是 path。
+ */
+function toFileName(name: string): string {
+  return name.split(/[/\\]/).pop() || name;
+}
+
 // qBittorrent 文件优先级: 0=skip, 1=normal, 6=high, 7=maximum
 function mapQBittorrentFilePriority(priority: number): TorrentFilePriority {
   switch (priority) {
@@ -305,7 +319,14 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
   }
 
   get isApiKeyAuth(): boolean {
-    return !this.config.username && this.config.password.startsWith("qbt_");
+    // ⚠️ 只有 username 为空时才会走到 startsWith（`&&` 短路），所以坏的形状是
+    // 「username 空 且 password 这项是 undefined」。构造函数吃的是
+    // `{...clientConfig, ...options}`，实测两种展开：options 里**没有**这个键时默认的 ""
+    // 会留下（不炸）；键在、值为 undefined 时被覆盖成 undefined（炸）。而
+    // `DownloaderBaseConfig.password` 的类型本来就是可选，配置又是从存储里直接传进来的
+    // （getDownloader 把 config 原样交给构造函数）。原先直接 .startsWith 抛 TypeError，
+    // 这个 getter 每个请求前都要问一次，于是整个客户端不可用。补 ?? ""。
+    return !this.config.username && (this.config.password ?? "").startsWith("qbt_");
   }
 
   // 是否启用「绕过 CSRF 保护」：请求时通过 DNR 移除 Origin 头
@@ -368,7 +389,8 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
 
   override async getClientFreeSpace(): Promise<number> {
     const syncData = await this.getSyncData();
-    return syncData.server_state?.["free_space_on_disk"] as number;
+    // 声明的是 number，但 server_state 可能整个缺失 —— 给 0 而不是 undefined
+    return (syncData.server_state?.["free_space_on_disk"] as number) ?? 0;
   }
 
   // qbt 默认Session时长 3600s，一次登录应该足够进行所有操作
@@ -801,7 +823,9 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
       const priority = mapQBittorrentFilePriority(file.priority);
       return {
         index: file.index,
-        name: file.name,
+        // ⚠️ 契约是「name 不含路径」：qB 的 file.name 是 "种子目录/…/子文件"，
+        // 原样当 name 用会让列表里每行都带一遍路径。取最后一段。
+        name: toFileName(file.name),
         path: file.name,
         size: file.size,
         progress: file.progress * 100,

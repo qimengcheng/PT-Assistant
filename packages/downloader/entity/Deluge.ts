@@ -724,26 +724,39 @@ export default class Deluge extends AbstractBittorrentClient {
     }
   }
 
-  private async request<T>(method: DelugeMethod, params: any[] = []): Promise<T> {
+  private async request<T>(method: DelugeMethod, params: any[] = [], sessionRetries = 0): Promise<T> {
     // 防止循环调用
     if (!this.isLogin && method !== "auth.login") {
       await this.login();
     }
 
-    const {
-      data: { result, error },
-    } = await axios.post<DelugeDefaultResponse<T>>(
-      this.address,
-      {
-        id: this._msgId++,
-        method: method,
-        params: params,
-      },
-      {
-        responseType: "json",
-        timeout: this.config.timeout,
-      },
-    );
+    let result: T;
+    let error: unknown;
+    try {
+      ({
+        data: { result, error },
+      } = await axios.post<DelugeDefaultResponse<T>>(
+        this.address,
+        {
+          id: this._msgId++,
+          method: method,
+          params: params,
+        },
+        {
+          responseType: "json",
+          timeout: this.config.timeout,
+        },
+      ));
+    } catch (e) {
+      // ⚠️ 会话失效后 isLogin 一直是 true —— request() 开头那句 `!this.isLogin`
+      // 于是永远不再登录，这个长驻实例（offscreen 按 id 缓存）就永久失效了。
+      // 这里把会话标记为失效并重登一次再试，限一次避免死循环。
+      if (sessionRetries < 1 && !method.startsWith("auth.")) {
+        this.isLogin = false;
+        return await this.request<T>(method, params, sessionRetries + 1);
+      }
+      throw e;
+    }
 
     // Deluge 用 HTTP 200 + JSON-RPC error 字段报错，result 此时是 undefined。
     // 直接 return result 会把 undefined 当成功返回（例如 addResult.success = result !== null 判成 true），

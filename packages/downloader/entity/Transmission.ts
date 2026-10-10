@@ -150,7 +150,16 @@ interface TransmissionStatsResponse extends TransmissionBaseResponse {
 
 interface AddTorrentResponse extends TransmissionBaseResponse {
   arguments: {
-    "torrent-added": {
+    /**
+     * 两者只会回一个：成功是 torrent-added，**重复添加**是 torrent-duplicate
+     * （且此时没有 torrent-added）。原先类型里只写了前者，于是重复推送恒报失败。
+     */
+    "torrent-added"?: {
+      id: number;
+      hashString: string;
+      name: string;
+    };
+    "torrent-duplicate"?: {
       id: number;
       hashString: string;
       name: string;
@@ -449,7 +458,23 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
     try {
       const { data } = await this.request<AddTorrentResponse>("torrent-add", addTorrentOptions);
 
-      const torrentId = data.arguments["torrent-added"].id;
+      // ⚠️ 重复添加时 Transmission 回的是 torrent-duplicate 而**没有** torrent-added，
+      // 原先直接解引用 data.arguments["torrent-added"].id 会抛 TypeError，
+      // 而外面那个 catch 把它吞了 —— 于是「重复推送」恒报失败，其实种子早就在里面了。
+      const added = data.arguments["torrent-added"];
+      const duplicate = data.arguments["torrent-duplicate"];
+      const torrentId = added?.id ?? duplicate?.id;
+
+      if (torrentId === undefined) {
+        // 真没有 id 才是异常形状，交给下面统一处理
+        throw new Error(`Transmission torrent-add returned no torrent id: ${JSON.stringify(data.arguments)}`);
+      }
+
+      // 重复添加不算失败：种子已经在下载器里了，如实告诉调用方
+      if (!added && duplicate) {
+        addResult.success = true;
+        addResult.message = "torrent-duplicate";
+      }
 
       // Transmission 3.0 以上才支持label
       if (!supportLabelAtAdd && labels) {
@@ -823,7 +848,14 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
     return true;
   }
 
-  async request<T>(method: TransmissionRequestMethod, args: any = {}): Promise<AxiosResponse<T>> {
+  /**
+   * @param sessionRetries 409 重试计数（内部用，调用方不必传）
+   */
+  async request<T>(
+    method: TransmissionRequestMethod,
+    args: any = {},
+    sessionRetries = 0,
+  ): Promise<AxiosResponse<T>> {
     try {
       return await axios.post<T>(
         this.address,
@@ -844,8 +876,14 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
       );
     } catch (error: any) {
       if (isAxiosError(error) && error?.response?.status === 409) {
+        // ⚠️ 必须有重试上限：409 的正常含义就是「拿新的 session id 再试一次」，
+        // 而服务端若持续回 409（代理层顶掉了那个头），无上限重试就是死循环。
+        if (sessionRetries >= 3) {
+          throw error;
+        }
+        sessionRetries++;
         this.sessionId = error.response.headers["x-transmission-session-id"]; // lower cased header in axios
-        return await this.request<T>(method, args);
+        return await this.request<T>(method, args, sessionRetries);
       } else {
         throw error;
       }

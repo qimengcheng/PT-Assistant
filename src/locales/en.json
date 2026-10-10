@@ -99,6 +99,7 @@
         "wrong": "Not seeding",
         "paused": "Paused",
         "pending": "Pending",
+        "downloading": "Downloading",
         "notFound": "Not in downloader",
         "untracked": "Not matched to an entry in the downloader"
       },

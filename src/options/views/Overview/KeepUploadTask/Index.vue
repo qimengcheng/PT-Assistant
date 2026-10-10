@@ -576,6 +576,24 @@ const reseedVerdictText = computed<Record<TReseedVerdict, string>>(() => ({
 }));
 
 /**
+ * 一条结论在界面上怎么说。两处用（展开行那一颗徽标 + 悬停里逐条明细），只这一份判法 ——
+ * 同一页两个说法是他反复指过的那类缺陷。
+ *
+ * `pending` 里要单独拎出「其实已经判出来了：它正在下载」那一半。基准那条「还在下」之所以翻成
+ * `pending`，只是为了别被 `wrong` 一路带去自动暂停（v0.59.1），可「待确认」说的是「还没判出来」，
+ * 于是那一格读起来像卡住了 —— 他 2026-10-10 指着它说「这个应该是下载中(0%)」。
+ * 结论本身不动（`wrong` / 暂停 / 排序档位都不受影响），只换措辞。
+ */
+function itemVerdictText(status?: IReseedItemStatus): string {
+  if (status?.verdict === "pending" && status.downloading) {
+    const label = t("KeepUploadTask.recheck.state.downloading");
+    // 没报进度就只说「下载中」，不替下载器编一个 0%
+    return typeof status.progress === "number" ? `${label} ${Math.round(status.progress)}%` : label;
+  }
+  return reseedVerdictText.value[status?.verdict ?? "notFound"];
+}
+
+/**
  * 进度阶段那一行的标签。写成 computed 而不是顶层常量：切语言要重算（AGENTS §3.4 那条）。
  * `wrong` 那一档不在这里 —— 它的文字带着条数，见 `stageText`。
  */
@@ -627,7 +645,10 @@ function stageText(task: IKeepUploadTask): string {
   // wrong 那一档直接报数，不写「没正常做种」再在第二行重复一遍条数
   if (stage === "wrong") return t("KeepUploadTask.recheck.stage.wrong", { count: info.wrongCount });
   const label = reseedStageLabel.value[stage];
-  if (stage === "baseDownloading") return `${label} ${Math.round(info.progress ?? 0)}%`;
+  // 没报进度就只说「基准在下」，不替下载器编一个 0%（同 v0.60.3 那条 `toPercent` 的口径）
+  if (stage === "baseDownloading") {
+    return typeof info.progress === "number" ? `${label} ${Math.round(info.progress)}%` : label;
+  }
   // x/y 的分母是除基准外的条数：基准是前提，不算进「辅种进度」
   if ((stage === "reseeding" || stage === "done") && info.totalCount > 0) {
     return `${label} ${info.doneCount}/${info.totalCount}`;
@@ -707,7 +728,7 @@ function reseedRows(record: IKeepUploadTask) {
     return {
       key: hash || String(index),
       title: item.title,
-      text: hash ? reseedVerdictText.value[status?.verdict ?? "notFound"] : t("KeepUploadTask.recheck.state.untracked"),
+      text: hash ? itemVerdictText(status) : t("KeepUploadTask.recheck.state.untracked"),
       raw: status?.rawState ?? "",
     };
   });
@@ -734,7 +755,7 @@ function itemReseed(record: IKeepUploadTask, item: IKeepUploadTask["items"][numb
   if (!hash) return { color: "default", text: t("KeepUploadTask.recheck.state.untracked") };
   const status = perTask[hash];
   if (!status) return { color: "warning", text: reseedVerdictText.value.notFound };
-  return { color: RESEED_VERDICT_COLOR[status.verdict], text: reseedVerdictText.value[status.verdict] };
+  return { color: RESEED_VERDICT_COLOR[status.verdict], text: itemVerdictText(status) };
 }
 
 // 发送基准种子到下载器

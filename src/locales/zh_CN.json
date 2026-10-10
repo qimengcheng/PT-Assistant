@@ -99,6 +99,7 @@
         "wrong": "没正常做种",
         "paused": "已暂停",
         "pending": "待确认",
+        "downloading": "下载中",
         "notFound": "下载器里没有",
         "untracked": "没认出在下载器里是哪一条"
       },

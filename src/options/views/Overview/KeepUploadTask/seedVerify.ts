@@ -45,6 +45,12 @@ export interface IReseedItemStatus {
   progress?: number;
   /** 下载器报的「已下完」。判进度阶段要用它，见 `reseedStage` */
   completed?: boolean;
+  /**
+   * 下载器报的是「正在下」这一族状态（不含停着的 `pausedDL`）。
+   * 结论本身不动它 —— 基准那条靠 `isBase` 翻成 `pending`（不是故障），辅种那条仍是 `wrong`；
+   * 这一项只让界面把基准那一格的「待确认」换成「下载中 N%」，别说成「还没判出来」。
+   */
+  downloading?: boolean;
 }
 
 /**
@@ -73,6 +79,15 @@ const INCOMPLETE_RAW = new Set(["pausedDL", "downloading", "stalledDL", "forcedD
 /** qBittorrent 里算「正常做种」的（`queuedUP` 只是排队等上传，数据是齐的） */
 const SEEDING_RAW = new Set(["uploading", "stalledUP", "forcedUP", "queuedUP"]);
 
+/**
+ * `INCOMPLETE_RAW` 里「真的正在下」那一半（`pausedDL` 除外 —— 那是停着的，报「下载中」是骗人）。
+ *
+ * 只给界面用，见 `IReseedItemStatus.downloading`：基准那条「还在下」在判据里翻成 `pending`
+ * 只是为了不去触发自动暂停，可 `pending` 那个词（界面上写「待确认」）说的是「还没判出来」，
+ * 而这一半恰恰是**已经判出来了：它正在下载**。
+ */
+const ACTIVE_DL_RAW = new Set([...INCOMPLETE_RAW].filter((raw) => raw !== "pausedDL"));
+
 /** 「有全部数据但停着」 */
 const PAUSED_RAW = new Set(["pausedUP", "stoppedUP"]);
 
@@ -99,11 +114,14 @@ export function judgeReseedTorrent(
   if (!probe) return { verdict: "notFound", rawState: "" };
 
   const raw = String(probe.rawState ?? "").trim();
+  const normalized = String(probe.state ?? "").trim();
   const status: IReseedItemStatus = {
     verdict: "pending",
     rawState: raw,
     progress: typeof probe.progress === "number" ? probe.progress : undefined,
     completed: !!probe.isCompleted,
+    // 两条来路都要认：`rawState` 只有 qBittorrent 有，别的客户端只剩归一那 7 值
+    downloading: ACTIVE_DL_RAW.has(raw) || normalized === "downloading",
   };
 
   if (PENDING_RAW.has(raw)) return { ...status, verdict: "pending" };

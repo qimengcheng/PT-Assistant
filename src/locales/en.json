@@ -47,7 +47,7 @@
     },
     "ReDownloadSelectDialog": {
       "partiallyFailed": "{n} torrent(s) failed to re-download. Check the client and retry.",
-        "oldMethod": "Retry with original method",
+      "oldMethod": "Retry with original method",
       "selectDownloader": "Select Downloader",
       "title": "Re-download {0} records"
     },
@@ -318,7 +318,7 @@
     "searchPlaceholder": "Search by name, hash, label, or path",
     "speedLimit": {
       "partiallyFailed": "{succeeded} applied, {failed} failed",
-        "batchBtn": "Speed Limit",
+      "batchBtn": "Speed Limit",
       "download": "Download Limit (KiB/s, 0 = unlimited)",
       "emptyLimit": "Please fill in at least one of upload or download limit",
       "success": "Limited {count} torrent(s)",
@@ -1043,6 +1043,7 @@
       "saveDownloadHistory": "Save download history"
     },
     "BackupWindow": {
+      "loadingKey": "Reading the current key…",
       "groupEncryption": "Backup encryption",
       "encryptionKey": "Backup file encryption key",
       "encryptionKeyHint": "Exports and remote backups are encrypted (AES) with this key; the same key is required when restoring. Leave it empty for no encryption.",
@@ -1172,6 +1173,9 @@
       "switchOff": "Off"
     },
     "index": {
+      "defaultDownloaderIdGone": "The selected downloader was deleted or disabled — pick another one",
+      "defaultDownloaderNoId": "Pick a default downloader first",
+      "defaultDownloaderSaveFailed": "Failed to save the default downloader",
       "changeDefaultDownloader": "Default downloader updated successfully. If necessary, please further configure the download path and tags.",
       "editDefaultDownloaderBtn": "Edit Default Downloader",
       "emptyNotice": "Before using the download service, you need to add at least one download server.",
@@ -1212,7 +1216,7 @@
     },
     "index": {
       "saveFailed": "Save failed, the change was reverted",
-        "title": "Media Server",
+      "title": "Media Server",
       "needName": "Please enter the media server name",
       "needAddress": "Please enter the media server address",
       "needAuthField": "Please fill in the authentication field \"{0}\"",

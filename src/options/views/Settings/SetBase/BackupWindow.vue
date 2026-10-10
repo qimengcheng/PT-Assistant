@@ -18,10 +18,33 @@ import RestorePtppUserDataDialog from "./RestorePtppUserDataDialog.vue";
 const { t } = useI18n();
 const configStore = useConfigStore();
 
-const encryptionKey = shallowRef<string>(configStore.backup.encryptionKey);
+/**
+ * ⚠️ configStore 是 persistWebExt 的 store，取数走 chrome.storage.local.get，
+ * **异步水合**。在 setup 里同步读 configStore.backup.encryptionKey 拿到的是
+ * 初始值（空串），不是用户真正的密钥 —— 这一节不是点开才挂的：SetBase/Index.vue:300
+ * 的 v-for 一次性把九节全挂上，所以冷启动进「常规设置」的那一刻就会读到空串。
+ *
+ * 后果有两条：
+ *  1. 输入框是空的，看着像「这个备份没有密钥」；
+ *  2. 用户在这个空输入框点「随机密钥」，会生成一个新的 nanoid，
+ *     而下面那条单向 watch 立刻把它写回 store —— **原有备份从此解不开**。
+ *
+ * 修法：等 $onReady 之后再回填本地 ref，水合前 watch 不回写、整组控件禁用并给加载提示
+ * （$onReady 的仓库内正例见 entrypoints/options/main.ts:30、MediaServerEntity/Index.vue:65）。
+ */
+const encryptionKey = shallowRef<string>("");
+const isKeyReady = ref<boolean>(false);
 const { history, undo: undoEncryptionKey } = useThrottledRefHistory(encryptionKey, { throttle: 50 });
+
 watch(encryptionKey, (newValue) => {
+  // 水合前一律不回写：那时的值是空串，写回去就是抹掉用户真实的密钥
+  if (!isKeyReady.value) return;
   configStore.backup.encryptionKey = newValue; // 将 encryptionKey 同步回 configStore
+});
+
+configStore.$onReady(() => {
+  encryptionKey.value = configStore.backup.encryptionKey ?? "";
+  isKeyReady.value = true;
 });
 
 function randomEncryptionKey() {
@@ -74,15 +97,21 @@ function pickPtppFile(file: File) {
           :label="t('SetBase.BackupWindow.encryptionKey')"
           :extra="t('SetBase.BackupWindow.encryptionKeyHint')"
         >
+          <!-- 水合回来之前整组不可用：此刻输入框是空的（不是「没设密钥」），
+               点「随机密钥」会生成新密钥盖掉真实密钥，已有备份就再也解不开了。 -->
+          <a-alert v-if="!isKeyReady" type="info" show-icon class="mb-2">
+            <template #message>{{ t("SetBase.BackupWindow.loadingKey") }}</template>
+          </a-alert>
           <a-space-compact>
             <a-input-password
               v-model:value="encryptionKey"
               class="key-input"
               :placeholder="t('SetBase.BackupWindow.encryptionKeyPlaceholder')"
               autocomplete="new-password"
+              :disabled="!isKeyReady"
             />
             <a-tooltip :title="t('SetBase.BackupWindow.randomKeyTooltip')">
-              <a-button @click="randomEncryptionKey">
+              <a-button :disabled="!isKeyReady" @click="randomEncryptionKey">
                 <template #icon>
                   <KeyOutlined />
                 </template>

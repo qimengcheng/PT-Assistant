@@ -140,6 +140,19 @@ async function doAutoImport() {
       }
     } catch (e) {
       importStatus.value.failed.push(site);
+      // ⚠️ catch 分支同样要把临时配置清掉：上面 addSite() 已经落库了，
+      // 而 getSiteUserConfig / sendMessage 抛错（网络、SW 挂了、动态 import 失败）
+      // 会直接跳到这里 —— 只记 failed 而不清理，站点就以「已添加但连不上」的
+      // 状态留在库里，还会进 buildSiteMapCache（后面 addSite 时按 host/name
+      // 建索引，于是站点列表里多出一个永远搜不出东西的条目）。
+      console.error(`[OneClickImport] import site failed: ${site}`, e);
+      try {
+        await metadataStore.removeSite(site, { reBuildMap: false });
+      } catch (cleanupError) {
+        // 清理本身失败不能再抛出去打断整批 —— 但要记下来，
+        // 否则用户看到「导入失败」却不知道库里还留着一条脏数据
+        console.error(`[OneClickImport] rollback site failed: ${site}`, cleanupError);
+      }
     }
   }
 

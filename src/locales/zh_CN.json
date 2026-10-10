@@ -47,7 +47,7 @@
     },
     "ReDownloadSelectDialog": {
       "partiallyFailed": "有 {n} 条重下失败，请检查下载器后重试",
-        "oldMethod": "按原下载方式重试",
+      "oldMethod": "按原下载方式重试",
       "selectDownloader": "选择下载服务器",
       "title": "重新下载 {0} 条记录"
     },
@@ -318,7 +318,7 @@
     "searchPlaceholder": "搜索种子名称、Hash、标签、路径",
     "speedLimit": {
       "partiallyFailed": "已设置 {succeeded} 个，{failed} 个失败",
-        "batchBtn": "批量限速",
+      "batchBtn": "批量限速",
       "download": "下载限速（KiB/s，0 表示不限速）",
       "emptyLimit": "请至少填写上传或下载限速中的一个",
       "success": "已设置 {count} 个种子的限速",
@@ -1043,6 +1043,7 @@
       "saveDownloadHistory": "保存下载历史记录"
     },
     "BackupWindow": {
+      "loadingKey": "正在读取现有密钥…",
       "groupEncryption": "备份加密",
       "encryptionKey": "备份文件加密密钥",
       "encryptionKeyHint": "导出与远程备份将使用该密钥加密（AES），恢复时需要填写相同密钥。留空表示不加密。",
@@ -1172,6 +1173,9 @@
       "switchOff": "关"
     },
     "index": {
+      "defaultDownloaderIdGone": "所选下载器已被删除或已禁用，请重新选择",
+      "defaultDownloaderNoId": "请先选择一个默认下载器",
+      "defaultDownloaderSaveFailed": "保存默认下载器失败",
       "changeDefaultDownloader": "更新默认下载服务器成功！如有必要请进一步设置下载地址和标签。",
       "editDefaultDownloaderBtn": "默认下载服务器设置",
       "emptyNotice": "在使用推送服务之前，您至少需要添加一个下载服务器。",
@@ -1212,7 +1216,7 @@
     },
     "index": {
       "saveFailed": "保存失败，已撤销本次改动",
-        "title": "媒体服务器",
+      "title": "媒体服务器",
       "needName": "请填写媒体服务器名称",
       "needAddress": "请填写媒体服务器地址",
       "needAuthField": "请填写认证字段「{0}」",

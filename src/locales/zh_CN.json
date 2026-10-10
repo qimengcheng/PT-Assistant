@@ -781,6 +781,9 @@
       "title": "{name} 的历史备份"
     },
     "LocalExportConfirmDialog": {
+      "exportFailed": "导出失败",
+      "exported": "导出完成",
+      "selectAtLeastOne": "请至少选择一项要导出的内容",
       "title": "请选择本地需要导出的内容"
     },
     "RestoreDialog": {
@@ -1352,6 +1355,7 @@
     },
     "ReBuildMapDialog": {
       "doRebuildBtn": "重建",
+      "failed": "重建失败",
       "rebuildSiteHostMap": "重建站点域名关系缓存",
       "rebuildSiteNameMap": "重建站点名称关系缓存",
       "title": "重建站点映射关系缓存"

@@ -356,29 +356,34 @@ async function markSelectedAsRead() {
   progress.value = { done: 0, total: targets };
   const doneBySite = new Map<TSiteID, string[]>();
 
-  for (const [siteId, ids] of bySite) {
-    const group = groups.value.find((item) => item.siteId === siteId);
-    const urls = new Map((group?.messages ?? []).filter((item) => item.id).map((item) => [item.id!, item.url]));
-    for (const messageId of ids) {
-      const url = urls.get(messageId);
-      if (url) {
-        try {
-          await sendMessage("getSiteMessageContent", { siteId, messageId, url });
-          doneBySite.set(siteId, [...(doneBySite.get(siteId) ?? []), messageId]);
-        } catch {
-          // 一条打不通不停下整批
+  // ⚠️ busyKind 必须在 finally 里复位：它是 isBusy 的来源，而 isBusy 又兼作
+  // 「别重复点」的闸 —— 中途抛错不复位的话两个按钮永久禁用，只能刷新页面。
+  try {
+    for (const [siteId, ids] of bySite) {
+      const group = groups.value.find((item) => item.siteId === siteId);
+      const urls = new Map((group?.messages ?? []).filter((item) => item.id).map((item) => [item.id!, item.url]));
+      for (const messageId of ids) {
+        const url = urls.get(messageId);
+        if (url) {
+          try {
+            await sendMessage("getSiteMessageContent", { siteId, messageId, url });
+            doneBySite.set(siteId, [...(doneBySite.get(siteId) ?? []), messageId]);
+          } catch {
+            // 一条打不通不停下整批
+          }
         }
+        progress.value = { done: progress.value.done + 1, total: targets };
+        // 逐条之间留一道缝：一口气把 N 条打过去会撞上站点对刷新频率的保护
+        await sleep(300);
       }
-      progress.value = { done: progress.value.done + 1, total: targets };
-      // 逐条之间留一道缝：一口气把 N 条打过去会撞上站点对刷新频率的保护
-      await sleep(300);
     }
-  }
 
-  for (const [siteId, ids] of doneBySite) {
-    await messageRead.markRead(siteId, ids);
+    for (const [siteId, ids] of doneBySite) {
+      await messageRead.markRead(siteId, ids);
+    }
+  } finally {
+    busyKind.value = null;
   }
-  busyKind.value = null;
   await afterBatch([...doneBySite.keys()]);
 }
 
@@ -394,26 +399,28 @@ async function deleteSelected() {
   const skipped: string[] = [];
   const doneSites: TSiteID[] = [];
 
-  for (const siteId of siteIds) {
-    const ids = bySite.get(siteId) ?? [];
-    const siteName = groups.value.find((group) => group.siteId === siteId)?.siteName ?? siteId;
-    try {
-      const result = await sendMessage("deleteSiteMessages", { siteId, messageIds: ids });
-      // 少于请求条数 = 有几条在那页上根本不存在，等同「没删动」，不能说成功
-      if (result.supported && result.status === EResultParseStatus.success && result.handled >= ids.length) {
-        doneSites.push(siteId);
-      } else {
-        // 删不动要说出来：报「已删除」而信还在，比不删更糟
+  try {
+    for (const siteId of siteIds) {
+      const ids = bySite.get(siteId) ?? [];
+      const siteName = groups.value.find((group) => group.siteId === siteId)?.siteName ?? siteId;
+      try {
+        const result = await sendMessage("deleteSiteMessages", { siteId, messageIds: ids });
+        // 少于请求条数 = 有几条在那页上根本不存在，等同「没删动」，不能说成功
+        if (result.supported && result.status === EResultParseStatus.success && result.handled >= ids.length) {
+          doneSites.push(siteId);
+        } else {
+          // 删不动要说出来：报「已删除」而信还在，比不删更糟
+          skipped.push(siteName);
+        }
+      } catch {
         skipped.push(siteName);
       }
-    } catch {
-      skipped.push(siteName);
+      progress.value = { done: progress.value.done + ids.length, total: targets };
+      await sleep(300);
     }
-    progress.value = { done: progress.value.done + ids.length, total: targets };
-    await sleep(300);
+  } finally {
+    busyKind.value = null;
   }
-
-  busyKind.value = null;
   await afterBatch(doneSites);
   if (skipped.length > 0) {
     runtimeStore.showSnakebar(t("MyData.allMessages.deleteSkipped", { sites: skipped.join("、") }), {

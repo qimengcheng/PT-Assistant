@@ -781,6 +781,9 @@
       "title": "Backup History for {name}"
     },
     "LocalExportConfirmDialog": {
+      "exportFailed": "Export failed",
+      "exported": "Export finished",
+      "selectAtLeastOne": "Select at least one field to export",
       "title": "Select content to export locally"
     },
     "RestoreDialog": {
@@ -1352,6 +1355,7 @@
     },
     "ReBuildMapDialog": {
       "doRebuildBtn": "Rebuild",
+      "failed": "Rebuild failed",
       "rebuildSiteHostMap": "Rebuild site host mapping cache",
       "rebuildSiteNameMap": "Rebuild site name mapping cache",
       "title": "Rebuild Site Mapping Cache"

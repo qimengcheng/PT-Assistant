@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { CloseCircleOutlined, ExportOutlined } from "@antdv-next/icons";
+import { message } from "antdv-next";
 
 import { BackupFields, type TBackupFields } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
@@ -11,8 +12,35 @@ const { t } = useI18n();
 
 const backupFields = ref<TBackupFields[]>([]);
 
+const exporting = ref(false);
+
 async function doLocalExport() {
-  await sendMessage("exportBackupData", { backupFields: backupFields.value, backupServerId: "local" });
+  // ⚠️ 原来这里既不 await 也不 catch、OK 键还没有 loading —— 连点就是并发导出，
+  // 抛错时既没有提示也不关窗（弹窗停在那儿，用户不知道成没成）。
+  if (exporting.value) return;
+  if (backupFields.value.length === 0) {
+    message.warning(t("SetBackup.LocalExportConfirmDialog.selectAtLeastOne"));
+    return;
+  }
+
+  exporting.value = true;
+  try {
+    const ok = await sendMessage("exportBackupData", {
+      backupFields: backupFields.value,
+      backupServerId: "local",
+    });
+    if (ok) {
+      message.success(t("SetBackup.LocalExportConfirmDialog.exported"));
+      showDialog.value = false;
+    } else {
+      message.error(t("SetBackup.LocalExportConfirmDialog.exportFailed"));
+    }
+  } catch (e) {
+    message.error(t("SetBackup.LocalExportConfirmDialog.exportFailed"));
+    console.error("[SetBackup] local export failed", e);
+  } finally {
+    exporting.value = false;
+  }
 }
 
 function dialogEnter() {
@@ -46,7 +74,7 @@ function dialogEnter() {
           </template>
           {{ t("common.dialog.cancel") }}
         </a-button>
-        <a-button type="primary" @click="() => doLocalExport()">
+        <a-button type="primary" :loading="exporting" :disabled="backupFields.length === 0" @click="doLocalExport">
           <template #icon>
             <ExportOutlined />
           </template>

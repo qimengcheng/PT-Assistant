@@ -140,26 +140,31 @@ async function markAllAsRead() {
   markProgress.value = { done: 0, total: targets.length };
   const readIds: string[] = [];
 
-  for (const item of targets) {
-    const messageId = item.id;
-    const url = item.url;
-    if (messageId && url) {
-      try {
-        await sendMessage("getSiteMessageContent", { siteId: id, messageId, url });
-        readIds.push(messageId);
-      } catch {
-        // 一条打不通不停下整批，剩下的接着标
+  // ⚠️ 整段必须 try/finally：isMarkingAll 一旦抛在半路不复位，这颗按钮就永久 loading
+  // （它同时还兼作「别重复点」的闸），用户只能刷新页面。
+  try {
+    for (const item of targets) {
+      const messageId = item.id;
+      const url = item.url;
+      if (messageId && url) {
+        try {
+          await sendMessage("getSiteMessageContent", { siteId: id, messageId, url });
+          readIds.push(messageId);
+        } catch {
+          // 一条打不通不停下整批，剩下的接着标
+        }
       }
+      markProgress.value = { done: markProgress.value.done + 1, total: targets.length };
+      // 逐条之间留一道缝：一口气把 N 条打过去会撞上站点对刷新频率的保护
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
-    markProgress.value = { done: markProgress.value.done + 1, total: targets.length };
-    // 逐条之间留一道缝：一口气把 N 条打过去会撞上站点对刷新频率的保护
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
 
-  if (readIds.length > 0) {
-    await messageRead.markRead(id, readIds);
+    if (readIds.length > 0) {
+      await messageRead.markRead(id, readIds);
+    }
+  } finally {
+    isMarkingAll.value = false;
   }
-  isMarkingAll.value = false;
   if (showDialog.value && siteId === id) {
     await loadMessages(id);
   }

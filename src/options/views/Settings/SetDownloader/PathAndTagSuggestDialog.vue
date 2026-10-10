@@ -74,8 +74,11 @@ const suggestFolderInput = computed<string>({
 const isLoadingClientFolders = ref<boolean>(false);
 async function loadClientFolders() {
   isLoadingClientFolders.value = true;
-  const client = await getDownloader(clientConfig.value!);
+  // ⚠️ getDownloader 原先在 try 之外：它 reject（配置脏了 / 下载器类型没了）时
+  // 直接冒泡，跳过下面的复位 —— isLoadingClientFolders 永远停在 true，
+  // 那颗按钮永久转圈。整段包进 try/finally。
   try {
+    const client = await getDownloader(clientConfig.value!);
     const clientPaths = await client.getClientPaths();
     for (const path of clientPaths) {
       if ((clientConfig.value?.suggestFolders ?? []).includes(path)) continue; // 避免重复添加
@@ -83,9 +86,9 @@ async function loadClientFolders() {
     }
   } catch {
     runtimeStore.showSnakebar(t("SetDownloader.PathAndTag.downloadPath.autoImportFail"), { color: "error" });
+  } finally {
+    isLoadingClientFolders.value = false;
   }
-
-  isLoadingClientFolders.value = false;
 }
 
 const suggestTagInput = computed<string>({

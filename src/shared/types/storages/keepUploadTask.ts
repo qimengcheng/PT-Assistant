@@ -109,8 +109,23 @@ export interface IKeepUploadTaskAutoState {
   notifiedWrong?: number;
   /** 后台折出来的进度阶段。界面上那一列在没人手动回查时读它，否则后台都在暂停种子了、页面还写「没查过」 */
   stage?: TReseedStage;
-  /** infoHash（小写）→ 那一条的结论，同上 */
-  statuses?: Record<string, IReseedItemStatus>;
+}
+
+/**
+ * 最近一次「拿下载器那边的状态和任务对账」的结论，连时刻一起存。
+ *
+ * 为什么必须落盘（v0.68.1）：这一份原先只存在页面组件的一个 `ref` 里，换一页 / 重加载设置页就没了，
+ * 于是明明五分钟前刚查过、还把某条停了，界面上又写回「没查过」（他 2026-10-10 报的就是这个）。
+ * `at` 是**这条结论自己的**时刻，界面上那句「查于 N 分钟前」读它 —— 不能用 `autoState.lastRunAt`，
+ * 那个是「后台上次跑过这一条」，开了自动辅种的任务每分钟都在推进度，跟查没查到不是一回事。
+ *
+ * 页面手动点「回查」、发送后 18 秒那次延迟查、以及后台每分钟那一轮，写的都是这一块，
+ * 谁最后查谁覆盖（不再有两份结论在界面上比时间）。
+ */
+export interface IKeepUploadTaskVerify {
+  /** infoHash（小写）→ 那一条的结论 */
+  statuses: Record<string, IReseedItemStatus>;
+  at: number;
 }
 
 /**
@@ -136,6 +151,8 @@ export interface IKeepUploadTask {
   autoReseed?: boolean;
   /** 自动辅种走到哪一步了，见 `IKeepUploadTaskAutoState` */
   autoState?: IKeepUploadTaskAutoState;
+  /** 最近一次对账查到的结论，见 `IKeepUploadTaskVerify`。没查过就没这一项，界面上写「没查过」 */
+  verify?: IKeepUploadTaskVerify;
 }
 
 /**

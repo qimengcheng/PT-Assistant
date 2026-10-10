@@ -77,6 +77,17 @@ onMessage("patchKeepUploadTaskAutoState", async ({ data }) => {
 });
 
 /**
+ * 后台每分钟那一轮**只**往任务里写 `verify`（对账结论 + 查的时刻），不动其余字段。
+ * 同上面那条：整条写回会把用户这一分钟里改的开关盖回旧值；任务不在了也不凭空造一条。
+ */
+onMessage("patchKeepUploadTaskVerify", async ({ data }) => {
+  const { taskId, verify } = data;
+  const tasks = (await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema | null;
+  if (!tasks || !tasks[taskId]) return;
+  await extStore.patchItem(STORAGE_KEY, `${taskId}.verify`, verify);
+});
+
+/**
  * 删除辅种任务
  */
 export async function deleteKeepUploadTask(taskId: TKeepUploadTaskKey): Promise<void> {

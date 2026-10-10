@@ -86,6 +86,7 @@
     "recheck": {
       "button": "回查做种状态",
       "col": "做种状态",
+      "checkedAt": "查于 {time}",
       "none": "这些任务没记下种子的 infoHash，在下载器里也没找到能唯一对上的种子，没法对账",
       "linked": "已自动关联 {count} 条（任务里原先没记下 infoHash）",
       "unlinked": "另有 {count} 条没记下 infoHash，在下载器里也没找到能唯一对上的（同名的一个都没有，或者有好几个）",

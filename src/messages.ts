@@ -46,6 +46,7 @@ import type {
   ITorrentDownloadMetadata,
   IKeepUploadTask,
   IKeepUploadTaskAutoState,
+  IKeepUploadTaskVerify,
   TKeepUploadTaskKey,
   TSearchSnapshotKey,
   TTorrentDownloadKey,
@@ -237,6 +238,11 @@ export interface ProtocolMap {
    * 在这一分钟里改的「自动辅种」开关盖回旧值。
    */
   patchKeepUploadTaskAutoState(data: { taskId: TKeepUploadTaskKey; autoState: IKeepUploadTaskAutoState }): void;
+  /**
+   * 只写任务里 `verify` 那一块（后台每分钟对账查到的结论）。
+   * 和上面那条同样的理由：不拿整条任务写回，就不盖用户这一分钟里改的开关。
+   */
+  patchKeepUploadTaskVerify(data: { taskId: TKeepUploadTaskKey; verify: IKeepUploadTaskVerify }): void;
   deleteKeepUploadTask(taskId: TKeepUploadTaskKey): void;
   clearKeepUploadTasks(): void;
 

@@ -86,6 +86,7 @@
     "recheck": {
       "button": "Check seeding",
       "col": "Seeding",
+      "checkedAt": "Checked at {time}",
       "none": "These tasks recorded no infoHash for their torrents, and nothing in the downloader matched them uniquely either, so there is nothing to reconcile",
       "linked": "Linked {count} automatically (the task had no infoHash recorded)",
       "unlinked": "{count} more had no infoHash recorded and matched nothing unique in the downloader (no torrent with that name, or several of them)",

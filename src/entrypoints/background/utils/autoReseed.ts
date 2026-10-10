@@ -114,14 +114,39 @@ function worthWriting(task: IKeepUploadTask, next: IKeepUploadTask["autoState"])
   for (const k of ["baseSentAt", "baseSendFails", "othersSentAt", "othersSent", "completedAt", "stage", "notifiedWrong"]) {
     if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return true;
   }
-  return JSON.stringify(a.statuses) !== JSON.stringify(b.statuses);
+  return false;
+}
+
+/**
+ * 把这一轮对账查到的结论写回任务的 `verify`（界面上「做种状态」那一列读它）。
+ *
+ * 连不上下载器时**整块不动**，沿用原先那份「没查到就别覆盖旧结论」的口径；
+ * 另外结论没变也不写、不刷新 `at` —— `at` 的语义是「上一次真的看到状态是什么时候」，
+ * 每分钟无脑盖一次的话，界面上那句「查于 1 分钟前」就成了假话。
+ */
+async function persistVerify(
+  task: IKeepUploadTask,
+  statuses: Record<string, IReseedItemStatus>,
+  reachable: boolean,
+): Promise<void> {
+  if (!reachable) return;
+  const prev = task.verify;
+  if (prev && JSON.stringify(prev.statuses) === JSON.stringify(statuses)) return;
+  const verify = { statuses, at: Date.now() };
+  task.verify = verify;
+  await sendMessage("patchKeepUploadTaskVerify", { taskId: task.id, verify });
 }
 
 async function autoReseedTick() {
   await whenOffscreenReady();
 
   const all = (await sendMessage("getKeepUploadTasks", undefined)) as IKeepUploadTask[] | undefined;
-  const tasks = (all ?? []).filter((task) => task.autoReseed === true);
+  /**
+   * **对账**吃全部任务，**动手**只吃开了自动辅种的那些（下面 `task.autoReseed !== true` 就 continue）。
+   * 原先这一行是 `filter((task) => task.autoReseed === true)`，于是关着开关的任务后台一眼都不看 ——
+   * 他 2026-10-10 那句「应该自动去检查啊，非得用户手动去刷新吗」说的就是这个。
+   */
+  const tasks = all ?? [];
   if (tasks.length === 0) return;
 
   const metadata = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema | undefined;
@@ -164,6 +189,25 @@ async function autoReseedTick() {
           );
         };
 
+        /**
+         * 先把这一轮看到的结论按 hash 存进任务的 `verify`，再谈要不要动手。
+         * 顺序要紧：界面上那一列吃的是 `verify`，而下面那些动作可能整段跳过（没开自动辅种），
+         * 放在后面就永远不会写。
+         */
+        const statuses: Record<string, IReseedItemStatus> = {};
+        if (reachable) {
+          for (const item of task.items) {
+            const key = String(item.hash ?? "").toLowerCase();
+            const status = probe(item.hash);
+            if (key !== "" && status) statuses[key] = status;
+          }
+        }
+        await persistVerify(task, statuses, reachable);
+
+        // 没开自动辅种的到这儿就结束：**只看不动手** —— 不发种子、不暂停、不弹通知。
+        // 「查」和「动他的种子」是两件事，用户关的是后者，不是前者。
+        if (task.autoReseed !== true) continue;
+
         const base = probe(baseHash);
         /** 除基准外的全部条目（`baseLocal` 那种任务里就是整份 items） */
         const allOthers = task.baseLocal ? task.items : task.items.slice(1);
@@ -184,15 +228,7 @@ async function autoReseedTick() {
           now: Date.now(),
         });
 
-        // 把这一轮查到的结论按 hash 存下来：界面上那一列读它，否则后台都在暂停种子了、
-        // 页面上还写着「没查过」
-        const statuses: Record<string, IReseedItemStatus> = {};
-        for (const item of task.items) {
-          const key = String(item.hash ?? "").toLowerCase();
-          const status = probe(item.hash);
-          if (key !== "" && status) statuses[key] = status;
-        }
-        const next = { ...tick.next, statuses: reachable ? statuses : task.autoState?.statuses };
+        const next = { ...tick.next };
 
         const downloader = metadata?.downloaders?.[downloaderId];
         let acted = false;

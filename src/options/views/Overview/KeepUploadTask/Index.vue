@@ -398,16 +398,10 @@ const AUTO_RECHECK_DELAY_MS = 18_000;
 
 const rechecking = ref(false);
 /**
- * 回查结果：taskId -> (infoHash -> 结论)。按 hash 存而不是按序号存，因为「设为基准种子」
- * 会把 items 重排，序号存的那一份会跟着错位。
+ * 对账结论**不在这个组件里存副本**了（原先是 `reseedStatuses` + `reseedStatusesAt` 两个 ref）：
+ * 那份只活在组件里，换一页 / 重加载设置页就清空，于是明明刚查过、还把某条停了，
+ * 界面上又写回「没查过」。现在它落在任务自己的 `verify` 上，见 `IKeepUploadTaskVerify`。
  */
-const reseedStatuses = ref<Record<string, Record<string, IReseedItemStatus>>>({});
-/**
- * 上面那一份是**什么时候**查的（taskId -> 毫秒）。
- * 后台那条自动辅种每分钟把结论写进 `task.autoState.statuses`，这一份是用户点「回查」或发送后延迟查的，
- * 两边都有就得比时间 —— 不比的话，后台刚把某条暂停，界面还在拿半小时前那次「一切正常」给他看。
- */
-const reseedStatusesAt = ref<Record<string, number>>({});
 const autoRecheckTimers = new Set<number>();
 
 onUnmounted(() => {
@@ -430,17 +424,14 @@ function trackableItems(task: IKeepUploadTask) {
 }
 
 /**
- * 这一条任务此刻该用哪一份对账结果：页面自己查的那份，还是后台自动辅种写进任务里的那份，**谁新用谁**。
+ * 这一条任务此刻该显示哪一份对账结果。
  *
- * 回落不是锦上添花：开了自动辅种的任务，后台每分钟在动种子，而用户从没点过「回查」时
- * `reseedStatuses` 里压根没有这一条 —— 那一格就会写「没查过」，而其实一分钟前刚查过、还把两条停了。
- * 反过来用户刚点过回查，也不该被更早的后台那一份盖掉。
+ * 判据只有一条：**查它的人把结论写在了任务上**（`verify`，见 `IKeepUploadTaskVerify`）。
+ * 手动点「回查」、发送后 18 秒那次延迟查、后台每分钟那一轮，写的都是同一块，谁最后查谁覆盖 ——
+ * 所以这里不再需要「页面那份 vs 后台那份」比时间（那正是它原先会退回「没查过」的地方）。
  */
 function reseedStatusSource(task: IKeepUploadTask): Record<string, IReseedItemStatus> | undefined {
-  const manualAt = reseedStatusesAt.value[task.id] ?? 0;
-  const autoAt = task.autoState?.statuses ? (task.autoState.lastRunAt ?? 0) : 0;
-  if (autoAt > manualAt) return task.autoState?.statuses;
-  return reseedStatuses.value[task.id];
+  return task.verify?.statuses;
 }
 
 /**
@@ -468,7 +459,6 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
   }
 
   rechecking.value = true;
-  const next: Record<string, Record<string, IReseedItemStatus>> = { ...reseedStatuses.value };
   let checked = 0;
   let seeding = 0;
   let wrong = 0;
@@ -476,8 +466,8 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
   let unreachable = 0;
   let linked = 0;
   let unlinked = 0;
-  /** 这一轮真的查到过东西的任务，用来给 `reseedStatusesAt` 打时间戳（连不上的那台不算） */
-  const touched = new Set<string>();
+  /** 这一轮真的查到过东西的任务（连不上的那台不算，不去覆盖它上次查到的结论） */
+  const touched = new Set<IKeepUploadTask>();
 
   try {
     for (const [downloaderId, group] of byDownloader) {
@@ -513,10 +503,16 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
       for (const task of group) {
         // 基准那条的「还在下」是进度，不是故障 —— 判成 wrong 会被下面那句自动暂停把基准停掉
         const baseHash = task.baseLocal ? "" : String(task.items[0]?.hash ?? "").toLowerCase();
+        /**
+         * 在上一份结论上改，而不是整块换掉：一次回查只覆盖这次真的查到过的那几条 hash，
+         * 没在列表里出现的旧条目留着（按 hash 存、不按序号，「设为基准种子」会重排 items）。
+         */
+        const statuses: Record<string, IReseedItemStatus> = { ...(task.verify?.statuses ?? {}) };
+        let hit = 0;
         for (const item of trackableItems(task)) {
           const hash = String(item.hash).toLowerCase();
           checked++;
-          touched.add(task.id);
+          hit++;
           const found = index.get(hash);
           const status = judgeReseedTorrent(
             found
@@ -529,7 +525,7 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
               : undefined,
             { isBase: hash !== "" && hash === baseHash },
           );
-          next[task.id] = { ...(next[task.id] ?? {}), [hash]: status };
+          statuses[hash] = status;
           if (status.verdict === "seeding") seeding++;
           // 「校验失败要立刻暂停该种子」：判据里只有 wrong 会走到这里，中间态（正在校验、
           // 刚发出去还没进列表）不动它
@@ -542,13 +538,16 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
             }
           }
         }
+        if (hit > 0) {
+          task.verify = { statuses, at: Date.now() };
+          touched.add(task);
+        }
       }
     }
-    reseedStatuses.value = next;
-    const at = Date.now();
-    const stamp = { ...reseedStatusesAt.value };
-    for (const taskId of touched) stamp[taskId] = at;
-    reseedStatusesAt.value = stamp;
+    // 结论要落进 IDB：这一份原先只活在组件的 ref 里，换一页就没了，界面上于是又写回「没查过」
+    for (const task of touched) {
+      await sendMessage("updateKeepUploadTask", task);
+    }
   } finally {
     rechecking.value = false;
   }
@@ -978,6 +977,11 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
               >
                 <template #content>
                   <div class="reseed-detail">
+                    <!-- 这份结论是哪一次查的：现在它会一直留在任务上（换页、重加载都在），
+                         所以必须同时说清它是几点看到的，否则三小时前那份看着像刚查的。 -->
+                    <div v-if="record.task.verify" class="text-grey mb-1">
+                      {{ t("KeepUploadTask.recheck.checkedAt", { time: formatDate(record.task.verify.at) }) }}
+                    </div>
                     <div v-for="row in reseedRows(record.task)" :key="row.key" class="reseed-detail-row">
                       <span class="reseed-detail-title">{{ row.title }}</span>
                       <span>{{ row.text }}</span>

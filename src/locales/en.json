@@ -651,6 +651,10 @@
     },
     "siteFilter": {
       "all": "All Site"
+    },
+    "bestReseed": {
+      "hint": "Best reseed: {size} · on {count} sites",
+      "tip": "The copy carried by the most sites in these results (only byte-identical sizes count as the same data). Click to open reseed detection with those torrents already picked for you."
     }
   },
   "SearchResultSnapshot": {

@@ -776,7 +776,11 @@ const hasSearchStatus = computed<boolean>(() => {
     <!-- 内衬由下面 .result-card 的 card body padding 统一给 8px，这里不再叠 pt-2/pb-0 -->
     <div class="search-results">
       <!-- 站点筛选器、已选种子等提示信息 -->
-      <QuickFilterNotice class="site-filter-notice" :selected-torrents="tableSelectedRaw" />
+      <QuickFilterNotice
+        class="site-filter-notice"
+        :selected-torrents="tableSelectedRaw"
+        :all-torrents="tableItems"
+      />
 
       <!-- `--pt-table-body-h` 把这里已经实测好的表体高递给全局样式：空态那条规则要撑满
            剩余高度，而这一页的表体是 scroll.y（rc-table 给它写的是内联 max-height），

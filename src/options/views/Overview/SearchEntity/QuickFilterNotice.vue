@@ -2,19 +2,23 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useBreakpoint } from "antdv-next";
-import { CheckCircleFilled, GlobalOutlined, HddOutlined } from "@antdv-next/icons";
+import { BranchesOutlined, CheckCircleFilled, GlobalOutlined, HddOutlined } from "@antdv-next/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { formatSize } from "@/options/utils.ts";
+import { findBestReseedGroup } from "@/shared/bestReseed.ts";
 import type { ISearchResultTorrent } from "@/shared/types/storages/runtime.ts";
 
 import { tableCustomFilter } from "./utils/filter.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
+import KeepUploadDialog from "./KeepUploadDialog.vue";
 
-const { selectedTorrents } = defineProps<{
+const { selectedTorrents, allTorrents } = defineProps<{
   selectedTorrents: ISearchResultTorrent[];
+  /** 当前这一份结果（已过筛选器、含没翻页看到的），「最佳辅种」按整份算 */
+  allTorrents: ISearchResultTorrent[];
 }>();
 
 const { t } = useI18n();
@@ -49,6 +53,27 @@ const selectedTorrentsInfo = computed(() => {
     totalSize,
   };
 });
+
+/**
+ * 「最佳辅种」：这批结果里被最多站点同时收录的那一份（判据、以及为什么按「字节完全相同」
+ * 算，都在 src/shared/bestReseed.ts）。没有任何一档被 ≥2 站共有时返回 null，这颗 chip 就不出。
+ */
+const bestGroup = computed(() => findBestReseedGroup(allTorrents));
+
+const showBestReseedDialog = ref(false);
+/**
+ * 点的那一刻把这一批快照下来再交给弹窗。搜索结果是一个站点一个站点陆续回包的，
+ * 直接绑 bestGroup.items 会让弹窗**开着的时候**换列表 —— 那个弹窗的基准选择、
+ * 指纹比对都是在打开时算的，中途换输入不会重算，只会对不上账。
+ */
+const bestReseedItems = ref<ISearchResultTorrent[]>([]);
+
+function openBestReseedDialog() {
+  const group = bestGroup.value;
+  if (!group) return;
+  bestReseedItems.value = [...group.items];
+  showBestReseedDialog.value = true;
+}
 
 function clearSiteFilter() {
   selectedSite.value = ""; // 清除站点过滤器
@@ -121,7 +146,31 @@ function selectSite(siteId: string) {
           </div>
         </template>
 
+        <!-- 最佳辅种：这批结果里被最多站点共有的那一份，点一下直接开辅种检测，
+             要辅种哪几条由判据选好（不重排、不要求用户先勾）。 -->
+        <template v-if="bestGroup">
+          <a-divider orientation="vertical" class="mx-2" />
+          <a-tooltip :title="t('SearchEntity.bestReseed.tip')">
+            <a-tag class="chip chip_limit_width" color="green" @click.stop="openBestReseedDialog">
+              <span class="chip-inner">
+                <BranchesOutlined />
+                {{ t("SearchEntity.bestReseed.hint", { size: formatSize(bestGroup.size), count: bestGroup.siteCount }) }}
+              </span>
+            </a-tag>
+          </a-tooltip>
+        </template>
+
         <div class="flex-1-1-0" />
+
+        <!-- 挂在上面那一排里、不与 a-alert 并列，是为了保住**单根**：Index.vue 用
+             `class="site-filter-notice"` 引这个组件，模板一旦变成双根 fragment，那个 class
+             就无处可挂、被 Vue 静默丢掉。Modal 自己 portal 到 body，不参与这一排的 flex。
+             ⚠️ 这里**不许**加 `v-if="bestReseedItems.length"`：那个弹窗的全部初始化挂在
+             `watch(showDialog)`（不带 immediate）上，而 items 和 open 是同一拍置的 ——
+             挂上去时 showDialog 已经是 true，watcher 一次都不触发，候选表永远是空的
+             （台架 .tmp-build/bench-bestreseed 第一版就是这么抓到的）。不挂 v-if 也不额外花钱：
+             工具条那颗 ActionTd 本来就常驻着一份同组件实例。 -->
+        <KeepUploadDialog v-model="showBestReseedDialog" :torrent-items="bestReseedItems" />
 
         <!-- 选中种子信息条 -->
         <a-divider orientation="vertical" class="mx-2" />

@@ -651,6 +651,10 @@
     },
     "siteFilter": {
       "all": "全部站点"
+    },
+    "bestReseed": {
+      "hint": "最佳辅种：{size} · {count} 个站点都有",
+      "tip": "这批结果里被最多站点同时收录的那一份（大小完全相同才算同一份数据）。点一下直接打开辅种检测，要辅种哪几条已经替你选好。"
     }
   },
   "SearchResultSnapshot": {

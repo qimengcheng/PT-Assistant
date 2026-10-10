@@ -1,7 +1,7 @@
 import { toMerged } from "es-toolkit";
 import { ETorrentStatus, type ISiteMetadata, type IUserInfo, type ITorrent, type ISearchInput } from "../types";
 import { GazelleBase } from "./Gazelle";
-import { parseSizeString, definedFilters } from "../utils";
+import { parseSizeString, definedFilters, afterColon } from "../utils";
 import Sizzle from "sizzle";
 
 export const SchemaMetadata: Partial<ISiteMetadata> = {
@@ -20,7 +20,10 @@ export const SchemaMetadata: Partial<ISiteMetadata> = {
       id: {
         selector: ["a[href*='torrents.php?id=']"],
         attr: "href",
-        filters: [(query: string) => query.match(/torrents\.php\?id=(\d+)/)![1]],
+        // ⚠️ 原来用 match(...)![1] 非空断言：站点改版 / 链接格式一变就抛
+        // TypeError，而它在一批 filters 里跑，一行坏就是整页列表解析失败。
+        // 取不到时回空串，交给上层判空。
+        filters: [(query: string) => query.match(/torrents\.php\?id=(\d+)/)?.[1] ?? ""],
       },
       title: { selector: ["a[href*='torrents.php?id=']"] },
       subTitle: {
@@ -129,11 +132,13 @@ export const SchemaMetadata: Partial<ISiteMetadata> = {
       },
       uploaded: {
         selector: ["ul.stats > li:contains('Uploaded:')"],
-        filters: [(query: string) => parseSizeString(query.split(":")[1].trim().replace(/,/g, "") || "0")],
+        // ⚠️ split(":")[1] 在文案里没有冒号时是 undefined，接着 .trim() 就抛；
+        // 而且 "Ratio: 1:2" 这类值本身带冒号的，取到的会是错的那一段。
+        filters: [(query: string) => parseSizeString(afterColon(query).replace(/,/g, "") || "0")],
       },
       downloaded: {
         selector: ["ul.stats > li:contains('Downloaded:')"],
-        filters: [(query: string) => parseSizeString(query.split(":")[1].trim().replace(/,/g, "") || "0")],
+        filters: [(query: string) => parseSizeString(afterColon(query).replace(/,/g, "") || "0")],
       },
       levelName: {
         selector: ["span.rank", "ul.stats > li:contains('Class:')"],
@@ -143,7 +148,7 @@ export const SchemaMetadata: Partial<ISiteMetadata> = {
       },
       bonus: {
         selector: ["div[id='bonusdiv'] > h4", "h4:contains('Credits:')"],
-        filters: [(query: string) => parseFloat(query.split(":")[1].trim().replace(/,/g, "") || "0")],
+        filters: [(query: string) => parseFloat(afterColon(query).replace(/,/g, "") || "0") || 0],
       },
       ratio: {
         selector: ["ul.stats > li:contains('Ratio:') > span"],
@@ -206,7 +211,7 @@ export const SchemaMetadata: Partial<ISiteMetadata> = {
       id: {
         selector: ["a[href*='/torrents.php?action=download']"],
         attr: "href",
-        filters: [(query: string) => query.match(/id=(\d+)/)![1]],
+        filters: [(query: string) => query.match(/id=(\d+)/)?.[1] ?? ""],
       },
       link: {
         selector: ["a[href*='/torrents.php?action=download']"],

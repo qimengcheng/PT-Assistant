@@ -1,8 +1,21 @@
 {
-  "generatedAt": "2026-10-10 22:52:33",
-  "headSha": "5421057",
+  "generatedAt": "2026-10-10 23:15:16",
+  "headSha": "2c9457a",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.68.23",
+      "date": "2026-10-10 23:13:58",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "Plex 的海报地址不再把访问令牌写在页面里 —— 之前那条 URL 会进浏览器历史和图片请求的 Referer",
+        "fnOS（飞牛）电影详情链接改用影片自身的 id：换海报之后，已保存/收藏的那条链接不再跟着失效",
+        "CookieCloud 备份服务器：自定义请求头的值里带冒号时不再被截断（例如 X-Token: abc:def）",
+        "一批站点（Luminance / Unit3D 系）在站点改版、某个字段格式变化时，只丢那一格数据，不再整页搜索结果空白"
+      ],
+      "improvedTotal": 4
+    },
     {
       "version": "0.68.22",
       "date": "2026-10-10 22:51:43",

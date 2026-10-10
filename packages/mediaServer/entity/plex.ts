@@ -142,8 +142,50 @@ export default class Plex extends AbstractMediaServer<IPlexConfig> {
     config.params ??= {};
     config.params["X-Plex-Token"] = this.config.auth.apikey;
 
-    config.responseType = "json";
+    // ⚠️ 原来是无条件赋值 responseType = "json"，会把调用方传的 blob 覆盖掉 ——
+    // getPosterUrl 要下图片二进制（用 URL.createObjectURL 转 blob URL），
+    // 拿到 JSON 文本的话 createObjectURL 建出来的是「字符串」而不是图片，
+    // 海报位直接裂。
+    config.responseType ??= "json";
     return axios.request<T>(config);
+  }
+
+  /**
+   * 海报缓存：key → objectURL。
+   *
+   * ⚠️ 为什么不能直接给界面一个带 token 的 URL：海报是 <img src> 加载的，
+   * 而 <img> 发不了自定义请求头 —— 只能把 token 拼在 query 里，于是这条 URL 会
+   * 落进 DOM、浏览器历史、以及它自己发出的 Referer。
+   * 所以按 fnos 那套做法：自己把图取回来（走 request()，token 仍按它一贯的方式放在
+   * params 里，不是自定义头 —— 这次改的不是「token 不上 URL」，
+   * 而是**不再把它交给页面里的那张 <img>**），转成 blob URL 给界面。
+   */
+  private static posterUrlCache = new Map<string, string>();
+
+  private async getPosterUrl(item: IPlexSearchItem | IPlexRecentlyAddedItem): Promise<string> {
+    if (!item.thumb) return "";
+
+    const cacheKey = [this.config.id, item.key, item.thumb].join("|");
+    const cached = Plex.posterUrlCache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const resp = await this.request<Blob>(item.thumb, { responseType: "blob" });
+      const objectUrl = URL.createObjectURL(resp.data);
+      Plex.posterUrlCache.set(cacheKey, objectUrl);
+      // objectURL 不会被 GC 回收，缓存得自己设上限（沿用 fnos 那档）
+      if (Plex.posterUrlCache.size > 300) {
+        const oldest = Plex.posterUrlCache.keys().next().value;
+        if (oldest !== undefined) {
+          URL.revokeObjectURL(Plex.posterUrlCache.get(oldest)!);
+          Plex.posterUrlCache.delete(oldest);
+        }
+      }
+      return objectUrl;
+    } catch (e) {
+      console.warn(`[plex] load poster failed: ${item.thumb}`, e);
+      return "";
+    }
   }
 
   private async getServerIdentity(): Promise<string | undefined> {
@@ -166,8 +208,6 @@ export default class Plex extends AbstractMediaServer<IPlexConfig> {
       items: [],
     };
 
-    const serverIdentity = await this.getServerIdentity();
-
     // 生成基本请求参数
     let requestConfig: AxiosRequestConfig = { params: {} };
     config.startIndex = requestConfig.params["X-Plex-Container-Start"] = config.startIndex ?? 0;
@@ -175,6 +215,11 @@ export default class Plex extends AbstractMediaServer<IPlexConfig> {
     requestConfig = toMerged(requestConfig, this.config.defaultSearchExtraRequestConfig ?? {});
 
     try {
+      // ⚠️ 原来这次身份查询在 try **之外**：服务器不可达时它自己 reject，
+      // 整个 getSearchResult 直接抛出，拿不到 {status, errorMessage} 这套统一结构
+      // —— 上层拿到的就是一个 AxiosError，与 emby / jellyfin 的行为不一致。
+      // 挪进 try：401 判 needLogin（plex 的 token 也走 401），其余 parseError。
+      const serverIdentity = await this.getServerIdentity();
       // 从服务器获取最新数据 /library/recentlyAdded
       let url = "/library/recentlyAdded";
 
@@ -187,7 +232,10 @@ export default class Plex extends AbstractMediaServer<IPlexConfig> {
       const resp = await this.request<IPlexJsonResponse<IPlexSearchData>>(url, requestConfig);
 
       const items = resp?.data?.MediaContainer?.Metadata ?? [];
-      for (const item of items) {
+      // 海报逐个下（带鉴权头）→ blob URL，见 getPosterUrl 的注释
+      const posters = await Promise.all(items.map((item) => this.getPosterUrl(item)));
+
+      for (const [index, item] of items.entries()) {
         const mediaItem: IMediaServerItem<IPlexSearchItem | IPlexRecentlyAddedItem> = {
           server: this.config.id!,
           // @ts-ignore
@@ -202,7 +250,7 @@ export default class Plex extends AbstractMediaServer<IPlexConfig> {
           // Plex 的 duration 是毫秒；消费方（ItemInformationDialog.formatDuration）按秒拆分，
           // 与 emby/fnos 的 RunTimeTicks/1e7 同一口径，不除会放大 1000 倍
           duration: item.duration ? item.duration / 1000 : 0,
-          poster: item.thumb ? urlJoin(this.apiBaseUrl, `${item.thumb}?X-Plex-Token=${this.config.auth.apikey}`) : "",
+          poster: posters[index] ?? "",
           tags: item.Genre?.map((tag) => ({ name: tag.tag, url: "" })) ?? [],
           rating: item.audienceRating ?? "-", // Plex may not provide rating in search results
           streams: [], // Plex does not provide streams in search results

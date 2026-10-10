@@ -370,8 +370,12 @@ export default class FnOS extends AbstractEmbyCompatibleServer<IFnOSConfig> {
 
   private getItemUrl(item: IFnOSQueryItem) {
     if (item.Type === "Movie") {
-      const movieGuid = item.ImageTags?.Primary ?? item.MediaSources?.[0]?.Id ?? item.Id;
-      return urlJoin(this.webBaseUrl, `/movie/${movieGuid}`);
+      // ⚠️ 原来优先取 ImageTags.Primary —— 那是**图片的 cache tag**（同一个值在
+      // getPoster() 里就是海报缓存键的一段），海报一换它就变，于是已保存/收藏的
+      // 详情链接下次打开就对不上。Id 在 IFnOSQueryItem 里是必填（第 94 行），
+      // 不必再留 MediaSources / undefined 那两级兜底；剧集分支本来就用的 item.Id，
+      // 两条路径一致。
+      return urlJoin(this.webBaseUrl, `/movie/${item.Id}`);
     }
 
     if (item.Type === "Series") {

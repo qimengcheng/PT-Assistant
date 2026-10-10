@@ -119,7 +119,8 @@ export const SchemaMetadata: Partial<ISiteMetadata> = {
       id: {
         selector: ["a.view-torrent", "a.torrent-search--list__name"],
         attr: "href",
-        filters: [(query: string) => query.match(/\/torrents\/(\d+)/)![1]],
+        // ⚠️ 同 Luminance：非空断言在站点改版时抛，一行坏连带整页解析
+        filters: [(query: string) => query.match(/\/torrents\/(\d+)/)?.[1] ?? ""],
       },
       title: {
         selector: ["a.view-torrent", "a.torrent-search--list__name"],
@@ -302,7 +303,7 @@ export const SchemaMetadata: Partial<ISiteMetadata> = {
         id: {
           selector: ["a[href*='/torrents/']:not([href*='/download'])"],
           attr: "href",
-          filters: [(query: string) => query.match(/\/torrents\/(\d+)/)![1]],
+          filters: [(query: string) => query.match(/\/torrents\/(\d+)/)?.[1] ?? ""],
         },
         title: {
           selector: ["a[href*='/torrents/']:not([href*='/download'])"],

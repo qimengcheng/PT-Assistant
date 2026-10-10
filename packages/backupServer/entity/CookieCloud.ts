@@ -96,14 +96,23 @@ export default class CookieCloud extends AbstractBackupServer<CookieCloudConfig>
     };
 
     if (this.userConfig.headers?.trim().length > 0) {
-      let extraHeaderPairs = this.userConfig.headers?.trim().split("\n");
-      extraHeaderPairs.forEach((extraHeaderPair, index) => {
-        let extraHeaderPairKV = String(extraHeaderPair).split(":");
-        if (extraHeaderPairKV?.length > 1) {
-          // @ts-ignore
-          headers[extraHeaderPairKV[0]] = extraHeaderPairKV[1];
-        }
-      });
+      const extraHeaderPairs = this.userConfig.headers!.trim().split("\n");
+      for (const extraHeaderPair of extraHeaderPairs) {
+        const line = String(extraHeaderPair).trim();
+        if (!line) continue;
+        // ⚠️ 原来用 split(":") 取第 [1] 段，值里只要还有一个冒号就被截断（实测）：
+        //   "X-Token: abc:def"                            → " abc"
+        //   "Cookie: a=1; expires=Wed, 01 Jan 12:30:00"    → " a=1; expires=Wed, 01 Jan 12"
+        //   "Proxy-Authorization: Bearer 1:2:3"            → " Bearer 1"
+        // 值里只有一个冒号的那些（如 "Authorization: Basic xxx"）原本是好的，
+        // 但头值带着一个前导空格没人 trim。改成只在**第一个**冒号处切、两侧去空白。
+        const colon = line.indexOf(":");
+        if (colon <= 0) continue;
+        const name = line.slice(0, colon).trim();
+        const value = line.slice(colon + 1).trim();
+        if (!name) continue;
+        (headers as Record<string, string>)[name] = value;
+      }
     }
 
     return axios.request<T>({
@@ -142,13 +151,20 @@ export default class CookieCloud extends AbstractBackupServer<CookieCloudConfig>
       manifest,
     };
 
-    // 将 file.cookie 转换为 CookieCloud 需要的格式
-    if (file.cookies) {
-      fileData.cookie_data = file.cookies;
-      delete file.cookies; // 删除原有的 file.cookies 以免重复存储
+    /**
+     * 原来这里 `delete file.cookies` / `delete file.manifest` 是**就地改调用方的入参**。
+     * 现在唯一的调用方（offscreen/utils/backup.ts:165）每次自己 createBackupData、
+     * 用完就丢，所以今天看不出问题；但那是个陷阱：一旦有人把同一份 IBackupData
+     * 发给第二台备份服务器、或失败后重试，cookies 与 manifest 已经在第一次调用里
+     * 被删掉了 —— 备份内容静默少两块，而且报错点在别的类里，根本查不到这里。
+     * 备份服务器那一圈（Gist/S3/WebDAV/…）都是只读入参的，这个类不该例外。
+     */
+    const { cookies, manifest: _manifest, ...rest } = file;
+    if (cookies) {
+      fileData.cookie_data = cookies;
     }
-    delete file.manifest; // 删除 manifest 以免重复存储
-    fileData.ptd_data = file; // 其他的数据直接放在 ptd_data 里
+    // manifest 不进 ptd_data（文件头已经单独放了一份），其余数据直接放进去
+    fileData.ptd_data = rest as IBackupData;
 
     // 按照 CookieCloud 的流程对数据进行加密
     const theKey = CryptoJS.MD5(`${this.userConfig.uuid}-${this.userConfig.password}`).toString().substring(0, 16);
@@ -166,7 +182,16 @@ export default class CookieCloud extends AbstractBackupServer<CookieCloudConfig>
   }
 
   public async deleteFile(path: string): Promise<boolean> {
-    return await this.addFile("", { cookie: {} }); // 直接更新数据为 { cookie_data: {} }
+    // ⚠️ 原来传的是 `{ cookie: {} }`（少个 s），而 addFile 读的是 `file.cookies` ——
+    // 那个字段永远取不到。两份实际上传的 payload 我跑过（.tmp-build/cookiecloud-delete-sim.mjs）：
+    //   旧：cookie_data {} + ptd_data {cookie:{}}   ← 野键，谁也不读它
+    //   新：cookie_data {} + ptd_data {}
+    // 要说清的是：/update 是整份覆盖，所以旧写法**照样把内容清空了**，
+    // 「界面报删除成功、重新拉取还是老内容」那句是不成立的（我核对过才改的注释）。
+    // 真正的差处在 ptd_data 那一格：传对字段名才是「这份备份是空的」的形状，
+    // 而不是带一个没人认领的 cookie 键 —— 下一次 getFile 把 ptd_data 当备份内容读回去时，
+    // 读到的就是那坨野键。
+    return await this.addFile("", { cookies: {} }); // 直接更新数据为 { cookie_data: {} }
   }
 
   public async getFile(path: string): Promise<IBackupData> {

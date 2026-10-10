@@ -1172,6 +1172,42 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
   padding: 2px 0;
 }
 
+/* 站点那一格「图标要居中」（他 2026-10-10 三个箭头指着展开子行那几颗）。
+   根因不在图标自己：这一列是这张表的第一列，rc-table 把树形行的**缩进 span + 那颗 ＋/−** 也塞进了
+   同一个 td（class `ant-table-cell-with-append`）。父行里 16 的按钮和 18 的图标还挤得下一行；
+   子行多了 15 的缩进，图标就被顶到第二行 —— 于是 td 的 `vertical-align: middle` 居中的是
+   「两行的整体」，图标看着比行中心低一截。截图量到子行低 12.0 CSS px（父行只低 2.0），
+   台架在真 DOM 上量到 11.5 / 1.75，两个量具对得上。
+   把展开那两件挪出正常流，图标就是这一格里唯一的内容，横竖都落在格中心；
+   ＋/− 靠 absolute 钉回它本来所在的位置（格左沿），点击区域不变。
+   不用 `expandable.expandIconColumnIndex` 挪走：antd 会先减 1，传 2 等于默认值（实测数字一字不差），
+   传 3 又会把 ＋/− 塞进标题格 —— 标题那两行是块级 div，按钮会变成它们上面多出来的一行，整行被顶高。 */
+.page-panel :deep(td.ant-table-cell-with-append) {
+  position: relative;
+}
+
+.page-panel :deep(td.ant-table-cell-with-append .ant-table-row-indent),
+.page-panel :deep(td.ant-table-cell-with-append .ant-table-row-expand-icon) {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+}
+
+/* 那颗 ＋/− 自带 `margin: 2.5px 8px 0 0`：绝对定位之后 `top: 50%` 算的是外边距盒，
+   那 2.5 就把按钮整体压低了一截（实测中心比格中心低 2.1px）。行内时的 margin-inline-end
+   是用来跟图标留缝的，挪出正常流以后没意义，一并清掉。 */
+.page-panel :deep(td.ant-table-cell-with-append .ant-table-row-expand-icon) {
+  margin: 0;
+}
+
+/* 图标改成块级：行内 `<img>` 的 `vertical-align: middle` 是相对基线对齐的，量出来仍会低 1~2px
+   （父行那 1.75 就是这么来的）；块级盒由 td 的 vertical-align 整体居中，才是真居中。 */
+.page-panel :deep(td.ant-table-cell-with-append .site-favicon) {
+  display: block;
+  margin-inline: auto;
+}
+
 .reseed-detail-title {
   flex: 1 1 0;
   min-width: 0;

@@ -34,6 +34,7 @@ import {
 import { formatSize } from "@/options/utils.ts";
 import { countText, toCount } from "@/shared/torrentCount.ts";
 import { pickBaseRecommendations, type TReseedRecommendKind } from "@/shared/reseedRecommend.ts";
+import type { TCategoryKind } from "@/shared/category.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
@@ -41,7 +42,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
-import { resolveCategoryFolder } from "@/options/components/SentToDownloaderDialog/categoryMatch.ts";
+import { folderCategoryKind, resolveCategoryFolder } from "@/options/components/SentToDownloaderDialog/categoryMatch.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 const showDialog = defineModel<boolean>();
@@ -141,8 +142,7 @@ const siteCategoryMaps = computed(() => {
  * 所以 v0.45.0 给「发送到下载器」做的预选一直盖不到这里，这一栏只能手填。
  *
  * 判据整个复用 categoryMatch.ts（同一档剩两条候选就不猜、认分类前缀的只有 qBittorrent 那套规则），
- * 这里不另写一份字符串匹配（AGENTS §3.8）。没挑出来时**不动当前值**：那是「记住的上次路径」或下载器默认，
- * 比留一个空白格好用。
+ * 这里不另写一份字符串匹配（AGENTS §3.8）。
  */
 function applyAutoCategoryPath() {
   const d = metadataStore.downloaders[selectedDownloaderId.value];
@@ -153,7 +153,31 @@ function applyAutoCategoryPath() {
     d.categoryAssoc,
     (siteId) => siteCategoryMaps.value[siteId],
   );
-  if (res.folder) savePath.value = res.folder;
+  if (res.folder) {
+    savePath.value = res.folder;
+    return;
+  }
+  dropContradictingCategoryPath(res.kind);
+}
+
+/**
+ * 没挑出目录时**不是**一律不动当前值：那一栏留着的是「上次记住的那条」，而它可能是别的分类
+ * （他 2026-10-10 的截图：勾了 8 条电影，这一格写着 `category:剧集`）。这种旧值比空白更坏 ——
+ * 它看着像刚刚为这批挑好的，发送时就把电影塞进剧集的分类里。
+ *
+ * 所以只撤「自己也表过态、且和本批折出的类别不同」的那一种：具体路径（`/volume1/…`）不表态，
+ * 折不出类别的也不表态，两者都按原样留着 —— 那是「记住的上次路径」，比空白好用。
+ * 退回顺序和弹窗初次打开时那条一样：下载器默认目录；默认目录自己也矛盾时留空，
+ * 发送时那边是 `savePath || undefined`，等于让下载器用它自己的默认。
+ */
+function dropContradictingCategoryPath(kind: TCategoryKind | null) {
+  if (!kind) return;
+  const current = folderCategoryKind(savePath.value);
+  if (current === null || current === kind) return;
+
+  const fallback = metadataStore.defaultDownloader?.folder ?? "";
+  const fallbackKind = folderCategoryKind(fallback);
+  savePath.value = fallbackKind === null || fallbackKind === kind ? fallback : "";
 }
 
 /** 只勾中一条 = 「下载器已经下完了，只要再挂这一站」那种辅种 */

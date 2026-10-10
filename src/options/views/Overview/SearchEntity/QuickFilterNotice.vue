@@ -72,6 +72,12 @@ function updateQuickSiteFilter() {
  * 可以带图标。真正不用它的原因是另一条 —— 未选中态是 `background-color: transparent` +
  * `border-color: transparent`（tag/style/index.js 的 `&-checkable`），在这块淡蓝 alert 上
  * 看着就是一行裸文字，不像可点的 chip。
+ *
+ * ⚠️ 一颗 chip 的整包内容必须是**一个**子节点（下面统一包 `.chip-inner`）。
+ * dist/tag/index.js 取的是 `filterEmpty(slots?.default?.())[0]` —— 图标和站名并列成两颗
+ * 子节点时，站名被静默丢掉，这一排从平移过来就一直只剩图标（台架 .tmp-build/bench-chips
+ * 量到 chip 的 textContent 是空串、childElementCount=1）。和 a-alert / a-select 不读默认
+ * 插槽是同一族，见 AGENTS §3.4。
  */
 function selectSite(siteId: string) {
   selectedSite.value = siteId;
@@ -87,12 +93,14 @@ function selectSite(siteId: string) {
         <template v-if="configStore.searchEntity.quickSiteFilter">
           <!-- "全部"选项 -->
           <a-tag
-            class="chip_limit_width chip_white"
+            class="chip chip_limit_width chip_white"
             :class="{ chip_content_hidden_fix: smAndDown }"
             @click.stop="clearSiteFilter"
           >
-            <template #icon><GlobalOutlined /></template>
-            {{ smAndDown ? "" : t("SearchEntity.siteFilter.all") }}
+            <span class="chip-inner">
+              <GlobalOutlined />
+              {{ smAndDown ? "" : t("SearchEntity.siteFilter.all") }}
+            </span>
           </a-tag>
 
           <!-- 分站点选项（可横向滚动，对应 v-chip-group 的 scroll-to-active + show-arrows） -->
@@ -102,11 +110,13 @@ function selectSite(siteId: string) {
               :key="siteId"
               :color="siteId === selectedSite ? 'blue' : undefined"
               :variant="siteId === selectedSite ? 'solid' : 'outlined'"
-              :class="['mr-1 mb-1', { chip_white: siteId !== selectedSite }]"
+              :class="['chip', { chip_white: siteId !== selectedSite }]"
               @click.stop="selectSite(siteId)"
             >
-              <SiteFavicon :site-id="siteId" :size="14" class="mr-1" />
-              <SiteName :site-id="siteId" tag="span" />
+              <span class="chip-inner">
+                <SiteFavicon :site-id="siteId" :size="14" />
+                <SiteName :site-id="siteId" tag="span" />
+              </span>
             </a-tag>
           </div>
         </template>
@@ -121,16 +131,20 @@ function selectSite(siteId: string) {
              —— bordered === false 时强制把 variant 压成 filled（默认值是 true）。
              也就是说它只能「取消描边」，永远造不出描边；
              真正切换实心/描边的是 variant="solid" / variant="outlined"，已按它改写。 -->
-        <a-tag class="my-2 chip_limit_width" color="blue">
-          <CheckCircleFilled class="mr-1" />
-          {{
-            smAndDown
-              ? selectedTorrentsInfo.count
-              : t("SearchEntity.index.selectedTorrents", [selectedTorrentsInfo.count])
-          }}
-          <a-divider orientation="vertical" class="mx-2" />
-          <HddOutlined class="mr-1" />
-          {{ formatSize(selectedTorrentsInfo.totalSize) }}
+        <a-tag class="my-2 chip chip_limit_width" color="blue">
+          <!-- 同样必须是**一个**子节点：这里原先五颗并列（图标 / 条数 / 分隔线 / 图标 / 大小），
+               a-tag 只渲染第一颗，界面上就只剩一个对勾，条数和大小整个静默丢掉。 -->
+          <span class="chip-inner">
+            <CheckCircleFilled />
+            {{
+              smAndDown
+                ? selectedTorrentsInfo.count
+                : t("SearchEntity.index.selectedTorrents", [selectedTorrentsInfo.count])
+            }}
+            <a-divider orientation="vertical" class="mx-2" />
+            <HddOutlined />
+            {{ formatSize(selectedTorrentsInfo.totalSize) }}
+          </span>
         </a-tag>
       </div>
     </template>
@@ -156,18 +170,49 @@ function selectSite(siteId: string) {
 
 .site-filter-scroll {
   overflow-x: auto;
+  /* chip 之间原先靠每颗自带 mr-1（4px），「全部」那颗没有 → 两颗零间距贴边。
+     改成容器给 gap，颗颗同缝，也不再有人多出 4px（那条 mb-1 还会把整排顶高 2px，见下）。 */
+  gap: 4px;
+  margin-inline-start: 8px;
+  /* 不需要再补 min-width:0：flex item 的 min-width:auto 只对**非滚动容器**才等于内容宽，
+     这一条自己有 overflow-x:auto，规范里那个 auto 已经折成 0。台架 600px 容器实测：
+     提示条 scrollWidth == clientWidth（574，零溢出），超出部分由这一条自己横滚（462 > 289）。 */
+}
+
+/**
+ * 一颗 chip 的整包内容（图标 + 文字）。四条都是台架 .tmp-build/bench-chips 逐条量出来的，
+ * 每条对应一种「把它撤掉就复现」的坏形状：
+ * 1. 整包必须是**一个**子节点 —— a-tag 的默认插槽取的是 `filterEmpty(…)[0]`，两颗并列时
+ *    第二颗被静默丢掉（这一排从 Vuetify 平移过来就一直只剩图标：chip 的 childElementCount=1、
+ *    textContent 是空串）。右边那颗「已选中 N 条 · 大小」同理，原先五颗并列只剩一个对勾。
+ * 2. `display:flex + align-items:center`：退回 inline 排列时，图标盒中心比站名盒中心低 **2.3px**
+ *    （就是「里面的图标没垂直居中」）；加了这两条之后 6 颗 chip 的差全是 **0px**。
+ * 3. `height: 14px`：不钉的话每颗的内容盒高跟着自己最高的那个孩子走，实测三种 10 / 11.7 / 14，
+ *    top 也差 ~2px —— 一排 chip 的盒子不同位，看着就是歪的。钉死后 8 颗全是 `20.9+14`。
+ * 4. `vertical-align: middle`：inline-flex 的基线由它第一个 flex 子项给，而图标（块化的替换元素）
+ *    的基线是它的**下沿**，于是 14px 那颗整体被抬起来，chip 高会分成 19.6 与 20.8 两种。
+ */
+.chip-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 14px;
+  vertical-align: middle;
+}
+
+/** chip 本体不许带上下外边距：父级是 align-center 的 flex，单侧 mb-1 会让这一排比左边那颗高 2px */
+.chip.ant-tag {
+  margin-block: 0;
 }
 
 /**
  * 在窄屏下，「全部站点」这一项的文字内容被隐藏（见模板中的 smAndDown），
- * 由于改用了 tag 的 icon 插槽，这里用 hack css 把它压紧，避免图标两侧留白过大。
+ * 只剩一颗图标，这里把它压紧，避免图标两侧留白过大。
+ * （原先这条还顺手清了 `.ant-tag-icon` 的外边距 —— 那颗是 a-tag 的 icon 插槽产生的，
+ * 现在内容统一包在 .chip-inner 里、不再走 icon 插槽，那条已经是死规则，删掉。）
  */
 .chip_content_hidden_fix {
   padding: 0 5px !important;
-
-  :deep(.ant-tag-icon) {
-    margin: 0;
-  }
 }
 
 /**

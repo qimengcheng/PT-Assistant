@@ -189,6 +189,9 @@ async function dialogEnter() {
 </script>
 
 <template>
+  <!-- ⚠️ 原来这里写 :styles="{ body: { maxHeight: '…vh', overflowY: 'auto' } }"，
+       把 style.css 那套布局算出来的 body 高度覆盖成了手写常数（AGENTS.md §3.4 点名的
+       那一族）。body 的高度交给全局规则算即可。 -->
   <a-modal
     v-model:open="showDialog"
     :title="t('SetSite.oneClickImportDialog.title')"
@@ -196,7 +199,6 @@ async function dialogEnter() {
     :closable="!importStatus.isWorking"
     :mask="{ closable: !importStatus.isWorking }"
     :keyboard="!importStatus.isWorking"
-    :styles="{ body: { maxHeight: '72vh', overflowY: 'auto' } }"
     :after-open-change="(open: boolean) => open && dialogEnter()"
   >
 

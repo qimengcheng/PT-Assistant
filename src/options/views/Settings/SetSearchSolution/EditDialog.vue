@@ -162,7 +162,7 @@ function dialogLeave() {
           </a-form-item>
         </a-col>
         <a-col :flex="'220px'">
-          <a-form-item label="ID">
+          <a-form-item :label="t('SetSearchSolution.solutionId')">
             <a-input v-model:value="solution.id" disabled />
           </a-form-item>
         </a-col>

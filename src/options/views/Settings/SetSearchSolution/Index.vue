@@ -166,7 +166,7 @@ const { promptInDialog } = usePromptInDialog();
 
 const newSearchSolutionName = await promptInDialog(
     t("SetSearchSolution.newSolutionNamePrompt"),
-    `Copy of ${copied.name ?? copied.id}`,
+    t("SetSearchSolution.copiedName", [copied.name ?? copied.id]),
   );
   if (newSearchSolutionName) {
     copied.name = newSearchSolutionName;

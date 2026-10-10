@@ -1329,6 +1329,7 @@
       "solutionName": "方案名称",
       "title": "自定义搜索方案"
     },
+    "copiedName": "{0} 的副本",
     "copy": "创建副本",
     "delete": {
       "text": "确认删除这 {0} 个 @:SetSearchSolution.solution 吗？"
@@ -1341,6 +1342,7 @@
     },
     "newSolutionNamePrompt": "请输入新搜索方案名称",
     "solution": "搜索方案",
+    "solutionId": "方案 ID",
     "spDialog": {
       "action": {
         "add": "添加此@:SetSearchSolution.solution",

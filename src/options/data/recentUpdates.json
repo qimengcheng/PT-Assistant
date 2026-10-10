@@ -1,8 +1,20 @@
 {
-  "generatedAt": "2026-10-10 23:43:41",
-  "headSha": "696cfd7",
+  "generatedAt": "2026-10-10 23:57:43",
+  "headSha": "44377d9",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.68.26",
+      "date": "2026-10-10 23:57:01",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "站点编辑的时区下拉里，Israel / Colombo / Dhaka / Shanghai / Hong Kong 的拼写改对了，其中一条末尾多出来的逗号也去了",
+        "复制搜索方案的默认名、以及方案 ID 那一格的标签现在跟着界面语言走，不再一种语言里夹另一种",
+        "站点添加与一键导入两个弹窗不再用手工写死的最大高度：高度按窗口算，矮窗口里也能用满一整屏"
+      ],
+      "improvedTotal": 3
+    },
     {
       "version": "0.68.25",
       "date": "2026-10-10 23:43:40",

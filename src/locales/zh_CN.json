@@ -1659,6 +1659,8 @@
     "success": "连接成功，你可以顺利进行下一步。"
   },
   "contentScript": {
+    "downloadMultiAllFailed": "{total} 个种子全部下载失败",
+    "downloadMultiDone": "已下载 {ok}/{total} 个种子",
     "AdvanceListModuleDialog": {
       "selectNotSeeding": "勾选未下载过",
       "selectSeeders": "勾选上传行",

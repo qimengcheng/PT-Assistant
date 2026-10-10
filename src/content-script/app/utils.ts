@@ -14,6 +14,7 @@ import { uniq } from "es-toolkit";
 import type { TSupportSocialSite } from "@ptd/social";
 import { getSite as createSiteInstance } from "@ptd/site";
 import type BittorrentSite from "@ptd/site/schemas/AbstractBittorrentSite.ts";
+import type { TPattern } from "@ptd/site/types/base.ts";
 
 import { sendMessage } from "@/messages.ts";
 import {
@@ -42,6 +43,26 @@ export interface IPtdData {
 }
 
 export const pageType = ref<TPageType>("unknown");
+
+/**
+ * 用第三方站点定义里的 urlPattern 匹配当前 URL，坏正则跳过而不是让整轮 some 崩掉。
+ *
+ * ⚠️ 这些 pattern 来自 packages/site/definitions（外部数据），一个写错的括号就会让
+ * `new RegExp` 抛 SyntaxError —— 而它在 .some() 回调里抛，整轮分类直接中断，
+ * list/detail 全部退回 unknown（内容脚本的入口整个不出现）。异常还会被
+ * App.vue 的裸 catch 吞掉，现场什么都不剩。
+ *
+ * TPattern 允许直接给 RegExp（那就别再包一层 new RegExp）。
+ */
+function matchesUrlPattern(pattern: TPattern | undefined, url: string): boolean {
+  if (pattern === undefined || pattern === null) return false;
+  try {
+    const re = pattern instanceof RegExp ? pattern : new RegExp(pattern, "i");
+    return re.test(url);
+  } catch {
+    return false;
+  }
+}
 
 export async function updatePageType(ptdData: IPtdData = {}) {
   const metadataStore = useMetadataStore();
@@ -73,15 +94,15 @@ export async function updatePageType(ptdData: IPtdData = {}) {
         metadata.list?.flatMap((item) => item.excludeUrlPattern ?? []).filter(Boolean) ?? [];
 
       if (
-        listUrlPatterns.some((pattern) => new RegExp(pattern!, "i").test(url)) &&
-        !excludeListUrlPatterns.some((pattern) => new RegExp(pattern!, "i").test(url))
+        listUrlPatterns.some((pattern) => matchesUrlPattern(pattern, url)) &&
+        !excludeListUrlPatterns.some((pattern) => matchesUrlPattern(pattern, url))
       ) {
         pageType.value = "list";
       } else {
         // 如果不是 list 页面，再判断是否为 detail 页面
         let detailUrlPatterns = metadata.detail?.urlPattern ?? [];
 
-        if (detailUrlPatterns.some((pattern) => new RegExp(pattern, "i").test(url))) {
+        if (detailUrlPatterns.some((pattern) => matchesUrlPattern(pattern, url))) {
           pageType.value = "detail";
         }
       }

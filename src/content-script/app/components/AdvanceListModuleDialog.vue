@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, inject } from "vue";
+import { ref, computed, inject, nextTick, onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useWindowSize } from "@vueuse/core";
 import {
   CloudDownloadOutlined,
   CopyOutlined,
@@ -27,7 +26,49 @@ const { t } = useI18n();
 
 const showDialog = defineModel<boolean>();
 
-const { height: windowHeight } = useWindowSize();
+// ============================================================================
+// 表体高度：实测容器，不写视口常数
+//
+// ⚠️ 原先是 `:styles="{ body: { maxHeight: windowHeight - 256 } }"` 加
+// `:scroll="{ y: windowHeight - 320 }"` 两处硬编码减数。外壳内衬一改就失准，
+// 而且这两个数各减各的、彼此不对账（256 与 320 差 64 没人说得清是啥）。
+// 改成量容器实高 − 表头，与 SearchEntity/Index.vue 同一套做法（那边把这条
+// 公式错过三次，注释写清了四个减数都不能依赖 y）。
+// ============================================================================
+const tableWrapperRef = useTemplateRef<HTMLDivElement>("tableWrapper");
+const tableScrollY = ref(320);
+
+function recalcTableScrollY() {
+  const el = tableWrapperRef.value;
+  if (!el) return;
+
+  const containerHeight = el.clientHeight;
+  if (containerHeight <= 0) return;
+
+  // 设了 scroll.y 后表头会被拆成独立一层，量它比量 thead 准
+  const headerHeight =
+    el.querySelector<HTMLElement>(".ant-table-header")?.getBoundingClientRect().height ??
+    el.querySelector<HTMLElement>(".ant-table-thead")?.getBoundingClientRect().height ??
+    0;
+
+  const next = Math.max(containerHeight - headerHeight, 160);
+  if (next !== tableScrollY.value) tableScrollY.value = next;
+}
+
+// ResizeObserver 在 observe 时会先投递一次观测，所以首帧那一量也归它管
+let tableResizeObserver: ResizeObserver | null = null;
+onMounted(() => {
+  const el = tableWrapperRef.value;
+  if (!el) return;
+  tableResizeObserver = new ResizeObserver(() => nextTick(recalcTableScrollY));
+  tableResizeObserver.observe(el);
+});
+onBeforeUnmount(() => tableResizeObserver?.disconnect());
+// 结果集变化时分页器/表头高度会变，跟着重量一次
+watch(
+  () => torrentItems.length,
+  () => nextTick(recalcTableScrollY),
+);
 
 const { torrentItems } = defineProps<{
   torrentItems: ITorrent[];
@@ -40,7 +81,10 @@ const tableHeaders = computed<TableColumnsType<ITorrent>>(
   () =>
     [
       { title: t("SearchEntity.index.table.category"), dataIndex: "category", key: "category", align: "center", width: 60 },
-      { title: t("SearchEntity.index.table.title"), dataIndex: "title", key: "title", align: "start", width: 400 },
+      // ⚠️ 标题列**不写 width**：一列都不写时表格是 auto 布局、写全是 fixed，
+      // 而 fixed 下容器比列宽合计宽时浏览器会把所有列按比例放大，写了的宽度
+      // 一个都不作数（最该宽的标题列被钉成定值）。留标题列吃剩余宽度。
+      { title: t("SearchEntity.index.table.title"), dataIndex: "title", key: "title", align: "start" },
       { title: t("SearchEntity.index.table.size"), dataIndex: "size", key: "size", align: "end", width: 80 },
       { title: t("SearchEntity.index.table.seeders"), dataIndex: "seeders", key: "seeders", align: "end", width: 60 },
       { title: t("SearchEntity.index.table.leechers"), dataIndex: "leechers", key: "leechers", align: "end", width: 60 },
@@ -61,14 +105,31 @@ const localDownloadMultiStatus = ref<boolean>(false);
 async function handleLocalDownloadMulti() {
   localDownloadMultiStatus.value = true;
   try {
-    for (const torrent of selectedTorrents.value) {
-      await sendMessage("downloadTorrent", { torrent, downloaderId: "local" });
+    // ⚠️ 逐条 catch 并汇总：原先串行 await 且只有外层一个 catch，
+    // 第一个失败的种子就把整批中断（后面选中的再也下不到），提示还误用
+    // 「页面解析失败」文案。参照 SiteListPage 的逐条处理。
+    const results = await Promise.allSettled(
+      selectedTorrents.value.map((torrent) =>
+        sendMessage("downloadTorrent", { torrent, downloaderId: "local" }),
+      ),
+    );
+    const failed = results.filter((r) => r.status === "rejected");
+    for (const f of failed) {
+      console.error("[PTD] download torrent failed", (f as PromiseRejectedResult).reason);
     }
-  } catch (e) {
-    // 必须 try/finally：中途抛错时 localDownloadMultiStatus 会永远停在 true，按钮永久转圈
-    console.error("[PTD] batch download failed", e);
-    runtimeStore.showSnakebar(t("contentScript.parsePageFailed"), { color: "error" });
+
+    const total = results.length;
+    const okCount = total - failed.length;
+    if (okCount > 0) {
+      runtimeStore.showSnakebar(
+        t("contentScript.downloadMultiDone", { ok: okCount, total }),
+        { color: failed.length > 0 ? "warning" : "success" },
+      );
+    } else if (total > 0) {
+      runtimeStore.showSnakebar(t("contentScript.downloadMultiAllFailed", { total }), { color: "error" });
+    }
   } finally {
+    // 必须 finally：中途抛错时 localDownloadMultiStatus 会永远停在 true，按钮永久转圈
     localDownloadMultiStatus.value = false;
   }
 }
@@ -132,7 +193,6 @@ const rowSelection = computed(() => ({
     v-model:open="showDialog"
     :title="t('contentScript.AdvanceListModuleDialog.title', [torrentItems.length])"
     :width="1200"
-    :styles="{ body: { maxHeight: `${windowHeight - 256}px`, overflow: 'auto' } }"
     :after-open-change="(open: boolean) => open && enterDialog()"
   >
 
@@ -141,17 +201,20 @@ const rowSelection = computed(() => ({
       <a-button type="primary" @click="handleSelectNotSeeding"><template #icon><MinusCircleOutlined /></template><span>{{ t('contentScript.AdvanceListModuleDialog.selectNotSeeding') }}</span></a-button>
     </div>
 
-    <a-table
-      bordered
-      :columns="tableHeaders"
-      :data-source="torrentItems"
-      :row-key="(record: ITorrent) => record.id"
-      :row-selection="rowSelection"
-      :pagination="false"
-      size="small"
-      class="table-header-no-wrap"
-      :scroll="{ y: windowHeight - 320 }"
-    >
+    <!-- 表格外层量高用：a-modal 的 body 是 flex 项（style.css 那五条把 body 收成
+         flex: 1 1 auto; min-height: 0），这里再套一层 flex 容器把剩余高度交给表格 -->
+    <div ref="tableWrapper" class="table-wrapper">
+      <a-table
+        bordered
+        :columns="tableHeaders"
+        :data-source="torrentItems"
+        :row-key="(record: ITorrent) => record.id"
+        :row-selection="rowSelection"
+        :pagination="false"
+        size="small"
+        class="table-header-no-wrap"
+        :scroll="{ y: tableScrollY }"
+      >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'title'">
           <TorrentTitleTd :item="record" :show-social="false" />
@@ -182,7 +245,8 @@ const rowSelection = computed(() => ({
           </span>
         </template>
       </template>
-    </a-table>
+      </a-table>
+    </div>
 
     <!-- 不设 :footer="null"：那会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...） -->
     <template #footer>
@@ -210,4 +274,15 @@ const rowSelection = computed(() => ({
   </a-modal>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+/**
+ * 表格外层：吃满 a-modal body 的剩余高度，供上面量表体高（scroll.y）。
+ * min-height: 0 必须有 —— flex 项默认 min-height:auto，内容一高就不肯收缩，
+ * 量出来的 clientHeight 会跟着内容长高，scroll.y 跟着一起长，永远不滚动。
+ */
+.table-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+</style>

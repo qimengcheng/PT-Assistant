@@ -27,7 +27,14 @@ async function handleSearch() {
   try {
     const parserMatches = socialPageParserMatchesMap[ptdData.socialSite!];
     for (const [pattern, parser] of parserMatches) {
-      if (new RegExp(pattern, "i").test(window.location.href)) {
+      // 坏正则跳过而不是让整轮解析崩掉（pattern 来自各社交站点的定义）
+      let matched: boolean;
+      try {
+        matched = new RegExp(pattern, "i").test(window.location.href);
+      } catch {
+        continue;
+      }
+      if (matched) {
         const parseResult = await parser(document.cloneNode(true) as Document);
         if (parseResult) {
           const shouldShowChosenDialog =

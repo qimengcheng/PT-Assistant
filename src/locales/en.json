@@ -1659,6 +1659,8 @@
     "success": "Connect Successful! You can enter next step."
   },
   "contentScript": {
+    "downloadMultiAllFailed": "All {total} torrents failed to download",
+    "downloadMultiDone": "Downloaded {ok}/{total} torrents",
     "AdvanceListModuleDialog": {
       "selectNotSeeding": "Select not downloaded",
       "selectSeeders": "Select seeding rows",

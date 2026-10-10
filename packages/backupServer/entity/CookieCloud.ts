@@ -21,7 +21,7 @@
 import CryptoJS from "crypto-js";
 import axios, { type AxiosRequestConfig } from "axios";
 import AbstractBackupServer from "../AbstractBackupServer.ts";
-import { localSort } from "../utils.ts";
+import { localSort, describeRequestError } from "../utils.ts";
 import type {
   IBackupConfig,
   IBackupData,
@@ -119,7 +119,8 @@ export default class CookieCloud extends AbstractBackupServer<CookieCloudConfig>
       const pingResp = await this.request<string>("", { responseType: "text" });
       return pingResp.data?.includes("Hello World!API ROOT =") || false;
     } catch (e) {
-      console?.warn(e);
+      // 只打摘要：AxiosError 里带着自定义鉴权头（见 request）
+      console?.warn(`[CookieCloud] ping failed: ${describeRequestError(e)}`);
     }
     return false;
   }

@@ -15,6 +15,27 @@ import ConnectCheckButton from "@/options/components/ConnectCheckButton.vue";
 
 const { t } = useI18n();
 
+/**
+ * 备份服务这些字段是明文凭据（CookieCloud 密码、S3 Secret Access Key、
+ * Dropbox access_token、OWSS 授权码…），而备份内容本身就是全站 cookie ——
+ * 用普通 a-input 渲染等于摆在屏幕上。字段清单取自
+ * `packages/backupServer/entity/*` 的 requiredField，白名单而非黑名单：
+ * 漏一个新字段会退化成明文框，比误判某个字段更安全。
+ */
+const SECRET_BACKUP_FIELDS = new Set([
+  "password",
+  "loginPwd",
+  "secretAccessKey",
+  "applicationKey",
+  "access_token",
+  "refresh_token",
+  "client_secret",
+  "authCode",
+  "digest",
+]);
+// key 的声明类型是 `keyof T["config"]`（可能是 number/symbol），这里收 unknown 后自己收窄
+const isSecretBackupField = (key: unknown) => typeof key === "string" && SECRET_BACKUP_FIELDS.has(key);
+
 const clientConfig = defineModel<IBackupServerMetadata>();
 const emits = defineEmits<{
   (e: "update:configValid", value: boolean): void;
@@ -234,6 +255,11 @@ async function checkConnect() {
             <a-textarea
               v-if="metaField.type === 'strings'"
               v-model:value="clientConfig.config[metaField.key! as string]"
+            />
+            <a-input-password
+              v-else-if="metaField.type === 'string' && isSecretBackupField(metaField.key)"
+              v-model:value="clientConfig.config[metaField.key! as string]"
+              :visibility-toggle="true"
             />
             <a-input
               v-else-if="metaField.type === 'string'"

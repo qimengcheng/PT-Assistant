@@ -403,7 +403,8 @@ export default class UTorrent extends AbstractBittorrentClient<TorrentClientConf
     return true;
   }
 
-  async removeTorrent(id: string, removeData: boolean = true): Promise<boolean> {
+  async removeTorrent(id: string, removeData: boolean = false): Promise<boolean> {
+    // 默认与抽象契约及其余 7 个客户端一致（不删数据）：省略参数就误删数据不可恢复
     const action = removeData ? "removedatatorrent" : "removetorrent";
     await this.request<BaseUtorrentResponse>(action, { hash: id });
     return true;

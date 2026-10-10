@@ -133,6 +133,26 @@ function iv(val: string | null): number {
   return isNaN(v) ? 0 : v;
 }
 
+/** 同上但保留小数。`d.get_ratio=` 返回的就是比值本身（如 "1.2345"），不是千分比 */
+function fv(val: string | null): number {
+  const v = val == null ? 0 : parseFloat(val + "");
+  return isNaN(v) ? 0 : v;
+}
+
+/**
+ * ruTorrent 的标签是 URI 编码的，但用户自建的标签名里可能有裸 `%`（如 `100%BD`），
+ * `decodeURIComponent` 遇到不成对转义会抛 URIError —— 而这里在 map 回调里抛，
+ * 整个 getAllTorrents 直接 reject，列表一条都出不来。解码失败时退回原串。
+ */
+function safeDecodeURIComponent(val: string | null | undefined): string {
+  if (!val) return "";
+  try {
+    return decodeURIComponent(val);
+  } catch {
+    return val;
+  }
+}
+
 /**
  * XML 文本转义。ruTorrent 的参数里有大量用户输入（标签名、保存路径、tracker URL 等），
  * 直接插值进 XML 会被 `&` / `<` / `>` 破坏文档结构（标签名含 `&` 即 XML 注入）。
@@ -369,7 +389,7 @@ export default class RuTorrent extends AbstractBittorrentClient<TorrentClientCon
       const getState = iv(rawTorrent[3]);
       const getHashing = iv(rawTorrent[23]);
       const isActive = iv(rawTorrent[28]);
-      const torrentMsg = rawTorrent[30];
+      const torrentMsg = rawTorrent[29];
 
       const chunksProcessing = isHashChecking === 0 ? iv(rawTorrent[6]) : iv(rawTorrent[24]);
       const TorrentDone = Math.floor((chunksProcessing / iv(rawTorrent[7])) * 1000);
@@ -401,13 +421,17 @@ export default class RuTorrent extends AbstractBittorrentClient<TorrentClientCon
         infoHash,
         name: rawTorrent[4],
         state,
-        dateAdded: parseInt(rawTorrent[21]),
+        dateAdded: parseInt(rawTorrent[26]),
         isCompleted,
         progress: TorrentDone / 10,
-        label: decodeURIComponent(rawTorrent[15]),
+        label: safeDecodeURIComponent(rawTorrent[14]),
         savePath,
         totalSize: iv(rawTorrent[5]),
-        ratio: iv(rawTorrent[10]),
+        // d.get_ratio= 返回的就是比值本身（"1.2345" 这种小数），不是千分比 —— ruTorrent 自己
+        // 也是 `torrent.ratio = iv(values[10])`（js/rtorrent.js:1413，字段表见 plugins/httprpc/action.php
+        // 的 case "list"），没有除 1000。这里用浮点解析而不是 iv，是为了不再把 1.9 截成 1；
+        // 除以 1000 会把 1.23 变成 0.001。
+        ratio: fv(rawTorrent[10]),
         uploadSpeed: iv(rawTorrent[11]),
         downloadSpeed: iv(rawTorrent[12]),
         totalUploaded: iv(rawTorrent[9]),

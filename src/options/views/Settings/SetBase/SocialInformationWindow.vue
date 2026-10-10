@@ -59,9 +59,10 @@ const configStore = useConfigStore();
               label="Bangumi API Key"
               :extra="t('SetBase.SocialInformationWindow.bangumiHint')"
             >
-              <a-input
+              <a-input-password
                 v-model:value="configStore.socialSiteInformation.socialSite!.bangumi.apikey"
                 autocomplete="new-password"
+                :visibility-toggle="true"
               />
             </a-form-item>
           </a-col>
@@ -70,9 +71,10 @@ const configStore = useConfigStore();
               label="AniDB Client"
               :extra="t('SetBase.SocialInformationWindow.anidbHint')"
             >
-              <a-input
+              <a-input-password
                 v-model:value="configStore.socialSiteInformation.socialSite!.anidb.client"
                 autocomplete="new-password"
+                :visibility-toggle="true"
               />
             </a-form-item>
           </a-col>

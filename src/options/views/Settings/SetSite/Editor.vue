@@ -16,6 +16,15 @@ const { t } = useI18n();
 const metadataStore = useMetadataStore();
 const runtimeStore = useRuntimeStore();
 
+/**
+ * 这些 inputSetting 字段装的是各站凭据（passkey / token / apikey…），
+ * 用普通 a-input 渲染就等于把明文口令摆在屏幕上，肩窥即可拿走。
+ * 字段名取自 `packages/site/definitions/*` 的 userInputSettingMeta，全站共
+ * token(7) / passkey(3) / apikey / apiKey / rsskey / password 这几类。
+ */
+const SECRET_INPUT_PATTERN = /^(?:.*_)?(?:token|passkey|apikey|rsskey|passwd|password|secret|authkey|pid|pass)$/i;
+const isSecretInput = (name: string) => SECRET_INPUT_PATTERN.test(name);
+
 const siteId = defineModel<TSiteID>({ default: "" });
 const emit = defineEmits<{
   (e: "update:formValid", v: boolean): void;
@@ -343,7 +352,15 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
             : ''
         "
       >
+        <a-input-password
+          v-if="isSecretInput(userInputMeta.name)"
+          v-model:value="siteUserConfig.inputSetting[userInputMeta.name]"
+          size="small"
+          :placeholder="userInputMeta.hint"
+          :visibility-toggle="true"
+        />
         <a-input
+          v-else
           v-model:value="siteUserConfig.inputSetting[userInputMeta.name]"
           size="small"
           :placeholder="userInputMeta.hint"

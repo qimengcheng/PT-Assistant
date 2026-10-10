@@ -76,7 +76,13 @@ export default class BittorrentSite {
     // 整个站点实例直接崩。这里在构造期补一个空对象兜底，那些写法就都安全了，
     // 同时不必为每个站点单独改一遍。
     this.userConfig = { inputSetting: {}, ...userConfig };
-    console?.log(`[Site] ${this.name} Initialized with Metadata: `, this.metadata, "UserConfig: ", this.userConfig);
+    // ⚠️ 这里原来无条件打印完整 metadata + userConfig，而 inputSetting 装的是各站
+    // password / pid / passkey / token（见 Avistaz 的 inputSetting 定义）——
+    // 任何页面控制台、日志采集或屏幕共享都能直接读到明文口令。
+    // 排查站点问题临时开这个开关即可，长期不要留在生产构建里。
+    if (import.meta.env.DEV) {
+      console.log(`[Site] ${this.name} Initialized with Metadata: `, this.metadata);
+    }
   }
 
   get name(): string {

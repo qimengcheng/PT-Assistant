@@ -13,6 +13,27 @@ import { omit } from "es-toolkit";
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/**
+ * 把请求错误压成一行可安全打日志的摘要。
+ *
+ * ⚠️ 为什么不能直接 `console.warn(e)`：备份链路的请求头里带着明文凭据
+ * （Gist 是 `Authorization: Bearer <github_pat>`、CookieCloud 是自定义鉴权头），
+ * 而 axios 的 AxiosError 自带 `config` / `request`，整个打出来等于把 token
+ * 写进控制台 —— 屏幕共享、日志采集、用户截图都能拿走。而备份内容本身是
+ * 全站 cookie，泄露后果被放大。只留状态码与 message，足够定位问题。
+ */
+export function describeRequestError(e: unknown): string {
+  const err = e as {
+    message?: string;
+    code?: string;
+    response?: { status?: number; statusText?: string };
+  };
+  const parts = [err?.response?.status, err?.response?.statusText || err?.message || err?.code].filter(
+    (x): x is string | number => x !== undefined && x !== null && x !== "",
+  );
+  return parts.length ? parts.join(" ") : "Unknown request error";
+}
+
 /** 时间窗口采样的默认规则（仅用于 UI 提示），单位为天 */
 export const DEFAULT_BACKUP_RETENTION_SAMPLE_RULES = {
   day: { interval: 1, horizon: 7 },

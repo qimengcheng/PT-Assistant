@@ -41,7 +41,7 @@ export async function store(
 ): Promise<void> {
   // 走按路径增量写入，而不是「读全量 metadata → 改 → 写回全量」：
   // 后者每次都要传输/序列化整个 300+ 站点的 metadata blob，且两个并发调用会互相覆盖。
-  await extStore.patchItem("metadata", `sites.${siteId}.${field}.${key}`, undefined);
+  await extStore.patchItem("metadata", `sites.${siteId}.${field}.${key}`, value);
 }
 
 export async function retrieve<T extends any>(

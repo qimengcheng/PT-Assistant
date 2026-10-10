@@ -714,10 +714,11 @@ export default class SynologyDownloadStation extends AbstractBittorrentClient<To
           state,
           dateAdded: task.additional!.detail!.created_time,
           isCompleted,
-          progress: download / task.size,
+          // 契约是「完成百分比0-100」（见 types.ts），其余 8 个客户端都乘了 100
+          progress: task.size > 0 ? (download / task.size) * 100 : 0,
           savePath: task.additional!.detail!.destination,
           totalSize: task.size,
-          ratio: upload / download,
+          ratio: download > 0 ? upload / download : 0,
           uploadSpeed: task.additional!.transfer!.speed_upload,
           downloadSpeed: task.additional!.transfer!.speed_download,
           totalUploaded: upload,

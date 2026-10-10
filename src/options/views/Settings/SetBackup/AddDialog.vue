@@ -55,7 +55,6 @@ async function updateStoredDownloaderConfigByDefault(type: IBackupServerMetadata
     id: nanoid(),
     backupFields: [...BackupFields],
   } as IBackupServerMetadata;
-  console.log("storedBackupServerConfig", storedBackupServerConfig.value);
 }
 
 async function saveStoredBackupServerConfig() {

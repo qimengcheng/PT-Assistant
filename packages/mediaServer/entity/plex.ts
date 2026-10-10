@@ -199,7 +199,9 @@ export default class Plex extends AbstractMediaServer<IPlexConfig> {
           format: item.Media?.[0]?.container ?? "",
           // @ts-ignore
           size: item.Media?.[0]?.Part?.[0].size ?? 0,
-          duration: item.duration ?? 0,
+          // Plex 的 duration 是毫秒；消费方（ItemInformationDialog.formatDuration）按秒拆分，
+          // 与 emby/fnos 的 RunTimeTicks/1e7 同一口径，不除会放大 1000 倍
+          duration: item.duration ? item.duration / 1000 : 0,
           poster: item.thumb ? urlJoin(this.apiBaseUrl, `${item.thumb}?X-Plex-Token=${this.config.auth.apikey}`) : "",
           tags: item.Genre?.map((tag) => ({ name: tag.tag, url: "" })) ?? [],
           rating: item.audienceRating ?? "-", // Plex may not provide rating in search results

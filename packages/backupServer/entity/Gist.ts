@@ -19,7 +19,7 @@
 import axios, { type AxiosRequestConfig } from "axios";
 import CryptoJS from "crypto-js";
 import AbstractBackupServer from "../AbstractBackupServer.ts";
-import { localSort, decryptData, encryptData } from "../utils.ts";
+import { localSort, decryptData, encryptData, describeRequestError } from "../utils.ts";
 import {
   type IBackupConfig,
   type IBackupData,
@@ -94,7 +94,8 @@ export default class Gist extends AbstractBackupServer<GistConfig> {
       const pingReq = await this.request<{ url?: string }>("");
       return typeof pingReq.data?.url === "string";
     } catch (e) {
-      console?.warn(e);
+      // 只打摘要：AxiosError 里带着 `Authorization: Bearer <github_pat>`（见 request）
+      console?.warn(`[Gist] ping failed: ${describeRequestError(e)}`);
     }
     return false;
   }

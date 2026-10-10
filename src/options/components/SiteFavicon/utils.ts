@@ -58,8 +58,11 @@ function resolveBundledIcon(siteId: TSiteID): string | null {
  */
 export const faviconCache = ref<Record<TSiteID, string>>({});
 
-/** 同一站点的并发请求收敛成一条消息（表格一次渲染 20 行、多处共用站点时很常见） */
-const inflight = new Map<TSiteID, Promise<string>>();
+/**
+ * 在飞请求去重表（表格一次渲染 20 行、多处共用站点时很常见）。
+ * 键是 `flush|siteId` / `normal|siteId` 两桶 —— 为什么按 flush 分开，见 getSiteFavicon 里的注释。
+ */
+const inflight = new Map<string, Promise<string>>();
 
 async function readFaviconFromIdb(siteId: TSiteID): Promise<string | null> {
   try {
@@ -98,7 +101,13 @@ export async function getSiteFavicon(siteId: TSiteID, flush: boolean = false): P
   }
 
   // 3. 交给 offscreen 抓取（它负责写回 IndexedDB）
-  const pending = inflight.get(siteId);
+  // ⚠️ inflight 按 flush 分桶：合并在飞请求是为了去重，但**不能把 flush 合并进
+  // 非 flush 那一条**。列表滚动时排了一个普通请求，紧接着用户点「刷新图标」
+  // 发出 flush:true —— 拿到的是那个还在飞、且早就带着 flush:false 发出去的请求，
+  // 于是强制刷新静默退化成一次普通读缓存，图标不变（用户侧表现为「点了没反应」）。
+  // 两种请求各自独立排队，宁可并发两次也不能把语义混掉。
+  const bucket = flush ? "flush" : "normal";
+  const pending = inflight.get(bucket + "|" + siteId);
   if (pending) return pending;
 
   const task = sendMessage("getSiteFavicon", { site: siteId, flush })
@@ -113,10 +122,10 @@ export async function getSiteFavicon(siteId: TSiteID, flush: boolean = false): P
       return NO_IMAGE;
     })
     .finally(() => {
-      inflight.delete(siteId);
+      inflight.delete(bucket + "|" + siteId);
     });
 
-  inflight.set(siteId, task);
+  inflight.set(bucket + "|" + siteId, task);
   return task;
 }
 
@@ -143,12 +152,22 @@ export async function flushSiteFavicon(siteIds: TSiteID[]): Promise<void> {
     });
   }
 
+  // 排队 flush 请求要排在上面的 IndexedDB 清理**之后**：offscreen 那边抓到新图会直接
+  // put 回同一张表（offscreen/utils/site.ts 的 put），两边反过来跑就会把刚写回的那条删掉，
+  // 界面又退回占位图。
   await Promise.all(siteIds.map((siteId) => getSiteFavicon(siteId, true)));
 }
 
 /** 清空整张 favicon 缓存（调试页用） */
 export async function clearFaviconCaches(): Promise<void> {
   faviconCache.value = {};
-  const db = await ptdIndexDb();
-  await db.clear("favicon");
+  try {
+    const db = await ptdIndexDb();
+    await db.clear("favicon");
+  } catch (e) {
+    // 内存那份已经清了；库里清不掉（比如 IndexedDB 临时不可用）时不能把异常
+    // 抛给调用方 —— 调试页那颗「清空图标缓存」会变成一个 unhandled rejection，
+    // 用户看到的是按钮没反应而不是「有一半清了」。
+    console.error("[PTD] 清空 favicon 缓存失败", e);
+  }
 }

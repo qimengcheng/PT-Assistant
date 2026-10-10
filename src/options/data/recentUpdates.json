@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-10 23:34:09",
-  "headSha": "fdeab69",
+  "generatedAt": "2026-10-10 23:43:41",
+  "headSha": "696cfd7",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.68.25",
+      "date": "2026-10-10 23:43:40",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "站点管理那一列的「刷新图标」现在真的会强制重取：以前刚好有一个普通读取在飞时，这次刷新会被悄悄并进那一条，图标不变",
+        "调试页的「清空图标缓存」在浏览器存储临时不可用时会记下原因，不再表现为按钮没反应"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.68.24",
       "date": "2026-10-10 23:32:53",

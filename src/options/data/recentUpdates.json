@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-10 19:11:53",
-  "headSha": "f782227",
+  "generatedAt": "2026-10-10 19:19:12",
+  "headSha": "4ad1509",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.68.12",
+      "date": "2026-10-10 19:17:56",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "统计图的悬停提示现在把站点名当文本处理：名字里带 & 或尖括号时（添加自定义站点填得出这种名字），以前会把那段提示的内容改写掉、名字显示不全，现在照原样显示。这同时把设置页上的一个 HTML 注入面堵掉了。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.68.11",
       "date": "2026-10-10 19:11:07",

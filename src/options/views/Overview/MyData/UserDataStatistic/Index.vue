@@ -44,6 +44,22 @@ import CheckSwitchButton from "@/options/components/CheckSwitchButton.vue";
 import { type IUserDataStatistic, loadFullData, setSubDate } from "./utils.ts";
 import { allAddedSiteMetadata, loadAllAddedSiteMetadata } from "../utils/siteMetadata.ts";
 
+/**
+ * 转义后再拼进 tooltip 的 HTML 字符串。
+ *
+ * ⚠️ formatter 返回的是字符串，ECharts 把它当 HTML 塞进 tooltip 容器。站点名来自
+ * 第三方定义/解析结果（含 aka），favicon URL 也是外部拼出来的 —— 未转义时一个
+ * `<img onerror=…>` 或一个引号就能改写这段 HTML，在扩展的特权页里注入钓鱼内容。
+ * MV3 的 CSP 挡住内联脚本执行，所以危害上限是 HTML 注入而不是任意 JS，
+ * 但属性引号逃逸是确定可行的，仍然要转义。
+ */
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  );
+}
+
 type EChartsLineChartOption = ComposeOption<
   TitleComponentOption | TooltipComponentOption | LegendComponentOption | GridComponentOption | LineSeriesOption
 >;
@@ -270,7 +286,7 @@ function createPerSiteChartOptionsFn(
         formatter: (params: any[]) => {
           let ret = "";
           const date = params?.[0]?.name ?? "No Date";
-          ret += `<span class="font-weight-bold">${date}</span><br>`;
+          ret += `<span class="font-weight-bold">${escapeHtml(date)}</span><br>`;
 
           const hasData = params.some((x) => Number(x.data));
           const totalCount = params.reduce((acc, cur) => acc + (Number(cur.data) || 0), 0);
@@ -302,8 +318,8 @@ function createPerSiteChartOptionsFn(
               }
 
               ret += `<tr style='${isHighlightSite ? `color: ${data.color};` : ""}'>
-<td style="padding-right: 12px;"><div class="d-inline-flex align-center"><img src="${siteFavicon}" class="mr-1" style="width:16px; height: 16px; " alt="${siteName}">${siteName}</div></td>
-<td style="padding-right: 12px; text-align: right;">${formatDict[format](data.value)}</td>
+<td style="padding-right: 12px;"><div class="d-inline-flex align-center"><img src="${escapeHtml(siteFavicon)}" class="mr-1" style="width:16px; height: 16px; " alt="${escapeHtml(siteName)}">${escapeHtml(siteName)}</div></td>
+<td style="padding-right: 12px; text-align: right;">${escapeHtml(formatDict[format](data.value))}</td>
 <td style="text-align: right;">${precentValue.toFixed(2)}%</td>
 </tr>`;
             }

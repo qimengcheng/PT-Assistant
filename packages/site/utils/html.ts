@@ -2,9 +2,15 @@ import type { TSiteFullUrl, TSiteHost } from "../types";
 
 /**
  * cloudflare Email 解码方法，来自 https://usamaejaz.com/cloudflare-email-decoding/
+ *
+ * ⚠️ 缺 `data-cfemail` 的 span（改版 / 半截标签）会让 slice 在 undefined 上抛，
+ * 而调用方（AbstractBittorrentSite.request）那个 catch 会把它改抛成 NetworkError ——
+ * 于是一个畸形 span 把整页请求搞挂，报错还指向完全不相干的方向。空值返回空串。
  * @param {*} encodedString
  */
-export function cfDecodeEmail(encodedString: string) {
+export function cfDecodeEmail(encodedString: string | undefined | null) {
+  if (!encodedString) return "";
+
   let email = "";
   const r = parseInt(encodedString.slice(0, 2), 16);
   for (let n = 2; encodedString.length - n; n += 2) {

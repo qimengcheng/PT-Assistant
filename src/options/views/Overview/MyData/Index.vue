@@ -337,10 +337,37 @@ function viewHistoryData(siteId: TSiteID) {
 }
 
 async function multiOpen() {
-  for (const siteId of tableSelected.value) {
+  // ⚠️ 弹窗必须在**用户手势那一帧**同步打开：原先这里先 await getSiteUrl()
+  // （里面是 `await import()` 取站点定义，真跨了任务边界），手势链一断，
+  // window.open 被拦且不给任何提示 —— 选了 5 个站点只开出 1 个标签页。
+  // 办法：同步开占位窗口拿到句柄，之后再逐个填地址。
+  // 句柄必须**按位**存（map 天然如此）：少存一个，windows[i] 与 siteId 就整体错位，
+  // 每个站点会导航到别人的那个标签页。
+  const siteIds = tableSelected.value;
+  const windows: (Window | null)[] = siteIds.map(() => window.open("about:blank", "_blank"));
+
+  for (const [i, siteId] of siteIds.entries()) {
     const siteUrl = await metadataStore.getSiteUrl(siteId);
-    if (siteUrl) {
-      window.open(siteUrl, "_blank", "noopener noreferrer");
+    const w = windows[i];
+    if (siteUrl && w) {
+      try {
+        w.location.href = siteUrl;
+      } catch (e) {
+        // 用户提前把占位标签页关掉了：退回直接开，让 Chrome 自己处理
+        console.error("[MyData] assign location failed, fallback to window.open", siteId, e);
+        window.open(siteUrl, "_blank", "noopener noreferrer");
+      }
+      // 占位窗口是我们自己开的、带着 opener，原来那串 "noopener noreferrer" 在这条路上
+      // 整个丢了：站点页拿到 window.opener 就能反向导航设置页（reverse tabnabbing）。
+      // 把 opener 置 null 不要求同源，导航发起后立刻断开。
+      try {
+        w.opener = null;
+      } catch {
+        // 断开失败也不影响已经发起的导航
+      }
+    } else {
+      // 拿不到地址就把占位窗口关掉，别留一个空白标签页
+      w?.close();
     }
   }
 }

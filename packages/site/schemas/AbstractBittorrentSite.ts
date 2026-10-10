@@ -25,6 +25,7 @@ import {
   type ISearchEntryRequestConfig,
   type IParsedTorrentListPage,
   type TSchemaMetadataListSelectors,
+  type TPattern,
   ETorrentStatus,
 } from "../types";
 import {
@@ -61,6 +62,21 @@ const defaultTorrentSelectorKey = [
   "progress",
   "status",
 ];
+
+/**
+ * 用站点定义里的 urlPattern 匹配 URL，坏正则跳过而不是让调用方整个挂掉。
+ * pattern 全部来自 packages/site/definitions（外部数据），一个写错的括号就会抛
+ * SyntaxError，而它在 .some() 回调里抛会把整页解析/列表取数一起带崩。
+ */
+function matchesPattern(pattern: TPattern | undefined, url: string): boolean {
+  if (pattern === undefined || pattern === null) return false;
+  try {
+    // TPattern 允许直接给 RegExp（那就别再包一层 new RegExp）
+    return (pattern instanceof RegExp ? pattern : new RegExp(pattern, "i")).test(url);
+  } catch {
+    return false;
+  }
+}
 
 // 适用于公网BT站点，同时也作为 所有站点方法 的基类
 export default class BittorrentSite {
@@ -148,7 +164,10 @@ export default class BittorrentSite {
         const doc = req.data;
 
         // 进行简单的检查，防止无意义的替换
-        if (doc instanceof Document && doc.documentElement.outerHTML.search("__cf_email__")) {
+        // ⚠️ String.search 没找到时返回 -1，而 -1 是 truthy —— 原判断于是
+        // 「页面里根本没有 __cf_email__ 时」反而进来跑一遍 Sizzle 替换，
+        // token 恰好在下标 0 时又会被跳过，两个边界正好搞反。这里显式与 -1 比较。
+        if (doc instanceof Document && doc.documentElement.outerHTML.search("__cf_email__") !== -1) {
           const cfProtectSpan = Sizzle(".__cf_email__", doc);
 
           cfProtectSpan.forEach((element) => {
@@ -706,7 +725,9 @@ export default class BittorrentSite {
     // 使用 list 中定义的 selectors 覆盖掉 search 中的 selectors
     for (const list of this.metadata.list ?? []) {
       const { urlPattern: listUrlPattern = [], selectors: listSelectors = {}, mergeSearchSelectors = true } = list;
-      if (listUrlPattern.some((pattern) => new RegExp(pattern!, "i").test(parsedListPageUrl))) {
+      // ⚠️ new RegExp 不能裸调：urlPattern 来自站点定义，一个写错的括号就在这里抛，
+      // 整个 transformListPage 挂掉（列表页内容脚本什么都不出）。坏 pattern 跳过。
+      if (listUrlPattern.some((pattern) => matchesPattern(pattern, parsedListPageUrl))) {
         searchEntry.selectors = { ...(mergeSearchSelectors ? searchEntry.selectors : {}), ...listSelectors };
         break; // 找到匹配的 list 后，直接跳出循环
       }
@@ -725,7 +746,10 @@ export default class BittorrentSite {
       retData.keywords = this.getFieldData(doc, {
         selector: [
           keywordField === "params" ? `input[name="${keywordParams}"]` : false,
-          keywordField === "data" ? `form[method="post" i] input[name="${keywordField}"]` : false,
+          // ⚠️ 原这里写的是 input[name="${keywordField}"] —— 那个分支里
+          // keywordField 恒为字面量 "data"，于是生成 input[name="data"]，
+          // 与真正的表单字段名（keywordParams）永远对不上，该分支形同虚设。
+          keywordField === "data" ? `form[method="post" i] input[name="${keywordParams}"]` : false,
         ].filter(Boolean) as string[],
         elementProcess: (el: HTMLInputElement) => el.value,
         text: "",

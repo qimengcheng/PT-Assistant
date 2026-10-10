@@ -5,7 +5,7 @@
  * 逐站点勾选后写入 userInfo storage（可选覆盖已有数据）。
  * 平移自 PT-depiler views/Settings/SetBase/RestorePtppUserDataDialog.vue。
  */
-import { computed, ref, shallowRef } from "vue";
+import { computed, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { Modal, message } from "antdv-next";
 import {
@@ -98,6 +98,20 @@ const allSupportedSiteHost = computed(() =>
 
 const overwriteExistUserInfo = ref<boolean>(false);
 
+/**
+ * 存档条数 = 键数减去 latest 那一条。
+ *
+ * ⚠️ `latest` 不保证在：ptpp.ts:42 那个类型是「索引签名 + latest」，写的是形状不是保证，
+ * 而下面读它的那句本来就写着 `data.latest ?? {}` —— 说明来的 dump 确实可能没这个键。
+ * 原先无条件 `Object.keys(data).length - 1`，缺它时少算一条，
+ * 一条都没有的站点会显示「-1 条记录」—— 一个内部占位值直接上了屏。
+ * 这里按实际有没有 latest 决定减不减。
+ */
+function archiveCountOf(data: Record<string, unknown>): number {
+  const keys = Object.keys(data);
+  return keys.includes("latest") ? keys.length - 1 : keys.length;
+}
+
 function statusInfo(host: string) {
   if (!allSupportedSiteHost.value.includes(host)) {
     return { color: "default", title: t("SetBase.RestorePtppUserDataDialog.statusUnsupported") };
@@ -133,6 +147,15 @@ function transferUserInfo(userInfo: IPtppUserInfo) {
 }
 
 async function doImport() {
+  // ⚠️ 空选择点确定原来照走：循环体一条都不进，最后照样 replaceArchive +
+  // 报「导入成功」、5 秒后关窗。用户什么都没勾却看到成功提示，
+  // 下次再来一遍还是「成功」—— 纯误导。
+  if (isImporting.value) return;
+  if (toImportSite.value.length === 0) {
+    runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.noSelection"), { color: "warning" });
+    return;
+  }
+
   if (isEmpty(metadataStore.sites)) {
     // ⚠️ MV3 扩展页面原生 confirm() 静默失效，改用 antdv Modal.confirm
     Modal.confirm({
@@ -169,6 +192,8 @@ async function doImportInternal() {
         userInfoStorage[siteId] ??= {} as any;
 
         // 仅处理 lastUpdateStatus 为 success，且历史时间大于当前存储的时间（帮助导入 isDead 站点）
+        // latest 可能没有（见上方 archiveCountOf 的注释），兜一个 {} 让下面那句
+        // lastUpdateStatus 的比较自然落空 —— 缺就是缺，不要因此往 storage 里写一条 undefined。
         const latestUserInfo = data.latest ?? {};
         if (
           overwriteExistUserInfo.value &&
@@ -192,16 +217,26 @@ async function doImportInternal() {
 
     runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.importSuccess"), { color: "success" });
 
-    setTimeout(() => (showDialog.value = false), 5e3);
+    // ⚠️ 原来这个 setTimeout 不保存句柄：组件在 5 秒内卸载（用户手动关窗 /
+    // 切路由）后再回来，回调照样把 showDialog 置 false —— 那是**新**一次打开的
+    // 弹窗，被一个 5 秒前就开始计时的旧回调关掉。保存句柄并在卸载时清掉。
+    closeTimer = setTimeout(() => (showDialog.value = false), 5e3);
   } catch (e) {
     console.error("导入失败", e);
     runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.importFailed"), { color: "error" });
   } finally {
-    // 恢复自动刷新的状态
-    configStore.userInfo.autoReflush.enabled = autoReflushStatus;
-    await configStore.$save();
-
+    // ⚠️ 恢复自动刷新状态这一步自己也会 $save，它 reject 时下面那行
+    // isImporting = false 永远执行不到 —— 弹窗卡在 confirm-loading 不消失，
+    // 用户只能刷新页面。而它要恢复的恰恰是「导入前关掉的后台刷新」，
+    // 失败时那条设置也停在关着的状态，后台悄悄不刷数据了。
+    // 所以把复位提到最前面，恢复失败只记日志（真正的失败已在上方提示过）。
     isImporting.value = false;
+    try {
+      configStore.userInfo.autoReflush.enabled = autoReflushStatus;
+      await configStore.$save();
+    } catch (e) {
+      console.error("[RestorePtppUserDataDialog] restore auto-refresh failed", e);
+    }
   }
 }
 
@@ -236,6 +271,13 @@ async function entryDialog() {
   toImportSite.value = allSupportedSiteHost.value;
 }
 
+/** 成功后自动关窗的定时器句柄（卸载时要清，否则会关掉下一次打开的弹窗） */
+let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+onUnmounted(() => {
+  if (closeTimer) clearTimeout(closeTimer);
+});
+
 function toggleAll(checked: boolean) {
   toImportSite.value = checked ? [...allSupportedSiteHost.value] : [];
 }
@@ -247,6 +289,7 @@ function toggleAll(checked: boolean) {
     :title="t('SetBase.RestorePtppUserDataDialog.dialogTitle')"
     width="800px"
     :confirm-loading="isImporting"
+    :ok-button-props="{ disabled: toImportSite.length === 0 || isImporting }"
     :ok-text="t('SetBase.RestorePtppUserDataDialog.okText')"
     :cancel-text="t('SetBase.RestorePtppUserDataDialog.cancelText')"
     :after-open-change="(open: boolean) => open && entryDialog()"
@@ -281,7 +324,7 @@ function toggleAll(checked: boolean) {
             </template>
             <a-tooltip :title="statusInfo(host as string).title">
               <a-tag :color="statusInfo(host as string).color" style="margin-left: auto">
-                {{ t("SetBase.RestorePtppUserDataDialog.recordCount", { n: Object.keys(data).length - 1 }) }}
+                {{ t("SetBase.RestorePtppUserDataDialog.recordCount", { n: archiveCountOf(data) }) }}
               </a-tag>
             </a-tooltip>
           </div>

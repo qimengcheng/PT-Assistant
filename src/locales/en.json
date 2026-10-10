@@ -1077,6 +1077,7 @@
       "cacheDayHint": "How long fetched movie information stays in the local cache before it is requested again; 0 means always refetch."
     },
     "RestorePtppUserDataDialog": {
+      "noSelection": "Select at least one site",
       "dialogTitle": "Import PT-Plugin-Plus user data",
       "okText": "Import",
       "cancelText": "Cancel",

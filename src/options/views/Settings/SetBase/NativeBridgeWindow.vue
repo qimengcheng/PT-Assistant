@@ -5,7 +5,7 @@
  * 2. 授权后可开关桥、查看连接状态、手动重连测试；
  * 3. 未连接时给出 ptd CLI 注册命令（含本扩展 id）。
  */
-import { computed, onMounted, ref, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { ApiOutlined } from "@antdv-next/icons";
 
@@ -96,12 +96,31 @@ function onSwitchChange(checked: boolean | string | number) {
   void toggleEnabled(checked === true);
 }
 
-async function waitForSettledState(maxMs = 5000, intervalMs = 500) {
+/**
+ * 轮询令牌：组件卸载（或又点了一次测试连接）之后，本轮等待必须立刻退出。
+ *
+ * ⚠️ 原来这个循环没有取消点：它最多跑 5 秒，期间用户关掉窗口、切走路由，
+ * 循环仍会每 500ms 一次 sendMessage + 写 status.value —— 对已卸载组件的
+ * ref 写值，并且用户回到这一页时又看到 testLoading 被那次迟到的 finally 置
+ * false，与新一轮的 loading 打架。
+ *
+ * 令牌由**发起方**持有并传进循环，不能在循环里自己 +1：那样卸载之后
+ * testConnection 接着往下走的那一句 waitForSettledState() 会把令牌重新认领回去，
+ * 刚作废的那轮又复活，卸载后照样轮询 5 秒（第一版就是这么漏的）。
+ */
+let pollingToken = 0;
+
+onUnmounted(() => pollingToken++);
+
+async function waitForSettledState(token: number, maxMs = 5000, intervalMs = 500) {
   const transientStates: BridgeState[] = ["connecting", "retrying"];
   const start = Date.now();
-  while (Date.now() - start < maxMs) {
+  while (token === pollingToken && Date.now() - start < maxMs) {
     await new Promise((r) => setTimeout(r, intervalMs));
+    // 每轮醒来先看令牌：已经作废就直接退出，不再发消息也不写 ref
+    if (token !== pollingToken) return;
     await refreshStatus();
+    if (token !== pollingToken) return;
     if (!transientStates.includes(status.value.state)) {
       return;
     }
@@ -109,16 +128,20 @@ async function waitForSettledState(maxMs = 5000, intervalMs = 500) {
 }
 
 async function testConnection() {
+  if (testLoading.value) return;
+  const token = ++pollingToken;
   testLoading.value = true;
   try {
     status.value = await sendMessage("nativeBridgeReconnect", undefined);
-    if (status.value.state === "connecting") {
-      await waitForSettledState();
+    // 这一句之前可能已经卸载过：令牌被谁 +1 走了就别再进轮询
+    if (token === pollingToken && status.value.state === "connecting") {
+      await waitForSettledState(token);
     }
   } catch (e: any) {
     console.debug("[PTD] Reconnect failed:", e);
   } finally {
-    testLoading.value = false;
+    // 迟到的 finally 不许把**新一轮**的 loading 关掉（卸载那一路也无所谓，ref 已经没人看了）
+    if (token === pollingToken) testLoading.value = false;
   }
 }
 

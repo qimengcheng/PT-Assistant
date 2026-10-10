@@ -1077,6 +1077,7 @@
       "cacheDayHint": "查到的影片信息在本地留多少天，期限内不再重复请求；填 0 表示每次都重新查。"
     },
     "RestorePtppUserDataDialog": {
+      "noSelection": "请至少选择一个站点",
       "dialogTitle": "导入 PT-Plugin-Plus 用户数据",
       "okText": "导入",
       "cancelText": "取消",

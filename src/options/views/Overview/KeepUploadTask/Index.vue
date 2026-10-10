@@ -3,7 +3,6 @@ import { computed, onMounted, onUnmounted, ref, useTemplateRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { type TableColumnsType } from "antdv-next";
 import {
-  ArrowUpOutlined,
   CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
@@ -740,6 +739,13 @@ async function sendOneAndPromote(task: IKeepUploadTask, index: number) {
   if (okToSend && index > 0) await setAsBaseTorrent(task, index);
 }
 
+/** 「只发送」：把这一条发出去，基准不动（他 2026-10-09：「应该还可以单独发送和单独换基准」） */
+async function sendOneOnly(task: IKeepUploadTask, index: number) {
+  const item = task.items[index];
+  if (!item) return;
+  await sendTorrentsToDownloader(task, [item], `one:${index}`);
+}
+
 // 复制下载链接
 async function copyLinksToClipboard(task: IKeepUploadTask) {
   const urls = task.items.map((item) => item.url).join("\n");
@@ -989,29 +995,43 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
             </a-tooltip>
           </a-space>
 
-          <!-- 条目行这一格：那颗文字键做完「只发这条 + 发成了再换基准」（拆成两颗会留下一种错法：
-               点了换基准却没发送，任务就挂在一条根本没发出去的种子上），后面单独的「↑」是只换基准。
-               同上面那条「按住不给点而不是藏起来」的判据：第一条本来就是基准、基准在下载器里时换基准也没有对象 -->
+          <!-- 条目行这一格三颗：只发送 / 只换基准 / 发送并换基准。
+               他 2026-10-09：「应该还可以单独发送和单独换基准」—— 原先只有一颗合并键
+               「发送这一条并换它当基准」+ 一颗没人认得的「↑」，两件事没法各做各的。
+               标签压到三个汉字是宽度预算：这一格实测只有 194px 可用（见上面 columns 那条注释），
+               完整说法挂在每颗的 tooltip 上。合并那颗仍然留着 —— 它保证「先发成功、再挪基准」，
+               比让人自己记这个顺序可靠（顺序反了一旦发送失败，基准就挂在一条根本没发出去的种子上）。
+               按住不给点而不是藏起来：第一条本来就是基准、基准在下载器里时换基准也没有对象。 -->
           <a-space v-else :size="0" wrap>
-            <a-button
-              size="small"
-              type="link"
-              :loading="sendingOf(record.task.id) === `one:${record.index}`"
-              :disabled="!!sendingOf(record.task.id)"
-              @click="sendOneAndPromote(record.task, record.index)"
-            >
-              {{ record.index === 0 ? t("KeepUploadTask.sendThisOne") : t("KeepUploadTask.sendAndSetBase") }}
-            </a-button>
+            <a-tooltip :title="t('KeepUploadTask.sendThisOne')">
+              <a-button
+                size="small"
+                type="link"
+                :loading="sendingOf(record.task.id) === `one:${record.index}`"
+                :disabled="!!sendingOf(record.task.id)"
+                @click="sendOneOnly(record.task, record.index)"
+              >
+                {{ t("KeepUploadTask.sendOne") }}
+              </a-button>
+            </a-tooltip>
             <a-tooltip :title="t('KeepUploadTask.setAsBaseTorrent')">
               <a-button
                 size="small"
-                type="text"
+                type="link"
                 :disabled="record.index === 0 || !!record.task.baseLocal || !!sendingOf(record.task.id)"
                 @click="setAsBaseTorrent(record.task, record.index)"
               >
-                <template #icon>
-                  <ArrowUpOutlined />
-                </template>
+                {{ t("KeepUploadTask.promoteOnly") }}
+              </a-button>
+            </a-tooltip>
+            <a-tooltip :title="t('KeepUploadTask.sendAndSetBase')">
+              <a-button
+                size="small"
+                type="link"
+                :disabled="record.index === 0 || !!record.task.baseLocal || !!sendingOf(record.task.id)"
+                @click="sendOneAndPromote(record.task, record.index)"
+              >
+                {{ t("KeepUploadTask.sendAndPromote") }}
               </a-button>
             </a-tooltip>
           </a-space>

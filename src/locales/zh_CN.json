@@ -556,9 +556,22 @@
         "title": "标题",
         "size": "大小",
         "files": "文件数",
+        "seeders": "做种",
+        "leechers": "下载",
         "status": "状态"
       },
       "setAsBase": "设为基准种子",
+      "recommend": {
+        "label": "推荐基准",
+        "mostSeeders": "做种人数最多",
+        "mostSeedersFree": "免费里做种最多",
+        "mostSeedersShort": "做种最多",
+        "mostSeedersFreeShort": "免费最多",
+        "mostSeedersHint": "这一批里做种人数最多的那一条。基准那一条要真下一遍，从还热着的种子里挑，不必等它慢慢有源。",
+        "mostSeedersFreeHint": "免费下载的那批里做种最多的那一条。基准这一份是要真下一遍的，挑免费的就不为它花下载量。",
+        "seedersCount": "{n} 人做种",
+        "alreadyBase": "这一条已经是基准了"
+      },
       "localBase": {
         "byFiles": "文件清单一致，已替你选中",
         "byList": "没指定就用列表第一条当基准",

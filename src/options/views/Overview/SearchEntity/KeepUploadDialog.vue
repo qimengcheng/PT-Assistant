@@ -32,6 +32,8 @@ import {
   type ILocalTorrentFingerprintEntry,
 } from "@/shared/fingerprint/index.ts";
 import { formatSize } from "@/options/utils.ts";
+import { countText, toCount } from "@/shared/torrentCount.ts";
+import { pickBaseRecommendations, type TReseedRecommendKind } from "@/shared/reseedRecommend.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
@@ -271,10 +273,58 @@ const showCreateRow = computed(() => includedItems.value.some((item) => !item.lo
  * 基准取自下载器（`useLocalBase`）或只勾一条时，列表里没有基准这一说，整列撤掉，
  * 留一列一模一样的「其他」标签是噪声。
  */
+/**
+ * 基准 = `verifiedItemsOrder` 的第一条。表头排序会改**渲染序**（`#bodyCell` 的 `index`），
+ * 但基准从来只由那个数组的头一项决定 —— 所以凡判「这一条是不是基准」一律按 id 比。
+ * 原来这几处写的是 `index === 0` / `index > 0`：在没有排序的表格里两者等价，
+ * 这次给「做种 / 下载」加了排序，照旧写法会把「基准」标签画到排序后的第一行上，
+ * 而它其实只是做种人数最少的那一条。
+ */
+const baseId = computed(() => verifiedItemsOrder.value[0] ?? "");
+const baseItem = computed(() => verifiedItems.value.get(baseId.value) ?? null);
+
+/**
+ * 两组推荐基准（做种最多 / 免费里做种最多），判据在 `@/shared/reseedRecommend.ts`。
+ *
+ * 只在这张表真的靠「列表第一条」当基准时才有意义：基准取自下载器（`useLocalBase`）或只勾一条时
+ * 列表里没有「当基准」这一说 —— 跟角色列同一判据（所以那一列撤掉时这两颗按钮也一起撤）。
+ * 候选还要过一道 `!!item.torrent`：没拿到种子文件的那一条点不动，推荐它等于给一颗死按钮。
+ */
+const recommendations = computed(() => {
+  if (isSingleMode.value || useLocalBase.value) return [];
+  const list = pickBaseRecommendations(
+    includedItems.value
+      .filter((item) => !!item.torrent)
+      .map((item) => ({ id: item.id, seeders: item.data.seeders, tags: item.data.tags })),
+  );
+  // 站点名在这里一起算好：SiteName 那一栏要它，而按钮里没有可靠的 index/id 反查
+  return list.map((r) => ({ ...r, site: verifiedItems.value.get(r.id)?.data.site ?? "" }));
+});
+
+/** 这一条是不是被推荐当基准的那两条之一（角色列第二行的小标签用它） */
+function recommendOf(item: IVerifiedItem) {
+  return recommendations.value.find((r) => r.id === item.id);
+}
+
+/** 键是字面量写死的两条（不用 `t("前缀" + kind)`）：防线③看不见拼出来的键（AGENTS §3.4） */
+const recommendKindText = computed<Record<TReseedRecommendKind, string>>(() => ({
+  mostSeeders: t("SearchEntity.KeepUploadDialog.recommend.mostSeeders"),
+  mostSeedersFree: t("SearchEntity.KeepUploadDialog.recommend.mostSeedersFree"),
+}));
+const recommendKindShort = computed<Record<TReseedRecommendKind, string>>(() => ({
+  mostSeeders: t("SearchEntity.KeepUploadDialog.recommend.mostSeedersShort"),
+  mostSeedersFree: t("SearchEntity.KeepUploadDialog.recommend.mostSeedersFreeShort"),
+}));
+const recommendKindHint = computed<Record<TReseedRecommendKind, string>>(() => ({
+  mostSeeders: t("SearchEntity.KeepUploadDialog.recommend.mostSeedersHint"),
+  mostSeedersFree: t("SearchEntity.KeepUploadDialog.recommend.mostSeedersFreeHint"),
+}));
+
+/** 角色 96：这一列现在要容得下第二行的推荐短标签（英文 "Free top" 47px + 内衬 16 + 余量） */
 const columns = computed<TableColumnsType<IVerifiedItem>>(() => {
   const cols: TableColumnsType<IVerifiedItem> = [];
   if (!isSingleMode.value && !useLocalBase.value) {
-    cols.push({ title: t("SearchEntity.KeepUploadDialog.columns.role"), key: "role", align: "center", width: 78 });
+    cols.push({ title: t("SearchEntity.KeepUploadDialog.columns.role"), key: "role", align: "center", width: 96 });
   }
   return [
     ...cols,
@@ -283,14 +333,30 @@ const columns = computed<TableColumnsType<IVerifiedItem>>(() => {
     { title: t("SearchEntity.KeepUploadDialog.columns.title"), key: "title", ellipsis: true },
     { title: t("SearchEntity.KeepUploadDialog.columns.size"), key: "size", align: "right", width: 92 },
     { title: t("SearchEntity.KeepUploadDialog.columns.files"), key: "files", align: "center", width: 72 },
+    // 做种 / 下载：挑基准的两个主要信息，所以给排序。表头宽 = 文字 + 箭头 1em+4 + small 档内衬 16×2
+    // → 英文 "Seeders"/"Leechers" 要 80 上下，取 88。
+    {
+      title: t("SearchEntity.KeepUploadDialog.columns.seeders"),
+      key: "seeders",
+      align: "right",
+      width: 88,
+      sorter: (a, b) => (toCount(a.data.seeders) ?? -1) - (toCount(b.data.seeders) ?? -1),
+    },
+    {
+      title: t("SearchEntity.KeepUploadDialog.columns.leechers"),
+      key: "leechers",
+      align: "right",
+      width: 88,
+      sorter: (a, b) => (toCount(a.data.leechers) ?? -1) - (toCount(b.data.leechers) ?? -1),
+    },
     { title: t("SearchEntity.KeepUploadDialog.columns.status"), key: "status", width: 150 },
     { title: t("common.action"), key: "action", align: "center", width: 170 },
   ];
 });
 
 /** 能不能把某一条挪成基准：只有「基准取自列表第一条」那条路有意义，且它得已经拿到种子信息 */
-function canPromote(index: number, item: IVerifiedItem): boolean {
-  return index > 0 && !isSingleMode.value && !useLocalBase.value && !!item.torrent;
+function canPromote(item: IVerifiedItem): boolean {
+  return item.id !== baseId.value && !isSingleMode.value && !useLocalBase.value && !!item.torrent;
 }
 
 // 状态文本
@@ -852,7 +918,7 @@ async function createKeepUploadTask() {
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :title="t('SearchEntity.KeepUploadDialog.title')" :width="1024" :mask="{ closable: false }">
+  <a-modal v-model:open="showDialog" :title="t('SearchEntity.KeepUploadDialog.title')" :width="1280" :mask="{ closable: false }">
     <!-- 「怎么用」入口原先挂在 #title 插槽里，会和右上角相撞，移到内容区顶部。
        它以前是 a-button 的 href，指向上游旧项目的 wiki；现在改为打开应用内说明弹窗。 -->
     <div class="d-flex justify-end">
@@ -907,6 +973,29 @@ async function createKeepUploadTask() {
       <div class="text-body-small text-grey mt-1">{{ localBaseHint }}</div>
     </div>
 
+    <!-- 两组推荐基准（他 2026-10-10：「要给出2组推荐的种子作为基准，一组是做种人数最多的，
+         一组是免费的里面做种人数最多的」）。放在表格正上方而不是并到「基准种子」那一栏里：
+         那一栏挑的是**下载器里**的种子，这两颗挑的是**列表里**的种子，两种来路混一排会读成同一个下拉。
+         一条都推荐不出来时整行不出（不摆两颗空按钮）；两组指向同一条时只出一颗。 -->
+    <div v-if="recommendations.length" class="recommend-row mb-2">
+      <span class="recommend-label">{{ t("SearchEntity.KeepUploadDialog.recommend.label") }}</span>
+      <a-tooltip
+        v-for="r in recommendations"
+        :key="r.kind"
+        :title="r.id === baseId ? t('SearchEntity.KeepUploadDialog.recommend.alreadyBase') : recommendKindHint[r.kind]"
+      >
+        <!-- 站点名走 SiteName 组件而不是字符串拼接：真名要异步取（siteNameMap 没命中时它自己回落），
+             在 computed 里直接写 `siteNameMap?.[site] ?? site` 会把内部 id 画到按钮上（AGENTS §3.5）。 -->
+        <a-button size="small" :disabled="r.id === baseId" @click="setItemBase(r.id)">
+          <span class="recommend-text">
+            <span class="recommend-kind">{{ recommendKindText[r.kind] }}</span>
+            <SiteName :site-id="r.site" tag="span" class="recommend-site" />
+            <span class="recommend-count">{{ t("SearchEntity.KeepUploadDialog.recommend.seedersCount", { n: r.seeders }) }}</span>
+          </span>
+        </a-button>
+      </a-tooltip>
+    </div>
+
     <!-- 这里不再自己当滚动容器（原先是 `style="max-height: 80vh"` + 下面那条 overflow-y）：
          弹窗 body 已经由 v0.42.4 那条 flex 链负责限高与滚动，两层都在滚就是双竖向滚动条。 -->
     <div class="keep-upload-list">
@@ -921,11 +1010,16 @@ async function createKeepUploadTask() {
         :data-source="includedItems"
         :pagination="false"
       >
-        <template #bodyCell="{ column, record, index }">
+        <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'role'">
-            <a-tag :color="index === 0 ? 'blue' : 'default'">
-              {{ index === 0 ? t("SearchEntity.KeepUploadDialog.baseTorrent") : t("SearchEntity.KeepUploadDialog.otherTorrent") }}
+            <a-tag :color="record.id === baseId ? 'blue' : 'default'">
+              {{ record.id === baseId ? t("SearchEntity.KeepUploadDialog.baseTorrent") : t("SearchEntity.KeepUploadDialog.otherTorrent") }}
             </a-tag>
+            <!-- 推荐的两条在表里也要认得出来：上面那排按钮写的是站名 + 做种数，而这一屏里几条同站、
+                 同大小的结果并排，光靠站名对不到具体哪一行。包成一个 flex 列，两颗标签不零间距贴边。 -->
+            <div v-if="recommendOf(record)" class="role-recommend">
+              <a-tag color="gold">{{ recommendKindShort[recommendOf(record)!.kind] }}</a-tag>
+            </div>
           </template>
 
           <!-- 图标旁边必须带上站点名：不少站点的 favicon 长得一样（他截图里 SBPT 和「库非」
@@ -979,6 +1073,16 @@ async function createKeepUploadTask() {
             {{ getFileCount(record) }}
           </template>
 
+          <!-- 判不出就是空格，不写 0：0 会上报「这个站说没人做种」，而实情是站点没给这一格
+               （同一口径见 @/shared/torrentCount.ts 的 countText） -->
+          <template v-else-if="column.key === 'seeders'">
+            {{ countText(record.data.seeders) }}
+          </template>
+
+          <template v-else-if="column.key === 'leechers'">
+            {{ countText(record.data.leechers) }}
+          </template>
+
           <!-- 判定依据单独一行：它决定这条结论有多硬，混在状态后面会被当成状态的一部分读掉 -->
           <template v-else-if="column.key === 'status'">
             <div>{{ record.status }}</div>
@@ -986,10 +1090,11 @@ async function createKeepUploadTask() {
           </template>
 
           <template v-else-if="column.key === 'action'">
-            <!-- 「有参照物可比」的两种来路：基准取列表第一条时要求它已经验证通过（所以只有 index>0 比得了）；
+            <!-- 「有参照物可比」的两种来路：基准取列表第一条时要求它已经验证通过（所以除它以外的行才比得了，
+                 判据是 id 而不是渲染序 —— 这一列现在能按做种/下载排序）；
                  基准取下载器那条时参照物一直在，第一条也允许人工确认 / 重下 -->
             <a-button
-              v-if="!record.loading && !record.verified && (useLocalBase || (index > 0 && includedItems[0]?.verified))"
+              v-if="!record.loading && !record.verified && (useLocalBase || (record.id !== baseId && baseItem?.verified))"
               type="text"
               size="small"
               :title="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
@@ -999,7 +1104,7 @@ async function createKeepUploadTask() {
             </a-button>
 
             <a-button
-              v-if="!record.loading && !record.torrent && (useLocalBase || (index > 0 && includedItems[0]?.verified))"
+              v-if="!record.loading && !record.torrent && (useLocalBase || (record.id !== baseId && baseItem?.verified))"
               type="text"
               size="small"
               :title="t('SearchEntity.KeepUploadDialog.redownload')"
@@ -1011,7 +1116,7 @@ async function createKeepUploadTask() {
             <!-- 原先是一颗向上的箭头图标，悬停才有说明：行右侧同时挂着三颗图标钮，
                  「向上」看不出是「把这一条挪成基准」，所以直接写成文字。 -->
             <a-button
-              v-if="canPromote(index, record)"
+              v-if="canPromote(record)"
               type="link"
               size="small"
               :title="t('SearchEntity.KeepUploadDialog.setAsBase')"
@@ -1121,6 +1226,53 @@ async function createKeepUploadTask() {
    让长站名出省略号比把它整栏撑宽、把标题列挤没更可读）。 */
 .site-cell {
   min-width: 0;
+}
+
+/* 推荐那一排：标签 + 两颗按钮。整排可换行 —— 按钮里带站名，窄窗口下压谁都是把话说一半。
+   这颗 a-button 用 small 档：这一排里没有默认档控件并排（「创建任务」那颗在 footer，
+   隔着一整张表），AGENTS §3.4 那条「同一行里不许谁单独降档」在这里不成立。 */
+.recommend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.recommend-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 一颗按钮里三段文字（判据 / 站名 / 做种数）：Button 的 gap 只在「图标 + 文字」那档生效，
+   三个裸 span 之间不会有缝，所以自己包一层 flex 给间距。 */
+.recommend-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.recommend-kind {
+  white-space: nowrap;
+}
+
+.recommend-site {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommend-count {
+  color: rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+/* 角色列第二行的推荐短标签：跟上面的「基准 / 其他」之间留 2px，不零间距贴边 */
+.role-recommend {
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
 }
 
 /* 标题那一格：黑字、悬停变绿（沿用改成表格之前的观感，只把截断从 a-typography 换成 CSS） */

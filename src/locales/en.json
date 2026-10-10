@@ -556,9 +556,22 @@
         "title": "Title",
         "size": "Size",
         "files": "Files",
+        "seeders": "Seeders",
+        "leechers": "Leechers",
         "status": "Status"
       },
       "setAsBase": "Set as base torrent",
+      "recommend": {
+        "label": "Suggested base",
+        "mostSeeders": "Most seeders",
+        "mostSeedersFree": "Most seeders, free",
+        "mostSeedersShort": "Top",
+        "mostSeedersFreeShort": "Free top",
+        "mostSeedersHint": "The most-seeded torrent in this batch. The base still has to be downloaded once, so picking one that is alive means not waiting for a source to appear.",
+        "mostSeedersFreeHint": "The most-seeded torrent among the free ones. The base copy is downloaded for real, and a free leech spends none of your download quota.",
+        "seedersCount": "{n} seeders",
+        "alreadyBase": "This one is already the base"
+      },
       "localBase": {
         "byFiles": "File lists match - selected for you",
         "byList": "Nothing picked - the first entry in the list is the base",

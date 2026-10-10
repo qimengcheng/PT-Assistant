@@ -142,6 +142,7 @@
     "setBaseError": "设置失败",
     "setBaseSuccess": "已设为基准种子",
     "table": {
+      "completedAt": "完成时间",
       "count": "种子数",
       "savePath": "保存路径",
       "site": "站点",

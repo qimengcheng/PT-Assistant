@@ -142,6 +142,7 @@
     "setBaseError": "Failed to set as base torrent",
     "setBaseSuccess": "Set as base torrent successfully",
     "table": {
+      "completedAt": "Completed At",
       "count": "Count",
       "savePath": "Save Path",
       "site": "Site",

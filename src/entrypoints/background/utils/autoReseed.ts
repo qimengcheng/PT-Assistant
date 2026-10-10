@@ -21,7 +21,11 @@ import type { IKeepUploadTask, IKeepUploadTaskItem, IMetadataPiniaStorageSchema 
 
 import {
   buildReseedAddTorrentOptions,
+  othersAlreadySent,
+  othersStillPending,
   planAutoReseed,
+  reseedItemKey,
+  sendReseedBatch,
 } from "@/options/views/Overview/KeepUploadTask/autoReseed.ts";
 import { judgeReseedTorrent, linkItemToTorrent } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
@@ -104,7 +108,7 @@ function resolveBaseHash(task: IKeepUploadTask, torrents: readonly CTorrent[] | 
 function worthWriting(task: IKeepUploadTask, next: IKeepUploadTask["autoState"]): boolean {
   const a = (task.autoState ?? {}) as Record<string, unknown>;
   const b = (next ?? {}) as Record<string, unknown>;
-  for (const k of ["baseSentAt", "baseSendFails", "othersSentAt", "stage", "notifiedWrong"]) {
+  for (const k of ["baseSentAt", "baseSendFails", "othersSentAt", "othersSent", "completedAt", "stage", "notifiedWrong"]) {
     if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return true;
   }
   return JSON.stringify(a.statuses) !== JSON.stringify(b.statuses);
@@ -140,115 +144,147 @@ async function autoReseedTick() {
     const index = new Map((torrents ?? []).map((t) => [String(t.infoHash).toLowerCase(), t]));
 
     for (const task of group) {
-      const baseHash = resolveBaseHash(task, torrents);
-      const probe = (hash?: string): IReseedItemStatus | undefined => {
-        const key = String(hash ?? "").toLowerCase();
-        if (!reachable || key === "") return undefined;
-        const found = index.get(key);
-        return judgeReseedTorrent(
-          found
-            ? { state: found.state, rawState: found.raw?.state, progress: found.progress, isCompleted: found.isCompleted }
-            : undefined,
-          { isBase: key === baseHash },
-        );
-      };
+      // 一条任务的任何意外都不许终止整轮：这一层以前没有隔离罩，`resolveBaseHash` /
+      // `planAutoReseed` / 最后那次写回只要抛一下，后面所有下载器组、所有任务这一分钟就都不再推进
+      // （他这次问的「别的怎么也受影响」，一半是下面那个逐条发送的挡，另一半就是这里）。
+      try {
+        const baseHash = resolveBaseHash(task, torrents);
+        const probe = (hash?: string): IReseedItemStatus | undefined => {
+          const key = String(hash ?? "").toLowerCase();
+          if (!reachable || key === "") return undefined;
+          const found = index.get(key);
+          return judgeReseedTorrent(
+            found
+              ? { state: found.state, rawState: found.raw?.state, progress: found.progress, isCompleted: found.isCompleted }
+              : undefined,
+            { isBase: key === baseHash },
+          );
+        };
 
-      const base = probe(baseHash);
-      const others = (task.baseLocal ? task.items : task.items.slice(1)).map((item) => probe(item.hash));
-      const untracked = (task.baseLocal ? task.items : task.items.slice(1)).filter((i) => String(i.hash ?? "").trim() === "").length;
+        const base = probe(baseHash);
+        /** 除基准外的全部条目（`baseLocal` 那种任务里就是整份 items） */
+        const allOthers = task.baseLocal ? task.items : task.items.slice(1);
+        const others = allOthers.map((item) => probe(item.hash));
+        const untracked = allOthers.filter((i) => String(i.hash ?? "").trim() === "").length;
+        /** 其中还没成功发出去的那几条（逐条记，不再拿「整批发过一次」当闸） */
+        const othersToSend = othersStillPending(task.autoState ?? {}, allOthers);
 
-      const tick = planAutoReseed({
-        baseLocal: !!task.baseLocal,
-        otherCount: task.baseLocal ? task.items.length : Math.max(0, task.items.length - 1),
-        reachable,
-        base,
-        others,
-        untracked,
-        state: task.autoState ?? {},
-        now: Date.now(),
-      });
-
-      // 把这一轮查到的结论按 hash 存下来：界面上那一列读它，否则后台都在暂停种子了、
-      // 页面上还写着「没查过」
-      const statuses: Record<string, IReseedItemStatus> = {};
-      for (const item of task.items) {
-        const key = String(item.hash ?? "").toLowerCase();
-        const status = probe(item.hash);
-        if (key !== "" && status) statuses[key] = status;
-      }
-      const next = { ...tick.next, statuses: reachable ? statuses : task.autoState?.statuses };
-
-      const othersToSend = task.baseLocal ? task.items : task.items.slice(1);
-      const downloader = metadata?.downloaders?.[downloaderId];
-      let acted = false;
-
-      if (tick.sendBase) {
-        try {
-          await sendOne(task, task.items[0], downloader, siteNameOf(metadata, task.items[0].site));
-          next.baseSentAt = Date.now();
-          void sendMessage("logger", { msg: `Auto-reseed: base torrent sent for [${task.title}]` });
-        } catch (e) {
-          next.baseSendFails = (next.baseSendFails ?? 0) + 1;
-          void sendMessage("logger", {
-            msg: `Auto-reseed: sending base failed for [${task.title}] (${e instanceof Error ? e.message : e})`,
-          });
-        }
-        acted = true;
-      }
-
-      if (tick.sendOthers && !tick.sendBase) {
-        try {
-          for (const item of othersToSend) await sendOne(task, item, downloader, siteNameOf(metadata, item.site));
-          next.othersSentAt = Date.now();
-          void sendMessage("logger", { msg: `Auto-reseed: ${othersToSend.length} reseed torrent(s) sent for [${task.title}]` });
-        } catch (e) {
-          // 发失败不记 othersSentAt —— 下一轮整个重发。qBittorrent 对已存在的 hash 是幂等的
-          // （add 同一条只会返回已在那儿的那份），所以重发不会造出重复种子
-          void sendMessage("logger", {
-            msg: `Auto-reseed: sending reseed torrents failed for [${task.title}] (${e instanceof Error ? e.message : e})`,
-          });
-        }
-        acted = true;
-      }
-
-      // 要暂停的那几条：基准 + 其余里判成 wrong 的那些。id 用下载器列表里那一条的 id
-      // （qBittorrent 的 pause 认的是它的 gid/hash 组合键，不是任务里的字段）
-      const pauseTargets = [
-        ...(tick.pauseBase ? [{ label: task.items[0]?.title ?? "base", id: index.get(baseHash)?.id }] : []),
-        ...tick.pauseIndexes.map((i) => ({
-          label: othersToSend[i]?.title ?? "?",
-          id: index.get(String(othersToSend[i]?.hash ?? "").toLowerCase())?.id,
-        })),
-      ];
-      let paused = 0;
-      for (const one of pauseTargets) {
-        if (!one.id) continue;
-        try {
-          if (await sendMessage("pauseClientTorrent", { downloaderId, id: one.id })) paused++;
-        } catch {
-          // 暂停失败只记日志：下一轮还会看到它 wrong，还会再试一次
-          void sendMessage("logger", { msg: `Auto-reseed: pause failed for [${task.title}] ${one.label}` });
-        }
-      }
-      if (paused > 0) acted = true;
-
-      if (tick.notify) {
-        const count = tick.pauseIndexes.length + (tick.pauseBase ? 1 : 0);
-        const { title, message } = notifyText(config?.lang, task.title, count);
-        // 一条任务只挂一条通知：同一个 id 再 create 是替换，不会堆一屏
-        chrome.notifications?.create(`auto-reseed-${task.id}`, {
-          type: "basic",
-          iconUrl: chrome.runtime.getURL("icon/128.png"),
-          title,
-          message,
+        const tick = planAutoReseed({
+          baseLocal: !!task.baseLocal,
+          otherCount: allOthers.length,
+          othersPending: othersToSend.length,
+          reachable,
+          base,
+          others,
+          untracked,
+          state: task.autoState ?? {},
+          now: Date.now(),
         });
-        void sendMessage("logger", { msg: `Auto-reseed: ${count} torrent(s) not seeding for [${task.title}], paused` });
-      }
 
-      if (acted || worthWriting(task, next)) {
-        // 只 patch `autoState` 这一块，不写整条任务 —— 理由见 `resolveBaseHash` 那段
-        task.autoState = next;
-        await sendMessage("patchKeepUploadTaskAutoState", { taskId: task.id, autoState: next });
+        // 把这一轮查到的结论按 hash 存下来：界面上那一列读它，否则后台都在暂停种子了、
+        // 页面上还写着「没查过」
+        const statuses: Record<string, IReseedItemStatus> = {};
+        for (const item of task.items) {
+          const key = String(item.hash ?? "").toLowerCase();
+          const status = probe(item.hash);
+          if (key !== "" && status) statuses[key] = status;
+        }
+        const next = { ...tick.next, statuses: reachable ? statuses : task.autoState?.statuses };
+
+        const downloader = metadata?.downloaders?.[downloaderId];
+        let acted = false;
+
+        if (tick.sendBase) {
+          try {
+            await sendOne(task, task.items[0], downloader, siteNameOf(metadata, task.items[0].site));
+            next.baseSentAt = Date.now();
+            void sendMessage("logger", { msg: `Auto-reseed: base torrent sent for [${task.title}]` });
+          } catch (e) {
+            next.baseSendFails = (next.baseSendFails ?? 0) + 1;
+            void sendMessage("logger", {
+              msg: `Auto-reseed: sending base failed for [${task.title}] (${e instanceof Error ? e.message : e})`,
+            });
+          }
+          acted = true;
+        }
+
+        if (tick.sendOthers && !tick.sendBase) {
+          const at = Date.now();
+          const sent: Record<string, number> = { ...othersAlreadySent(task.autoState ?? {}, allOthers) };
+          const { sentKeys, failed } = await sendReseedBatch({
+            items: othersToSend,
+            keyOf: reseedItemKey,
+            // 日志要点名是**哪一颗**坏的。原先只报任务标题（=基准那一条），于是日志读起来像
+            // 「这一整个任务失败」，看不出是同批里某一站的接口挂了。
+            titleOf: (item) => `${siteNameOf(metadata, item.site)} / ${item.title}`,
+            send: async (item) => {
+              await sendOne(task, item, downloader, siteNameOf(metadata, item.site));
+            },
+            onFailure: (f) => {
+              void sendMessage("logger", {
+                msg: `Auto-reseed: reseed torrent failed for [${task.title}] → ${f.title} (${f.message})`,
+              });
+            },
+          });
+          for (const key of sentKeys) sent[key] = at;
+          next.othersSent = sent;
+          // 一条不剩才写这个老标记（它现在的含义就是「整批都发出去了」；旧任务那份逐条记录
+          // 也由它回填，见 `othersAlreadySent`）
+          if (allOthers.every((item) => sent[reseedItemKey(item)] !== undefined)) next.othersSentAt = at;
+          if (sentKeys.length > 0) {
+            void sendMessage("logger", {
+              msg:
+                `Auto-reseed: ${sentKeys.length} reseed torrent(s) sent for [${task.title}]` +
+                (failed.length > 0 ? `（另有 ${failed.length} 条失败，下一轮只重试这几条）` : ""),
+            });
+          }
+          acted = true;
+        }
+
+        // 要暂停的那几条：基准 + 其余里判成 wrong 的那些。id 用下载器列表里那一条的 id
+        // （qBittorrent 的 pause 认的是它的 gid/hash 组合键，不是任务里的字段）
+        // ⚠️ 下标吃的是 `allOthers`（= `tick.pauseIndexes` 的那份输入），不是筛过一遍的 `othersToSend`
+        const pauseTargets = [
+          ...(tick.pauseBase ? [{ label: task.items[0]?.title ?? "base", id: index.get(baseHash)?.id }] : []),
+          ...tick.pauseIndexes.map((i) => ({
+            label: allOthers[i]?.title ?? "?",
+            id: index.get(String(allOthers[i]?.hash ?? "").toLowerCase())?.id,
+          })),
+        ];
+        let paused = 0;
+        for (const one of pauseTargets) {
+          if (!one.id) continue;
+          try {
+            if (await sendMessage("pauseClientTorrent", { downloaderId, id: one.id })) paused++;
+          } catch {
+            // 暂停失败只记日志：下一轮还会看到它 wrong，还会再试一次
+            void sendMessage("logger", { msg: `Auto-reseed: pause failed for [${task.title}] ${one.label}` });
+          }
+        }
+        if (paused > 0) acted = true;
+
+        if (tick.notify) {
+          const count = tick.pauseIndexes.length + (tick.pauseBase ? 1 : 0);
+          const { title, message } = notifyText(config?.lang, task.title, count);
+          // 一条任务只挂一条通知：同一个 id 再 create 是替换，不会堆一屏
+          chrome.notifications?.create(`auto-reseed-${task.id}`, {
+            type: "basic",
+            iconUrl: chrome.runtime.getURL("icon/128.png"),
+            title,
+            message,
+          });
+          void sendMessage("logger", { msg: `Auto-reseed: ${count} torrent(s) not seeding for [${task.title}], paused` });
+        }
+
+        if (acted || worthWriting(task, next)) {
+          // 只 patch `autoState` 这一块，不写整条任务 —— 理由见 `resolveBaseHash` 那段
+          task.autoState = next;
+          await sendMessage("patchKeepUploadTaskAutoState", { taskId: task.id, autoState: next });
+        }
+      } catch (e) {
+        void sendMessage("logger", {
+          msg: `Auto-reseed: task [${task.title}] 这一轮没走完 (${e instanceof Error ? e.message : e})`,
+        });
       }
     }
   }

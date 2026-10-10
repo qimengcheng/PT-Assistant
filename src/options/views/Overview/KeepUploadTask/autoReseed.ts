@@ -45,6 +45,14 @@ export interface IAutoReseedTickInput {
   baseLocal: boolean;
   /** 除基准之外还有几条要发 */
   otherCount: number;
+  /**
+   * 除基准之外**还没成功发出去**的还剩几条（判据在调用方，见 `othersStillPending`）。
+   * 不传就当 `otherCount`（一条都没发过）。
+   *
+   * 为什么不让判据自己看 `othersSentAt`：那个标记是「整批都发完了」的意思，而一批里可能
+   * 只有一颗发失败（站点接口挂了、链接失效）。用它当闸，那颗坏的会把整批的进度冻住。
+   */
+  othersPending?: number;
   /** 这一轮下载器连上了没有。连不上时**什么都不做** —— 不许把「没查到」读成「不在下载器里」 */
   reachable: boolean;
   /** 基准那一条的结论。查不到就是 `verdict: "notFound"`；认不出是哪条 / 连不上时传 undefined */
@@ -84,11 +92,13 @@ export interface IAutoReseedTick {
  * 2. 基准不在列表里、又还没发过（或上一次发送已超过 `AUTO_RESEED_BASE_RESEND_MS` 没落地）
  *    → 发基准，**不跳过校验**（这一条是要下全量的那一条，跳过就等于让它挂着不完整的数据被当成 100%）。
  * 3. 基准在列表里但没下完 → 等。
- * 4. 基准下完了（含「一开始就已下完」和 `baseLocal` 那种本来就在的）→ 把其余几条发出去，跳过校验。
+ * 4. 基准下完了（含「一开始就已下完」和 `baseLocal` 那种本来就在的）→ 把**还没成功发出去**的那几条
+ *    发出去，跳过校验。哪些算发过了看 `othersPending`（调用方按逐条记录算，见 `othersStillPending`）。
  * 5. 之后每轮盯做种状态：判成 wrong 的就暂停，条数比上次通知过的多就再弹一次通知。
  */
 export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
   const { baseLocal, otherCount, reachable, base, others, state, now } = input;
+  const othersPending = input.othersPending ?? otherCount;
 
   const wrongIndexes = others
     .map((s, i) => (s && s.verdict === "wrong" ? i : -1))
@@ -121,7 +131,7 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
   // `baseLocal` 那种任务走的是同一条：基准是下载器里已有的那条，查它下完没下完，
   // 下完了才把 items 里那几条挂上去（不然挂的是不完整的数据）。
   const baseReady = reachable && base?.completed === true;
-  const sendOthers = reachable && state.othersSentAt === undefined && baseReady && otherCount > 0;
+  const sendOthers = reachable && baseReady && othersPending > 0;
 
   // 连不上下载器时不许把阶段改写成 idle —— 那会把上一轮查到的真进度抹掉，界面上看着像没查过
   const stage: TReseedStage = reachable
@@ -136,11 +146,16 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
 
   const notify = reachable && wrongCount > (state.notifiedWrong ?? 0);
 
+  // 「完成时间」那一列读这一条：只在真的走到 `done` 那一档时留下时刻，离开就清掉。
+  // 连不上下载器的那一轮不改它（阶段本身也没重算，见上）—— 不然一次断网就把已完成任务的完成时间抹了。
+  const completedAt = reachable ? (stage === "done" ? (state.completedAt ?? now) : undefined) : state.completedAt;
+
   const next: IKeepUploadTaskAutoState = {
     ...state,
     baseSentAt,
     baseSendFails,
     lastRunAt: now,
+    completedAt,
     stage,
     notifiedWrong: notify ? wrongCount : (state.notifiedWrong ?? 0),
   };
@@ -154,6 +169,80 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     stage,
     next,
   };
+}
+
+/** 一条种子在「逐条发送记录」里的键：有 infoHash 就认 hash（小写），老任务没记 hash 的退到标题 */
+export function reseedItemKey(item: { hash?: string; title?: string }): string {
+  const hash = String(item.hash ?? "").trim().toLowerCase();
+  return hash !== "" ? hash : `t:${String(item.title ?? "").trim()}`;
+}
+
+/**
+ * 这一批里「已经成功发出去」的那几条，返回 `键 → 时刻`。
+ *
+ * 旧任务（这份逐条记录之前建的）只有整批的 `othersSentAt`，那种情况**认它全发过**：
+ * 否则升级到这一版的第一分钟，后台会把那一批原样重发一遍 —— 对 qBittorrent 是幂等的
+ * （add 同一条只会返回已在那儿的那份），但对站点是白打 N 次种子下载请求。
+ */
+export function othersAlreadySent(
+  state: IKeepUploadTaskAutoState,
+  items: readonly { hash?: string; title?: string }[],
+): Record<string, number> {
+  if (state.othersSent) return state.othersSent;
+  if (state.othersSentAt !== undefined) {
+    const at = state.othersSentAt;
+    return Object.fromEntries(items.map((item) => [reseedItemKey(item), at]));
+  }
+  return {};
+}
+
+/** 还没成功发出去的那几条（`sendOthers` 的判据就是它非空） */
+export function othersStillPending<T extends { hash?: string; title?: string }>(
+  state: IKeepUploadTaskAutoState,
+  items: readonly T[],
+): T[] {
+  const sent = othersAlreadySent(state, items);
+  return items.filter((item) => sent[reseedItemKey(item)] === undefined);
+}
+
+export interface IReseedBatchFailure {
+  key: string;
+  title: string;
+  message: string;
+}
+
+/**
+ * 逐条发送，**一条失败不许挡住后面的**。
+ *
+ * 为什么不把 try/catch 罩在循环外面（v0.65.7 之前那样写）：一颗种子的站点接口报错
+ * （他 2026-10-10 那条 yemapt）会让整个循环当场跳出，排在它后面的每一条本轮都不再尝试；
+ * 而那次「整批发成功」的标记又没写上，下一分钟又从同一颗重开 —— 表现就是「基准下完
+ * 七分钟了，一条都没推」，而且永远推不动。日志里那句还只报任务标题，看不出是**哪一颗**坏。
+ *
+ * 串行（不并发）是故意的：并发会一次打出 N 个站点请求，站点侧有速率限制和账号风险。
+ */
+export async function sendReseedBatch<T>(params: {
+  items: readonly T[];
+  keyOf: (item: T) => string;
+  titleOf: (item: T) => string;
+  send: (item: T) => Promise<void>;
+  /** 每失败一条调一次（后台用它写日志）；这里不直接 import 消息层，判据才好在 Node 里跑 */
+  onFailure?: (fail: IReseedBatchFailure) => void;
+}): Promise<{ sentKeys: string[]; failed: IReseedBatchFailure[] }> {
+  const sentKeys: string[] = [];
+  const failed: IReseedBatchFailure[] = [];
+  for (const item of params.items) {
+    const key = params.keyOf(item);
+    try {
+      await params.send(item);
+      sentKeys.push(key);
+    } catch (e) {
+      const fail: IReseedBatchFailure = { key, title: params.titleOf(item), message: e instanceof Error ? e.message : String(e) };
+      failed.push(fail);
+      params.onFailure?.(fail);
+    }
+  }
+  return { sentKeys, failed };
 }
 
 /**

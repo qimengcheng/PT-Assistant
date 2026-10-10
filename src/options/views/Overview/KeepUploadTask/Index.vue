@@ -120,6 +120,26 @@ const columns = computed<TableColumnsType<ITaskRow>>(() => [
     ...persistedSort("time"),
   },
   {
+    // 「完成时间」= 这一条走到「辅种完成」（其余每条都在做种/停着、且没有认不出的）那一档的时刻，
+    // 由后台每分钟那一轮写进 `autoState.completedAt`。没走到就是 "-"。
+    // 边界要说清：**没开「自动辅种」的任务这一列永远是 "-"** —— 那一档只有后台在算，
+    // 页面上手动「回查」不写时间（它拿的是同一份判据，但没有每一轮的时刻可记）。
+    title: t("KeepUploadTask.table.completedAt"),
+    key: "completedAt",
+    align: "center",
+    width: 170,
+    // 没完成的那些没有这一项，按 0 参与比较会混进「最早完成」那一头，所以缺值一律排到已完成的
+    // 后面（升序降序都如此）；两条都没完成时返回 0，不返回 Infinity-Infinity（那是 NaN，比较器不许）
+    sorter: (a, b) => {
+      const x = a.task.autoState?.completedAt;
+      const y = b.task.autoState?.completedAt;
+      if (x === undefined) return y === undefined ? 0 : 1;
+      if (y === undefined) return -1;
+      return x - y;
+    },
+    ...persistedSort("completedAt"),
+  },
+  {
     title: t("common.action"),
     key: "action",
     align: "center",
@@ -863,7 +883,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       :loading="loading"
       :pagination="pagination"
       :expandable="{ showExpandColumn: true }"
-      :scroll="{ x: 1310 }"
+      :scroll="{ x: 1480 }"
       :row-selection="{
         selectedRowKeys: selectedTasks,
         onChange: (keys: (string | number)[]) => (selectedTasks = keys as TKeepUploadTaskKey[]),
@@ -979,6 +999,16 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 
         <template v-else-if="column.key === 'time'">
           {{ record.kind === "task" ? formatDate(record.task.time) : "" }}
+        </template>
+
+        <template v-else-if="column.key === 'completedAt'">
+          {{
+            record.kind === "task"
+              ? record.task.autoState?.completedAt
+                ? formatDate(record.task.autoState.completedAt)
+                : "-"
+              : ""
+          }}
         </template>
 
         <template v-else-if="column.key === 'action'">

@@ -12,7 +12,7 @@ import {
   SyncOutlined,
 } from "@antdv-next/icons";
 
-import type { CAddTorrentOptions, CTorrent } from "@ptd/downloader";
+import type { CTorrent } from "@ptd/downloader";
 import type { IKeepUploadTask, TKeepUploadTaskKey } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
 import { formatSize, formatDate } from "@/options/utils.ts";
@@ -24,7 +24,7 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
-import { skipCheckingFor, withReseedSkipChecking } from "./sendOptions.ts";
+import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
 import {
   judgeReseedTorrent,
   linkItemToTorrent,
@@ -200,6 +200,10 @@ function baseLocalLine(record: IKeepUploadTask) {
   return `${t("KeepUploadTask.baseLocal")}${record.baseLocal?.name ?? ""}`;
 }
 
+/** 页面开着时跟着后台那一分钟的节奏取一次任务，见 `refreshTasksFromStorage` */
+const AUTO_REFRESH_MS = 60_000;
+let autoRefreshTimer: number | undefined;
+
 async function loadTasks() {
   loading.value = true;
   try {
@@ -214,7 +218,26 @@ async function loadTasks() {
 
 onMounted(() => {
   loadTasks();
+  autoRefreshTimer = window.setInterval(refreshTasksFromStorage, AUTO_REFRESH_MS);
 });
+
+/**
+ * 后台那条自动辅种每分钟把结论写回任务（`autoState`），而这一页原本只在打开时读一次 ——
+ * 不刷新的话用户看到的是「没查过」，而种子其实一分钟前就被后台停了。
+ *
+ * 不走 `loadTasks`：那颗 `loading` 是给整张表套一层 Spin（AGENTS §3.4「轮询的表不许翻 loading」），
+ * 每分钟把整页暗一下、遮罩期间还点不动，比迟一分钟看到更新更糟。
+ * 回包先比一次，内容没变就不换数组引用，免得每分钟白重排一遍整张表。
+ */
+async function refreshTasksFromStorage() {
+  try {
+    const next = await sendMessage("getKeepUploadTasks", undefined);
+    if (JSON.stringify(next) === JSON.stringify(tasks.value)) return;
+    tasks.value = next;
+  } catch {
+    // 静默：这一轮没拿到就下一轮再拿，用户随时能手动刷新
+  }
+}
 
 // 统一走公共实现（原先这里是本仓库第一份手写副本，现已抽到 components/useConfirmDanger.ts）
 const { confirmDanger } = useConfirmDanger();
@@ -283,34 +306,15 @@ async function sendTorrentsToDownloader(
     // 「列表第一条、而基准又不是下载器里那条」= 这一条真要下全量，那一条不许跳过校验（见 sendOptions.ts）
     const baseEntry = task.baseLocal ? null : task.items[0];
     for (const item of items) {
-      const now = new Date();
-      const replacements: Record<string, string> = {
-        "torrent.title": item.title,
-        "torrent.subTitle": item.subTitle ?? "",
-        "torrent.category": String(item.category ?? ""),
-        "torrent.site": item.site,
-        "torrent.siteName": await metadataStore.getSiteName(item.site),
-        "date:YYYY": formatDate(now, "yyyy"),
-        "date:MM": formatDate(now, "MM"),
-        "date:DD": formatDate(now, "dd"),
-      };
-      const plainOptions: CAddTorrentOptions = {
-        localDownload: true,
-        // 与普通下载保持一致：是否暂停由下载器的“自动开始”设置决定。
-        addAtPaused: !(downloader.feature?.DefaultAutoStart ?? true),
-        savePath: task.downloadOptions.savePath || "",
-        ...task.downloadOptions.addTorrentOptions,
-      };
-      const addTorrentOptions: CAddTorrentOptions = skipCheckingFor(task, item, baseEntry)
-        ? withReseedSkipChecking(plainOptions)
-        : plainOptions;
-
-      for (const key of ["savePath", "label"] as const) {
-        if (!addTorrentOptions[key]) continue;
-        for (const [templateKey, value] of Object.entries(replacements)) {
-          addTorrentOptions[key] = addTorrentOptions[key]!.replaceAll(`$${templateKey}$`, value);
-        }
-      }
+      // 拼选项那份算式在 autoReseed.ts —— 后台那条自动链发的必须是**同一份**选项，
+      // 抄第二份的话改一处漏一处，表现就是「手动发的能挂上、自动发的挂不上」
+      const addTorrentOptions = buildReseedAddTorrentOptions({
+        task,
+        item,
+        baseEntry,
+        downloader,
+        siteName: await metadataStore.getSiteName(item.site),
+      });
 
       const result = await sendMessage("downloadTorrent", {
         torrent: {
@@ -375,11 +379,18 @@ const rechecking = ref(false);
  * 会把 items 重排，序号存的那一份会跟着错位。
  */
 const reseedStatuses = ref<Record<string, Record<string, IReseedItemStatus>>>({});
+/**
+ * 上面那一份是**什么时候**查的（taskId -> 毫秒）。
+ * 后台那条自动辅种每分钟把结论写进 `task.autoState.statuses`，这一份是用户点「回查」或发送后延迟查的，
+ * 两边都有就得比时间 —— 不比的话，后台刚把某条暂停，界面还在拿半小时前那次「一切正常」给他看。
+ */
+const reseedStatusesAt = ref<Record<string, number>>({});
 const autoRecheckTimers = new Set<number>();
 
 onUnmounted(() => {
   autoRecheckTimers.forEach((id) => window.clearTimeout(id));
   autoRecheckTimers.clear();
+  if (autoRefreshTimer !== undefined) window.clearInterval(autoRefreshTimer);
 });
 
 function scheduleAutoRecheck(taskId: string) {
@@ -393,6 +404,20 @@ function scheduleAutoRecheck(taskId: string) {
 /** 这一条任务里能拿去和下载器对账的那些（没记 infoHash 的要先走下面那条自动认亲） */
 function trackableItems(task: IKeepUploadTask) {
   return task.items.filter((item) => String(item.hash ?? "").trim() !== "");
+}
+
+/**
+ * 这一条任务此刻该用哪一份对账结果：页面自己查的那份，还是后台自动辅种写进任务里的那份，**谁新用谁**。
+ *
+ * 回落不是锦上添花：开了自动辅种的任务，后台每分钟在动种子，而用户从没点过「回查」时
+ * `reseedStatuses` 里压根没有这一条 —— 那一格就会写「没查过」，而其实一分钟前刚查过、还把两条停了。
+ * 反过来用户刚点过回查，也不该被更早的后台那一份盖掉。
+ */
+function reseedStatusSource(task: IKeepUploadTask): Record<string, IReseedItemStatus> | undefined {
+  const manualAt = reseedStatusesAt.value[task.id] ?? 0;
+  const autoAt = task.autoState?.statuses ? (task.autoState.lastRunAt ?? 0) : 0;
+  if (autoAt > manualAt) return task.autoState?.statuses;
+  return reseedStatuses.value[task.id];
 }
 
 /**
@@ -428,6 +453,8 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
   let unreachable = 0;
   let linked = 0;
   let unlinked = 0;
+  /** 这一轮真的查到过东西的任务，用来给 `reseedStatusesAt` 打时间戳（连不上的那台不算） */
+  const touched = new Set<string>();
 
   try {
     for (const [downloaderId, group] of byDownloader) {
@@ -466,6 +493,7 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
         for (const item of trackableItems(task)) {
           const hash = String(item.hash).toLowerCase();
           checked++;
+          touched.add(task.id);
           const found = index.get(hash);
           const status = judgeReseedTorrent(
             found
@@ -494,6 +522,10 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
       }
     }
     reseedStatuses.value = next;
+    const at = Date.now();
+    const stamp = { ...reseedStatusesAt.value };
+    for (const taskId of touched) stamp[taskId] = at;
+    reseedStatusesAt.value = stamp;
   } finally {
     rechecking.value = false;
   }
@@ -573,7 +605,7 @@ const RESEED_STAGE_COLOR: Record<TReseedStage, string> = {
  * —— 发送那颗「基准」的一直是第一颗。
  */
 function taskStage(task: IKeepUploadTask) {
-  const perTask = reseedStatuses.value[task.id];
+  const perTask = reseedStatusSource(task);
   const list = trackableItems(task);
   const baseLocal = !!task.baseLocal;
   const statusOf = (item: IKeepUploadTask["items"][number]) => perTask?.[String(item.hash).toLowerCase()];
@@ -619,7 +651,7 @@ type TReseedKind = "seeding" | "paused" | "pending" | "untracked" | "notFound" |
 function reseedSummary(
   record: IKeepUploadTask,
 ): { color: string; text: string; kind: TReseedKind } | null {
-  const perTask = reseedStatuses.value[record.id];
+  const perTask = reseedStatusSource(record);
   if (!perTask) return null;
   const sum = summarizeReseed(
     trackableItems(record).map((item) => perTask[String(item.hash).toLowerCase()]),
@@ -668,7 +700,7 @@ function reseedRank(record: IKeepUploadTask): number {
 
 /** 悬停里逐条列明：标题 + 结论 + 下载器那边那条的原样状态 */
 function reseedRows(record: IKeepUploadTask) {
-  const perTask = reseedStatuses.value[record.id] ?? {};
+  const perTask = reseedStatusSource(record) ?? {};
   return record.items.map((item, index) => {
     const hash = String(item.hash ?? "").toLowerCase();
     const status = hash ? perTask[hash] : undefined;
@@ -684,7 +716,7 @@ function reseedRows(record: IKeepUploadTask) {
 /**
  * 展开列表里那一条在下载器那边的结论。
  *
- * 数据就是「做种状态」列悬停明细那一份（`reseedStatuses` 按 infoHash 存），这里只是换个地方摆出来 ——
+ * 数据就是「做种状态」列悬停明细那一份（`reseedStatusSource` 挑出来的那份，按 infoHash 存），这里只是换个地方摆出来 ——
  * 不另算一套判据，否则同一页会出现两个说法。
  * 「还没查过」单独一档：那不是一个结论，把它写成「下载器里没有」是骗人（他 2026-10-09 要的就是这一列能在每条上看到）。
  */
@@ -696,7 +728,7 @@ const RESEED_VERDICT_COLOR: Record<TReseedVerdict, string> = {
   notFound: "warning",
 };
 function itemReseed(record: IKeepUploadTask, item: IKeepUploadTask["items"][number]) {
-  const perTask = reseedStatuses.value[record.id];
+  const perTask = reseedStatusSource(record);
   if (!perTask) return { color: "default", text: t("KeepUploadTask.recheck.state.idle") };
   const hash = String(item.hash ?? "").toLowerCase();
   if (!hash) return { color: "default", text: t("KeepUploadTask.recheck.state.untracked") };
@@ -895,7 +927,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           <div v-if="record.kind === 'task'">
             <div>
               <a-popover
-                v-if="reseedStatuses[record.task.id]"
+                v-if="reseedStatusSource(record.task)"
                 trigger="hover"
                 placement="left"
                 :mouse-enter-delay="0.4"

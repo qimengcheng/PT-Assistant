@@ -107,8 +107,23 @@ export const usageZh: IUsageDoc = {
       ],
     },
     {
+      id: "auto",
+      title: "六、想让任务自己往下走：「自动辅种」开关",
+      lead:
+        "创建辅种任务那一屏最右边、那颗「创建任务」按钮旁边有一颗「自动辅种」开关，默认开着。开着的时候不用你守着点按钮 —— 扩展每隔 1 分钟自己去看一眼那台下载器：",
+      points: [
+        { title: "第一步", text: "基准那条不在下载器里，就先把基准发过去，而且这一条**不**跳过校验 —— 它是要真的把内容下下来的那一条。" },
+        { title: "第二步", text: "每分钟查基准下完没有，认的是下载器自己报的「已完成」，不是「状态看着像做种」。一开始基准就已经下完（或者基准选的本来就是下载器里那条在做种的）就直接进第三步。" },
+        { title: "第三步", text: "基准下完，把其余几条一起发过去，这几条跳过校验 —— 内容在建任务那一步已经比过文件清单。" },
+        { title: "之后", text: "持续盯这一任务里每一条的做种状态。判成「没有正常做种」的那几条（文件缺失、客户端报错、或者变成了正在下载）会立刻被暂停，并弹一条系统通知说清有几条、进哪一页看。" },
+        { text: "「做种状态」那一列显示的就是它走到哪一步了（已发基准 / 基准在下 x% / 基准已下完 / 辅种中 n/m / 辅种完成 / 有 N 条异常），不用你手动点「回查做种状态」也有数。" },
+        { text: "开关只管你这一次建的那条任务：以前建的任务不会因为你升级就突然开始自动发种子。关掉它也不会动已经发出去的种子，更不会替你暂停它们。" },
+        { text: "下载器连不上时那一轮什么都不做 —— 「没查到」不会被当成「不在下载器里」，于是既不会重发也不会暂停。基准连着 3 次都进不了下载器的列表就不再自动重试，原因写在「运行日志」里。" },
+      ],
+    },
+    {
       id: "risk",
-      title: "六、风险与责任边界",
+      title: "七、风险与责任边界",
       lead: "「辅种任务」页底部那条「警告：」的三条就是这功能的责任边界，动手前先读那三条。这里再补几条排查用的：",
       points: [
         { text: "辅种前确认下载器没有开着「自动开始下载」这一类选项（有的话先关掉）。让下载器先暂停、你确认文件真的都在位之后再开始，是最稳的。" },
@@ -195,8 +210,23 @@ export const usageEn: IUsageDoc = {
       ],
     },
     {
+      id: "auto",
+      title: "6. Letting a task run itself: the 'Auto reseed' switch",
+      lead:
+        "On the screen where you create a reseed task, right next to the 'Create Task' button, there is an 'Auto reseed' switch, on by default. While it is on you don't have to sit there pressing buttons - the extension looks at that downloader once a minute:",
+      points: [
+        { title: "Step 1", text: "If the base entry is not in the downloader, the base gets sent first - and this one does NOT skip hash checking, because it's the entry that has to actually bring the data down." },
+        { title: "Step 2", text: "Every minute it asks whether the base has finished, believing only the downloader's own 'is completed' report, not 'the state looks like seeding'. If the base was already complete from the start (or you picked an entry that is already seeding in the downloader) it goes straight to step 3." },
+        { title: "Step 3", text: "Once the base is complete, the remaining entries are sent together, those with hash checking skipped - their contents were already compared file-by-file when the task was created." },
+        { title: "After that", text: "It keeps watching every entry's seeding state. Anything found 'not seeding properly' (missing files, a client error, or turned into an actual download) is paused immediately, and one system notification says how many and where to look." },
+        { text: "The 'Seeding' column shows exactly which step it reached (base sent / base downloading x% / base ready / reseeding n/m / done / N entries wrong) - you get that without pressing 'Check seeding' yourself." },
+        { text: "The switch applies only to the task you are creating: tasks created earlier never start sending on their own just because you upgraded. Turning it off does not touch torrents already sent, and does not pause them for you." },
+        { text: "When the downloader can't be reached that round does nothing - 'didn't find it' is never read as 'not in the downloader', so nothing gets re-sent or paused on that basis. If the base fails to show up in the downloader's list 3 times in a row, automatic retries stop and the reason is written to the 'Run Log'." },
+      ],
+    },
+    {
       id: "risk",
-      title: "6. Risk and responsibility",
+      title: "7. Risk and responsibility",
       lead: "The three-item warning at the bottom of the 'Reseed Tasks' page is the boundary of what this feature promises. A few practical notes on top of it:",
       points: [
         { text: "Before reseeding, make sure your download client has 'auto start download' turned off. Adding paused, confirming the files really are where they should be, then starting is the safe order." },

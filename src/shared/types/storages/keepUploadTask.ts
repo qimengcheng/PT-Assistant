@@ -6,6 +6,11 @@ import type { TSiteID } from "@ptd/site";
 import type { TDownloaderKey } from "./metadata.ts";
 import type { CAddTorrentOptions } from "@ptd/downloader";
 
+// 进度阶段与那一条的结论这两个类型，住在 `seedVerify.ts`（判据和它的类型在一起，那份能直接跑
+// Node 断言）。这里**只 import type**：构建时整条擦除，不会把 views 目录拖进 service worker 的
+// 运行时图（AGENTS §3.2 那条铁律）。抄第二份类型定义才是坑 —— 判据改档位时两边会静默分家。
+import type { IReseedItemStatus, TReseedStage } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
+
 export type TKeepUploadTaskKey = string;
 
 /**
@@ -57,6 +62,29 @@ export interface IKeepUploadTaskLocalBase {
 }
 
 /**
+ * 「自动辅种」这条任务走到哪一步了 —— 后台每分钟醒一次，靠这一片判断「该发哪一步、发过没有」，
+ * 所以它必须落盘：service worker 每 30 秒就被浏览器杀掉，内存里存不住任何东西。
+ *
+ * 只存**进度**和**去重用的数**，不存时间线：每一步都是「做过一次就不再做过」。
+ */
+export interface IKeepUploadTaskAutoState {
+  /** 基准那条已经发出去的时刻。没有这一项 = 还没发过（下一轮就发） */
+  baseSentAt?: number;
+  /** 发基准失败过几次。失败不记 `baseSentAt`，靠这个数封顶重试次数，否则下载器没网时每分钟撞一次 */
+  baseSendFails?: number;
+  /** 除基准外的那些已经发出去的时刻 */
+  othersSentAt?: number;
+  /** 上一次后台跑这一条的时刻（只为排查，判据不看它） */
+  lastRunAt?: number;
+  /** 上一次弹通知时「没辅种成功」的条数：条数没再变多就不重复轰炸 */
+  notifiedWrong?: number;
+  /** 后台折出来的进度阶段。界面上那一列在没人手动回查时读它，否则后台都在暂停种子了、页面还写「没查过」 */
+  stage?: TReseedStage;
+  /** infoHash（小写）→ 那一条的结论，同上 */
+  statuses?: Record<string, IReseedItemStatus>;
+}
+
+/**
  * 辅种任务
  */
 export interface IKeepUploadTask {
@@ -70,6 +98,15 @@ export interface IKeepUploadTask {
   items: IKeepUploadTaskItem[]; // 种子列表
   /** 有这一项 = 基准种子是下载器里已有的那条，不在 items 里 */
   baseLocal?: IKeepUploadTaskLocalBase;
+  /**
+   * 「自动辅种」开关（建任务那个弹窗里，默认开）。
+   *
+   * **判据写的是 `=== true` 而不是「不等于 false」**：旧任务没有这一项，
+   * 按后者读会让所有存量任务在某天升级之后突然开始自动往下载器发种子 —— 那是替用户做主。
+   */
+  autoReseed?: boolean;
+  /** 自动辅种走到哪一步了，见 `IKeepUploadTaskAutoState` */
+  autoState?: IKeepUploadTaskAutoState;
 }
 
 /**

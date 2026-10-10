@@ -504,6 +504,8 @@
     "KeepUploadDialog": {
       "addToKeepUpload": "添加到辅种列表",
       "addToKeepUploadConfirm": "确认将该种子添加到辅种列表？",
+      "autoReseed": "自动辅种",
+      "autoReseedHint": "建完任务后由扩展每隔 1 分钟自己往下走：基准不在下载器里就先把基准发过去（这一条不跳过校验），等基准下完再把其余几条发过去（跳过校验），之后持续盯做种状态——没在做种的那几条会被立刻暂停并发一条系统通知。不想让它自己动就把这里关掉。",
       "baseTorrent": "基准种子",
       "create": "创建任务",
       "createError": "辅种任务创建失败",

@@ -504,6 +504,8 @@
     "KeepUploadDialog": {
       "addToKeepUpload": "Add to reseed list",
       "addToKeepUploadConfirm": "Confirm adding this torrent to reseed list?",
+      "autoReseed": "Auto reseed",
+      "autoReseedHint": "Once the task is created the extension drives it every minute: sends the base torrent if it is not in the downloader (without skipping the check), then sends the remaining ones once the base has finished (skipping the check), and keeps watching the seeding state—torrents that are not seeding get paused right away with a notification. Turn this off to keep it manual.",
       "baseTorrent": "Base Torrent",
       "create": "Create Task",
       "createError": "Failed to create reseed task",

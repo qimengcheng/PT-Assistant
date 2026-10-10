@@ -105,6 +105,12 @@ const localLookup = computed<IFingerprintIndexLookup>(() => buildFingerprintInde
 const selectedDownloaderId = ref<string>("");
 const savePath = ref("");
 const torrentLabel = ref("");
+/**
+ * 建完任务后要不要让后台每分钟自己往下走（发基准 → 等下完 → 发其余 → 盯状态）。
+ * 默认开（他 2026-10-10 原话「有个自动辅种的开关（默认打开）」）—— 这一屏本来就是「我要把这批
+ * 种子挂到别的站去」，而挂上以后没人守着点按钮才是想要的结果。
+ */
+const autoReseed = ref(true);
 const suggestedSavePaths = computed(() => metadataStore.downloaders[selectedDownloaderId.value]?.suggestFolders ?? []);
 const suggestedLabels = computed(() => metadataStore.downloaders[selectedDownloaderId.value]?.suggestTags ?? []);
 
@@ -797,6 +803,10 @@ async function createKeepUploadTask() {
       subTitle: verifiedList[0].data.subTitle,
       size: verifiedList[0].data.size || 0,
       downloadOptions,
+      // 自动辅种：建完任务后由后台每分钟替人往下走那条链（判据在 `KeepUploadTask/autoReseed.ts`）。
+      // 这里**必须显式写值**：任务页/后台判的是 `=== true`，写成 undefined 的旧任务不会被突然
+      // 开始自动发种子（那等于给存量用户开了一个他们从没同意的开关）。
+      autoReseed: autoReseed.value,
       // 单条模式：基准是下载器里那条，不在 items 里。任务页靠这个标记决定
       // 「发送基准种子」那两颗要不要出现，并把基准的名字显示出来。
       baseLocal: chosenLocalBase.value
@@ -1058,6 +1068,12 @@ async function createKeepUploadTask() {
             style="flex: 0 1 200px; min-width: 160px"
             :popup-match-select-width="false"
           />
+          <a-tooltip :title="t('SearchEntity.KeepUploadDialog.autoReseedHint')">
+            <span class="auto-reseed">
+              <a-switch v-model:checked="autoReseed" size="small" />
+              <span class="auto-reseed-label">{{ t("SearchEntity.KeepUploadDialog.autoReseed") }}</span>
+            </span>
+          </a-tooltip>
           <a-button
             type="primary"
             :loading="creating"
@@ -1089,6 +1105,16 @@ async function createKeepUploadTask() {
    scoped 规则选不中它们。 */
 .create-row {
   flex-wrap: wrap;
+}
+
+/* 「自动辅种」那颗开关和它的标签包成一个元素再走 flex：a-switch 的轨道 16px 高、汉字 13px，
+   并排写在流里是两个不同的对齐基准（一个按行盒、一个按基线），看着就是没居中。
+   整块自己是一个 flex item，纵向居中由 .create-row 的 align-center 管。 */
+.auto-reseed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 /* 站点那一栏：图标不参与收缩，站名吃掉剩下的宽度并截断（列宽是钉死的，

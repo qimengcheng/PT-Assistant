@@ -45,6 +45,7 @@ import type {
   ISearchData,
   ITorrentDownloadMetadata,
   IKeepUploadTask,
+  IKeepUploadTaskAutoState,
   TKeepUploadTaskKey,
   TSearchSnapshotKey,
   TTorrentDownloadKey,
@@ -220,6 +221,12 @@ export interface ProtocolMap {
   getKeepUploadTaskById(taskId: TKeepUploadTaskKey): IKeepUploadTask;
   createKeepUploadTask(task: IKeepUploadTask): void;
   updateKeepUploadTask(task: IKeepUploadTask): void;
+  /**
+   * 只写任务里 `autoState` 那一块（后台自动辅种每分钟的判据快照）。
+   * 故意不传整条任务：见 offscreen/utils/keepUploadTask.ts 里那条注释 —— 整条写回会把用户
+   * 在这一分钟里改的「自动辅种」开关盖回旧值。
+   */
+  patchKeepUploadTaskAutoState(data: { taskId: TKeepUploadTaskKey; autoState: IKeepUploadTaskAutoState }): void;
   deleteKeepUploadTask(taskId: TKeepUploadTaskKey): void;
   clearKeepUploadTasks(): void;
 

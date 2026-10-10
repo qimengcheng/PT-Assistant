@@ -17,6 +17,9 @@ import "./utils/omnibox.ts";
 import "./utils/alarms.ts";
 // 检查更新：每日一次查仓库的最新 Release，发现新版本发系统通知（手动检查走同一条消息）
 import "./utils/updateCheck.ts";
+// 自动辅种：每 1 分钟替开了开关的辅种任务走完「发基准 → 等下完 → 发辅种 → 盯做种」那条链
+// （判据在 views/KeepUploadTask/autoReseed.ts，那份能直接跑 Node 断言；这里只做取数、发送、暂停、通知）
+import "./utils/autoReseed.ts";
 // 原生通信桥（可选权限 nativeMessaging）：本机 ptd CLI ↔ 扩展，未授权时自动休眠
 import "./utils/nativeMessaging.ts";
 import { fixAllStoredUserInfo } from "./utils/fixer.ts";

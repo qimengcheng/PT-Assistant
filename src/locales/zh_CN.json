@@ -676,6 +676,7 @@
     "categoryForget": "不再记住",
     "categoryGroup": "分类目录",
     "categoryLink": "关联到已有分类",
+    "categoryManyNames": "（这一批里有 {count} 种叫法：{list}）",
     "categoryNoMatch": "种子分类「{category}」在这个下载器里没有对应的分类目录，要新建一个，还是关联到已有的？",
     "categoryRemember": "记住这个关联",
     "categoryRemembered": "种子分类「{category}」按你记住的关联放进 {folder}",

@@ -41,11 +41,20 @@ export interface ICategorySource {
  *
  * 两种都不成立时返回全 null：**不取多数派**，这一版弹窗对整批种子用的是同一个 savePath。
  */
+/**
+ * 这一批里出现过的分类**原样叫法**（去首尾空白、去空、去重，保持首次出现顺序）。
+ * 「共有」的两种判定和「记住关联」要写的条目都以它为准 —— 界面那边问完一次要**逐条 raw 都记下**，
+ * 否则下一批同样的组合又被 `assocForBatch` 判成「没记全」，会反复问。
+ */
+export function batchCategoryRaws(items: readonly ICategorySource[]): string[] {
+  return [...new Set(items.map((item) => String(item.category ?? "").trim()).filter(Boolean))];
+}
+
 export function sharedCategory(
   items: readonly ICategorySource[],
   siteMapOf: (siteId: string) => Record<string, string> | undefined = () => undefined,
 ): { raw: string | null; kind: TCategoryKind | null } {
-  const raws = [...new Set(items.map((item) => String(item.category ?? "").trim()).filter(Boolean))];
+  const raws = batchCategoryRaws(items);
   if (raws.length === 0) return { raw: null, kind: null };
 
   // 折类是按「每一条各自的站点覆盖表」算的，所以逐条折再去重，不能只折 raws（那会丢掉 site 维度）
@@ -171,7 +180,7 @@ export interface ICategoryResolution {
  */
 function assocForBatch(items: readonly ICategorySource[], assoc?: TCategoryAssocMap): string | null {
   if (!assoc) return null;
-  const raws = [...new Set(items.map((item) => String(item.category ?? "").trim()).filter(Boolean))];
+  const raws = batchCategoryRaws(items);
   if (raws.length === 0) return null;
   const hits = raws.map((raw) => assoc[categoryAssocKey(raw)]);
   const first = hits[0];

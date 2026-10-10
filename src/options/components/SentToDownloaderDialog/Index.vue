@@ -28,6 +28,7 @@ import type { IDownloaderMetadata } from "@/shared/types.ts";
 
 import {
   CATEGORY_FOLDER_PREFIX,
+  batchCategoryRaws,
   categoryAssocKey,
   newCategoryFolder,
   resolveCategoryFolder,
@@ -182,8 +183,10 @@ const siteCategoryMaps = computed(() => {
 });
 
 interface ICategoryDecision {
-  /** 种子的分类原样叫法 */
-  raw: string;
+  /** 这一批里出现过的原样叫法（去重后）；一条都没有时整个 decision 是 null */
+  raws: string[];
+  /** 界面上说的那个名字：只有一种叫法就用原样串，多种则用折出来的类别名 */
+  name: string;
   /** 已经定下来的目录（带前缀原样串），还没定下来是 null */
   folder: string | null;
   /** folder 来自用户记住的关联，不是三档判据 */
@@ -205,14 +208,19 @@ function applyAutoCategoryPath(downloader?: IDownloaderMetadata) {
   );
   if (res.folder) addTorrentOptions.value.savePath = res.folder;
 
-  const raw = res.category;
-  categoryDecision.value = raw
+  // 界面上要说哪个名字：整批只有一种叫法就说那串原样；各站写法不同（20 个站点辅种就是这种）
+  // 就说折出来的类别名 —— 以前这里只看 `res.category`，写法一不同就是 null，于是
+  // 「没挑出目录」和「压根没分类」被混成同一种「什么都不说」，该问他的那一次也没问。
+  const raws = batchCategoryRaws(torrentItems);
+  const name = res.category ?? (res.kind ? t(`common.categoryKind.${res.kind}`) : "");
+  categoryDecision.value = name
     ? {
-        raw,
+        raws,
+        name,
         folder: res.folder,
         fromMemory: res.source === "assoc",
         // 带上下载器 id：「忽略」只对本台生效，换一台该重新问
-        promptKey: `${d?.id ?? ""}::${raw}`,
+        promptKey: `${d?.id ?? ""}::${raws.join("|")}`,
         // 认分类前缀的只有 qBittorrent，别处的「新建分类」是个假动作（整串会被当路径）
         needPrompt: !res.folder && supportsCategoryFolders(d?.type),
       }
@@ -249,7 +257,7 @@ async function chooseCategoryFolder(folder: string) {
   if (!decision) return;
   addTorrentOptions.value.savePath = folder;
   const remember = rememberCategoryAssoc.value;
-  if (remember) await writeCategoryAssoc(decision.raw, folder);
+  if (remember) await writeCategoryAssoc(decision.raws, folder);
   dismissedPromptKey.value = "";
   // 记住过就改挂那条「按你记住的关联」的说明（它带着「不再记住」，是唯一的反悔入口）；
   // 没记住就整条收掉，这次的选择仍然是有效的，只是下次还要再问。
@@ -257,12 +265,19 @@ async function chooseCategoryFolder(folder: string) {
   syncChoiceFields();
 }
 
-async function writeCategoryAssoc(raw: string, folder: string) {
+/**
+ * 一次写**整批每一种叫法**的关联。`assocForBatch` 认的是「每个 raw 都记过且指向同一条」，
+ * 只记一种的话下一批同样的组合仍然会被判成没记全、重新问一遍。
+ */
+async function writeCategoryAssoc(raws: string[], folder: string) {
   const current = selectedDownloader.value;
-  if (!current) return;
+  if (!current || raws.length === 0) return;
   await metadataStore.addDownloader({
     ...current,
-    categoryAssoc: { ...(current.categoryAssoc ?? {}), [categoryAssocKey(raw)]: folder },
+    categoryAssoc: {
+      ...(current.categoryAssoc ?? {}),
+      ...Object.fromEntries(raws.map((raw) => [categoryAssocKey(raw), folder])),
+    },
   });
   // addDownloader 写进 store 的是新对象，本地引用得跟过去，否则读到的还是旧的那份
   selectedDownloader.value = metadataStore.downloaders[current.id] ?? null;
@@ -274,7 +289,7 @@ async function forgetCategoryAssoc() {
   const decision = categoryDecision.value;
   if (!current || !decision) return;
   const next = { ...(current.categoryAssoc ?? {}) };
-  delete next[categoryAssocKey(decision.raw)];
+  for (const raw of decision.raws) delete next[categoryAssocKey(raw)];
   await metadataStore.addDownloader({ ...current, categoryAssoc: next });
   selectedDownloader.value = metadataStore.downloaders[current.id] ?? null;
   applyAutoCategoryPath();
@@ -367,10 +382,16 @@ async function sendToDownloader() {
 
   // 保存此次选择记录（默认推送不保存）
   if (!isDefaultSend && configStore.download.saveLastDownloader) {
-    // noinspection ES6MissingAwait
+    // ⚠️ `options` 必须交一份深拷贝出去。原先这里直接把界面上那个活对象交出去，
+    // 而 `restoreAddTorrentOptions` 是**就地**改它的字段（`addTorrentOptions.value.label = ""`，
+    // 不是换对象），弹窗一关 `dialogLeave` 就把 store 里那同一份对象擦成空 ——
+    // 于是「记住上次选项」里除下载器 id 以外的一项都记不住（标签、保存路径、高级设置全中）。
+    // 判据在 `.tmp-build/last-downloader-alias-test.mjs`。
+    // 用 `toMerged({}, x)` 而不是 `structuredClone`：后者吃不了 Vue 的 reactive 代理，
+    // 实测当场抛 `DOMException: #<Object> could not be cloned.`（每次发送都会失败）。
     metadataStore.setLastDownloader({
       id: selectedDownloader.value.id,
-      options: addTorrentOptions.value,
+      options: toMerged({}, addTorrentOptions.value),
     });
   }
 
@@ -677,16 +698,26 @@ function dialogLeave() {
             @close="dismissCategoryPrompt"
           >
             <template #message>
-              {{ t("SentToDownloaderDialog.categoryNoMatch", { category: categoryDecision?.raw ?? "" }) }}
+              {{ t("SentToDownloaderDialog.categoryNoMatch", { category: categoryDecision?.name ?? "" }) }}
+              <!-- 各站叫法不同时，光说「电视剧」他会愣一下（自己没写过这三个字）：把这一批里
+                   真的出现过的几种叫法列出来，他才认得出这是在说同一件事。 -->
+              <span v-if="(categoryDecision?.raws.length ?? 0) > 1" class="category-many">
+                {{
+                  t("SentToDownloaderDialog.categoryManyNames", {
+                    count: categoryDecision?.raws.length ?? 0,
+                    list: categoryDecision?.raws.join("、") ?? "",
+                  })
+                }}
+              </span>
             </template>
             <template #description>
               <div class="category-actions">
                 <a-button
                   type="primary"
                   size="small"
-                  @click="chooseCategoryFolder(newCategoryFolder(categoryDecision?.raw ?? ''))"
+                  @click="chooseCategoryFolder(newCategoryFolder(categoryDecision?.name ?? ''))"
                 >
-                  {{ t("SentToDownloaderDialog.categoryCreate", { category: categoryDecision?.raw ?? "" }) }}
+                  {{ t("SentToDownloaderDialog.categoryCreate", { category: categoryDecision?.name ?? "" }) }}
                 </a-button>
                 <a-dropdown v-if="categoryFolderCandidates.length > 0" trigger="click">
                   <a-button size="small">{{ t("SentToDownloaderDialog.categoryLink") }}</a-button>
@@ -720,7 +751,7 @@ function dialogLeave() {
                 <span>
                   {{
                     t("SentToDownloaderDialog.categoryRemembered", {
-                      category: categoryDecision?.raw ?? "",
+                      category: categoryDecision?.name ?? "",
                       folder: categoryDecision?.folder ?? "",
                     })
                   }}
@@ -1006,5 +1037,13 @@ function dialogLeave() {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+// 「这一批里有 N 种叫法：…」那半句：跟在主句后面，长叫法列表要能换行不许撑破浮层
+.category-many {
+  display: block;
+  margin-top: 4px;
+  color: #6b7280;
+  overflow-wrap: anywhere;
 }
 </style>

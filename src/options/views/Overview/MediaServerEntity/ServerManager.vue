@@ -166,7 +166,8 @@ function confirmDelete(row: IMediaServerMetadata) {
   Modal.confirm({
     title: t("SetMediaServer.index.deleteTitle"),
     content: t("SetMediaServer.index.deleteConfirm", [row.name]),
-    okType: "danger",
+    // 只给 `okType: "danger"` 出来是红描边不是实心红，原因写在 `appDialog.ts` 那条注释
+    okButtonProps: { type: "primary", danger: true },
     okText: t("common.remove"),
     cancelText: t("common.dialog.cancel"),
     onOk: async () => {

@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-11 21:21:01",
-  "headSha": "7ae93f9",
+  "generatedAt": "2026-10-11 21:57:08",
+  "headSha": "58349fd",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.86.1",
+      "date": "2026-10-11 21:56:04",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "删除类的确认框：那颗「删除」键改成实心红，与工具栏上的删除按钮同一档强调（原先是白底红描边，看着像没被强调）",
+        "「我的数据 → 站内信」批量删除的确认键从蓝色改成红色 —— 动作是删除就该长得像删除"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.86.0",
       "date": "2026-10-11 21:18:33",

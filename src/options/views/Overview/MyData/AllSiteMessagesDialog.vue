@@ -500,6 +500,7 @@ watch(
         <a-popconfirm
           :title="t('MyData.allMessages.deleteConfirm', { n: selectedCount })"
           :ok-text="t('MyData.allMessages.delete')"
+          :ok-button-props="{ type: 'primary', danger: true }"
           :cancel-text="t('common.dialog.cancel')"
           :disabled="selectedCount === 0"
           @confirm="deleteSelected"

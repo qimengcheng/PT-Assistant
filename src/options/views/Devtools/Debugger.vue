@@ -198,7 +198,8 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
   modal.confirm({
     title: t("Debugger.confirmReset"),
     content: t("Debugger.dangerWarning"),
-    okType: "danger",
+    // 只给 `okType: "danger"` 出来是红描边不是实心红，原因写在 `appDialog.ts` 那条注释
+    okButtonProps: { type: "primary", danger: true },
     onOk: async () => {
       // ⚠️ 原先 onOk 里既没有 catch 也没有闸：resetFn 抛错时 antd 会
       // 把它当成 onOk 返回的 Promise rejection 挂起（确认框卡在 loading

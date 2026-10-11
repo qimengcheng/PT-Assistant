@@ -435,6 +435,7 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 | `<a-step>` 等注册表里不存在的 `a-*` 标签 | 被当原生未知元素，**内容静默丢失**（带对象插槽时整块空白） | antdv-next 全量 install 实测只有 139 个注册名，**没有** `AStep`/`AList`；Steps 只有 `:items` 数组写法。CI 的 check-antd-tags 会拦 |
 | 图标 `import * as Icons from "@antdv-next/icons"` | 1760 个图标模块**全进包** | 只具名导入用到的：`import { DeleteOutlined } from "@antdv-next/icons"` |
 | 删除类按钮只写 `danger`（红描边 + 红字） | 在白底工具条上跟背景融成一片，看着像没强调；用户 2026-10-06 明确要求改实心 | **删除/清空数据的按钮一律 `type="primary" danger`（实心红）**。判据：动作真是删数据才算 —— 取消、关闭、重置、清空输入框、撤销授权**不算**，它们保留 `danger` 描边或 `variant="text"`。全站 19 颗已按此收口（含表格行内的单条删除、`DeleteDialog` 的确认键、以及原本标成蓝色 primary 的「我的数据 → 历史数据」删除） |
+| 确认框那颗键写 `okType: "danger"`（`modal.confirm` / `Modal.confirm` / `a-popconfirm` 的 `ok-type`） | **它出来是红描边，不是实心红**：确认框走的是 legacy 映射 `convertLegacyProps`（`dist/button/button.js:24`），`"danger"` 只折成 `{ danger: true }`、**不给 type** → `mergedType` 停在 default → `button.js:65` 算出 `["danger", "outlined"]`。class 里照样挂着 `.ant-btn-dangerous`，所以**只看 class 会判成已经对了**；不报错、不进 vue-tsc。2026-10-11 用户指着「确认删除该辅种任务吗？」那张框报的 | 一律给最终那两个 prop：`okButtonProps: { type: "primary", danger: true }`（`ConfirmOkBtn` 把它 merge 在 legacy 映射之后，所以它说了算；`type` + `danger` 才走到 `["danger", "solid"]`）。全站四处已收口：`appDialog.makeConfirmDanger`（所有确认框的总入口）、`Debugger.vue` 插件重置、`ServerManager.vue` 删除服务器、`AllSiteMessagesDialog.vue` 批量删除站内信的 popconfirm。防线 ⑪ 扫 `src/` 里出现的 `okType` / `ok-type` 字样（注释不算），所以那条形参现在叫 `tone` |
 | 列表页给 `a-table` 写 `:scroll="{ y: 'calc(100vh - Npx)' }"` | 面板（`.page-panel`）自己已经是滚动容器，两层滚动会露出一条常驻的滚动条轨道 —— 哪怕只有一行，右边也挂着带箭头的经典滚动条；那个 N 还是目测的，外壳内衬一改就失准 | **不要写视口常数。** 列表页让 `.page-panel` 自己滚就行。真要表头吸顶，走 SearchEntity 那套**实测**容器高度算 `scroll.y`（见 PLAYBOOK，那个公式错过两次：拿会漂的量当基准会自指死循环） |
 | 标题列内容太长，把整张表撑出横向滚动条，于是给它写 `max-width: 32vw` | 视口常数两头都不对：窄窗口照样溢出、宽窗口白留一片；本仓库还把它挂在一个默认关闭的开关上，等于没做 | **算式按「这张表实际有多宽」定**：给表格容器标 `container-type: inline-size`，单元格写 `max-width: max(地板, calc(100cqi - 其它列实测预算))`，前面留一条 px 兜底给不支持容器查询的单位（范本 `SearchEntity/Index.vue`：预算 860 = 其它 10 列实测 740 + 英文表头/多一颗按钮的余量，地板 220）。两条实测来的判据：① 表宽压到容器宽，靠的是夹住 `<table>` 上的 `width: max-content`，与 auto/fixed 档位无关；② `overflow: hidden` 不能省，但它挡的不是长标题（那条 max-width 自己压得住），是第二行标签/副标题 —— 标签给到 20 个时表宽仍然等于容器宽，可标签伸出单元格 756px，照样把滚动容器的 `scrollWidth` 顶大、把滚动条带回来 |
 | 逐页自己写滚动条样式 | 全站已经有一条：细、无箭头、轨道常驻占位、**滑块平时透明、悬停到滚动区才现形**（`style.css` 一份 + content 的 `app.css` 一份，shadow root 选不到外面那份） | **别再逐页加 `scrollbar-width` / `scrollbar-color` / `::-webkit-scrollbar`。** 要改观感就动那两处。轨道常驻占位是故意的 —— 滑块现形/消失不该让内容横向跳一下 |
@@ -505,7 +506,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 （`dist/`）才能判，它会被自动收进来在构建前假报错 —— 那种守卫要单独给一步排到
 `Build and package` 之后，并加进 `check-all.mjs` 的 `EXCLUDED`。
 
-前六条是**静态扫描**，7、8、10 是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
+前六条与 11 是**静态扫描**，7、8、10 是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
 不需要 loader、不引入新依赖），9 是**数据快照自检**：
 
 | # | 脚本 | 防的静默失效 |
@@ -520,6 +521,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 | 8 | `check-fingerprint` | 种子指纹三层逻辑自检（含「本该不同」的用例） |
 | 9 | `check-recent-updates` | 首页「最近更新」那份快照被裁掉条目、时间戳写成只有日期、或 `date` 对不上那次提交的真实时间（§3.7） |
 | 10 | `check-category-map` | 搜索结果「分类」折类判据（§3.8）：同一内容的各种写法必须折到同一类、**别名顺序敏感的那几对不许互撞**、站点覆盖必须压过规则，外加 `common.categoryKind.*` 这批**动态拼出来**的 i18n 键两侧都在（防线 ③ 看不见这种键） |
+| 11 | `check-confirm-danger` | 确认框那颗键走了 legacy 的 `okType: "danger"` —— 它出来是红描边不是实心红，而 class 里照样带 `.ant-btn-dangerous`（§3.4 那条，判据是扫 `src/` 里的 `okType` / `ok-type` 字样，注释不算） |
 
 第六条守的是 §3.2：从两个无 DOM / 必须轻量 的上下文出发，静态 import 闭包不许走到 `sizzle`、
 不许命中 `@ptd/site` / `@ptd/social` 根入口，entrypoint 的 `import.meta.glob` 必须根绝对，

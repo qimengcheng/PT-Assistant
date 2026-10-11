@@ -44,18 +44,28 @@ export type TPromptInDialog = (
  *
  * okText 默认「完成」，但**破坏性操作要按动作给**（删除就写删除）—— 这个确认框的标题是
  * 「确认操作」，按钮再写「完成」等于把动作信息全丢了。
+ *
+ * ⚠️ 危险档**不能只给 `okType: "danger"`**：确认框那颗键走的是
+ * `dist/modal/components/ConfirmOkBtn.js:16` → `ActionButton` → `convertLegacyProps`
+ * （`dist/button/button.js:24`），那个 legacy 映射把 `"danger"` 只折成 `{ danger: true }`、
+ * **不给 type** —— 于是 `mergedType` 停在 default，算出来是「红描边 + 红字」（实测：白底、
+ * `border-color` 红、字红），不是全站口径要的实心红（AGENTS §3.4）。
+ * 所以这里直接给最终那两个 prop：`{ type: "primary", danger: true }` 才走到
+ * `button.js:65` 那条 `["danger", "solid"]`。
+ * 形参因此叫 `tone` 而不是 `okType` —— 全仓 `src/` 里不许再出现那个词，
+ * 有它就是在用坏掉的那条入口（判据：`scripts/check-confirm-danger.mjs`）。
  */
 export function makeConfirmDanger(modal: IDialogModalApi, t: TTranslate) {
   return function confirmDanger(
     content: string,
-    okType: "danger" | "primary" = "danger",
+    tone: "danger" | "primary" = "danger",
     okText: string = t("common.dialog.ok"),
   ): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       modal.confirm({
         title: t("common.dialog.title.confirmAction"),
         content,
-        okType,
+        okButtonProps: tone === "danger" ? { type: "primary", danger: true } : { type: "primary" },
         okText,
         cancelText: t("common.dialog.cancel"),
         onOk: () => resolve(true),

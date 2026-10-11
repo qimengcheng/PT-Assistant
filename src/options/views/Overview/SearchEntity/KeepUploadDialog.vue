@@ -41,6 +41,8 @@ import {
   type TReseedRecommendKind,
 } from "@/shared/reseedRecommend.ts";
 import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
+import { isFreeTorrent } from "@/shared/torrentFree.ts";
+import type { TRatioImpact } from "@/shared/ratioGuard.ts";
 import type { TCategoryKind } from "@/shared/category.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
@@ -48,6 +50,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
+import SiteRatioPopover from "@/options/components/SiteRatioPopover.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
 import { folderCategoryKind, resolveCategoryFolder } from "@/options/components/SentToDownloaderDialog/categoryMatch.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
@@ -420,6 +423,22 @@ const listBaseCandidates = computed(() => {
 /** 这一条所在站的分享率报不报得出、低于不低于 1（判据在 `@/shared/reseedRecommend.ts`） */
 function ratioVerdictOf(item: IVerifiedItem) {
   return reseedRatioVerdict(metadataStore.lastUserInfo?.[item.data.site]?.ratio);
+}
+
+/**
+ * 站点那一格悬停时，「下完这一条之后」要不要真算 —— 判的是这一条在当前流程里会不会被下载。
+ *
+ * 辅种只有**基准那一条**要真下一次（其余是跳过校验直接算完成），基准取自下载器时那一条
+ * 已经在里面了、整批都不下。把 15 GiB 记到不会下的那几条头上，就是凭空吓人。
+ * 顺序不能换：`useLocalBase` 时角色列整列撤掉、`baseId` 不再指列表里的某一条，所以先判它。
+ */
+function siteRatioImpact(item: IVerifiedItem): TRatioImpact {
+  if (useLocalBase.value) return "localBase";
+  if (item.id !== baseId.value) return "skipCheck";
+  if (isFreeTorrent(item.data.tags)) return "free";
+  const size = item.data.size;
+  if (typeof size !== "number" || !Number.isFinite(size) || size <= 0) return "noSize";
+  return "download";
 }
 
 // 角色列那颗标签的两截文字。写成函数而不是在模板里摆两个三元：
@@ -1398,16 +1417,23 @@ async function createKeepUploadTask() {
           </template>
 
           <!-- 图标旁边必须带上站点名：不少站点的 favicon 长得一样（他截图里 SBPT 和「库非」
-               两颗都是同一个蓝底 N），只有图标就分不出这一条是哪个站。 -->
+               两颗都是同一个蓝底 N），只有图标就分不出这一条是哪个站。
+               悬停出账户数与「下完这一条之后」（用户 2026-10-11 指着这一列提的）。 -->
           <template v-else-if="column.key === 'site'">
-            <div class="d-flex align-center ga-1 site-cell">
-              <SiteFavicon :site-id="record.data.site" :size="18" />
-              <SiteName
-                :site-id="record.data.site"
-                tag="span"
-                class="text-body-small text-grey text-truncate flex-1-1-0"
-              />
-            </div>
+            <SiteRatioPopover
+              :site-id="record.data.site"
+              :size="record.data.size"
+              :impact="siteRatioImpact(record)"
+            >
+              <div class="d-flex align-center ga-1 site-cell">
+                <SiteFavicon :site-id="record.data.site" :size="18" />
+                <SiteName
+                  :site-id="record.data.site"
+                  tag="span"
+                  class="text-body-small text-grey text-truncate flex-1-1-0"
+                />
+              </div>
+            </SiteRatioPopover>
           </template>
 
           <template v-else-if="column.key === 'title'">

@@ -1760,6 +1760,18 @@
     "saveSuccess": "保存成功",
     "search": "搜索",
     "site": "站点",
+    "siteRatio": {
+      "uploaded": "上传量",
+      "downloaded": "下载量",
+      "ratio": "分享率",
+      "afterTitle": "下完这一条之后",
+      "afterValue": "下载量 {downloaded}，分享率 {ratio}",
+      "free": "这一条为免费下载，不增加下载量",
+      "skipCheck": "这一条跳过校验直接计为完成，不产生下载量",
+      "localBase": "基准取自下载器里已有的一条，这一批不产生下载量",
+      "noSize": "该种子未报出体积，算不出变化",
+      "noAccount": "未取到该站点的上传量或下载量，算不出变化"
+    },
     "sortIndex": "优先级",
     "test": "测试",
     "totalItems": "共 {total} 项",

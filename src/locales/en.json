@@ -1760,6 +1760,18 @@
     "saveSuccess": "Saved successfully",
     "search": "Search",
     "site": "Site",
+    "siteRatio": {
+      "uploaded": "Uploaded",
+      "downloaded": "Downloaded",
+      "ratio": "Share ratio",
+      "afterTitle": "After downloading this item",
+      "afterValue": "Downloaded {downloaded}, ratio {ratio}",
+      "free": "This is a free download and adds no download data",
+      "skipCheck": "Added with skip-checking, so it produces no download data",
+      "localBase": "The base comes from a torrent already in your downloader, so this batch downloads nothing",
+      "noSize": "This torrent reports no size, so the change cannot be computed",
+      "noAccount": "No uploaded/downloaded figure for this site, so the change cannot be computed"
+    },
     "sortIndex": "Priority",
     "test": "Test",
     "totalItems": "{total} items in total",

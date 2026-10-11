@@ -15,6 +15,10 @@
  *
  * 纯判据，不碰界面也不碰浏览器 API —— 行为断言直接 import 这个文件跑（见 .tmp-build 里的
  * best-reseed-test.mjs），同族先例 `src/shared/reseedRecommend.ts`。
+ *
+ * 对外两个出口：{@link findBestReseedGroup} 给工具条那颗 chip（只要最值得的那一档），
+ * {@link findAllReseedGroups} 给「更多」那一屏（把每一档都列出来让人挑 —— 最佳那档
+ * 常常是体积最大的一份，重下一次代价太高时用户想换小一档）。
  */
 
 /** 一行结果里这一判据要吃的字段（ISearchResultTorrent 的结构子集，方便单测造夹具） */
@@ -43,10 +47,13 @@ export function toSizeBytes(raw: unknown): number | null {
 }
 
 /**
- * 找出被最多站点共有的一份；没有任何一档被 ≥2 个站点共有时返回 null（没得辅种，提示就不出）。
- * 并列时先比条数、再比大小（大的那份重下一次的代价更高，更值得辅）。
+ * 所有可辅种的一档一档，按「最值得辅」从前往后排在第一位。
+ *
+ * 排序就是 {@link findBestReseedGroup} 原来那套并列判据（站点数 → 条数 → 大小），
+ * 完全并列时保留输入顺序 —— 与旧版「先遇到者赢」一字不差，所以 `[0]` 恒等于旧版的最佳那档。
+ * 界面上「更多」列的是这整个数组，chip 上写的是它的第 0 项。
  */
-export function findBestReseedGroup<T extends IReseedGroupRow>(rows: T[] | null | undefined): IReseedGroup<T> | null {
+export function findAllReseedGroups<T extends IReseedGroupRow>(rows: T[] | null | undefined): IReseedGroup<T>[] {
   const bySize = new Map<number, T[]>();
   for (const row of rows ?? []) {
     if (!row || typeof row !== "object") continue;
@@ -57,23 +64,25 @@ export function findBestReseedGroup<T extends IReseedGroupRow>(rows: T[] | null 
     else bySize.set(size, [row]);
   }
 
-  let best: IReseedGroup<T> | null = null;
+  const groups: IReseedGroup<T>[] = [];
   for (const [size, items] of bySize) {
     const sites = new Set<string>();
     for (const item of items) {
       const site = String(item.site ?? "");
       if (site) sites.add(site);
     }
-    const siteCount = sites.size;
-    if (siteCount < 2) continue;
-    if (
-      !best ||
-      siteCount > best.siteCount ||
-      (siteCount === best.siteCount &&
-        (items.length > best.items.length || (items.length === best.items.length && size > best.size)))
-    ) {
-      best = { size, items, siteCount };
-    }
+    // 只有一站收录的没有辅种价值（辅的是别的站），不进列表
+    if (sites.size < 2) continue;
+    groups.push({ size, items, siteCount: sites.size });
   }
-  return best;
+
+  return groups.sort((a, b) => b.siteCount - a.siteCount || b.items.length - a.items.length || b.size - a.size);
+}
+
+/**
+ * 找出被最多站点共有的一份；没有任何一档被 ≥2 个站点共有时返回 null（没得辅种，提示就不出）。
+ * 并列时先比条数、再比大小（大的那份重下一次的代价更高，更值得辅）。
+ */
+export function findBestReseedGroup<T extends IReseedGroupRow>(rows: T[] | null | undefined): IReseedGroup<T> | null {
+  return findAllReseedGroups(rows)[0] ?? null;
 }

@@ -2,11 +2,11 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useBreakpoint } from "antdv-next";
-import { BranchesOutlined, CheckCircleFilled, GlobalOutlined, HddOutlined } from "@antdv-next/icons";
+import { BranchesOutlined, CheckCircleFilled, GlobalOutlined, HddOutlined, UnorderedListOutlined } from "@antdv-next/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { formatSize } from "@/options/utils.ts";
-import { findBestReseedGroup } from "@/shared/bestReseed.ts";
+import { findAllReseedGroups, type IReseedGroup } from "@/shared/bestReseed.ts";
 import type { ISearchResultTorrent } from "@/shared/types/storages/runtime.ts";
 
 import { tableCustomFilter } from "./utils/filter.ts";
@@ -14,6 +14,7 @@ import { tableCustomFilter } from "./utils/filter.ts";
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import KeepUploadDialog from "./KeepUploadDialog.vue";
+import ReseedGroupDialog from "./ReseedGroupDialog.vue";
 
 const { selectedTorrents, allTorrents } = defineProps<{
   selectedTorrents: ISearchResultTorrent[];
@@ -55,24 +56,39 @@ const selectedTorrentsInfo = computed(() => {
 });
 
 /**
- * 「最佳辅种」：这批结果里被最多站点同时收录的那一份（判据、以及为什么按「字节完全相同」
- * 算，都在 src/shared/bestReseed.ts）。没有任何一档被 ≥2 站共有时返回 null，这颗 chip 就不出。
+ * 这批结果里所有可辅种的一档一档（判据、以及为什么按「字节完全相同」算，都在
+ * src/shared/bestReseed.ts）。排第一的就是那颗 chip。没有任何一档被 ≥2 站共有时是空数组，
+ * chip 和「更多」都不出。
  */
-const bestGroup = computed(() => findBestReseedGroup(allTorrents));
+const reseedGroups = computed(() => findAllReseedGroups(allTorrents));
+const bestGroup = computed(() => reseedGroups.value[0] ?? null);
 
 const showBestReseedDialog = ref(false);
+const showReseedGroupDialog = ref(false);
 /**
  * 点的那一刻把这一批快照下来再交给弹窗。搜索结果是一个站点一个站点陆续回包的，
  * 直接绑 bestGroup.items 会让弹窗**开着的时候**换列表 —— 那个弹窗的基准选择、
  * 指纹比对都是在打开时算的，中途换输入不会重算，只会对不上账。
+ * 「更多」那一屏同理，所以它吃的是打开那一刻的组列表，不是活算的 computed。
  */
 const bestReseedItems = ref<ISearchResultTorrent[]>([]);
+const pickedGroups = ref<IReseedGroup<ISearchResultTorrent>[]>([]);
 
-function openBestReseedDialog() {
-  const group = bestGroup.value;
+/** chip 与「更多」里挑中的那一组，走的是同一条路：选好种子 → 开辅种检测 */
+function useReseedGroup(group: IReseedGroup<ISearchResultTorrent> | null | undefined) {
   if (!group) return;
   bestReseedItems.value = [...group.items];
+  showReseedGroupDialog.value = false;
   showBestReseedDialog.value = true;
+}
+
+function openBestReseedDialog() {
+  useReseedGroup(bestGroup.value);
+}
+
+function openReseedGroupDialog() {
+  pickedGroups.value = reseedGroups.value.map((group) => ({ ...group, items: [...group.items] }));
+  showReseedGroupDialog.value = true;
 }
 
 function clearSiteFilter() {
@@ -158,6 +174,18 @@ function selectSite(siteId: string) {
               </span>
             </a-tag>
           </a-tooltip>
+          <!-- 「更多」：chip 那一档往往也是最大的一档（全集 2160p），想换小一档得能看见其余每一档。
+               只有一档可挑时这颗不出（没有可挑的，摆一颗开了个空列表是纯噪音）。
+               样式跟站点 chip 同族（白底描边）而不是 a-button：这一排的高度由 chip 定，
+               默认档按钮 32px 会把整条提示撑高。 -->
+          <a-tooltip v-if="reseedGroups.length > 1" :title="t('SearchEntity.reseedGroups.tip', { count: reseedGroups.length })">
+            <a-tag class="chip chip_limit_width chip_white" @click.stop="openReseedGroupDialog">
+              <span class="chip-inner">
+                <UnorderedListOutlined />
+                {{ t("SearchEntity.reseedGroups.button") }}
+              </span>
+            </a-tag>
+          </a-tooltip>
         </template>
 
         <div class="flex-1-1-0" />
@@ -171,6 +199,11 @@ function selectSite(siteId: string) {
              （台架 .tmp-build/bench-bestreseed 第一版就是这么抓到的）。不挂 v-if 也不额外花钱：
              工具条那颗 ActionTd 本来就常驻着一份同组件实例。 -->
         <KeepUploadDialog v-model="showBestReseedDialog" :torrent-items="bestReseedItems" />
+
+        <!-- 「更多」挑中一组 = 把 chip 那一批换成这一组，之后开的是上面同一个辅种检测弹窗。
+             这一颗**可以**挂 v-if（它的数据是 props 到了才渲染的表格，没有挂在 watch(打开标志) 上的初始化），
+             但没必要：不挂也不多花一分钱。 -->
+        <ReseedGroupDialog v-model="showReseedGroupDialog" :groups="pickedGroups" @pick="useReseedGroup" />
 
         <!-- 选中种子信息条 -->
         <a-divider orientation="vertical" class="mx-2" />

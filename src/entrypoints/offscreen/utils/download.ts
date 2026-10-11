@@ -299,6 +299,19 @@ onMessage("setClientTorrentLocation", async ({ data: { downloaderId, id, locatio
   return moveStatus;
 });
 
+// 分类表：拿不到（这台没有分类概念 / 没连上）一律回 null，调用方按「判不出」处理。
+// 它存在的理由见 `src/shared/reseedPath.ts` —— `category:电影` 不是目录，不能拿去比也不能搬。
+onMessage("getClientTorrentCategories", async ({ data: downloaderId }) => {
+  const downloaderInstance = await getDownloaderInstance(downloaderId);
+  if (!downloaderInstance) return null;
+  try {
+    return await downloaderInstance.getClientCategories();
+  } catch (e) {
+    console.error("[offscreen] getClientCategories failed:", e);
+    return null;
+  }
+});
+
 function buildDownloadHistory(downloadOption: IDownloadTorrentOption): ITorrentDownloadMetadata {
   const { torrent = {}, downloaderId = "local" } = downloadOption;
   return {

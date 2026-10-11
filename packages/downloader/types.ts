@@ -496,6 +496,17 @@ export abstract class AbstractBittorrentClient<T extends DownloaderBaseConfig = 
   }
 
   /**
+   * 这台客户端的**分类表**（分类名 → 它真正的落盘目录），默认拿不到（null），由各客户端 override。
+   *
+   * 辅种要它：保存路径那一格允许写成 `category:电影` 这种「分类假路径」，而它不是目录 ——
+   * 拿它去比「基准在不在任务目录」会报假警，拿它去调 setLocation 会被下载器当场拒掉（409）。
+   * 翻不出目录时那一格就是判不出，界面上不许拿分类名冒充路径。判据见 `src/shared/reseedPath.ts`。
+   */
+  public async getClientCategories(): Promise<Record<string, { name: string; savePath: string }> | null> {
+    return null;
+  }
+
+  /**
    * ─────────────────────────────────────────────
    * 文件级 / peers / tracker 管理（追加扩展，默认不支持）
    * 各客户端按能力矩阵 override，feature 枚举（FileList/FilePriority/PeerList/TrackerList/TrackerManage）同步声明

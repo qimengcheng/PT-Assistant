@@ -183,6 +183,12 @@ export interface ProtocolMap {
   setClientTorrentLabel(data: { downloaderId: string; id: any; label: string }): boolean;
   /** 把种子已在盘上的数据搬到别的目录（只有部分客户端支持，判据见 `src/shared/reseedPath.ts`） */
   setClientTorrentLocation(data: { downloaderId: string; id: any; location: string }): boolean;
+  /**
+   * 该下载器的分类表（分类名 → 真正的落盘目录）。辅种那两处要用它把 `category:电影` 这种
+   * 分类假路径翻成目录 —— 翻不出就是判不出，不许拿分类名当路径去比或去搬。
+   * null = 这台客户端没有分类概念（基类默认），或压根没连上。
+   */
+  getClientTorrentCategories(downloaderId: string): Record<string, { name: string; savePath: string }> | null;
 
   // ===== 2.2.3 offscreen：文件级 / peers / tracker 管理 =====
   getClientTorrentFiles(data: { downloaderId: string; torrent: CTorrent }): CTorrentFile[];

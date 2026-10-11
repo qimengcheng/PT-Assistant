@@ -40,7 +40,8 @@ import {
   reseedRatioVerdict,
   type TReseedRecommendKind,
 } from "@/shared/reseedRecommend.ts";
-import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
+import { detectBasePathMismatch, isCategorySavePath, type IClientCategory } from "@/shared/reseedPath.ts";
+import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
 import { isFreeTorrent } from "@/shared/torrentFree.ts";
 import type { TRatioImpact } from "@/shared/ratioGuard.ts";
 import type { TCategoryKind } from "@/shared/category.ts";
@@ -304,11 +305,32 @@ const localBaseHint = computed(() => {
  * `skip_checking`（等于告诉下载器「不用查，盘上就有」）。数据在 A、任务目录是 B，
  * 下载器按 B 去找当然找不到 —— 用户 2026-10-11 那条「本地已有，直接推了其他种子，结果失败了」
  * 就是这个形状，而失败发生在下载器那边，界面上只看得到一条没原因的失败。
- * 判得出/判不出的三条边界写在 `src/shared/reseedPath.ts`。
+ * 判得出/判不出的边界写在 `src/shared/reseedPath.ts`，其中一条要在这里现取数据才判得了：
+ * 底部那一栏允许写 `category:电影`（分类而不是目录），得先问下载器那个分类落到哪。
  */
+const categoryTable = ref<Record<string, IClientCategory> | null>(null);
+
+// 只有那一格真是分类写法时才去取分类表；取回来时路径可能已经被改了，所以要认回来那一份才算数
+watch(
+  [selectedDownloaderId, savePath],
+  async ([id, path]) => {
+    if (!isCategorySavePath(path)) {
+      categoryTable.value = null;
+      return;
+    }
+    const table = await loadCategoryTable(id);
+    if (selectedDownloaderId.value === id && savePath.value === path) categoryTable.value = table;
+  },
+  { immediate: true },
+);
+
 const basePathMismatch = computed(() =>
   useLocalBase.value
-    ? detectBasePathMismatch({ basePath: chosenLocalBase.value?.entry.savePath, taskPath: savePath.value })
+    ? detectBasePathMismatch({
+        basePath: chosenLocalBase.value?.entry.savePath,
+        taskPath: savePath.value,
+        categories: categoryTable.value,
+      })
     : null,
 );
 
@@ -345,7 +367,9 @@ async function moveLocalBaseToTaskPath() {
     const moved = await sendMessage("setClientTorrentLocation", {
       downloaderId: selectedDownloaderId.value,
       id: hash,
-      location: savePath.value,
+      // 取 mismatch 里那一份，不是输入框的原样：那一格可以写 `category:电影`，那是分类不是目录，
+      // 原样发过去会被下载器当场拒掉（用户 2026-10-11 报的 409）。判据已经把它翻成真实目录了。
+      location: mismatch.taskPath,
     });
     if (moved === false) {
       // false 只表示这台客户端没有移动数据的能力（各驱动的默认实现），不是搬输了
@@ -1315,7 +1339,10 @@ async function createKeepUploadTask() {
       <template #description>
         <div class="path-mismatch-lines">
           <div>
-            {{ t("KeepUploadTask.pathMismatch.taskPath", { path: savePath }) }}
+            <!-- 写的是判据算出来的那一份，不是输入框里的原样：输入框可以写 `category:电影`
+                 （分类而不是目录），而这一行要跟下面那行基准目录比得出高低，也必须跟
+                 「移到任务目录」真发出去的那一份一致。 -->
+            {{ t("KeepUploadTask.pathMismatch.taskPath", { path: basePathMismatch.taskPath }) }}
           </div>
           <div>
             {{ t("KeepUploadTask.pathMismatch.basePath", { path: basePathMismatch.basePath }) }}

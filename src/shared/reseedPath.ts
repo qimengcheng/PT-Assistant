@@ -53,6 +53,41 @@ export function isSameTorrentPath(a?: string | null, b?: string | null): boolean
   return left === right;
 }
 
+/**
+ * qBittorrent 那一套「按分类落目录」的写法前缀。这一格存的不是目录而是分类名，
+ * 真实目录由下载器决定。单一来源在这里：`SentToDownloaderDialog/categoryMatch.ts` 与
+ * 辅种那三处判据都从这一处拿（`packages/downloader/entity/qBittorrent.ts` 的 `category_prefix`
+ * 是零修改平移来的包内代码，不动它，靠 `reseed-path-test` 那条比对断言钉住两边同值）。
+ */
+export const CATEGORY_FOLDER_PREFIX = "category:";
+
+/** 这一格是不是「分类」而不是目录 */
+export function isCategorySavePath(raw?: string | null): boolean {
+  return typeof raw === "string" && raw.trim().startsWith(CATEGORY_FOLDER_PREFIX);
+}
+
+/** 分类表里我们吃得下的那一点形状（`/torrents/categories` 的返回值子集，方便造夹具） */
+export interface IClientCategory {
+  savePath?: string | null;
+}
+
+/**
+ * 把 `category:电影` 翻成它真正的目录。三种拿不出目录的情形一律回 null（= 判不出）：
+ * - 分类表还没取到（`categories` 为 null/undefined）；
+ * - 那个分类不存在（qBittorrent 在 add 时会自建一个没有目录的分类）；
+ * - 分类的 savePath 是空串 —— 那表示「跟下载器的默认目录走」，而默认目录我们手上没有。
+ */
+export function resolveCategoryTaskPath(
+  taskPath: string,
+  categories?: Record<string, IClientCategory> | null,
+): string | null {
+  if (!categories) return null;
+  const name = taskPath.trim().slice(CATEGORY_FOLDER_PREFIX.length).trim();
+  if (!name) return null;
+  const savePath = categories[name]?.savePath;
+  return typeof savePath === "string" && savePath.trim() !== "" ? savePath : null;
+}
+
 export interface IReseedPathMismatch {
   /** 基准那份数据实际所在（下载器报的，或建任务时记下的那一份） */
   basePath: string;
@@ -63,13 +98,26 @@ export interface IReseedPathMismatch {
 /**
  * 基准与任务目录不一致时返回那两条路径，一致或判不出返回 null。
  * 返回值里给的是**原样**（不是归一后的），界面上要显示用户/下载器写的那一份。
+ *
+ * `taskPath` 是 `category:电影` 时先按 `categories` 翻成真实目录再比（翻不出就判不出，
+ * 见 {@link resolveCategoryTaskPath}）。这一步不是可选的修饰：那一格存的本来就是分类名，
+ * 拿它当目录去比会报出一条假的「目录不一致」，而拿它当目录发给下载器的
+ * `setLocation` 会当场被拒（用户 2026-10-11 点「把本地文件移到任务目录」报的 409 就是这么来的）。
+ * 翻出来的是真实目录，所以提示里显示的、以及移动要发的那一份，也都是真实目录。
  */
 export function detectBasePathMismatch(input: {
   basePath?: string | null;
   taskPath?: string | null;
+  categories?: Record<string, IClientCategory> | null;
 }): IReseedPathMismatch | null {
-  const { basePath, taskPath } = input;
+  const { basePath, categories } = input;
+  let taskPath = input.taskPath;
   if (!basePath || !taskPath) return null;
   if (PATH_PLACEHOLDER.test(taskPath)) return null;
+  if (isCategorySavePath(taskPath)) {
+    const resolved = resolveCategoryTaskPath(taskPath, categories);
+    if (!resolved) return null;
+    taskPath = resolved;
+  }
   return isSameTorrentPath(basePath, taskPath) ? null : { basePath, taskPath };
 }

@@ -29,7 +29,7 @@ import {
 } from "@/options/views/Overview/KeepUploadTask/autoReseed.ts";
 import { judgeReseedTorrent, linkItemToTorrent } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
-import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
+import { detectBasePathMismatch, isCategorySavePath, type IClientCategory } from "@/shared/reseedPath.ts";
 import {
   estimateEtaSec,
   reseedNoticeGroupMessage,
@@ -277,6 +277,20 @@ async function autoReseedTick() {
     const reachable = !!torrents;
     const index = new Map((torrents ?? []).map((t) => [String(t.infoHash).toLowerCase(), t]));
 
+    /**
+     * 分类表。任务那一栏的保存路径允许写成 `category:电影` —— 那是分类，不是目录：
+     * 不翻成目录就没法判「基准那份在不在任务目录」（翻不出按判不出走），而拿它当移动目标
+     * 会被下载器当场拒掉（判据见 `src/shared/reseedPath.ts`）。只有这一组里真有用到分类写法才取。
+     */
+    let categories: Record<string, IClientCategory> | null = null;
+    if (group.some((task) => isCategorySavePath(task.downloadOptions.savePath))) {
+      try {
+        categories = await sendMessage("getClientTorrentCategories", downloaderId);
+      } catch {
+        categories = null;
+      }
+    }
+
     for (const task of group) {
       // 一条任务的任何意外都不许终止整轮：这一层以前没有隔离罩，`resolveBaseHash` /
       // `planAutoReseed` / 最后那次写回只要抛一下，后面所有下载器组、所有任务这一分钟就都不再推进
@@ -335,6 +349,7 @@ async function autoReseedTick() {
           ? detectBasePathMismatch({
               basePath: liveBase?.savePath ?? task.baseLocal.savePath,
               taskPath: task.downloadOptions.savePath,
+              categories,
             })
           : null;
 

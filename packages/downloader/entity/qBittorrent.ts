@@ -702,7 +702,11 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
     return true;
   }
 
-  private async getClientCategories(): Promise<Record<string, { name: string; savePath: string }>> {
+  /**
+   * 分类表。基类那份默认回 null（`types.ts` 的 `getClientCategories`），这里给真数据：
+   * `getClientPaths` 要用它列候选，辅种那两处要用它把 `category:电影` 翻成真实目录。
+   */
+  public override async getClientCategories(): Promise<Record<string, { name: string; savePath: string }>> {
     const { data: categories } =
       await this.request<Record<string, { name: string; savePath: string }>>("/torrents/categories");
     return categories;

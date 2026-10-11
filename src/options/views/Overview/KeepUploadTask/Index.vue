@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useTemplateRef } from "vue";
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { type TableColumnsType } from "antdv-next";
 import {
@@ -26,7 +26,8 @@ import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vu
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
-import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
+import { detectBasePathMismatch, isCategorySavePath, type IClientCategory } from "@/shared/reseedPath.ts";
+import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
 import {
   judgeReseedTorrent,
   linkItemToTorrent,
@@ -224,16 +225,43 @@ function baseLocalLine(record: IKeepUploadTask) {
 
 /**
  * 这一条任务的「基准那份数据在哪」和「这一批要挂到哪」对不对得上。
- * 判不出的三种情况（任务目录为空 / 带占位符 / 基准没记路径）一律不提示，见 `shared/reseedPath.ts`。
+ * 判不出的几种情况（任务目录为空 / 带占位符 / 基准没记路径 / 分类翻不出目录）一律不提示，
+ * 见 `shared/reseedPath.ts`。
  *
  * 读的是任务上记的那份 `baseLocal.savePath`，它会在每次「回查」时被下载器报的实路径刷新
  * （见 `recheckSeeding` 里那一段）—— 所以手动搬过文件的人点一次回查，这条提示就会自己消失。
  */
 function basePathMismatchOf(task: IKeepUploadTask) {
   return task.baseLocal
-    ? detectBasePathMismatch({ basePath: task.baseLocal.savePath, taskPath: task.downloadOptions?.savePath })
+    ? detectBasePathMismatch({
+        basePath: task.baseLocal.savePath,
+        taskPath: task.downloadOptions?.savePath,
+        categories: categoryTables.value[task.downloadOptions?.downloaderId ?? ""],
+      })
     : null;
 }
+
+/**
+ * 按下载器存着的分类表。任务那一栏的保存路径可以写成 `category:电影`（分类而不是目录），
+ * 不先翻成目录就会报一条判不出来的假警告，而那颗「移到任务目录」会把分类名当路径发出去、
+ * 被下载器拒成 409（用户 2026-10-11 在辅种检测那一屏报的，这一屏是同一个洞）。
+ * 只有真用到分类写法的任务才会去取，取到之前那一格按「判不出」走。
+ */
+const categoryTables = ref<Record<string, Record<string, IClientCategory> | null>>({});
+
+watch(
+  () => tasks.value.filter((task) => isCategorySavePath(task.downloadOptions?.savePath)),
+  (tasks) => {
+    for (const task of tasks) {
+      const id = task.downloadOptions?.downloaderId ?? "";
+      if (!id || id in categoryTables.value) continue;
+      void loadCategoryTable(id).then((table) => {
+        categoryTables.value = { ...categoryTables.value, [id]: table };
+      });
+    }
+  },
+  { immediate: true, deep: true },
+);
 
 /** 正在往任务目录搬的那几条任务（只影响提示措辞，不是发送闸门） */
 const movingBase = ref<Record<string, boolean>>({});

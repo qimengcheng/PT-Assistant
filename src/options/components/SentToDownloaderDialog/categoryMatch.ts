@@ -17,9 +17,14 @@
  * `autoTMM = true` + `category = 前缀后面那段`，所以这里挑出来的必须原样带回前缀。
  */
 import { categorizeCategory, type TCategoryKind } from "@/shared/category.ts";
+import { CATEGORY_FOLDER_PREFIX } from "@/shared/reseedPath.ts";
 
-/** `category:` 前缀的推荐目录单独成组：这批是分类目录，和按盘符列出来的具体路径不是一类东西 */
-export const CATEGORY_FOLDER_PREFIX = "category:";
+/**
+ * `category:` 前缀的推荐目录单独成组：这批是分类目录，和按盘符列出来的具体路径不是一类东西。
+ * 常量的真源在 `@/shared/reseedPath.ts`（那边也要用它把分类名翻成真实目录），这里只是转发一份，
+ * 免得两条链上各写一遍字面量。
+ */
+export { CATEGORY_FOLDER_PREFIX };
 
 /** 一行的最小输入：站点 id + 该站的原样叫法（`ITorrent` 里就这两个字段用得上） */
 export interface ICategorySource {

@@ -39,7 +39,8 @@ const tableHeaders = computed<TableColumnsType<IBackupFileInfo>>(() => [
     sorter: (a, b) => a.time - b.time,
     defaultSortOrder: "descend",
   },
-  { title: t("common.action"), key: "action", align: "center" },
+  // width：两颗 small 纯图标键（恢复 / 删除）→ 2×24 + a-space 缝 8 + 单元格内衬 8+8 = 72
+  { title: t("common.action"), key: "action", align: "center", width: 72 },
 ]);
 
 const tableSelected = ref<string[]>([]);

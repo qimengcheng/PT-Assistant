@@ -184,7 +184,9 @@ async function getFaviconFromUrl(url: string): Promise<Blob> {
         blob: faviconIco.data,
       } as IParsedFavicon);
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error(`[favicon] 抓首页解析 <link rel=icon> 失败: ${url}`, e);
+  }
 
   // 如果前面获取到足够的 favicons，我们需要比较下哪个更合适，并排序
   if (favicons.length > 0) {
@@ -212,8 +214,10 @@ async function getFaviconFromUrl(url: string): Promise<Blob> {
       if (usedFavicons.blob) {
         return usedFavicons.blob;
       } else {
+        // 提到 try 外面：catch 里要打日志才能定位是哪个候选 404，
+        // 而原来它声明在 try 块内，catch 访问不到（非空断言也是坑）
+        let faviconUrl = usedFavicons.href;
         try {
-          let faviconUrl = usedFavicons.href;
           if (faviconUrl.startsWith("//")) {
             faviconUrl = `${baseUrl.protocol}${faviconUrl}`;
           } else if (faviconUrl.startsWith("/")) {
@@ -222,7 +226,11 @@ async function getFaviconFromUrl(url: string): Promise<Blob> {
 
           const { data } = await axios.get(faviconUrl, { responseType: "blob", timeout: FAVICON_TIMEOUT });
           return data;
-        } catch {}
+        } catch (e) {
+          // 这一路只是候选来源之一，取不到就试下一个 —— 但记下来，
+          // 否则「图标一直不显示」时无从判断是全部候选都 404 还是别的
+          console.warn(`[favicon] 候选图标取失败: ${faviconUrl}`, (e as Error)?.message ?? e);
+        }
       }
     }
   }
@@ -260,7 +268,10 @@ export async function getFavicon(site: getFaviconMetadata): Promise<string> {
     try {
       const configReq = await axios.get(siteFavicon, { responseType: "blob", timeout: FAVICON_TIMEOUT });
       faviconMeta = configReq.data;
-    } catch {}
+    } catch (e) {
+      // 取不到就退到 2.2（抓首页解析），属正常降级 —— 但记下来
+      console.warn(`[favicon] siteFavicon 取失败，退到抓首页: ${siteFavicon}`, (e as Error)?.message ?? e);
+    }
   }
 
   // 2.2 请求网站首页，并从返回的html中解析所需要的 favicon 字段
@@ -269,7 +280,10 @@ export async function getFavicon(site: getFaviconMetadata): Promise<string> {
       try {
         faviconMeta = await getFaviconFromUrl(url);
         break;
-      } catch {}
+      } catch (e) {
+        // 逐个 siteUrls 试，取不到就试下一个
+        console.warn(`[favicon] 首页解析失败，继续下一个: ${url}`, (e as Error)?.message ?? e);
+      }
     }
   }
 

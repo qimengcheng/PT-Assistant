@@ -128,7 +128,9 @@ const baseTimeSelector = {
         }
         time = parseTimeToLiveToDate(time);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("[Gazelle] 解析发布时间失败，该条留空", e);
+    }
     return time;
   },
 };

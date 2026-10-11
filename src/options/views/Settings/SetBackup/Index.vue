@@ -50,7 +50,8 @@ const fullTableHeader = computed<TableColumnsType<IBackupServerMetadata>>(() => 
   { title: t("SetBackup.table.retention"), key: "retention", dataIndex: "retention", align: "center" },
   { title: t("SetBackup.table.lastBackupAt"), key: "lastBackupAt", dataIndex: "lastBackupAt", align: "end" },
   { title: t("common.enable"), key: "enabled", dataIndex: "enabled", align: "center" },
-  { title: t("common.action"), key: "action", align: "center" },
+  // width：四颗 small 纯图标键（立即备份 / 历史 / 编辑 / 删除）→ 4×24 + a-space 缝 3×8 + 单元格内衬 8+8 = 136
+  { title: t("common.action"), key: "action", align: "center", width: 136 },
 ]);
 
 const tableSelected = ref<TBackupServerKey[]>([]);
@@ -120,8 +121,6 @@ async function runBackup(backupServerId: TBackupServerKey | symbol) {
     }
   } else if (backupServerId == localBackup) {
     showLocalExportConfirmDialog.value = true;
-  } else {
-    console.log('"doBackup" without valid backupServerId');
   }
 }
 

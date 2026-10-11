@@ -790,12 +790,12 @@ export default class AvistazNetwork extends PrivateSite {
       Number.isFinite(storedAuthExpiry) &&
       storedAuthExpiry > currentTime
     ) {
-      console.log("Found valid token in runtimeSettings. Returning existing token.");
+      console.debug("Found valid token in runtimeSettings. Returning existing token.");
       return storedAuthToken.trim();
     }
 
     // 2. 如果过期或不存在，发起新的授权请求
-    console.log("Token expired or not found. Requesting new token...");
+    console.debug("Token expired or not found. Requesting new token...");
     try {
       const { data: apiAuth } = await this.request<AvzNetAuthResp>({
         url: "/api/v1/jackett/auth",
@@ -812,7 +812,7 @@ export default class AvistazNetwork extends PrivateSite {
         await this.storeRuntimeSettings("authToken", authToken);
         await this.storeRuntimeSettings("authExpiry", newAuthExpiry);
 
-        console.log("Successfully obtained and stored new token.");
+        console.debug("Successfully obtained and stored new token.");
         return authToken;
       } else if (isAuthFailResp(apiAuth)) {
         // 检查 message 属性是否存在且为字符串

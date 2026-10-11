@@ -447,7 +447,9 @@ export const SchemaMetadata: Pick<
             } else {
               time = parseValidTimeString(time);
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error("[NexusPHP] 解析发布时间失败，该条留空", e);
+          }
           return time as number;
         },
       },

@@ -97,7 +97,9 @@ export default class BittorrentSite {
     // 任何页面控制台、日志采集或屏幕共享都能直接读到明文口令。
     // 排查站点问题临时开这个开关即可，长期不要留在生产构建里。
     if (import.meta.env.DEV) {
-      console.log(`[Site] ${this.name} Initialized with Metadata: `, this.metadata);
+      // debug 档：每个站点初始化都会走到这里，340 个站点一次加载就是 340 行，
+      // 用 log 档会把控制台刷满（且整份 metadata 里含站点配置）。
+      console.debug(`[Site] ${this.name} Initialized with Metadata: `, this.metadata);
     }
   }
 

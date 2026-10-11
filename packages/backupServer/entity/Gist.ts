@@ -227,7 +227,9 @@ export default class Gist extends AbstractBackupServer<GistConfig> {
     for (const key of decryptKeys) {
       try {
         return decryptData(data, key) as T;
-      } catch (e) {}
+      } catch (e) {
+        console.error("[Gist] 用候选 key 解密失败，继续下一个", e);
+      }
     }
 
     throw new Error("Failed to decrypt data with provided keys.");

@@ -45,7 +45,9 @@ export const pageParserMatches: TSupportSocialSitePageParserMatches = [
         if (page_json && page_json.name) {
           titles.push(page_json.name);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("[imdb] 解析页面里的 __NEXT_DATA__ 片名失败", e);
+      }
 
       return {
         site: "imdb",

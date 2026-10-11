@@ -179,10 +179,6 @@ export function piniaWebExtPersistencePlugin(context: PiniaPluginContext) {
     // afterRestore 里显式调用的 $save 不受影响 —— 它走 hydrated 已置位的正常路径。
     restorePromise.then(() => {
       store.$subscribe((mutation, state: any) => {
-        // 只在开发期打印：打开自动保存后每次 mutation 都会走到这里，无条件 log 会刷屏
-        if (import.meta.env.DEV) {
-          console.log(`Store "${store.$id}" change subscribed: `, mutation);
-        }
         if (autoSaveType.includes(mutation.type)) {
           $save(state);
         }

@@ -82,7 +82,9 @@ export default class OWSS extends AbstractBackupServer<OWSSConfig> {
         url: "/list",
       });
       return Array.isArray(data.data);
-    } catch {}
+    } catch (e) {
+      console.error("[OWSS] ping 失败（/list 探测）", e);
+    }
     return false;
   }
 

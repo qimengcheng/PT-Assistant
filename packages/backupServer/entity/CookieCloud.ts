@@ -176,7 +176,9 @@ export default class CookieCloud extends AbstractBackupServer<CookieCloudConfig>
         data: { uuid: this.userConfig.uuid, encrypted: encryptedFileData },
       });
       return updateResp.data.action === "done";
-    } catch (e) {}
+    } catch (e) {
+      console.error("[CookieCloud] addFile 上传 /update 失败", e);
+    }
 
     return false;
   }

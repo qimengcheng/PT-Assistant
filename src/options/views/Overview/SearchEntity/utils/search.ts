@@ -171,7 +171,6 @@ export async function doSearchEntity(
   };
 
   // Search site by plan in queue
-  console.log(`Add search ${solutionKey} to queue.`);
   runtimeStore.search.searchPlan[solutionKey].queueAt = Date.now();
 
   // 领世代号放在**投递时**（不是任务体里）：.catch 回调也要用到它来判断
@@ -185,7 +184,6 @@ export async function doSearchEntity(
       const alive = () => isSearchGenerationAlive(generation);
 
       const startAt = (runtimeStore.search.searchPlan[solutionKey].startAt = Date.now());
-      console.log(`search ${solutionKey} start at ${startAt}`);
       runtimeStore.search.searchPlan[solutionKey].status = EResultParseStatus.working;
 
       let searchKeyword = runtimeStore.search.searchKey ?? "";
@@ -215,10 +213,6 @@ export async function doSearchEntity(
         return;
       }
 
-      console.log(
-        `success get search ${solutionKey} result, with code ${searchStatus}: ${searchStatusMsg ?? ""}`,
-        searchResult,
-      );
       runtimeStore.search.searchPlan[solutionKey].status = searchStatus;
       searchStatusMsg && (runtimeStore.search.searchPlan[solutionKey].statusMsg = searchStatusMsg);
 
@@ -304,8 +298,6 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
     }
   }
 
-  console.log("Start search with: ", searchKey, searchPlanKey, flush);
-
   runtimeStore.search.searchKey = searchKey;
   runtimeStore.search.searchPlanKey = searchPlanKey;
 
@@ -330,7 +322,6 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
     }
 
     runtimeStore.search.searchPlanKey = searchSolution.id; // 重写 searchPlanKey 为实际的 id
-    console.log(`Expanded Search Plan for ${searchPlanKey}: `, searchSolution);
 
     if (searchSolution.solutions.length === 0) {
       runtimeStore.showSnakebar(i18n.t("SearchEntity.index.needSite"), { color: "error" });
@@ -370,7 +361,6 @@ export async function retrySearch(retryStatus: EResultParseStatus[] = defaultErr
     runtimeStore.showSnakebar(i18n.t("SearchEntity.index.nothingToRetry"), { color: "info" });
     return;
   }
-  console.log("Retrying search plans: ", shouldRetrySearchPlan);
   for (const plan of shouldRetrySearchPlan) {
     await doSearchEntity(plan.siteId, plan.searchEntryName, plan.searchEntry, true);
   }

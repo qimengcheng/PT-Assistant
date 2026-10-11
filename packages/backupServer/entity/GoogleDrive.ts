@@ -291,7 +291,9 @@ export default class GoogleDrive extends AbstractBackupServer<GoogleDriveConfig>
     try {
       const accessToken = await this.fetchAccessToken();
       return typeof accessToken?.access_token !== "undefined";
-    } catch {}
+    } catch (e) {
+      console.error("[GoogleDrive] ping 失败（取 access_token）", e);
+    }
     return false;
   }
 }

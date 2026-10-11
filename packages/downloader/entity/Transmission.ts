@@ -483,7 +483,9 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
             ids: torrentId,
             labels: labels,
           });
-        } catch (e) {}
+        } catch (e) {
+          console.error("[Transmission] torrent-set 设置 labels 失败", e);
+        }
       }
 
       // 设置上传速度限制 - 必须在添加后使用 torrent-set
@@ -494,14 +496,21 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
             uploadLimit: options.uploadSpeedLimit * 1024, // KB/s
             uploadLimited: true,
           });
-        } catch (e) {}
+        } catch (e) {
+          // 限速设不上不影响种子已经加进去，但要说出来而不是静默
+          console.error("[Transmission] set upload speed limit failed", e);
+        }
       }
 
       addResult.success = data.result === "success";
       if (!addResult.success) {
         addResult.message = data;
       }
-    } catch (e) {}
+    } catch (e) {
+      // 抛错时 addResult.message 还空着，调用方只看到「失败」而不知道原因
+      console.error("[Transmission] add torrent failed", e);
+      addResult.message = e instanceof Error ? e.message : String(e);
+    }
 
     return addResult;
   }

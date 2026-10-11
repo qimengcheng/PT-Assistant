@@ -531,7 +531,9 @@ export default class MyAnonamouse extends AbstractPrivateSite {
         name: "mbsc",
       });
       mbsc = cookieObj?.value;
-    } catch {}
+    } catch (e) {
+      console.error("[myanonamouse] 读取 mbsc cookie 失败", e);
+    }
 
     if (!mbsc) {
       return {};

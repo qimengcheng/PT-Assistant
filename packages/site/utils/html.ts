@@ -61,7 +61,9 @@ export function getHostFromUrl(url: string): TSiteHost {
   try {
     const urlObj = new URL(url);
     host = urlObj.host;
-  } catch (e) {}
+  } catch (e) {
+    console.error(`[getHostFromUrl] 不是合法 URL，host 留空: ${url}`, e);
+  }
 
   return host;
 }

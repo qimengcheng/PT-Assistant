@@ -50,7 +50,9 @@ export default class WebDAV extends AbstractBackupServer<WebDAVConfig> {
     try {
       await this.getServer().getDirectoryContents("/");
       return true;
-    } catch {}
+    } catch (e) {
+      console.error("[WebDAV] ping 失败（列根目录）", e);
+    }
     return false;
   }
 

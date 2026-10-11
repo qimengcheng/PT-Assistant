@@ -182,6 +182,12 @@ const fullTableHeader = computed(
         key: "action",
         align: "center",
         sortable: false,
+        // ⚠️ 必须写死：这张表带 scroll.y（fixed 布局），列宽只从 column.width 取。
+        // 不写就没有 <col>，那一列永远跟着内容走 —— 而本页会因搜索结果刷新整表重排，
+        // 列宽跟着抖一下（用户看到的「刷新时整张表在动」）。
+        // 数值：ActionTd 在 compact 档是四颗 small 纯图标键（a-space-compact 把 size 传给
+        // 子按钮）→ 4×24 减掉 3×1px 贴合 = 93，加 small 单元格内衬 8+8 = 109。
+        width: 110,
         props: { disabled: true },
       },
     ] as ITableColumn[],
@@ -508,19 +514,16 @@ watch(
 const isSearchingParsed = ref<boolean>(searchQueue.isPaused);
 
 function pauseSearchQueue() {
-  console.log("pauseSearchQueue", searchQueue);
   searchQueue.pause();
   isSearchingParsed.value = true;
 }
 
 function startSearchQueue() {
-  console.log("startSearchQueue", searchQueue);
   searchQueue.start();
   isSearchingParsed.value = false;
 }
 
 function cancelSearchQueue() {
-  console.log("cancelSearchQueue", searchQueue);
   searchQueue.clear(); // 清空搜索队列
   // clear() 只清「还没开始」的排队任务，正在跑的那个照旧跑完并把结果追加进表格 ——
   // 世代号让它回来后自行放弃，否则界面表现是「已取消却还在冒新结果」而 isSearching 已 false。

@@ -150,7 +150,9 @@ export const siteMetadata: ISiteMetadata = {
             if (time) {
               time = parseValidTimeString(time as string);
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error("[retroflix] 解析发布时间失败，该条留空", e);
+          }
           return time;
         },
       },

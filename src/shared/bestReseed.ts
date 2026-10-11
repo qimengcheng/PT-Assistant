@@ -25,6 +25,31 @@
 export interface IReseedGroupRow {
   site?: string;
   size?: number | string | null;
+  /**
+   * 站点报的做种状态（`ETorrentStatus` 那几个字符串值）。
+   * 类型留 `unknown`：这是解析层从页面文本来的，缺字段 / 空串 / `"unknown"` 都是常态
+   * （全仓只有 37/340 个站点定义报得出这一列），判据不许拿它当 boolean。
+   */
+  status?: unknown;
+}
+
+/** `ETorrentStatus.seeding` 的字面值。不 import 那个枚举：它在 `@ptd/site` 根入口那条桶链上 */
+export const SEEDING_STATUS = "seeding";
+
+/** 这一条被站点报成「正在做种」吗 —— 只认这一个值，`completed`（完成未做种）不算 */
+export function isSeedingStatus(status: unknown): boolean {
+  return status === SEEDING_STATUS;
+}
+
+/** `ETorrentStatus` 里那四个「报得出内容」的值（`unknown` 不在内） */
+const KNOWN_STATUSES = new Set(["downloading", "seeding", "inactive", "completed"]);
+
+/**
+ * 这一条报得出做种状态吗。`unknown` 是枚举里那个「状态不明」，认不出的值同理 —— 都不算报得出，
+ * 否则界面上会出现「这一组 0 条在做种」这种其实什么都没查到的读数。
+ */
+export function isStatusKnown(status: unknown): boolean {
+  return typeof status === "string" && KNOWN_STATUSES.has(status);
 }
 
 export interface IReseedGroup<T> {
@@ -34,6 +59,13 @@ export interface IReseedGroup<T> {
   items: T[];
   /** 去重后的站点数 */
   siteCount: number;
+  /**
+   * 组里有几条被站点报成「正在做种」。>0 意味着这份数据已经在盘上、且我们已经在给某一站做种 ——
+   * 挑这一档辅种时其余各站都是纯辅，不用重下一次（用户 2026-10-11 要求把这种档排在前面）。
+   */
+  seedingCount: number;
+  /** 这一组有没有**任何**一条报得出状态；false 时界面上那一格留空，不画 0 */
+  statusKnown: boolean;
 }
 
 /**
@@ -67,13 +99,18 @@ export function findAllReseedGroups<T extends IReseedGroupRow>(rows: T[] | null 
   const groups: IReseedGroup<T>[] = [];
   for (const [size, items] of bySize) {
     const sites = new Set<string>();
+    let seedingCount = 0;
+    let statusKnown = false;
     for (const item of items) {
       const site = String(item.site ?? "");
       if (site) sites.add(site);
+      if (isSeedingStatus(item.status)) seedingCount++;
+      // 「报得出」要按整组求或：一条报得出、另一条缺字段，这一档仍然判得出有没有在做种
+      if (isStatusKnown(item.status)) statusKnown = true;
     }
     // 只有一站收录的没有辅种价值（辅的是别的站），不进列表
     if (sites.size < 2) continue;
-    groups.push({ size, items, siteCount: sites.size });
+    groups.push({ size, items, siteCount: sites.size, seedingCount, statusKnown });
   }
 
   return groups.sort((a, b) => b.siteCount - a.siteCount || b.items.length - a.items.length || b.size - a.size);

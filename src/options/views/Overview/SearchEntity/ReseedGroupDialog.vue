@@ -3,8 +3,10 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { type TableColumnsType } from "antdv-next";
 import { BranchesOutlined } from "@antdv-next/icons";
+import { ETorrentStatus } from "@ptd/site";
 
 import { formatSize } from "@/options/utils.ts";
+import { torrentStatusMeta } from "./torrentStatusMeta.ts";
 import type { IReseedGroup } from "@/shared/bestReseed.ts";
 import type { ISearchResultTorrent } from "@/shared/types/storages/runtime.ts";
 
@@ -37,16 +39,27 @@ interface IRow {
   sizeText: string;
   rowCount: number;
   siteCount: number;
+  /** 组里有几条被站点报成「正在做种」（判据在 `shared/bestReseed.ts`） */
+  seedingCount: number;
+  /** 这一组一条状态都报不出时那一格留空 —— 画个 0 会把「没查到」说成「确认没有」 */
+  statusKnown: boolean;
   /** 去重后的站点，最多取前 6 颗画图标，剩下的折成「+N」 */
   icons: string[];
   /** 没画成图标的那些还剩几个 */
   restSites: number;
   title: string;
+  /** 旁边那颗 chip 给的就是这一档（按传进来的名次判，不看界面第几行） */
+  isBest: boolean;
+  /** 传进来的名次（站点数 → 条数 → 大小），重排后分区内部照它排 */
+  rank: number;
   group: IReseedGroup<ISearchResultTorrent>;
 }
 
-const rows = computed<IRow[]>(() =>
-  groups.map((group) => {
+/** 「在做种」那一格的图标与颜色：与搜索页那一列同一档，不另挑一个绿 */
+const seedingMeta = torrentStatusMeta(ETorrentStatus.seeding);
+
+const rows = computed<IRow[]>(() => {
+  const list = groups.map((group, rank) => {
     const seen: string[] = [];
     const all = new Set<string>();
     for (const item of group.items) {
@@ -61,18 +74,32 @@ const rows = computed<IRow[]>(() =>
       sizeText: String(formatSize(group.size)),
       rowCount: group.items.length,
       siteCount: group.siteCount,
+      seedingCount: group.seedingCount,
+      statusKnown: group.statusKnown,
       icons: seen,
       restSites: Math.max(0, group.siteCount - seen.length),
       // 一组里各条标题通常不同（各站自己写的），取第一条当这一档的"这是什么内容"
       title: String(group.items[0]?.title ?? ""),
+      isBest: rank === 0,
+      rank,
       group,
     };
-  }),
-);
+  });
+  /**
+   * 已经在做种的那一档排到最前（用户 2026-10-11 提的）：那份数据本来就在盘上，
+   * 挑这一档其余各站都是纯辅、不用重下一次。
+   * 两个分区**内部**仍按传进来的名次（站点数 → 条数 → 大小）排，所以「最多站点共有」
+   * 那颗标记跟着它自己那一行走（上面那条 `isBest`），不再看界面第几行 —— 否则重排之后
+   * 标记会留在错的那一行上，而说明条里写的就是「第一行即最佳」。
+   */
+  return [...list].sort((a, b) => Number(b.seedingCount > 0) - Number(a.seedingCount > 0) || a.rank - b.rank);
+});
 
 const columns = computed<TableColumnsType<IRow>>(() => [
   { title: t("SearchEntity.reseedGroups.colSize"), key: "size", width: 104, align: "end" },
   { title: t("SearchEntity.reseedGroups.colRows"), key: "rows", width: 76, align: "end" },
+  // 84 = 表头三字实测 39 + 内衬 16×2 + 余量（这一列要容得下「数字 + 一颗 14px 图标」）
+  { title: t("SearchEntity.reseedGroups.colSeeding"), key: "seeding", width: 84, align: "end" },
   { title: t("SearchEntity.reseedGroups.colSites"), key: "sites", width: 200 },
   // 标题列**故意不给 width**：它是吃剩余宽度那一列（见下面模板那条 table-layout 注释）。
   { title: t("SearchEntity.reseedGroups.colTitle"), key: "title" },
@@ -105,12 +132,28 @@ function rowOf(record: unknown): IRow {
       bordered
       table-layout="fixed"
     >
-      <template #bodyCell="{ column, record, index }">
+      <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'size'">
           <span class="size-text">{{ rowOf(record).sizeText }}</span>
         </template>
 
         <template v-else-if="column.key === 'rows'">{{ rowOf(record).rowCount }}</template>
+
+        <!-- 整组一条状态都报不出时留空（只有 37/340 个站点定义报得出这一列）：
+             画个 0 会把「没查到」说成「确认没有」，而这一格正是用来分派的。 -->
+        <template v-else-if="column.key === 'seeding'">
+          <a-tooltip v-if="rowOf(record).statusKnown" :title="t('SearchEntity.reseedGroups.seedingTip')">
+            <span class="d-flex justify-end">
+              <span>{{ rowOf(record).seedingCount }}</span>
+              <component
+                :is="seedingMeta.icon"
+                v-if="rowOf(record).seedingCount > 0"
+                class="cell-icon"
+                :style="{ color: seedingMeta.color }"
+              />
+            </span>
+          </a-tooltip>
+        </template>
 
         <template v-else-if="column.key === 'sites'">
           <span class="site-line">
@@ -122,8 +165,10 @@ function rowOf(record: unknown): IRow {
 
         <template v-else-if="column.key === 'title'">
           <span class="title-line">
-            <!-- 第一行就是旁边那颗 chip 给的那一档，标出来是为了让这两处对得上号 -->
-            <a-tag v-if="index === 0" color="green" class="best-tag">
+            <!-- 这一行就是旁边那颗 chip 给的那一档，标出来是为了让这两处对得上号。
+                 按身份判（`isBest`）而不是按界面第几行 —— 已经在做种的那一档现在排在最前，
+                 看 index 会把标记留在错的那一行上。 -->
+            <a-tag v-if="rowOf(record).isBest" color="green" class="best-tag">
               <span class="tag-inner"><BranchesOutlined />{{ t("SearchEntity.reseedGroups.best") }}</span>
             </a-tag>
             <!-- 截断必须挂在**那一列的 flex 子项自己**身上：text-overflow 只对块级/被块化的盒生效，

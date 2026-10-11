@@ -220,9 +220,9 @@ async function dialogEnter() {
         </span>
       </template>
       <template #action>
-        <a-space :size="4">
-          <CheckSwitchButton v-model="importStatus.toWork" :all="realCanAutoAddSiteId" />
-        </a-space>
+        <!-- 原先这里包了一层 a-space :size="4"，对多根组件不起作用（它只数得见一个孩子），
+             缝现在由 CheckSwitchButton 自己给，那层壳留着只会多套一层 -->
+        <CheckSwitchButton v-model="importStatus.toWork" :all="realCanAutoAddSiteId" />
       </template>
     </a-alert>
 

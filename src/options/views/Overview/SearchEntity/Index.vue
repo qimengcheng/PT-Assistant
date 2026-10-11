@@ -45,6 +45,7 @@ import SetSearchSolutionPage from "@/options/views/Settings/SetSearchSolution/In
 
 // 主要助手方法
 import { tableCustomFilter } from "./utils/filter";
+import { TORRENT_STATUS_META } from "./torrentStatusMeta.ts";
 import { countCompare, commentsHref, countText } from "@/shared/torrentCount.ts";
 import { bumpSearchGeneration, doSearch, retrySearch, searchPlanStatus, searchQueue } from "./utils/search";
 import { pageOfSortedRows, pickSortColumns, scrollRowIntoView } from "./utils/locate.ts";
@@ -239,8 +240,49 @@ function onDisplayPreferenceChange(key: string, checked: any) {
   configStore.$save();
 }
 
-const { tableFilterRef, tableWaitFilterRef, tableFilterFn, buildAdvanceItemPropsFn, buildFilterDictFn } =
-  tableCustomFilter;
+const {
+  advanceFilterDictRef,
+  advanceItemPropsRef,
+  tableFilterRef,
+  tableWaitFilterRef,
+  tableFilterFn,
+  buildAdvanceItemPropsFn,
+  buildFilterDictFn,
+  updateTableFilterValueFn,
+} = tableCustomFilter;
+
+/**
+ * 「做种状态」这一档从工具条那颗下拉走（原先在结果上方那条 chip 行里，用户 2026-10-11 要求挪到
+ * 上面那一行）。写的是**同一份**筛选字典（`advanceFilterDictRef.status`），不另起第二条过滤路径：
+ * 这一颗、那颗漏斗里的高级筛选对话框、下面那排站点 chip 看到的永远是同一个条件。
+ */
+const statusOptions = computed(() =>
+  TORRENT_STATUS_META.map((meta) => ({ value: meta.value as string, label: t(meta.labelKey) })),
+);
+
+/**
+ * 这批结果里**真的报得出**哪些做种状态。取的是 `advanceItemPropsRef.status` —— 那份由
+ * `utils/search.ts` 在搜索队列空闲时从**未过滤**的整份结果算出来，所以：
+ * ① 用它当「这颗下拉有没有意义」的判据不会被自己的筛选结果反过来影响（选了「做种中」之后
+ *    下拉不该只剩一档）；② 站点一条都不报这一列时整颗下拉不出 —— 一排只有「未知」可选的
+ *    筛选器等于把全部结果再筛一遍，是噪音。
+ */
+const knownStatuses = computed<string[]>(() => (advanceItemPropsRef.value.status as string[]) ?? []);
+const statusFilterShown = computed(() => knownStatuses.value.some((value) => value !== ETorrentStatus.unknown));
+
+/** 当前选中的档：直接读那份筛选字典，不另起第二份状态（高级筛选对话框改了我们这边跟着变） */
+const statusFilter = computed<string[]>(() => (advanceFilterDictRef.value.status?.required as string[]) ?? []);
+
+/**
+ * 只动 `required`，`exclude` 原样留着 —— 这一颗和高级筛选对话框写的是同一个字段，
+ * 清空下拉不该把人在对话框里勾的那几项「不要」一起抹掉。
+ */
+function onStatusFilterChange(value: unknown) {
+  const dict = advanceFilterDictRef.value.status;
+  if (!dict) return;
+  dict.required = Array.isArray(value) ? (value as string[]) : [];
+  updateTableFilterValueFn();
+}
 
 /**
  * v-data-table 的 :search + :custom-filter 在 a-table 里没有对应 prop，
@@ -843,6 +885,23 @@ const hasSearchStatus = computed<boolean>(() => {
         >
           <template #prefix><FilterOutlined /></template>
         </a-select>
+
+        <!-- 做种状态：这一档原先摆在结果上方那条 chip 行里（用户 2026-10-11 指着它说「做种状态的筛选
+             放到上面那行」）。宽度写在行内 style：a-select 的根元素拿不到本组件的 data-v-*，
+             scoped class 选不中它。站点一条都报不出这一列时整颗不出（判据见 statusFilterShown）。 -->
+        <a-select
+          v-if="statusFilterShown"
+          :value="statusFilter"
+          mode="multiple"
+          :max-tag-count="1"
+          :options="statusOptions"
+          :placeholder="t('SearchEntity.statusFilter.label')"
+          :popup-match-select-width="false"
+          allow-clear
+          class="ml-1"
+          :style="{ maxWidth: '220px', minWidth: '128px' }"
+          @change="onStatusFilterChange"
+        />
 
         <div class="flex-1-1-0" />
         <a-input

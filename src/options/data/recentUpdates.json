@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-11 14:20:41",
-  "headSha": "d80bb28",
+  "generatedAt": "2026-10-11 14:40:46",
+  "headSha": "f92bcc8",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.78.2",
+      "date": "2026-10-11 14:40:23",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「生成高级过滤词」弹窗里那排滑块：常驻的黑色数值气泡不再盖住上面那一行（日期气泡原先压住「已完成」那一格、大小气泡压住日期预设按钮），现在数值写在滑块正上方一行，两个边界一次看全；悬停或拖动把手时气泡照旧出现"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.78.1",
       "date": "2026-10-11 14:20:11",

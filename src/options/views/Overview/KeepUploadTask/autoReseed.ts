@@ -40,6 +40,16 @@ export const AUTO_RESEED_BASE_SEND_FAIL_MAX = 3;
  */
 export const AUTO_RESEED_BASE_RESEND_MS = 5 * 60 * 1000;
 
+/**
+ * 基准那条的「已下字节」多久没变一次，就算它下不动了、要告诉用户（他 2026-10-11：
+ * 「如果基准长时间卡在0%，要通知用户」）。
+ *
+ * 为什么 15 分钟而不是复用上面那个 5 分钟：刚发出去那几分钟 qBittorrent 还在排队、连 peer，
+ * 0 字节是常态；而它一旦真开始下，一分钟能走几十 MB。15 分钟 = 后台 15 轮，够把「慢」和
+ * 「压根没源」分开。
+ */
+export const AUTO_RESEED_BASE_STALL_MS = 15 * 60 * 1000;
+
 export interface IAutoReseedTickInput {
   /** 基准是下载器里已有的那一条（不在 items 里） */
   baseLocal: boolean;
@@ -57,6 +67,12 @@ export interface IAutoReseedTickInput {
   reachable: boolean;
   /** 基准那一条的结论。查不到就是 `verdict: "notFound"`；认不出是哪条 / 连不上时传 undefined */
   base?: IReseedItemStatus;
+  /**
+   * 基准那条**此刻**的已下字节（下载器报的 `totalDownloaded`）。
+   * 判「长时间没有进展」要用它，而不是界面那个整数百分比：1.8 GiB 的种子下到 0.5% 时那一格
+   * 仍写 0%，可它明明在动 —— 拿百分比判会把慢种报成卡死。没传（连不上 / 认不出那条）就不判。
+   */
+  baseBytes?: number;
   /** 除基准外每一条的结论，顺序与 `otherCount` 对齐；没记 infoHash 的那条是 undefined */
   others: readonly (IReseedItemStatus | undefined)[];
   /** 任务上存的那一份进度（第一次跑传 `{}`） */
@@ -90,6 +106,11 @@ export interface IAutoReseedTick {
    * 不记账的话从 50% 到 100% 那段会连着弹十几条。
    */
   notifyHalfway: boolean;
+  /**
+   * 这一轮该弹「基准长时间没有进展」那一条。判据（看字节、15 分钟、人为暂停不报、
+   * 重新动起来之后可以再报）全在下面那一节，记账写在 `state.notifiedBaseStall`。
+   */
+  notifyStall: boolean;
   /**
    * 这一轮是**第一次**走到「全部正常辅种」那一档。
    * 记在 `completedAt` 上（它本来就是「上一次走到 done 的时刻」，离开那一档就清掉），
@@ -131,6 +152,9 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
   // 那两条进展通知的记账（弹过就写时刻）。基准被放开重发时要一起清掉，见下面那一支。
   let notifiedBaseStarted = state.notifiedBaseStarted;
   let notifiedHalfway = state.notifiedHalfway;
+  let baseBytes = state.baseBytes;
+  let baseBytesAt = state.baseBytesAt;
+  let notifiedBaseStall = state.notifiedBaseStall;
   if (
     reachable &&
     baseSentAt !== undefined &&
@@ -143,6 +167,11 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     // 那两条「刚开始下 / 下到一半」的通知也跟着作废：重发成功之后那是又一次真的进展
     notifiedBaseStarted = undefined;
     notifiedHalfway = undefined;
+    // 「没有进展」那一档的计时器也一起作废：重发之后是一条全新的下载，
+    // 拿上一条的字节数继续比会把「新发的那条恰好也从 0 开始」读成「一直没动」
+    baseBytes = undefined;
+    baseBytesAt = undefined;
+    notifiedBaseStall = undefined;
   }
   const sendBase =
     reachable &&
@@ -189,6 +218,36 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     base.progress >= 50;
   if (notifyHalfway) notifiedHalfway = now;
 
+  /**
+   * —— 基准「长时间没有进展」——
+   *
+   * 认的是**已下字节有没有变**（`input.baseBytes`，下载器报的 `totalDownloaded`），不是界面那一格
+   * 的整数百分比：1.8 GiB 的种子下到 0.5% 时那一格还是 0%，可它明明在动。
+   *
+   * `base.downloading === true` 这一条把「人自己按了暂停」挡在外面：`pausedDL` 不在
+   * 「正在下」那一族里（v0.65.2 就是为这个把它排除的），停着的种子字节永远不变，报「下不动了」
+   * 是把他的操作说成故障。代价：某个客户端既不给原样状态、归一又不是 `downloading` 时不报 ——
+   * 那种情况下确实分不出「停着」和「没源」，宁可不报。
+   * （`baseBytes` / `baseBytesAt` / `notifiedBaseStall` 那三个变量在上面「重发作废」那一节已经声明，
+   *  那一节清空它们、这一节推进它们，顺序就是读→清→推。）
+   */
+  const baseIsDownloading = reachable && !baseLocal && base?.completed !== true && base?.downloading === true;
+  // 这一轮有没有拿到字节数。拿不到 = **没有任何**「它没在动」的证据，所以这一档整档不判：
+  // 认不出基准那条 hash、下载器列表里查不到它、驱动不给 totalDownloaded 都会走到这里，
+  // 而计时器还留着上一轮的值，不查这一条就会把「我这轮没看着」说成「它卡住了」。
+  const hasBaseBytes = typeof input.baseBytes === "number" && Number.isFinite(input.baseBytes);
+  if (baseIsDownloading && hasBaseBytes) {
+    if (baseBytes === undefined || input.baseBytes !== baseBytes) {
+      // 字节动了（含第一次看到它）= 重新计时；上一条「卡住」的记账同时作废，
+      // 于是「动一阵又停 15 分钟」那种反复还能再报一次
+      baseBytes = input.baseBytes;
+      baseBytesAt = now;
+      notifiedBaseStall = undefined;
+    }
+  }
+  const notifyStall = baseIsDownloading && hasBaseBytes && baseBytesAt !== undefined && notifiedBaseStall === undefined && now - baseBytesAt >= AUTO_RESEED_BASE_STALL_MS;
+  if (notifyStall) notifiedBaseStall = now;
+
   // 「完成时间」那一列读这一条：只在真的走到 `done` 那一档时留下时刻，离开就清掉。
   // 连不上下载器的那一轮不改它（阶段本身也没重算，见上）—— 不然一次断网就把已完成任务的完成时间抹了。
   const completedAt = reachable ? (stage === "done" ? (state.completedAt ?? now) : undefined) : state.completedAt;
@@ -201,6 +260,9 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     baseSendFails,
     notifiedBaseStarted,
     notifiedHalfway,
+    baseBytes,
+    baseBytesAt,
+    notifiedBaseStall,
     lastRunAt: now,
     completedAt,
     stage,
@@ -214,6 +276,7 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     pauseBase: reachable && pauseBase,
     notify,
     notifyHalfway,
+    notifyStall,
     firstDone,
     stage,
     next,

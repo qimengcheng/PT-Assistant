@@ -130,6 +130,19 @@ export interface IKeepUploadTaskAutoState {
   notifiedHalfway?: number;
   /** 「基准下完、辅种那几条已推给下载器」那条通知弹过的时刻：一条任务只弹一次 */
   notifiedBaseDone?: number;
+  /**
+   * 上一轮看到的「基准那条已下字节」（下载器报的 `totalDownloaded`）。
+   * 判「下不动」要看的是**字节有没有变**，不是界面那个整数百分比：1.8 GiB 的种子下到 0.5%
+   * 界面上还是写 0%，可它明明在动 —— 拿百分比判会把慢种报成卡死。
+   */
+  baseBytes?: number;
+  /** 最后一次看到 `baseBytes` 变了的时刻（第一次看到它也算）。「卡了多久」从这一条算 */
+  baseBytesAt?: number;
+  /**
+   * 「基准长时间没有进展」那条通知弹过的时刻。字节重新动了就清掉（见 `planAutoReseed`）——
+   * 那种「动一阵、又停 15 分钟」的反复是新的故障，不该被第一条挡住。
+   */
+  notifiedBaseStall?: number;
   /** 后台折出来的进度阶段。界面上那一列在没人手动回查时读它，否则后台都在暂停种子了、页面还写「没查过」 */
   stage?: TReseedStage;
 }

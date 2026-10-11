@@ -54,7 +54,7 @@ async function notifyUser(
   kind: TReseedNoticeKind,
   task: IKeepUploadTask,
   lang: string | undefined,
-  extra: Pick<IReseedNotice, "progress" | "etaSec" | "count"> = {},
+  extra: Pick<IReseedNotice, "progress" | "etaSec" | "count" | "stalledSec"> = {},
 ): Promise<void> {
   const notice: IReseedNotice = { kind, taskId: task.id, title: task.title, at: Date.now(), ...extra };
   try {
@@ -189,6 +189,13 @@ function worthWriting(task: IKeepUploadTask, next: IKeepUploadTask["autoState"])
     "notifiedBaseStarted",
     "notifiedHalfway",
     "notifiedBaseDone",
+    // 「基准有没有在动」那一档的三个键。漏在这里的话标记进不了存储：每一轮都读到 undefined、
+    // 每一轮都把计时器重新起算，15 分钟那条判据永远走不到 —— 通知一次都不会弹，而且看着像功能没做。
+    // 代价说清：基准在下时字节每分钟都在变，于是这一档会让「正在下的任务」每分钟多一次 IDB 写
+    // （只 patch `autoState` 那一块，不是整条任务）。
+    "baseBytes",
+    "baseBytesAt",
+    "notifiedBaseStall",
   ]) {
     if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return true;
   }
@@ -316,6 +323,9 @@ async function autoReseedTick() {
           othersPending: othersToSend.length,
           reachable,
           base,
+          // 判「基准长时间没有进展」要的是已下字节，那份只在下载器这一轮的原始条目上有（`base` 那个
+          // 结论对象里没有）；认不出基准是哪条时 `baseHash` 是空串 → undefined → 那一档整轮不判
+          baseBytes: index.get(baseHash)?.totalDownloaded,
           others,
           untracked,
           pathMismatch: !!baseMismatch,
@@ -335,6 +345,19 @@ async function autoReseedTick() {
           await notifyUser("baseHalfway", task, config?.lang, {
             progress: base?.progress,
             etaSec: entry ? estimateEtaSec(entry) : undefined,
+          });
+        }
+
+        /**
+         * ②「基准长时间没有进展」。判据（15 分钟、认字节不认整数百分比、人为暂停不报、
+         * 重新动起来之后可以再报）全在 `planAutoReseed`；这里只补它算不出的那半句 ——
+         * 「卡了多久」要从最后一次字节变化的时刻起算，而那份记账就在 `next` 里。
+         */
+        if (tick.notifyStall) {
+          const since = next.baseBytesAt ?? Date.now();
+          await notifyUser("baseStalled", task, config?.lang, {
+            progress: base?.progress,
+            stalledSec: Math.round((Date.now() - since) / 1000),
           });
         }
 

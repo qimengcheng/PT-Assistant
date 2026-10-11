@@ -87,6 +87,7 @@
     "defaultPath": "默认路径",
     "deleteConfirm": "确认删除该辅种任务吗？",
     "deleteError": "删除失败",
+    "deletePartially": "已删除 {removed} 条，另有 {failed} 条没删掉",
     "deleteSelectedConfirm": "确认删除选中的 {count} 个辅种任务吗？",
     "deleteSuccess": "删除成功",
     "editSavePath": "修改保存路径",
@@ -132,6 +133,9 @@
       }
     },
     "qBittorrentLegacyFails": "qBittorrent 拒绝添加，但旧版 Web API 未返回具体原因；请检查是否已有相同种子、保存路径或分类是否有效，并查看 qBittorrent 日志",
+    "removeDone": "移除已完成",
+    "removeDoneConfirm": "确认移除这 {count} 条「辅种完成」的任务吗？只是把它们从助手的列表里去掉，下载器里那些还在做种的种子不受影响；以后要再管它们得重新建任务。",
+    "removeDoneSuccess": "已移除 {count} 条已完成任务",
     "savePath": "保存路径：",
     "seeders": "上传：",
     "sendAllTorrents": "发送所有种子",

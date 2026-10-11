@@ -87,6 +87,7 @@
     "defaultPath": "Default Path",
     "deleteConfirm": "Confirm deleting this reseed task?",
     "deleteError": "Delete failed",
+    "deletePartially": "Deleted {removed} task(s), {failed} could not be deleted",
     "deleteSelectedConfirm": "Confirm deleting {count} selected reseed tasks?",
     "deleteSuccess": "Deleted successfully",
     "editSavePath": "Edit save path",
@@ -132,6 +133,9 @@
       }
     },
     "qBittorrentLegacyFails": "qBittorrent rejected the torrent, but its legacy Web API returned no details; check for a duplicate torrent, validate the save path or category, and review the qBittorrent logs",
+    "removeDone": "Remove Completed",
+    "removeDoneConfirm": "Remove these {count} 'All seeded' tasks? This only drops them from the assistant's list - torrents still seeding in your downloader are untouched. Managing them again means creating a new task.",
+    "removeDoneSuccess": "Removed {count} completed task(s)",
     "savePath": "Save Path: ",
     "seeders": "Seeders: ",
     "sendAllTorrents": "Send all torrents",

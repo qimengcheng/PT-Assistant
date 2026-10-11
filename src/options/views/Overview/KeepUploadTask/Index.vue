@@ -346,20 +346,60 @@ async function deleteTask(task: IKeepUploadTask) {
   }
 }
 
+/**
+ * 逐条删，一条失败不影响其余，返回真删掉的条数。
+ *
+ * 原先这两处批量删除是整段包一个 try/catch：第一条抛错就跳出循环，后面的本轮不再试，
+ * 而且紧跟其后的 `tasks.value` 过滤也一起被跳过 —— 界面上会留着**已经真删掉**的那几条
+ * （刷新一次它们才消失）。同 v0.66.0 后台那条发送链上修掉的是同一个形状。
+ */
+async function deleteTasksByIds(ids: TKeepUploadTaskKey[]): Promise<number> {
+  const removed: TKeepUploadTaskKey[] = [];
+  for (const id of ids) {
+    try {
+      await sendMessage("deleteKeepUploadTask", id);
+      removed.push(id);
+    } catch (e) {
+      console.error("Failed to delete keep upload task:", id, e);
+    }
+  }
+  tasks.value = tasks.value.filter((item) => !removed.includes(item.id));
+  return removed.length;
+}
+
+/** 删完那一句反馈：全删掉 / 一条都没删掉 / 只删掉一部分，三种话不一样，不许都报「删除成功」 */
+function reportRemoval(removed: number, attempted: number) {
+  if (removed === 0) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.deleteError"), { color: "error" });
+  } else if (removed < attempted) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.deletePartially", { removed, failed: attempted - removed }), { color: "warning" });
+  } else {
+    runtimeStore.showSnakebar(t("KeepUploadTask.deleteSuccess"), { color: "success" });
+  }
+}
+
 async function deleteSelectedTasks() {
   if (selectedTasks.value.length === 0) return;
   const msg = t("KeepUploadTask.deleteSelectedConfirm", { count: selectedTasks.value.length });
   if (!(await confirmDanger(msg, "danger", t("common.remove")))) return;
 
-  try {
-    for (const taskId of selectedTasks.value) {
-      await sendMessage("deleteKeepUploadTask", taskId);
-    }
-    tasks.value = tasks.value.filter((item) => !selectedTasks.value.includes(item.id));
-    selectedTasks.value = [];
-    runtimeStore.showSnakebar(t("KeepUploadTask.deleteSuccess"), { color: "success" });
-  } catch (e) {
-    runtimeStore.showSnakebar(t("KeepUploadTask.deleteError"), { color: "error" });
+  const ids = [...selectedTasks.value];
+  reportRemoval(await deleteTasksByIds(ids), ids.length);
+  selectedTasks.value = [];
+}
+
+/** 工具栏那颗「移除已完成」：吃的是 `doneTasks`，也就是那一列正写着「辅种完成」的那一批 */
+async function removeDoneTasks() {
+  const ids = doneTasks.value.map((task) => task.id);
+  if (ids.length === 0) return;
+  const msg = t("KeepUploadTask.removeDoneConfirm", { count: ids.length });
+  if (!(await confirmDanger(msg, "danger", t("common.remove")))) return;
+
+  const removed = await deleteTasksByIds(ids);
+  if (removed === ids.length) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.removeDoneSuccess", { count: removed }), { color: "success" });
+  } else {
+    reportRemoval(removed, ids.length);
   }
 }
 
@@ -820,6 +860,16 @@ function stageDetail(task: IKeepUploadTask): string {
   return untracked > 0 ? t("KeepUploadTask.recheck.stage.untracked", { count: untracked }) : "";
 }
 
+/**
+ * 界面上正写着「辅种完成」的那些任务 —— 工具栏那颗「移除已完成」删的就是这一批。
+ *
+ * 判据**故意复用** `taskStage`（也就是那一列画出来的那一档），不另算一套：
+ * 用户在表里看到什么，点这颗就移除什么。要是这里按 `autoState.completedAt` 或
+ * `verify` 全 seeding 自己判一遍，就会出现「那一列还写着辅种中，任务却没了」或反过来
+ * 「写着辅种完成，点了却说没有可移除的」—— 同一件事两套口径迟早对不上账。
+ */
+const doneTasks = computed(() => tasks.value.filter((task) => taskStage(task).stage === "done"));
+
 /** 徽标报出来的那一档结论是哪一种（排序按它折权重，不按显示文字） */
 type TReseedKind = "seeding" | "paused" | "pending" | "untracked" | "notFound" | "wrong";
 
@@ -980,6 +1030,13 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
             <DeleteOutlined />
           </template>
           <span class="ml-1">{{ t("common.remove") }}</span>
+        </a-button>
+
+        <a-button type="primary" danger :disabled="doneTasks.length === 0" @click="removeDoneTasks">
+          <template #icon>
+            <DeleteOutlined />
+          </template>
+          <span class="ml-1">{{ t("KeepUploadTask.removeDone") }}</span>
         </a-button>
 
         <a-button type="primary" danger :disabled="tasks.length === 0" @click="clearAllTasks">

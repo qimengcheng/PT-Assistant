@@ -30,7 +30,14 @@ import {
 import { judgeReseedTorrent, linkItemToTorrent } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
-import { estimateEtaSec, reseedNoticeText, type IReseedNotice, type TReseedNoticeKind } from "@/shared/reseedNotice.ts";
+import {
+  estimateEtaSec,
+  reseedNoticeGroupMessage,
+  reseedNoticeTitle,
+  type IReseedNoticeGroup,
+  type IReseedNoticeItem,
+  type TReseedNoticeKind,
+} from "@/shared/reseedNotice.ts";
 import { isPluginPageVisible, pushReseedNotice } from "@/shared/reseedPresence.ts";
 
 import { whenOffscreenReady } from "./offscreen.ts";
@@ -41,40 +48,52 @@ const TICK_MS = 60 * 1000;
 const jobs = defineJobScheduler();
 
 /**
- * 一条进展该弹给谁看：**人在插件页面里 → 界面的 snakebar；不在 → 浏览器系统通知**。
+ * 一轮内进展通知的收集器：任务循环里**只登记**，整轮跑完再一次性投递（`flush`）。
  *
- * 「在不在」由页面自己每 10 秒报一次可见时刻（`src/shared/reseedPresence.ts`）——
- * `chrome.runtime.getContexts()` 只能告「有没有一个活的 options 页面」，告不出它是不是前台；
+ * 为什么不当场就发：一轮会翻好几条任务，同一类事件于是可能连着发好几条 —— 他 2026-10-11 的截图
+ * 里就是四条「辅种完成」并排堆着。那四条说的是同一件事（这一轮有四条任务走完了），逐条弹等于把
+ * 「一轮」当成「N 轮」读。所以按 kind 合并成一条，具体是哪几条列在正文下面。
+ *
+ * 通道（**人在插件页面 → 界面右上角的 notification 卡片；不在 → 浏览器系统通知**）一轮判一次：
+ * 「在不在页面里」对同一轮的各组是同一个答案。判据本身在 `src/shared/reseedPresence.ts` ——
+ * `chrome.runtime.getContexts()` 只能告「有没有一个活的 options 页面」，告不出它是不是前台，
  * 而 manifest 里没有 `tabs` 权限，也不该为这件事加权限。
- *
- * 文案两边共用 `reseedNoticeText`（SW 里拿不到 useI18n，同 `notifyText` 那条取舍）。
- * 写存储失败（session 配额那种极端情况）就退到系统通知，不能因为选不了通道就不吭声。
+ * 文案两边共用 `reseedNotice*`（SW 里拿不到 useI18n，同 `notifyText` 那条取舍）。
+ * 写存储失败（session 配额那种极端情况）就整批退到系统通知，不能因为选不了通道就不吭声。
  */
-async function notifyUser(
-  kind: TReseedNoticeKind,
-  task: IKeepUploadTask,
-  lang: string | undefined,
-  extra: Pick<IReseedNotice, "progress" | "etaSec" | "count" | "stalledSec"> = {},
-): Promise<void> {
-  const notice: IReseedNotice = { kind, taskId: task.id, title: task.title, at: Date.now(), ...extra };
-  try {
-    if (await isPluginPageVisible()) {
-      await pushReseedNotice(notice);
-      return;
-    }
-  } catch (e) {
-    void sendMessage("logger", {
-      msg: `Auto-reseed: 进展通知改走系统通知栏 (${e instanceof Error ? e.message : e})`,
-    });
-  }
-  const { title, message } = reseedNoticeText(notice, lang);
-  // 同一个 kind + 任务用同一个 id：再 create 是替换，不会在通知栏堆一排
-  chrome.notifications?.create(`reseed-${kind}-${task.id}`, {
-    type: "basic",
-    iconUrl: chrome.runtime.getURL("icon/128.png"),
-    title,
-    message,
-  });
+function createReseedNotifier(lang: string | undefined) {
+  const byKind = new Map<TReseedNoticeKind, IReseedNoticeItem[]>();
+  return {
+    add(kind: TReseedNoticeKind, item: IReseedNoticeItem): void {
+      const list = byKind.get(kind);
+      if (list) list.push(item);
+      else byKind.set(kind, [item]);
+    },
+    async flush(): Promise<void> {
+      if (byKind.size === 0) return;
+      const groups: IReseedNoticeGroup[] = [...byKind].map(([kind, items]) => ({ kind, items }));
+      byKind.clear();
+      try {
+        if (await isPluginPageVisible()) {
+          await pushReseedNotice({ at: Date.now(), groups });
+          return;
+        }
+      } catch (e) {
+        void sendMessage("logger", {
+          msg: `Auto-reseed: 进展通知改走系统通知栏 (${e instanceof Error ? e.message : e})`,
+        });
+      }
+      for (const group of groups) {
+        // 同一个 kind 用同一个 id：下一轮再 create 是替换，不会在通知栏堆一排
+        chrome.notifications?.create(`reseed-${group.kind}`, {
+          type: "basic",
+          iconUrl: chrome.runtime.getURL("icon/128.png"),
+          title: reseedNoticeTitle(group.kind, lang),
+          message: reseedNoticeGroupMessage(group, lang),
+        });
+      }
+    },
+  };
 }
 
 /** 通知文案：SW 里拿不到 useI18n，按 config.lang 选一份（同 updateCheck.ts 的 notifyText） */
@@ -236,6 +255,8 @@ async function autoReseedTick() {
 
   const metadata = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema | undefined;
   const config = await extStore.getItem("config");
+  /** 这一轮的进展：任务循环里只登记，函数末尾一次性投递（合并 + 选通道都在那儿） */
+  const notices = createReseedNotifier(config?.lang);
 
   // 同一台下载器只拉一次列表，多个任务共用那份（qBittorrent 那边 15 秒才刷一次，多拉没意义）
   const byDownloader = new Map<string, IKeepUploadTask[]>();
@@ -342,7 +363,8 @@ async function autoReseedTick() {
          */
         if (tick.notifyHalfway) {
           const entry = index.get(baseHash);
-          await notifyUser("baseHalfway", task, config?.lang, {
+          notices.add("baseHalfway", {
+            title: task.title,
             progress: base?.progress,
             etaSec: entry ? estimateEtaSec(entry) : undefined,
           });
@@ -355,7 +377,8 @@ async function autoReseedTick() {
          */
         if (tick.notifyStall) {
           const since = next.baseBytesAt ?? Date.now();
-          await notifyUser("baseStalled", task, config?.lang, {
+          notices.add("baseStalled", {
+            title: task.title,
             progress: base?.progress,
             stalledSec: Math.round((Date.now() - since) / 1000),
           });
@@ -373,7 +396,7 @@ async function autoReseedTick() {
             // 判据会把标记清掉，于是重发成功会再报一次 —— 那是又一次真的进展，不是重复轰炸。
             if (next.notifiedBaseStarted === undefined) {
               next.notifiedBaseStarted = Date.now();
-              await notifyUser("baseStarted", task, config?.lang);
+              notices.add("baseStarted", { title: task.title });
             }
           } catch (e) {
             next.baseSendFails = (next.baseSendFails ?? 0) + 1;
@@ -417,7 +440,7 @@ async function autoReseedTick() {
             // 用户读到的是同一件事。N 说的是这一轮真的发出去几条，不是这批一共几条。
             if (next.notifiedBaseDone === undefined) {
               next.notifiedBaseDone = Date.now();
-              await notifyUser("baseDone", task, config?.lang, { count: sentKeys.length });
+              notices.add("baseDone", { title: task.title, count: sentKeys.length });
             }
           }
           acted = true;
@@ -491,7 +514,7 @@ async function autoReseedTick() {
          * 后来某条坏了又修好的话会再报一次 —— 那是用户想知道的第二件事。
          */
         if (tick.firstDone) {
-          await notifyUser("allSeeded", task, config?.lang);
+          notices.add("allSeeded", { title: task.title });
         }
 
         if (acted || worthWriting(task, next)) {
@@ -506,6 +529,13 @@ async function autoReseedTick() {
       }
     }
   }
+
+  /**
+   * 一轮的进展在这一行一次性投递（按 kind 合并 + 选通道，都在 `createReseedNotifier` 里）。
+   * 为什么放末尾而不是各事件当场：登记之后每一处都在按任务的 try/catch 里，抛出去也只到
+   * 「那一条任务不吭声」这一层，其余任务和这一行的 flush 都照常走到。
+   */
+  await notices.flush();
 }
 
 /**

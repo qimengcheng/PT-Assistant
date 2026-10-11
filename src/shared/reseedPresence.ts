@@ -11,7 +11,7 @@
  */
 import { storage } from "wxt/utils/storage";
 
-import type { IReseedNotice } from "./reseedNotice.ts";
+import type { IReseedNoticeBatch } from "./reseedNotice.ts";
 
 /** 界面每 10 秒报一次「我还可见」 */
 export const PRESENCE_PING_MS = 10_000;
@@ -24,7 +24,7 @@ export const PRESENCE_PING_MS = 10_000;
 export const PRESENCE_FRESH_MS = 25_000;
 
 const visibleAtItem = storage.defineItem<number>("session:optionsVisibleAt", { fallback: 0 });
-const noticeItem = storage.defineItem<IReseedNotice | null>("session:reseedNotice", { fallback: null });
+const noticeItem = storage.defineItem<IReseedNoticeBatch | null>("session:reseedNotice", { fallback: null });
 
 /** 后台判：这一趟通知该走界面还是走浏览器通知 */
 export async function isPluginPageVisible(): Promise<boolean> {
@@ -32,16 +32,17 @@ export async function isPluginPageVisible(): Promise<boolean> {
   return typeof at === "number" && at > 0 && Date.now() - at < PRESENCE_FRESH_MS;
 }
 
-/** 后台写：把一条进展交给界面去弹 */
-export async function pushReseedNotice(notice: IReseedNotice): Promise<void> {
-  await noticeItem.setValue(notice);
+/** 后台写：把这一轮的进展（一类一组）交给界面去弹 */
+export async function pushReseedNotice(batch: IReseedNoticeBatch): Promise<void> {
+  await noticeItem.setValue(batch);
 }
 
 /**
- * 界面订阅：只在**变化**时回调，所以页面开着时不会把上次那条重弹一遍。
+ * 界面订阅：只在**变化**时回调，所以页面开着时不会把上次那一批重弹一遍。
+ * 一次回调就是后台的一整轮 —— 合并成一条的工作在后台做完，这里不再逐条收。
  * 返回取消订阅的函数（组件卸载时调）。
  */
-export function watchReseedNotice(cb: (notice: IReseedNotice) => void): () => void {
+export function watchReseedNotice(cb: (batch: IReseedNoticeBatch) => void): () => void {
   return noticeItem.watch((value) => {
     if (value) cb(value);
   });

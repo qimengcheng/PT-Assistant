@@ -23,7 +23,7 @@ import {
 } from "@antdv-next/icons";
 
 import { sendMessage } from "@/messages.ts";
-import { reseedNoticeColor, reseedNoticeLine } from "@/shared/reseedNotice.ts";
+import { showReseedNoticeCard } from "@/options/reseedNoticeCard.ts";
 import { startPresenceHeartbeat, watchReseedNotice } from "@/shared/reseedPresence.ts";
 import { antdLocaleMap } from "@/options/plugins/antd.ts";
 import { i18nInstance } from "@/options/plugins/i18n.ts";
@@ -58,17 +58,15 @@ onMounted(async () => {
 });
 
 /**
- * 两件配套的事（判据与文案都在 src/shared/reseedNotice.ts / reseedPresence.ts）：
+ * 两件配套的事（文案判据在 src/shared/reseedNotice.ts，卡片怎么摆在 src/options/reseedNoticeCard.ts）：
  * ① 每 10 秒替后台回答一次「用户此刻在不在插件页面」—— 后台那条自动辅种的进展通知据此选通道；
- * ② 接后台写来的那条进展，在界面里弹一条 snakebar。
+ * ② 接后台一轮写来的那批进展，一类弹一张右上角卡片。一轮里几条任务撞上同一类，后台已经合成一条
+ * （正文说「N 个任务」，明细列在下面），这里只管一组一张地摆出去。
  * 人不在页面里时后台改弹系统通知，这一趟什么都收不到（不是丢了，是走另一条路）。
  */
 const stopPresence = startPresenceHeartbeat();
-const stopReseedNoticeWatch = watchReseedNotice((notice) => {
-  runtimeStore.showSnakebar(reseedNoticeLine(notice, configStore.lang), {
-    color: reseedNoticeColor(notice.kind),
-    timeout: 6,
-  });
+const stopReseedNoticeWatch = watchReseedNotice((batch) => {
+  for (const group of batch.groups) showReseedNoticeCard(group, configStore.lang);
 });
 onUnmounted(() => {
   stopPresence();

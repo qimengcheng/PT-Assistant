@@ -5,7 +5,7 @@
  *
  * formatter：
  * - 传函数：tooltip 与上面那行读数都用它格式化（日期 / 体积）
- * - 传 null：明确不要 formatter（数字区间，读数就是原值）
+ * - 传 null：数字区间，读数与悬停气泡都给原值（它**不等于**「不要气泡」，那层坑见下面 tooltip 那段）
  * - 不传：不挂 formatter 键，tooltip 走 a-slider 默认格式化，读数走原值
  *
  * **读数为什么由这一层自己画**：原先这里挂的是 `tooltip: { open: true }`（照搬 Vuetify 的
@@ -41,7 +41,16 @@ function showOne(value: number | undefined): string {
 
 const readout = computed(() => `${showOne(range.value?.[0])} – ${showOne(range.value?.[1])}`);
 
-const tooltip = computed(() => (props.formatter === undefined ? {} : { formatter: props.formatter }));
+/**
+ * `formatter: null` 在 a-slider 那一层**不是**「用默认格式化」，而是「这颗气泡整个不画」：
+ * `dist/slider/index.js` 里 `open = (lockOpen || activeOpen) && mergedTipFormatter !== null` ——
+ * 传 null 会把悬停 / 拖动时的气泡一起关掉。那三把数字滑块（上传 / 下载 / 完成人数）在
+ * v0.78.2 之前连悬停都读不出数值，就是被这一条关掉的（读数行是 v0.78.2 补的，管静止状态）。
+ * 所以这里把 null 翻成「原值就行」，与上面那行读数的口径一致。
+ */
+const rawValue = (value?: number) => (typeof value === "number" ? String(value) : "");
+
+const tooltip = computed(() => (props.formatter === undefined ? {} : { formatter: props.formatter ?? rawValue }));
 </script>
 
 <template>

@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-11 15:17:11",
-  "headSha": "1df7250",
+  "generatedAt": "2026-10-11 15:32:42",
+  "headSha": "8ff769c",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.79.1",
+      "date": "2026-10-11 15:32:28",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「生成高级过滤词」里那三把数字滑块（上传人数 / 下载人数 / 完成人数）：把指针移到把手上时也能看到具体数值了，此前只有「发布于」和「大小」两把有悬停数值"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.79.0",
       "date": "2026-10-11 15:16:29",

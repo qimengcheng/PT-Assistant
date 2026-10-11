@@ -417,6 +417,25 @@
       "unreadOf": "未读 {n} 条",
       "totalOf": "读到 {n} 条"
     },
+    "levelProgress": {
+      "title": "升级进度",
+      "sortNearest": "离升级要求最近",
+      "sortSiteName": "按站点名称",
+      "summary": "共 {total} 个站点，其中 {rankable} 个仍可升级",
+      "empty": "没有站点提供等级要求",
+      "maxed": "已是最高等级",
+      "special": "贵宾或管理组，不参与逐级升级",
+      "noLevel": "未取到当前等级，请先刷新该站点的用户信息",
+      "noRequirements": "该站点未提供等级要求",
+      "levelUnknown": "等级未知",
+      "position": "第 {index} / {total} 级",
+      "nextLevel": "下一级：{name}",
+      "alreadyMet": "下一级要求已全部达成，等待站点升级",
+      "unmetCount": "未达标 {n} 项",
+      "bottleneck": "瓶颈项完成度 {pct}%",
+      "expandLadder": "等级表",
+      "collapseLadder": "收起等级表"
+    },
     "HistoryDataView": {
       "action": {
         "viewRaw": "查看原始数据"
@@ -467,6 +486,7 @@
         "alive": "相对时间",
         "aliveWeek": "相对周数"
       },
+      "levelProgress": "升级进度",
       "multiOpen": "批量打开",
       "noSiteSelectedCancelRefresh": "未选择任何站点，取消刷新",
       "noSiteSelectedRefreshAll": "未选择任何站点，默认刷新全部站点",

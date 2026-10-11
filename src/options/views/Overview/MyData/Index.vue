@@ -23,6 +23,7 @@ import {
   StopOutlined,
   SyncOutlined,
   ThunderboltOutlined,
+  TrophyOutlined,
   UnorderedListOutlined,
 } from "@antdv-next/icons";
 import { EResultParseStatus, type ISiteUserConfig, type IUserInfo, type TSiteID } from "@ptd/site";
@@ -44,6 +45,7 @@ import SiteMessagesDialog from "./SiteMessagesDialog.vue";
 import AllSiteMessagesDialog from "./AllSiteMessagesDialog.vue";
 import BonusFormatSpan from "./BonusFormatSpan.vue";
 import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
+import LevelProgressDialog from "./LevelProgressDialog.vue";
 
 import { bonusFullText, formatRatio } from "./utils/format.ts";
 import { tableData, isTableLoading, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
@@ -442,6 +444,7 @@ function bonusRevealLines(record: { bonus?: number | string; seedingBonus?: numb
 }
 
 const showExportDialog = ref(false);
+const showLevelProgressDialog = ref(false);
 </script>
 
 <template>
@@ -461,6 +464,9 @@ const showExportDialog = ref(false);
 
         <a-button @click="viewTimeline"><template #icon><LineChartOutlined /></template><span>{{ t('MyData.index.viewTimeline') }}</span></a-button>
         <a-button @click="viewStatistic"><template #icon><BarChartOutlined /></template><span>{{ t('MyData.index.viewStatistic') }}</span></a-button>
+
+        <!-- 各站等级叫法不一，表格那一列没法横向比；阶梯单独收进弹窗，按「离下一级还差多远」排 -->
+        <a-button @click="showLevelProgressDialog = true"><template #icon><TrophyOutlined /></template><span>{{ t('MyData.index.levelProgress') }}</span></a-button>
 
         <a-divider type="vertical" class="mx-2" />
 
@@ -975,6 +981,7 @@ const showExportDialog = ref(false);
     :reported-unread="messageDialogUnread"
   />
   <ExportUserInfoDialog v-model="showExportDialog" :selected-site-ids="tableSelected" />
+  <LevelProgressDialog v-model="showLevelProgressDialog" />
 </template>
 
 <style scoped lang="scss">

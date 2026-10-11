@@ -417,6 +417,25 @@
       "unreadOf": "{n} unread",
       "totalOf": "{n} loaded"
     },
+    "levelProgress": {
+      "title": "Upgrade Progress",
+      "sortNearest": "Nearest to next level",
+      "sortSiteName": "By site name",
+      "summary": "{total} sites in total, {rankable} still upgradable",
+      "empty": "No site provides level requirements",
+      "maxed": "Already at the top level",
+      "special": "VIP or staff - not part of the level ladder",
+      "noLevel": "Current level not available - refresh this site's user data first",
+      "noRequirements": "This site does not define level requirements",
+      "levelUnknown": "Level unknown",
+      "position": "Level {index} of {total}",
+      "nextLevel": "Next: {name}",
+      "alreadyMet": "All requirements for the next level are met, waiting for the site to promote the account",
+      "unmetCount": "{n} requirement(s) not met",
+      "bottleneck": "Bottleneck at {pct}% complete",
+      "expandLadder": "Levels",
+      "collapseLadder": "Hide levels"
+    },
     "HistoryDataView": {
       "action": {
         "viewRaw": "View Raw Data"
@@ -467,6 +486,7 @@
         "alive": "Relative Time",
         "aliveWeek": "Relative Weeks"
       },
+      "levelProgress": "Upgrade Progress",
       "multiOpen": "Open in batch",
       "noSiteSelectedCancelRefresh": "No site selected, refresh cancelled",
       "noSiteSelectedRefreshAll": "No site selected, refreshing all sites by default",

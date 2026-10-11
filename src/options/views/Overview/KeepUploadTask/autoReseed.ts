@@ -65,6 +65,12 @@ export interface IAutoReseedTickInput {
   now: number;
   /** 没记下 infoHash、连查都没法查的条数 */
   untracked?: number;
+  /**
+   * 基准那份数据实际所在与任务挑的目录不是同一个（判据在 `src/shared/reseedPath.ts`）。
+   * 为真时**不发辅种那几条**：跳过校验等于告诉下载器「盘上就有」，而它按任务目录去找是找不到的，
+   * 推几条废几条，废的那几条还留在下载器里要人手动清。
+   */
+  pathMismatch?: boolean;
 }
 
 export interface IAutoReseedTick {
@@ -94,6 +100,7 @@ export interface IAutoReseedTick {
  * 3. 基准在列表里但没下完 → 等。
  * 4. 基准下完了（含「一开始就已下完」和 `baseLocal` 那种本来就在的）→ 把**还没成功发出去**的那几条
  *    发出去，跳过校验。哪些算发过了看 `othersPending`（调用方按逐条记录算，见 `othersStillPending`）。
+ *    这一档还有一道闸：`pathMismatch` 为真（基准那份实际不在任务目录里）就不发，等用户挑完处置。
  * 5. 之后每轮盯做种状态：判成 wrong 的就暂停，条数比上次通知过的多就再弹一次通知。
  */
 export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
@@ -131,7 +138,7 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
   // `baseLocal` 那种任务走的是同一条：基准是下载器里已有的那条，查它下完没下完，
   // 下完了才把 items 里那几条挂上去（不然挂的是不完整的数据）。
   const baseReady = reachable && base?.completed === true;
-  const sendOthers = reachable && baseReady && othersPending > 0;
+  const sendOthers = reachable && baseReady && othersPending > 0 && !input.pathMismatch;
 
   // 连不上下载器时不许把阶段改写成 idle —— 那会把上一轮查到的真进度抹掉，界面上看着像没查过
   const stage: TReseedStage = reachable

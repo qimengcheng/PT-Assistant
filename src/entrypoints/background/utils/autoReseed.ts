@@ -29,6 +29,7 @@ import {
 } from "@/options/views/Overview/KeepUploadTask/autoReseed.ts";
 import { judgeReseedTorrent, linkItemToTorrent } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
+import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
 
 import { whenOffscreenReady } from "./offscreen.ts";
 
@@ -44,6 +45,30 @@ function notifyText(lang: string | undefined, title: string, count: number): { t
     : {
         title: "Reseed not seeding",
         message: `"${title}": ${count} torrent(s) were not seeding and have been paused. Open Reseed tasks to see which.`,
+      };
+}
+
+/**
+ * 「基准那份不在任务目录里」那条通知的文案。
+ *
+ * 这里**不**走 i18n：service worker 里没有 useI18n，而那两条路径是用户自己的数据，
+ * 本来就不在语言包里（见 `src/options/i18nOutside.ts` 同一件事的取舍）。
+ */
+function pathMismatchText(
+  lang: string | undefined,
+  title: string,
+  mismatch: { basePath: string; taskPath: string },
+): { title: string; message: string } {
+  return lang === "zh_CN"
+    ? {
+        title: "辅种没有发送",
+        message: `「${title}」的基准数据在 ${mismatch.basePath}，而任务目录是 ${mismatch.taskPath}，两者不是同一个地方。进「辅种任务」选一种处置`,
+      }
+    : {
+        title: "Reseed paused",
+        message:
+          `"${title}": the base files are in ${mismatch.basePath} but the task folder is ${mismatch.taskPath}. ` +
+          "Open Reseed tasks to pick a fix.",
       };
 }
 
@@ -111,7 +136,16 @@ function resolveBaseHash(task: IKeepUploadTask, torrents: readonly CTorrent[] | 
 function worthWriting(task: IKeepUploadTask, next: IKeepUploadTask["autoState"]): boolean {
   const a = (task.autoState ?? {}) as Record<string, unknown>;
   const b = (next ?? {}) as Record<string, unknown>;
-  for (const k of ["baseSentAt", "baseSendFails", "othersSentAt", "othersSent", "completedAt", "stage", "notifiedWrong"]) {
+  for (const k of [
+    "baseSentAt",
+    "baseSendFails",
+    "othersSentAt",
+    "othersSent",
+    "completedAt",
+    "stage",
+    "notifiedWrong",
+    "notifiedPathMismatch",
+  ]) {
     if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return true;
   }
   return false;
@@ -216,6 +250,22 @@ async function autoReseedTick() {
         /** 其中还没成功发出去的那几条（逐条记，不再拿「整批发过一次」当闸） */
         const othersToSend = othersStillPending(task.autoState ?? {}, allOthers);
 
+        /**
+         * 基准那份数据**此刻**到底在不在任务目录里。
+         *
+         * 认的是下载器刚报的那条的路径，不是建任务时记下的快照 —— 人自己搬过文件、或刚点过
+         * 「把本地文件移到任务目录」，那份快照都还是旧的，拿它判就会在已经好了的任务上挂一条
+         * 永远不消失的警告。连不上下载器时退回快照：那种情况下 `reachable` 已经先把发送挡住了，
+         * 不会因为快照旧而误发什么。
+         */
+        const liveBase = task.baseLocal ? index.get(String(task.baseLocal.hash).toLowerCase()) : undefined;
+        const baseMismatch = task.baseLocal
+          ? detectBasePathMismatch({
+              basePath: liveBase?.savePath ?? task.baseLocal.savePath,
+              taskPath: task.downloadOptions.savePath,
+            })
+          : null;
+
         const tick = planAutoReseed({
           baseLocal: !!task.baseLocal,
           otherCount: allOthers.length,
@@ -224,6 +274,7 @@ async function autoReseedTick() {
           base,
           others,
           untracked,
+          pathMismatch: !!baseMismatch,
           state: task.autoState ?? {},
           now: Date.now(),
         });
@@ -278,6 +329,34 @@ async function autoReseedTick() {
             });
           }
           acted = true;
+        }
+
+        /**
+         * 卡在「目录不一致」上不会自己解开 —— 要人挑一种处置（改任务目录 / 把数据搬过去）。
+         * 所以弹一次系统通知就够：一条任务只弹一次，等它真的解开了再把标记清掉。
+         * 只在「基准已下完、确实有东西要发」时弹，不然刚建好的任务会被一条还没发生的卡住打扰。
+         */
+        if (
+          baseMismatch &&
+          othersToSend.length > 0 &&
+          base?.completed === true &&
+          !task.autoState?.notifiedPathMismatch
+        ) {
+          const { title, message } = pathMismatchText(config?.lang, task.title, baseMismatch);
+          chrome.notifications?.create(`auto-reseed-path-${task.id}`, {
+            type: "basic",
+            iconUrl: chrome.runtime.getURL("icon/128.png"),
+            title,
+            message,
+          });
+          next.notifiedPathMismatch = Date.now();
+          void sendMessage("logger", {
+            msg:
+              `Auto-reseed: [${task.title}] 的辅种暂停发送 —— 基准那份在 ${baseMismatch.basePath}，` +
+              `任务目录是 ${baseMismatch.taskPath}`,
+          });
+        } else if (!baseMismatch && next.notifiedPathMismatch) {
+          next.notifiedPathMismatch = undefined;
         }
 
         // 要暂停的那几条：基准 + 其余里判成 wrong 的那些。id 用下载器列表里那一条的 id

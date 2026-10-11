@@ -485,6 +485,17 @@ export abstract class AbstractBittorrentClient<T extends DownloaderBaseConfig = 
   }
 
   /**
+   * 把某条种子**已经在盘上的数据**搬到另一个目录，默认不支持，由各客户端 override。
+   *
+   * 辅种要它：基准取自下载器时那份数据已经在某处，而任务挑的目录可能是另一处
+   * （判据见 `src/shared/reseedPath.ts`）。返回 false 表示这台客户端搬不了，
+   * 界面据此让用户改任务目录，而不是替他默默搬。
+   */
+  public async setTorrentLocation(_id: any, _location: string): Promise<boolean> {
+    return false;
+  }
+
+  /**
    * ─────────────────────────────────────────────
    * 文件级 / peers / tracker 管理（追加扩展，默认不支持）
    * 各客户端按能力矩阵 override，feature 枚举（FileList/FilePriority/PeerList/TrackerList/TrackerManage）同步声明

@@ -70,6 +70,14 @@ export interface IKeepUploadTaskLocalBase {
   hash: string;
   name: string;
   savePath?: string;
+  /**
+   * 用户挑的处置是「把本地这份搬到任务目录」，而不是改任务目录。
+   *
+   * 这只是一位**意图记录**：发送那道闸看的不是它，而是基准此刻实际在不在任务目录里
+   * （判据在 `src/shared/reseedPath.ts`）。搬几十万行的数据要几分钟，靠一个布尔值当"已完成"
+   * 会把种子推到还没落地的目录上。界面上它用来把提示从「请选一种处置」换成「正在搬，搬完自动继续」。
+   */
+  moveToTaskPath?: boolean;
 }
 
 /**
@@ -107,6 +115,11 @@ export interface IKeepUploadTaskAutoState {
   completedAt?: number;
   /** 上一次弹通知时「没辅种成功」的条数：条数没再变多就不重复轰炸 */
   notifiedWrong?: number;
+  /**
+   * 上一次因为「基准那份不在任务目录里」而弹通知的时刻。一条任务只弹一次 ——
+   * 这一种卡住不会自己解开（要人挑处置），每分钟弹一次只是把通知栏刷满。
+   */
+  notifiedPathMismatch?: number;
   /** 后台折出来的进度阶段。界面上那一列在没人手动回查时读它，否则后台都在暂停种子了、页面还写「没查过」 */
   stage?: TReseedStage;
 }

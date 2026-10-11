@@ -797,6 +797,23 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
     return true;
   }
 
+  /**
+   * 把种子已有的数据搬到别的目录（qBittorrent WebUI 里那颗 "Set Location"）。
+   *
+   * 两条实测自上游源码（`src/webui/api/torrentscontroller.cpp` 的 `setLocationAction` +
+   * `src/base/bittorrent/torrentimpl.cpp` 的 `setSavePath`）的副作用要说清，界面按这个措辞：
+   * - 它会**关掉这条种子的自动 Torrent 管理**（autoTMM），此后它的位置不再由分类决定；
+   * - 目录不存在时它会先建；而**只有已下完的那条才真的挪文件**，还在下的只改往后的落点。
+   *   辅种的基准本来就必须是已下完的那一条（后台第 4 档认的是 isCompleted），所以这条正好成立。
+   */
+  override async setTorrentLocation(id: any, location: string): Promise<boolean> {
+    await this.request("/torrents/setLocation", {
+      method: "post",
+      data: { hashes: normalizePieces(id), location },
+    });
+    return true;
+  }
+
   // ─────────────────────────────────────────────
   // 文件级 / peers / tracker 管理（qBittorrent WebAPI v2）
   // ─────────────────────────────────────────────

@@ -165,7 +165,22 @@
     "updateSuccess": "更新成功",
     "downloaderNotFound": "下载器不存在",
     "baseLocal": "基准种子（下载器里）：",
-    "sendReseedOne": "发送这一条去辅种"
+    "sendReseedOne": "发送这一条去辅种",
+    "pathMismatch": {
+      "title": "辅种目录和基准数据所在目录不是同一个",
+      "detail": "目录不一致时下载器在任务目录里找不到那份数据，发出去的每一条都会失败。",
+      "taskPath": "这一批要挂到：{path}",
+      "basePath": "本地那份在：{path}",
+      "short": "目录不一致",
+      "tip": "这一批要挂到 {taskPath}，而基准那份数据在 {basePath}。",
+      "useBase": "改用本地那份的目录",
+      "moveBase": "把本地文件移到任务目录",
+      "moving": "正在把本地那份移到任务目录，搬完会自动继续发送。",
+      "unsupported": "这台下载器不支持移动已经在盘上的数据，请手动移动，或改用本地那份的目录",
+      "moveSent": "已让下载器移动那份数据，搬完之前不会发送",
+      "moveFailed": "移动失败：{reason}",
+      "sendBlocked": "辅种目录和基准所在目录不是同一个，发送必然失败；请先在那一行选一种处置"
+    }
   },
   "Logger": {
     "action": {

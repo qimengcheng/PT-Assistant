@@ -34,6 +34,7 @@ import {
 import { formatSize } from "@/options/utils.ts";
 import { countText, toCount } from "@/shared/torrentCount.ts";
 import { pickBaseRecommendations, type TReseedRecommendKind } from "@/shared/reseedRecommend.ts";
+import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
 import type { TCategoryKind } from "@/shared/category.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
@@ -270,6 +271,73 @@ const localBaseHint = computed(() => {
     c.tier === "titleSize" ? "SearchEntity.KeepUploadDialog.localBase.byTitleSize" : "SearchEntity.KeepUploadDialog.localBase.bySize",
   );
 });
+
+/**
+ * 基准那份数据实际躺在哪，和底部那一栏挑的辅种目录是不是同一个地方。
+ *
+ * 为什么要在建任务这一屏就问：基准取自下载器时数据已经在盘上，发出去的每一条都带
+ * `skip_checking`（等于告诉下载器「不用查，盘上就有」）。数据在 A、任务目录是 B，
+ * 下载器按 B 去找当然找不到 —— 用户 2026-10-11 那条「本地已有，直接推了其他种子，结果失败了」
+ * 就是这个形状，而失败发生在下载器那边，界面上只看得到一条没原因的失败。
+ * 判得出/判不出的三条边界写在 `src/shared/reseedPath.ts`。
+ */
+const basePathMismatch = computed(() =>
+  useLocalBase.value
+    ? detectBasePathMismatch({ basePath: chosenLocalBase.value?.entry.savePath, taskPath: savePath.value })
+    : null,
+);
+
+/** 已经点过「把本地文件移过去」；搬没搬完不看它，看基准此刻的实际路径（下面那条提示会自己消失） */
+const baseMoveRequested = ref(false);
+const baseMoving = ref(false);
+
+// 换基准、改目录都可能让上一次那个「搬过去」不再对应现在的目标 —— 标记退回未请求，重新问一遍
+watch([localBaseHash, savePath], () => {
+  baseMoveRequested.value = false;
+});
+
+/** 处置一：辅种改用本地那份所在的目录（不动盘上的东西，只改任务挑的目录） */
+function useLocalBasePath() {
+  const mismatch = basePathMismatch.value;
+  if (!mismatch) return;
+  savePath.value = mismatch.basePath;
+}
+
+/**
+ * 处置二：让下载器把本地那份搬到任务目录。
+ *
+ * 这里只**发起**搬运，不当它已经搬完：几十万行的数据在 NAS 上要跑几分钟，而发送那道闸
+ * 看的是基准的实际路径（`baseLocal.savePath`，回查时按下载器报的刷新），搬完才放行。
+ * 所以点完之后的提示是「正在搬」而不是把警告撤掉 —— 撤掉等于谎报。
+ */
+async function moveLocalBaseToTaskPath() {
+  const mismatch = basePathMismatch.value;
+  const hash = chosenLocalBase.value?.entry.hash;
+  if (!mismatch || !hash || baseMoving.value) return;
+
+  baseMoving.value = true;
+  try {
+    const moved = await sendMessage("setClientTorrentLocation", {
+      downloaderId: selectedDownloaderId.value,
+      id: hash,
+      location: savePath.value,
+    });
+    if (moved === false) {
+      // false 只表示这台客户端没有移动数据的能力（各驱动的默认实现），不是搬输了
+      runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.unsupported"), { color: "warning" });
+      return;
+    }
+    baseMoveRequested.value = true;
+    runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveSent"), { color: "success" });
+  } catch (e) {
+    runtimeStore.showSnakebar(
+      t("KeepUploadTask.pathMismatch.moveFailed", { reason: e instanceof Error ? e.message : String(e) }),
+      { color: "error" },
+    );
+  } finally {
+    baseMoving.value = false;
+  }
+}
 
 // 是否可以创建任务
 const canCreateTask = computed(() => {
@@ -946,6 +1014,9 @@ async function createKeepUploadTask() {
             hash: chosenLocalBase.value.entry.hash,
             name: chosenLocalBase.value.entry.name,
             savePath: chosenLocalBase.value.entry.savePath,
+            // 用户挑的是「把本地那份搬过来」时带上这一项：任务页据此把提示写成「正在搬」而不是
+            // 「请选一种处置」。它不是发送闸门 —— 那道闸看基准的实际路径，见 `shared/reseedPath.ts`
+            moveToTaskPath: baseMoveRequested.value || undefined,
           }
         : undefined,
       items: verifiedList.map((item) => ({
@@ -1046,6 +1117,41 @@ async function createKeepUploadTask() {
       />
       <div class="text-body-small text-grey mt-1">{{ localBaseHint }}</div>
     </div>
+
+    <!-- 基准在 A、这一批要挂到 B：下载器在 B 里找不到数据，发出去必然失败，所以在这里就问一句，
+         而不是等下载器那边报一条没原因的失败。两条路径都写出来，是因为它们分别显示在两个地方
+         （基准那一栏的下拉里、底部那一栏的输入框里），不并排就看不出「不一样」在哪。 -->
+    <a-alert
+      v-if="basePathMismatch"
+      class="path-mismatch mb-2"
+      type="warning"
+      show-icon
+      :message="t('KeepUploadTask.pathMismatch.title')"
+    >
+      <template #description>
+        <div class="path-mismatch-lines">
+          <div>
+            {{ t("KeepUploadTask.pathMismatch.taskPath", { path: savePath }) }}
+          </div>
+          <div>
+            {{ t("KeepUploadTask.pathMismatch.basePath", { path: basePathMismatch.basePath }) }}
+          </div>
+          <div>
+            {{ baseMoveRequested ? t("KeepUploadTask.pathMismatch.moving") : t("KeepUploadTask.pathMismatch.detail") }}
+          </div>
+        </div>
+      </template>
+      <template v-if="!baseMoveRequested" #action>
+        <a-space>
+          <a-button size="small" :disabled="baseMoving" @click="useLocalBasePath">
+            {{ t("KeepUploadTask.pathMismatch.useBase") }}
+          </a-button>
+          <a-button size="small" :loading="baseMoving" @click="moveLocalBaseToTaskPath">
+            {{ t("KeepUploadTask.pathMismatch.moveBase") }}
+          </a-button>
+        </a-space>
+      </template>
+    </a-alert>
 
     <!-- 两组推荐基准（他 2026-10-10：「要给出2组推荐的种子作为基准，一组是做种人数最多的，
          一组是免费的里面做种人数最多的」）。放在表格正上方而不是并到「基准种子」那一栏里：
@@ -1300,6 +1406,14 @@ async function createKeepUploadTask() {
    让长站名出省略号比把它整栏撑宽、把标题列挤没更可读）。 */
 .site-cell {
   min-width: 0;
+}
+
+/* 那两条路径可能很长（NAS 上七八十字符很常见），不给 break 会把整个弹窗撑出横向滚动条。 */
+.path-mismatch-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
 }
 
 /* 推荐那一排：标签 + 两颗按钮。整排可换行 —— 按钮里带站名，窄窗口下压谁都是把话说一半。

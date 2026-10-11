@@ -287,6 +287,18 @@ onMessage("setClientTorrentLabel", async ({ data: { downloaderId, id, label } })
   return labelStatus;
 });
 
+// 返回 false 只表示**这台客户端没有这个能力**（各驱动的默认实现）；
+// 请求本身失败（没连上、被拒）走的是抛错，调用方分得清这两种，提示的措辞也不一样。
+onMessage("setClientTorrentLocation", async ({ data: { downloaderId, id, location } }) => {
+  let moveStatus: boolean = false;
+  const downloaderInstance = await getDownloaderInstance(downloaderId);
+  if (downloaderInstance) {
+    moveStatus = await downloaderInstance.setTorrentLocation(id, location);
+  }
+
+  return moveStatus;
+});
+
 function buildDownloadHistory(downloadOption: IDownloadTorrentOption): ITorrentDownloadMetadata {
   const { torrent = {}, downloaderId = "local" } = downloadOption;
   return {

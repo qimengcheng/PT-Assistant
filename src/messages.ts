@@ -181,6 +181,8 @@ export interface ProtocolMap {
   moveClientTorrentInQueue(data: { downloaderId: string; id: any; direction: TorrentQueueDirection }): boolean;
   setClientTorrentSpeedLimit(data: { downloaderId: string; id: any; limits: TorrentSpeedLimit }): boolean;
   setClientTorrentLabel(data: { downloaderId: string; id: any; label: string }): boolean;
+  /** 把种子已在盘上的数据搬到别的目录（只有部分客户端支持，判据见 `src/shared/reseedPath.ts`） */
+  setClientTorrentLocation(data: { downloaderId: string; id: any; location: string }): boolean;
 
   // ===== 2.2.3 offscreen：文件级 / peers / tracker 管理 =====
   getClientTorrentFiles(data: { downloaderId: string; torrent: CTorrent }): CTorrentFile[];

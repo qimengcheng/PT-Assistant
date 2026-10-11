@@ -6,6 +6,7 @@ import {
   CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  ExclamationCircleOutlined,
   LinkOutlined,
   NumberOutlined,
   QuestionCircleOutlined,
@@ -25,6 +26,7 @@ import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vu
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
+import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
 import {
   judgeReseedTorrent,
   linkItemToTorrent,
@@ -220,6 +222,76 @@ function baseLocalLine(record: IKeepUploadTask) {
   return `${t("KeepUploadTask.baseLocal")}${record.baseLocal?.name ?? ""}`;
 }
 
+/**
+ * 这一条任务的「基准那份数据在哪」和「这一批要挂到哪」对不对得上。
+ * 判不出的三种情况（任务目录为空 / 带占位符 / 基准没记路径）一律不提示，见 `shared/reseedPath.ts`。
+ *
+ * 读的是任务上记的那份 `baseLocal.savePath`，它会在每次「回查」时被下载器报的实路径刷新
+ * （见 `recheckSeeding` 里那一段）—— 所以手动搬过文件的人点一次回查，这条提示就会自己消失。
+ */
+function basePathMismatchOf(task: IKeepUploadTask) {
+  return task.baseLocal
+    ? detectBasePathMismatch({ basePath: task.baseLocal.savePath, taskPath: task.downloadOptions?.savePath })
+    : null;
+}
+
+/** 正在往任务目录搬的那几条任务（只影响提示措辞，不是发送闸门） */
+const movingBase = ref<Record<string, boolean>>({});
+
+/** 那一格只放得下一句「目录不一致」，两条完整路径写在悬停说明里 */
+function pathMismatchTip(task: IKeepUploadTask): string {
+  const mismatch = basePathMismatchOf(task);
+  if (!mismatch) return "";
+  return t("KeepUploadTask.pathMismatch.tip", { taskPath: mismatch.taskPath, basePath: mismatch.basePath });
+}
+
+/** 处置一：把任务的保存路径改成基准那份实际所在的目录（不碰盘上的东西） */
+async function useLocalBasePath(task: IKeepUploadTask) {
+  const mismatch = basePathMismatchOf(task);
+  if (!mismatch) return;
+
+  task.downloadOptions.savePath = mismatch.basePath;
+  delete task.baseLocal?.moveToTaskPath;
+  try {
+    await sendMessage("updateKeepUploadTask", task);
+    runtimeStore.showSnakebar(t("KeepUploadTask.updateSuccess"), { color: "success" });
+  } catch (e) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.updateError"), { color: "error" });
+  }
+}
+
+/** 处置二：让下载器把基准那份数据搬到任务目录；搬完之前发送那道闸不会放行 */
+async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
+  const mismatch = basePathMismatchOf(task);
+  const hash = task.baseLocal?.hash;
+  if (!mismatch || !hash || movingBase.value[task.id]) return;
+
+  movingBase.value[task.id] = true;
+  try {
+    const moved = await sendMessage("setClientTorrentLocation", {
+      downloaderId: task.downloadOptions.downloaderId,
+      id: hash,
+      // 取 mismatch 里那一份：它和 downloadOptions.savePath 同值，但类型上是确定的字符串
+      location: mismatch.taskPath,
+    });
+    if (moved === false) {
+      // false 只表示这台客户端没有移动数据的能力（各驱动的默认实现），不是搬输了
+      runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.unsupported"), { color: "warning" });
+      return;
+    }
+    task.baseLocal!.moveToTaskPath = true;
+    await sendMessage("updateKeepUploadTask", task).catch(() => {});
+    runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveSent"), { color: "success" });
+  } catch (e) {
+    runtimeStore.showSnakebar(
+      t("KeepUploadTask.pathMismatch.moveFailed", { reason: e instanceof Error ? e.message : String(e) }),
+      { color: "error" },
+    );
+  } finally {
+    movingBase.value[task.id] = false;
+  }
+}
+
 /** 页面开着时跟着后台那一分钟的节奏取一次任务，见 `refreshTasksFromStorage` */
 const AUTO_REFRESH_MS = 60_000;
 let autoRefreshTimer: number | undefined;
@@ -315,6 +387,13 @@ async function sendTorrentsToDownloader(
   const downloader = metadataStore.downloaders[task.downloadOptions.downloaderId];
   if (!downloader) {
     runtimeStore.showSnakebar(t("KeepUploadTask.downloaderNotFound"), { color: "error" });
+    return false;
+  }
+
+  // 基准在 A、这一批要挂到 B 时不必再推一遍：跳过校验的辅种在 B 里找不到数据，
+  // 推多少条就废多少条（用户 2026-10-11 那条失败就是这个原因）。怎么处置写在同一行的提示里。
+  if (basePathMismatchOf(task)) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.sendBlocked"), { color: "error" });
     return false;
   }
 
@@ -531,6 +610,21 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
             linked++;
           } else {
             unlinked++;
+          }
+        }
+
+        /**
+         * 顺手把「基准那份在哪」按下载器报的实路径刷新一次。
+         * 不刷的话，用户自己搬完文件、或上一次点的那颗「把本地文件移过去」已经落地，界面上那条
+         * 「目录不一致」的警告还会挂着 —— 拿一个建任务时的快照去判现在的事实，就是误报。
+         */
+        if (task.baseLocal) {
+          const baseHash = String(task.baseLocal.hash).toLowerCase();
+          const livePath = torrents.find((x) => String(x.infoHash).toLowerCase() === baseHash)?.savePath;
+          if (livePath && livePath !== task.baseLocal.savePath) {
+            task.baseLocal.savePath = livePath;
+            if (!basePathMismatchOf(task)) delete task.baseLocal.moveToTaskPath;
+            dirty.add(task);
           }
         }
       }
@@ -992,6 +1086,33 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                 {{ baseLocalLine(record.task) }}
               </a-typography-text>
             </div>
+            <!-- 目录不一致就是这一行失败的来源，所以警告和两颗处置就近放在这一格里，不另开弹窗：
+                 要改的就是这一格写着的那两条路径。基准的实际路径原先整页都看不到
+                 （上面那行只写基准的名字），所以那句说明里把两条都点出来。 -->
+            <div v-if="basePathMismatchOf(record.task)" class="path-mismatch">
+              <a-tooltip :title="pathMismatchTip(record.task)">
+                <span class="path-mismatch-text">
+                  <ExclamationCircleOutlined class="cell-icon" />
+                  {{ t("KeepUploadTask.pathMismatch.short") }}
+                </span>
+              </a-tooltip>
+              <div v-if="record.task.baseLocal?.moveToTaskPath" class="path-mismatch-hint">
+                {{ t("KeepUploadTask.pathMismatch.moving") }}
+              </div>
+              <div v-else class="path-mismatch-actions">
+                <a-button type="link" size="small" @click="useLocalBasePath(record.task)">
+                  {{ t("KeepUploadTask.pathMismatch.useBase") }}
+                </a-button>
+                <a-button
+                  type="link"
+                  size="small"
+                  :loading="!!movingBase[record.task.id]"
+                  @click="moveLocalBaseToTaskPath(record.task)"
+                >
+                  {{ t("KeepUploadTask.pathMismatch.moveBase") }}
+                </a-button>
+              </div>
+            </div>
           </div>
         </template>
 
@@ -1213,6 +1334,30 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 .task-line {
   font-size: 12px;
   color: #6b7280;
+}
+
+/* 「目录不一致」那一格：这一行本来就是失败的来源，所以宁可把行撑高也要把两条路和两颗处置摆全。
+   按钮是 link 档（表格行内没有实心键的位置），两颗各占一行 —— 220px 的列宽并排放不下中文标签，
+   挤在一行会把标签截断成看不懂的半截。 */
+.path-mismatch {
+  margin-top: 4px;
+}
+
+.path-mismatch-text {
+  color: #d46b08;
+  font-size: 12px;
+}
+
+.path-mismatch-hint {
+  font-size: 12px;
+  color: #6b7280;
+  overflow-wrap: anywhere;
+}
+
+.path-mismatch-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 /* 标题浮层里的全文：换行铺开 + 宽度上限，同 TorrentTitleTd.vue 那一条（不设上限就是半屏一条长串）。

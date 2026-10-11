@@ -12,6 +12,9 @@
  *    挑免费的能省下这一份流量（22 GiB 这种量级才看得见差别）。
  */
 import { toCount } from "./torrentCount.ts";
+// 「免费」判据住 torrentFree.ts：那边同时服务辅种推荐与「下载这一批之后分享率」的预估，
+// 两处取向必须一致（同一个站不能在一处算免费、在另一处算收费）。
+import { isFreeTorrent } from "./torrentFree.ts";
 
 /** 候选条目只需要这三样：判据不碰指纹、不碰下载器 */
 export interface IReseedBaseCandidate {
@@ -78,27 +81,6 @@ export interface IReseedRecommendation {
   kind: TReseedRecommendKind;
   id: string;
   seeders: number;
-}
-
-/**
- * 归一化之后的免费类标签名（`packages/site/utils/tags.ts` 的 preDefinedTorrentTagMap）。
- * 刻意不含 `NL.`（中性 = 0 上传 0 下载）：它的"免费"是双向归零，跟用户挑基准时想的
- * 「下载这一份不花钱」不是一回事，宁可少认不误认。也不含 2x50% / 25% / 50% 这些打折档。
- */
-const FREE_TAG_NAMES = new Set(["Free", "2xFree", "Freeload"]);
-
-/**
- * 站点原始标签没被归一化时剩下的写法（标签文本直接来自页面，见 NexusPHP 的 customTags 解析）。
- * 逐条写死而不是 `/free/i` 一把抓：`notFree` 这类含 free 的词会被顺手认成免费。
- */
-const FREE_TAG_PATTERNS: RegExp[] = [/^free$/i, /^2x?free$/i, /freeleech/i, /freeload/i, /免费/];
-
-/** 这一条是不是免费下载（促销标签里带免费性质的都算） */
-export function isFreeTorrent(tags?: { name: string }[] | null): boolean {
-  if (!tags?.length) return false;
-  return tags.some(
-    (tag) => FREE_TAG_NAMES.has(tag.name) || FREE_TAG_PATTERNS.some((re) => re.test(tag.name)),
-  );
 }
 
 /** 只有拿得出非负有限数字的条目才参与推荐（与表格那一列同一判据） */

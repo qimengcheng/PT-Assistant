@@ -1,9 +1,13 @@
 /**
- * 发送到下载器之前的分享率分档。纯函数，Node 可直接 import 跑断言
+ * 发送下载器之前的分享率分档。纯函数，Node 可直接 import 跑断言
  * （`.tmp-build/ratio-guard-test.mjs`）。
  *
- * **为什么下载前要看分享率**：下载会把下载量再抬一截，分享率已经低于 1 的站继续下载就是往
- * 保号线上压；1~2 之间是「还能下，但心里要有数」。
+ * **判的不是「现在多少」，是「把这一批下完之后会变成多少」**（用户 2026-10-11）：
+ * 下载会给该站记上一整份下载量，`新分享率 = 上传量 ÷（已下载量 + 这一批的体积）`。
+ * 一条 60 GiB 的电影能把 1.8 直接压到 0.4，只看现状就漏掉了这一档 —— 那正是他要拦的东西。
+ *
+ * **免费的条目不增加下载量**，所以不压低预估；判据与辅种推荐共用一份（`torrentFree.ts`）。
+ * 同一站在一批里多条时体积**相加**（那才是真要记上去的量），站点仍然只报一行。
  *
  * **辅种不在这一条里**：那是纯上传，反而在救分享率。所以辅种任务的重发、后台自动辅种
  * 两条路都不该套这个判据，套了会把「该做的补救」也拦下来。
@@ -12,6 +16,8 @@
  * packages/site 的 `fixRatio` 拿不到数时回 `-1`，上下行都是 0 时回 `-Infinity`，
  * 而有上传没下载时回 `+Infinity` —— 最后那个是最好的情况，不是缺失。
  */
+import { isFreeTorrent } from "./torrentFree.ts";
+
 export type TRatioTier = "danger" | "warn" | "ok" | "unknown";
 
 /** 低于它 → 发送前要人确认 */
@@ -20,24 +26,90 @@ export const RATIO_DANGER_CEIL = 1;
 export const RATIO_WARN_CEIL = 2;
 
 /**
- * 归一 + 分档。字符串形态（站点偶尔报 "1.5"）按 parseFloat 认，认不出就算缺失。
- * 负数一律当哨兵：协议上没有「倒欠的分享率」，-1 与 -Infinity 都是报不出。
+ * 归一站点报的分享率：`-1` / `-Infinity` / 负数 / `NaN` / 认不出的串都算「未取到」，
+ * `+Infinity`（有上传没下载）原样留着 —— 它是达标里最好的那一档，不是缺失。
+ */
+function normalizeRatio(ratio: unknown): number | null {
+  const value = typeof ratio === "string" ? parseFloat(ratio) : ratio;
+  if (typeof value !== "number" || Number.isNaN(value)) return null;
+  if (value === Infinity) return Infinity;
+  if (value === -Infinity || value < 0) return null;
+  return value;
+}
+
+/**
+ * 分档。吃的是已归一的数，也吃站点原样报的字符串（`"1.5"`）。
+ *
+ * 拿不出上下行、只能按**现状**判的那几行也走这一条：因为非免费下载只会把分母变大，
+ * 现状低于 1 的站下完之后必然还是低于 1 —— 按现状判这一档既不多拦也不漏拦。
  */
 export function ratioTier(ratio: unknown): TRatioTier {
-  const value = typeof ratio === "string" ? parseFloat(ratio) : ratio;
-  if (typeof value !== "number" || Number.isNaN(value)) return "unknown";
+  const value = normalizeRatio(ratio);
+  if (value === null) return "unknown";
   if (value === Infinity) return "ok";
-  if (value === -Infinity || value < 0) return "unknown";
   if (value < RATIO_DANGER_CEIL) return "danger";
   if (value < RATIO_WARN_CEIL) return "warn";
   return "ok";
+}
+
+/** 字节数那种字段：字符串按 parseFloat 认，负数与 Infinity 都算拿不出 */
+function toNonNegativeBytes(value: unknown): number | null {
+  const parsed = typeof value === "string" ? parseFloat(value) : value;
+  if (typeof parsed !== "number" || !Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+/** 这一档的数是从哪来的 */
+export type TRatioBasis =
+  /** 按「整条下完」预估过的 */
+  | "projected"
+  /** 只拿得出现在的分享率（缺上传量/下载量，或这批里有条目报不出体积） */
+  | "current";
+
+export interface IProjectedRatio {
+  value: number;
+  basis: TRatioBasis;
+}
+
+export interface IProjectRatioInput {
+  uploaded?: unknown;
+  downloaded?: unknown;
+  ratio?: unknown;
+  /** 这一批在该站要新记上的下载量（字节），免费的条目不计 */
+  countedSize?: number;
+  /** 这批里有没有报不出体积的非免费条目；false 时不敢当真算完了 */
+  sizeKnown?: boolean;
+}
+
+/**
+ * 下完这一批之后的分享率。拿不出上下行、或体积没算全时退回现状那一档，
+ * 由 `basis` 告诉界面「这个数不是预估出来的」—— 不替数据源编一个看着像预估的数。
+ */
+export function projectRatio(input: IProjectRatioInput): IProjectedRatio | null {
+  const uploaded = toNonNegativeBytes(input.uploaded);
+  const downloaded = toNonNegativeBytes(input.downloaded);
+  const counted = Math.max(0, toNonNegativeBytes(input.countedSize) ?? 0);
+
+  if (uploaded !== null && downloaded !== null && input.sizeKnown !== false) {
+    const divisor = downloaded + counted;
+    // 0 ÷ 0：什么都没发生过，判不出（与 fixRatio 给 -Infinity 的口径一致）
+    if (divisor === 0) return uploaded > 0 ? { value: Infinity, basis: "projected" } : null;
+    return { value: uploaded / divisor, basis: "projected" };
+  }
+
+  const now = normalizeRatio(input.ratio);
+  return now === null ? null : { value: now, basis: "current" };
 }
 
 export interface IRatioRow {
   site: string;
   /** 面向用户的站点名（内部 id 不进界面，见 AGENTS.md §3.5） */
   name: string;
-  ratio: unknown;
+  /** 判这一档用的那个数；null = 判不出 */
+  ratio: number | null;
+  basis: TRatioBasis | null;
+  /** 这一批在该站要新记上的下载量（字节） */
+  countedSize: number;
 }
 
 export interface IRatioRisk {
@@ -46,21 +118,64 @@ export interface IRatioRisk {
   unknown: IRatioRow[];
 }
 
-/**
- * 按站点去重后分档。一批 18 条结果可能全来自同一个站，报 18 行同样的话没有意义；
- * 同一站的多条取第一条的分享率（一个站的用户信息本来就只有一份）。
- *
- * 去重按 `site` 而不是按 `name`：不同站可以有同名显示（例如两条别名相同的定义），
- * 而分享率是按站点分别存的。
- */
-export function summarizeRatioRisk(rows: IRatioRow[]): IRatioRisk {
-  const seen = new Set<string>();
-  const risk: IRatioRisk = { danger: [], warn: [], unknown: [] };
+/** 参与预估只需要这三样 */
+export interface ISizeBearingTorrent {
+  site?: string;
+  size?: number;
+  tags?: { name: string }[] | null;
+}
 
-  for (const row of rows) {
-    if (!row.site || seen.has(row.site)) continue;
-    seen.add(row.site);
-    const tier = ratioTier(row.ratio);
+/** 该站的账户数（来自上次取到的用户信息那份缓存） */
+export interface ISiteAccount {
+  uploaded?: unknown;
+  downloaded?: unknown;
+  ratio?: unknown;
+}
+
+/**
+ * 一批种子 + 每站的账户 → 三档。
+ *
+ * 按站合并：一批 18 条结果可能全来自同一个站，报 18 行同样的话没有意义，
+ * 而那一站的下载量恰恰是这 18 条**加在一起**。
+ *
+ * 这一层只出 `nameFor` 给得出的名字；名字没命中的那些行由调用方补
+ * （见 {@link fillRatioRowNames}），判据本身不碰异步。
+ */
+export function assessRatioBatch(
+  torrents: ISizeBearingTorrent[],
+  deps: { accountFor: (site: string) => ISiteAccount | undefined; nameFor: (site: string) => string },
+): IRatioRisk {
+  const perSite = new Map<string, { counted: number; sizeKnown: boolean }>();
+
+  for (const torrent of torrents) {
+    const site = torrent.site;
+    if (!site) continue;
+    let acc = perSite.get(site);
+    if (!acc) {
+      acc = { counted: 0, sizeKnown: true };
+      perSite.set(site, acc);
+    }
+    if (isFreeTorrent(torrent.tags)) continue;
+    const size = toNonNegativeBytes(torrent.size);
+    if (size === null) acc.sizeKnown = false;
+    else acc.counted += size;
+  }
+
+  const risk: IRatioRisk = { danger: [], warn: [], unknown: [] };
+  for (const [site, acc] of perSite) {
+    const projected = projectRatio({
+      ...deps.accountFor(site),
+      countedSize: acc.counted,
+      sizeKnown: acc.sizeKnown,
+    });
+    const row: IRatioRow = {
+      site,
+      name: deps.nameFor(site),
+      ratio: projected?.value ?? null,
+      basis: projected?.basis ?? null,
+      countedSize: acc.counted,
+    };
+    const tier = projected ? ratioTier(projected.value) : "unknown";
     if (tier !== "ok") risk[tier].push(row);
   }
 
@@ -68,15 +183,30 @@ export function summarizeRatioRisk(rows: IRatioRow[]): IRatioRisk {
 }
 
 /**
+ * 给真要画进界面的那两档补站点名（未取到那一档只报个数，不必补）。
+ *
+ * `siteNameMap` 只覆盖已添加的站，且是选项页启动时建的那份缓存 —— 没命中就退回
+ * 异步取站点定义里的名字。直接 `?? site` 会把内部 id 画进界面，那是 AGENTS.md §3.5
+ * 的零容忍项（`KeepUploadDialog.vue:1332` 那条注释判的是同一件事）。
+ */
+export async function fillRatioRowNames(
+  risk: IRatioRisk,
+  getName: (site: string) => Promise<string>,
+): Promise<void> {
+  for (const row of [...risk.danger, ...risk.warn]) {
+    if (!row.name) row.name = await getName(row.site);
+  }
+}
+
+/**
  * 分享率的展示形态：`0.85` / `∞` / `-`。
  *
  * 与「我的数据」那一列的 `realFormatRatio` 同一口径（∞ 与 - 两档必须两边一致，
- * 否则同一个站在两处说法不同）。差别只在它吃的是已归一的 number，这里吃 unknown 并
- * 复用 {@link ratioTier} 的哨兵判据 —— 判不出时写 `-`，不替数据源编一个 0.00。
+ * 否则同一个站在两处说法不同）。判不出写 `-`，不替数据源编一个 0.00。
  */
 export function formatRatioText(ratio: unknown): string {
-  const value = typeof ratio === "string" ? parseFloat(ratio) : ratio;
-  if (value === Infinity) return "∞";
-  if (ratioTier(ratio) === "unknown") return "-";
-  return (value as number).toFixed(2);
+  const normalized = normalizeRatio(ratio);
+  if (normalized === Infinity) return "∞";
+  if (normalized === null) return "-";
+  return normalized.toFixed(2);
 }

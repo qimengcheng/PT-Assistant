@@ -1745,13 +1745,14 @@
     "name": "Name",
     "project": "PT Depiler",
     "ratioGuard": {
-      "confirmTitle": "Share ratio below 1 on these sites",
-      "confirmBody": "Downloading adds more download data on these sites. Send anyway?",
+      "confirmTitle": "Sites whose ratio will drop below 1 after this batch",
+      "confirmBody": "Computed as if every item downloads in full (free downloads add no download data). Send anyway?",
       "confirmOk": "Send anyway",
-      "warnTitle": "Share ratio below 2 on these sites",
-      "warnBody": "This download pushes their ratio further down.",
+      "warnTitle": "Sites whose ratio will drop below 2 after this batch",
+      "warnBody": "Computed as if every item downloads in full (free downloads add no download data).",
       "unknownNote": "No ratio is available for {n} other site(s). Refresh user data in My Data to check them.",
-      "unknownOnlyTitle": "No share ratio available for some sites"
+      "unknownOnlyTitle": "No share ratio available for some sites",
+      "currentBasis": " (now)"
     },
     "remove": "Delete",
     "save": "Save",

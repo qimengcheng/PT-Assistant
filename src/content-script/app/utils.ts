@@ -26,7 +26,13 @@ import {
 import { i18nInstance } from "@/options/plugins/i18n.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
-import { summarizeRatioRisk, type IRatioRisk, type IRatioRow } from "@/shared/ratioGuard.ts";
+import { formatSize } from "@/options/utils.ts";
+import {
+  assessRatioBatch,
+  fillRatioRowNames,
+  type IRatioRisk,
+  type ISizeBearingTorrent,
+} from "@/shared/ratioGuard.ts";
 import { makeRatioGuardUi } from "@/shared/ratioGuardUi.ts";
 
 import SocialSitePage from "./pages/SocialSitePage.vue";
@@ -162,10 +168,11 @@ const ratioGuardUi = makeRatioGuardUi({
   modal: contentModal,
   notify: { warning: (config) => notification.warning(config) },
   t: (key, named) => i18nInstance.global.t(key, named ?? {}),
+  formatSize,
 });
 
 /**
- * 一批种子 → 三档站点（同站多条只报一次）。
+ * 一批种子 → 三档「下完这批之后的分享率」（同站多条并成一行，免费的条目不记下载量）。
  *
  * 站点名的兜底链：`siteNameMap` 是选项页启动时建的，用户只在不打开设置页的情况下用站点页
  * 下载时它可能是空的 —— 那时先退回当前站点定义里的 name（content 这一路上这批种子都属于
@@ -175,24 +182,13 @@ const ratioGuardUi = makeRatioGuardUi({
  *
  * 补名字只发生在**真要画出来**的那两档（未取到那一档只报个数），所以不会为一整批发 N 次异步取数。
  */
-export async function collectRatioRisk(torrents: Array<{ site?: string }>): Promise<IRatioRisk> {
+export async function collectRatioRisk(torrents: ISizeBearingTorrent[]): Promise<IRatioRisk> {
   const metadataStore = useMetadataStore();
-  const rows: IRatioRow[] = [];
-
-  for (const torrent of torrents) {
-    const site = torrent.site;
-    if (!site) continue;
-    rows.push({
-      site,
-      name: metadataStore.siteNameMap[site] ?? siteInstance.value?.metadata?.name ?? "",
-      ratio: metadataStore.lastUserInfo[site]?.ratio,
-    });
-  }
-
-  const risk = summarizeRatioRisk(rows);
-  for (const row of [...risk.danger, ...risk.warn]) {
-    if (!row.name) row.name = await metadataStore.getSiteName(row.site);
-  }
+  const risk = assessRatioBatch(torrents, {
+    accountFor: (site) => metadataStore.lastUserInfo[site],
+    nameFor: (site) => metadataStore.siteNameMap[site] ?? siteInstance.value?.metadata?.name ?? "",
+  });
+  await fillRatioRowNames(risk, (site) => metadataStore.getSiteName(site));
   return risk;
 }
 

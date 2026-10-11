@@ -1745,13 +1745,14 @@
     "name": "名称",
     "project": "PT 助手 Plus",
     "ratioGuard": {
-      "confirmTitle": "以下站点的分享率低于 1",
-      "confirmBody": "下载还会继续增加这些站点的下载量，确认仍要发送？",
+      "confirmTitle": "下完这批后分享率将低于 1 的站点",
+      "confirmBody": "按整条下完计算（免费下载不增加下载量）。确认仍要发送？",
       "confirmOk": "仍要发送",
-      "warnTitle": "以下站点的分享率低于 2",
-      "warnBody": "本次下载会进一步压低这些站点的分享率。",
+      "warnTitle": "下完这批后分享率将低于 2 的站点",
+      "warnBody": "按整条下完计算（免费下载不增加下载量）。",
       "unknownNote": "另有 {n} 个站点未取到分享率，可在「我的数据」中刷新用户信息后确认。",
-      "unknownOnlyTitle": "部分站点未取到分享率"
+      "unknownOnlyTitle": "部分站点未取到分享率",
+      "currentBasis": "（现状）"
     },
     "remove": "删除",
     "save": "保存",

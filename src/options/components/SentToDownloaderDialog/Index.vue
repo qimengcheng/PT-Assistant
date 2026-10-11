@@ -24,6 +24,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
+import { useRatioGuard } from "@/options/components/useRatioGuard.ts";
 import type { IDownloaderMetadata } from "@/shared/types.ts";
 
 import {
@@ -52,6 +53,7 @@ const runtimeStore = useRuntimeStore();
 const metadataStore = useMetadataStore();
 // 依赖 <a-app> 祖先：选项页在 entrypoints/options/App.vue 里包，content 在 content-script/app/App.vue 里包
 const { promptInDialog } = usePromptInDialog();
+const { guard: ratioGuard, assessRatioRisk } = useRatioGuard();
 
 const isSending = ref(false);
 const quickSendToClient = ref<boolean>(false);
@@ -380,6 +382,13 @@ async function sendToDownloader() {
     return;
   }
 
+  /**
+   * 分享率低于 1 的站要先确认再发（下载会把分享率压得更低），1~2 的那批发完给一条汇总提示。
+   * 检查放在「记住上次选项」之前：用户取消时不该把他的这次选择写进 store。
+   */
+  const ratioRisk = await assessRatioRisk(torrentItems);
+  if (!(await ratioGuard.confirmDangerSites(ratioRisk.danger))) return;
+
   // 保存此次选择记录（默认推送不保存）
   if (!isDefaultSend && configStore.download.saveLastDownloader) {
     // ⚠️ `options` 必须交一份深拷贝出去。原先这里直接把界面上那个活对象交出去，
@@ -397,13 +406,17 @@ async function sendToDownloader() {
 
   isSending.value = true;
 
-  sendTorrentToDownloader(torrentItems, selectedDownloader.value.id, addTorrentOptions.value, promptInDialog).finally(
-    () => {
+  sendTorrentToDownloader(torrentItems, selectedDownloader.value.id, addTorrentOptions.value, promptInDialog)
+    .then((sentCount) => {
+      // 发完再提：这条说的是「你刚做的这件事对分享率有什么影响」，抢在发送前说会被
+      // 当成又一道要点的确认框。一条都没发出去（取消输入 / 整批失败）时不提这一句。
+      if (sentCount > 0) ratioGuard.notifyLowRatio(ratioRisk.warn, ratioRisk.unknown);
+    })
+    .finally(() => {
       isSending.value = false;
       showDialog.value = false;
       emit("done");
-    },
-  );
+    });
 }
 
 function quickSendToDownloader(downloader: IDownloaderMetadata, path: string = "", label?: string) {

@@ -8,6 +8,12 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { sendMessage } from "@/messages.ts";
 
+/**
+ * 永远不抛（约定见下面 buildOptionsForTorrent 上方的注释）。
+ *
+ * 返回**真正被下载器接受的条数**：调用方要靠它决定要不要发那条「发送后的分享率提示」——
+ * 取消 `<...>` 输入、或整批全失败时一条都没发出去，这时候提分享率是凭空说话。
+ */
 export async function sendTorrentToDownloader(
   torrentItems: ITorrent[],
   downloaderId: TDownloaderKey,
@@ -16,7 +22,7 @@ export async function sendTorrentToDownloader(
   // （静默返回 null → 下面的取消分支恒成立，`<...>` 占位符功能整个失效），
   // 所以输入框由调用方注入。
   promptInDialog: TPromptInDialog,
-): Promise<void> {
+): Promise<number> {
   const runtimeStore = useRuntimeStore();
   const metadataStore = useMetadataStore();
 
@@ -39,7 +45,7 @@ export async function sendTorrentToDownloader(
           i18nInstance.global.t("SentToDownloaderDialog.canceledInput", [key]),
           { color: "warning" },
         );
-        return;
+        return 0;
       }
     }
   }
@@ -145,4 +151,6 @@ export async function sendTorrentToDownloader(
   } else {
     runtimeStore.showSnakebar(i18nInstance.global.t("SentToDownloaderDialog.nothingSent"), { color: "warning" });
   }
+
+  return status.length;
 }

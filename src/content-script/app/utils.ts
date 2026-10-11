@@ -9,7 +9,7 @@
  * 阻塞主线程，且在 MV3 扩展页面被禁用）。
  */
 import { computed, ref, shallowRef } from "vue";
-import { Modal } from "antdv-next";
+import { Modal, notification } from "antdv-next";
 import { uniq } from "es-toolkit";
 import type { TSupportSocialSite } from "@ptd/social";
 import { getSite as createSiteInstance } from "@ptd/site";
@@ -26,6 +26,8 @@ import {
 import { i18nInstance } from "@/options/plugins/i18n.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
+import { summarizeRatioRisk, type IRatioRisk, type IRatioRow } from "@/shared/ratioGuard.ts";
+import { makeRatioGuardUi } from "@/shared/ratioGuardUi.ts";
 
 import SocialSitePage from "./pages/SocialSitePage.vue";
 import SiteListPage from "./pages/SiteListPage.vue";
@@ -148,6 +150,53 @@ export async function wrapperConfirmFn(
     fn();
   }
 }
+
+/**
+ * 低分享率检查（content 侧）。判据、文案、列表排版都在 `@/shared/ratioGuard*` 里，
+ * 与选项页共用一份；这里只负责喂 content 这套容器：静态 Modal 要显式 getContainer 指进
+ * shadowRoot 的浮层宿主（同上面 confirmDanger 的理由 —— 模块作用域拿不到 App 上下文）。
+ * notification 的样式与容器都由 init.ts 那次全局配置管（holderRender + notification.config）：
+ * ArgsProps 里没有 getContainer，逐次调用传会被 TS 拒掉，容器只有全局那一档。
+ */
+const ratioGuardUi = makeRatioGuardUi({
+  modal: contentModal,
+  notify: { warning: (config) => notification.warning(config) },
+  t: (key, named) => i18nInstance.global.t(key, named ?? {}),
+});
+
+/**
+ * 一批种子 → 三档站点（同站多条只报一次）。
+ *
+ * 站点名的兜底链：`siteNameMap` 是选项页启动时建的，用户只在不打开设置页的情况下用站点页
+ * 下载时它可能是空的 —— 那时先退回当前站点定义里的 name（content 这一路上这批种子都属于
+ * 页面上那个站），仍然没有就异步走 `getSiteName`（它会读站点定义，未添加的站也有真名）。
+ * 直接 `?? site` 会把内部 id 画进界面，那是 AGENTS.md §3.5 的零容忍项，与
+ * `KeepUploadDialog.vue:1332` 那条注释判的是同一件事。
+ *
+ * 补名字只发生在**真要画出来**的那两档（未取到那一档只报个数），所以不会为一整批发 N 次异步取数。
+ */
+export async function collectRatioRisk(torrents: Array<{ site?: string }>): Promise<IRatioRisk> {
+  const metadataStore = useMetadataStore();
+  const rows: IRatioRow[] = [];
+
+  for (const torrent of torrents) {
+    const site = torrent.site;
+    if (!site) continue;
+    rows.push({
+      site,
+      name: metadataStore.siteNameMap[site] ?? siteInstance.value?.metadata?.name ?? "",
+      ratio: metadataStore.lastUserInfo[site]?.ratio,
+    });
+  }
+
+  const risk = summarizeRatioRisk(rows);
+  for (const row of [...risk.danger, ...risk.warn]) {
+    if (!row.name) row.name = await metadataStore.getSiteName(row.site);
+  }
+  return risk;
+}
+
+export const ratioGuard = ratioGuardUi;
 
 export async function doKeywordSearch(keywords: string, plan = "default") {
   const search = keywords || (await promptInDialog(translate("contentScript.keywordPromptTitle")));

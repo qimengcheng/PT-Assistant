@@ -16,7 +16,15 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
 import type { IRemoteDownloadDialogData } from "../types.ts";
-import { copyTextToClipboard, doKeywordSearch, siteInstance, wrapperConfirmFn, type IPtdData } from "../utils.ts";
+import {
+  collectRatioRisk,
+  copyTextToClipboard,
+  doKeywordSearch,
+  ratioGuard,
+  siteInstance,
+  wrapperConfirmFn,
+  type IPtdData,
+} from "../utils.ts";
 
 import AdvanceListModuleDialog from "../components/AdvanceListModuleDialog.vue";
 import SpeedDialBtn from "../components/SpeedDialBtn.vue";
@@ -54,13 +62,18 @@ const localDownloadMultiStatus = ref<boolean>(false);
 function handleLocalDownloadMulti() {
   localDownloadMultiStatus.value = true;
   parseListPage()
-    .then(({ torrents }) => {
+    .then(async ({ torrents }) => {
+      const risk = await collectRatioRisk(torrents);
+      if (!(await ratioGuard.confirmDangerSites(risk.danger))) return;
+
       for (const torrent of torrents) {
         // 单个种子失败不应中断整批，也不该留下 unhandledRejection
         sendMessage("downloadTorrent", { torrent, downloaderId: "local" }).catch((e) =>
           console.error("[PTD] download torrent failed", torrent.title, e),
         );
       }
+
+      ratioGuard.notifyLowRatio(risk.warn, risk.unknown);
     })
     .catch((e) => {
       // parseListPage 失败时必须有兜底，否则只剩 .finally 复位、错误被彻底吞掉

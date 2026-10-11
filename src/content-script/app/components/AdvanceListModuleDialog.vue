@@ -19,6 +19,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
 import type { IRemoteDownloadDialogData } from "../types.ts";
+import { collectRatioRisk, ratioGuard } from "../utils.ts";
 
 import TorrentTitleTd from "@/options/components/TorrentTitleTd.vue";
 
@@ -118,6 +119,9 @@ const localDownloadMultiStatus = ref<boolean>(false);
 async function handleLocalDownloadMulti() {
   localDownloadMultiStatus.value = true;
   try {
+    const risk = await collectRatioRisk(selectedTorrents.value);
+    if (!(await ratioGuard.confirmDangerSites(risk.danger))) return;
+
     // ⚠️ 逐条 catch 并汇总，但**保持一条一条下**：原先串行 await 且只有外层一个 catch，
     // 第一个失败的种子就把整批中断（后面选中的再也下不到），提示还误用「页面解析失败」文案。
     // 改成 allSettled 也能解决中断问题，但那会同时对同一个站点发 N 个下载请求 ——
@@ -133,6 +137,8 @@ async function handleLocalDownloadMulti() {
         console.error("[PTD] download torrent failed", torrent.title, e);
       }
     }
+
+    ratioGuard.notifyLowRatio(risk.warn, risk.unknown);
 
     const failedCount = total - okCount;
     if (okCount > 0) {

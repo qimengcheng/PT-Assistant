@@ -15,7 +15,7 @@
 import appCss from "./app.css?inline";
 
 import { createApp, h } from "vue";
-import { ConfigProvider, message, StyleProvider } from "antdv-next";
+import { ConfigProvider, message, notification, StyleProvider } from "antdv-next";
 
 import App from "./App.vue";
 import { contentOverlay } from "./utils.ts";
@@ -104,6 +104,10 @@ export function mountApp(document: Document, data: Record<string, any> = {}) {
   });
   // 静态 message 的容器是全局配置，不读 ConfigProvider 的 getPopupContainer
   message.config({ getContainer: () => overlayElement });
+  // notification 的容器同样只有全局这一档：dist/notification/index.js:17-18 读的是
+  // defaultGlobalConfig.getContainer，ArgsProps 里没有这个 prop（interface.d.ts:63 挂在
+  // NotificationConfig 上），逐次调用传进去会被 TS 当场拒掉。
+  notification.config({ getContainer: () => overlayElement });
   // 同一个容器交给 utils.ts 的模块级 ref，静态 Modal.confirm 在那里显式传 getContainer
   contentOverlay.value = overlayElement;
 

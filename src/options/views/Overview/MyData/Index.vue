@@ -45,7 +45,7 @@ import AllSiteMessagesDialog from "./AllSiteMessagesDialog.vue";
 import BonusFormatSpan from "./BonusFormatSpan.vue";
 import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
 
-import { formatRatio } from "./utils/format.ts";
+import { bonusFullText, formatRatio } from "./utils/format.ts";
 import { tableData, isTableLoading, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
 
 // 本文件名为 Index.vue，与 SearchEntity/Index.vue 同名；<script setup> 推断出的
@@ -419,6 +419,28 @@ function viewStatistic() {
   });
 }
 
+/**
+ * 「积分」那一格的**一个**合并浮层：每行是「那颗图标的含义 + 不带简化的完整数字」。
+ *
+ * 原先这一格里挂着四个原生 title —— 两颗图标各说自己是什么（积分 / 做种积分）、
+ * 两个数字各给一份完整值（数字被简化成 1.42M 时 hover 才看得到 1,419,552.50）。
+ * 一次 hover 只能读到其中一个，要看全得在格子里挪四下鼠标。合成一个浮层后一次读完。
+ *
+ * 第二行的出现条件与格子里那条 v-if 完全一致 —— 两处必须判得一样，否则浮层里会多出
+ * 一行格子里根本没有的东西。
+ */
+function bonusRevealLines(record: { bonus?: number | string; seedingBonus?: number | string }) {
+  const lines = [{ label: t("levelRequirement.bonus"), value: bonusFullText(record.bonus) }];
+  if (
+    configStore.myDataTableControl.showSeedingBonus &&
+    record.seedingBonus !== "" &&
+    !isUndefined(record.seedingBonus)
+  ) {
+    lines.push({ label: t("levelRequirement.seedingBonus"), value: bonusFullText(record.seedingBonus) });
+  }
+  return lines;
+}
+
 const showExportDialog = ref(false);
 </script>
 
@@ -776,25 +798,36 @@ const showExportDialog = ref(false);
           </span>
         </template>
 
-        <!-- 魔力/积分 -->
+        <!-- 魔力/积分：整格只挂**一个**浮层（原先这一格里有四个原生 title，判据见 bonusRevealLines）。
+             两颗图标不再自己带提示，含义写在浮层那一行的标签上。 -->
         <template v-else-if="column.key === 'bonus'">
-          <div class="d-flex flex-column align-end">
-            <div class="bonus-line d-flex align-center justify-end flex-nowrap">
-              <BonusFormatSpan :num="record.bonus" />
-              <DollarOutlined class="cell-icon cell-icon--green" :title="t('levelRequirement.bonus')" />
+          <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+            <template #content>
+              <div class="bonus-reveal">
+                <div v-for="line in bonusRevealLines(record)" :key="line.label" class="bonus-reveal-line">
+                  <span class="bonus-reveal-label">{{ line.label }}</span>
+                  <span class="bonus-reveal-value">{{ line.value }}</span>
+                </div>
+              </div>
+            </template>
+            <div class="d-flex flex-column align-end">
+              <div class="bonus-line d-flex align-center justify-end flex-nowrap">
+                <BonusFormatSpan :num="record.bonus" :reveal="false" />
+                <DollarOutlined class="cell-icon cell-icon--green" />
+              </div>
+              <div
+                v-if="
+                  configStore.myDataTableControl.showSeedingBonus &&
+                  record.seedingBonus !== '' &&
+                  !isUndefined(record.seedingBonus)
+                "
+                class="bonus-line d-flex align-center justify-end flex-nowrap"
+              >
+                <BonusFormatSpan :num="record.seedingBonus" :reveal="false" />
+                <ThunderboltOutlined class="cell-icon cell-icon--green" />
+              </div>
             </div>
-            <div
-              v-if="
-                configStore.myDataTableControl.showSeedingBonus &&
-                record.seedingBonus !== '' &&
-                !isUndefined(record.seedingBonus)
-              "
-              class="bonus-line d-flex align-center justify-end flex-nowrap"
-            >
-              <BonusFormatSpan :num="record.seedingBonus" />
-              <ThunderboltOutlined class="cell-icon cell-icon--green" :title="t('levelRequirement.seedingBonus')" />
-            </div>
-          </div>
+          </a-popover>
         </template>
 
         <template v-else-if="column.key === 'bonusPerHour'">
@@ -805,52 +838,73 @@ const showExportDialog = ref(false);
           <span class="text-no-wrap">{{ typeof record.invites !== "undefined" ? record.invites : "-" }}</span>
         </template>
 
-        <!-- 入站时间 -->
+        <!-- 入站时间：格子里可以选「显示成多久以前」，完整时间原先挂原生 title，改成浮层 -->
         <template v-else-if="column.key === 'joinTime'">
-          <span class="text-no-wrap" :title="record.joinTime ? (formatDate(record.joinTime) as string) : '-'">
-            {{
-              typeof record.joinTime !== "undefined"
-                ? configStore.myDataTableControl.joinTimeFormat === "aliveWeek"
-                  ? formatTimeAgo(record.joinTime, { weekOnly: true })
-                  : configStore.myDataTableControl.joinTimeFormat === "alive"
-                    ? formatTimeAgo(record.joinTime)
-                    : formatDate(record.joinTime, "yyyy-MM-dd")
-                : "-"
-            }}
-          </span>
+          <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+            <template #content>
+              <div class="reveal-lines">
+                <div>{{ record.joinTime ? (formatDate(record.joinTime) as string) : "-" }}</div>
+              </div>
+            </template>
+            <span class="text-no-wrap">
+              {{
+                typeof record.joinTime !== "undefined"
+                  ? configStore.myDataTableControl.joinTimeFormat === "aliveWeek"
+                    ? formatTimeAgo(record.joinTime, { weekOnly: true })
+                    : configStore.myDataTableControl.joinTimeFormat === "alive"
+                      ? formatTimeAgo(record.joinTime)
+                      : formatDate(record.joinTime, "yyyy-MM-dd")
+                  : "-"
+              }}
+            </span>
+          </a-popover>
         </template>
 
-        <!-- 最近访问时间 -->
+        <!-- 最近访问：这一格里原先有两个原生 title（完整时间 + 那颗「N 天未访问」的说明），
+             合成一个浮层：第一行完整时间，第二行那句说明（只在图标出现时才有）。 -->
         <template v-else-if="column.key === 'lastAccessAt'">
-          <span
-            class="text-no-wrap"
-            :title="record.lastAccessAt ? (formatDate(record.lastAccessAt) as string) : '-'"
-          >
-            <template v-if="typeof record.lastAccessAt !== 'undefined'">
-              {{ formatDate(record.lastAccessAt) }}
-              <AlertOutlined
-                v-if="record.lastAccessDuration >= 5"
-                class="cell-icon"
-                :style="{ color: record.lastAccessDuration >= 15 ? '#f44336' : '#ffc107' }"
-                :title="t('MyData.table.lastAccessDurationNote', [record.lastAccessDuration])"
-              />
+          <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+            <template #content>
+              <div class="reveal-lines">
+                <div>{{ record.lastAccessAt ? (formatDate(record.lastAccessAt) as string) : "-" }}</div>
+                <div v-if="record.lastAccessDuration >= 5" class="reveal-note">
+                  {{ t("MyData.table.lastAccessDurationNote", [record.lastAccessDuration]) }}
+                </div>
+              </div>
             </template>
-            <template v-else>-</template>
-          </span>
+            <span class="text-no-wrap">
+              <template v-if="typeof record.lastAccessAt !== 'undefined'">
+                {{ formatDate(record.lastAccessAt) }}
+                <AlertOutlined
+                  v-if="record.lastAccessDuration >= 5"
+                  class="cell-icon"
+                  :style="{ color: record.lastAccessDuration >= 15 ? '#f44336' : '#ffc107' }"
+                />
+              </template>
+              <template v-else>-</template>
+            </span>
+          </a-popover>
         </template>
 
         <!-- 更新时间 -->
         <template v-else-if="column.key === 'updateAt'">
           <template v-if="record.status === EResultParseStatus.success">
-            <span class="text-wrap" :title="record.updateAt ? (formatDate(record.updateAt) as string) : '-'">
-              {{
-                record.updateAt
-                  ? configStore.myDataTableControl.updateAtFormatAsAlive
-                    ? formatTimeAgo(record.updateAt)
-                    : formatDate(record.updateAt)
-                  : "-"
-              }}
-            </span>
+            <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+              <template #content>
+                <div class="reveal-lines">
+                  <div>{{ record.updateAt ? (formatDate(record.updateAt) as string) : "-" }}</div>
+                </div>
+              </template>
+              <span class="text-wrap">
+                {{
+                  record.updateAt
+                    ? configStore.myDataTableControl.updateAtFormatAsAlive
+                      ? formatTimeAgo(record.updateAt)
+                      : formatDate(record.updateAt)
+                    : "-"
+                }}
+              </span>
+            </a-popover>
           </template>
           <template v-else>
             <a-tag>
@@ -994,5 +1048,43 @@ const showExportDialog = ref(false);
 
 .favicon-hover-bg:hover {
   background: rgba(0, 0, 0, 0.3);
+}
+
+/**
+ * 「积分」那一格的合并浮层：标签在左、完整数字在右，一行一项。
+ * tabular-nums 是必须的：两行位数不同（1,419,552.50 / 970,509.70），比例数字下右沿对不齐。
+ */
+.bonus-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.bonus-reveal-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bonus-reveal-label {
+  opacity: 0.75;
+}
+
+.bonus-reveal-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/** 日期那一族的浮层：第一行完整时间，第二行（可选）那句「N 天未访问」 */
+.reveal-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 480px;
+}
+
+.reveal-note {
+  opacity: 0.75;
 }
 </style>

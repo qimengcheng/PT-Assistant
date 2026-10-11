@@ -337,6 +337,17 @@ watch([tableFilterRef, tablePageSize], () => {
   tablePage.value = 1;
 });
 
+/**
+ * 每次发起新搜索也回到第一页。
+ *
+ * 信号用 search.startAt（doSearch 每轮都写一次 Date.now()，见 utils/search.ts）而不是
+ * searchKey：同一个关键词再搜一次、点「重试」、或从快照装载，searchKey 都不变，
+ * 只有 startAt 一定换 —— 那种情况下停在第 7 页看到的是一片空白。
+ */
+watch(() => runtimeStore.search.startAt, () => {
+  tablePage.value = 1;
+});
+
 const tablePagination = computed(() =>
   // totalRows 一传就有「一页放得下就不出分页条」——结果只有几条时不必挂着一条分页条
   // （用户 2026-10-07：条数少的时候不要启用分页）。

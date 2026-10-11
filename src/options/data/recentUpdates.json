@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-11 08:31:46",
-  "headSha": "83860f6",
+  "generatedAt": "2026-10-11 08:36:31",
+  "headSha": "b18e95e",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.68.28",
+      "date": "2026-10-11 08:36:30",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "每次发起新的搜索都会回到第一页（含同一关键词再搜一次、点重试、装载快照），不再停在上次的页码上看一片空白"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.68.27",
       "date": "2026-10-11 08:31:37",

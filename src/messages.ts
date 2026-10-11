@@ -285,7 +285,19 @@ export interface ProtocolMap {
   getBackupHistory(backupServerId: string): IBackupFileInfo[];
   deleteBackupHistory(data: { backupServerId: string; path: string }): boolean;
   applyBackupRetention(data: { backupServerId: string; keepFilename?: string }): IBackupFileInfo[];
-  restoreBackupData(data: { restoreData: IBackupData; restoreOptions?: IRestoreOptions }): boolean;
+  /**
+   * `cookieFailedCount` 是「没能写回浏览器的 cookie 条数」，0 表示全成功。
+   *
+   * 为什么单独返回而不是只给 boolean：cookie 写回里只要有一条失败（站点已注销、
+   * 权限被拒、值格式不对），剩下的就都不该算「恢复成功」—— 而 metadata /
+   * settings / downloadHistory 等字段已经真的写进去了，一并作废反而更糟。
+   * 所以成功仍算成功，但把失败条数如实带回，由界面给一句「恢复完成，但有 N 个
+   * cookie 没写进去」。原先只有 boolean，这条信息一路丢在日志里。
+   */
+  restoreBackupData(data: {
+    restoreData: IBackupData;
+    restoreOptions?: IRestoreOptions;
+  }): { success: boolean; cookieFailedCount: number };
   getRemoteBackupData(data: { backupServerId: string; path: string; decryptKey?: string }): IBackupData;
 }
 

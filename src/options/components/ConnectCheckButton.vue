@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { ApiOutlined, CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
 
@@ -28,15 +28,36 @@ const connectBtnMap: Record<connectStatus, { icon: any; color: string }> = {
 const isTestingConnectRef = ref<boolean>(false);
 const connectStatusRef = ref<connectStatus>(connectStatus.default);
 
+/**
+ * 失败后自动复位的定时器句柄。
+ *
+ * ⚠️ 原先不保存句柄：组件卸载（切路由、关弹窗）后这个 setTimeout 照样醒来，
+ * 去写一个已经卸载掉的组件的 ref（泄漏一条 Vue warn）。连点两次还会排出两个
+ * 定时器，第二个在第一个之后才复位 —— 用户看到状态「刚变回默认又跳回错误」。
+ */
+let resetTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleReset() {
+  if (!resetTimeout) return;
+  if (resetTimer) clearTimeout(resetTimer); // 连点时只保留最后一个
+  resetTimer = setTimeout(() => {
+    resetTimer = undefined;
+    connectStatusRef.value = connectStatus.default;
+  }, resetTimeout);
+}
+
+onUnmounted(() => {
+  if (resetTimer) clearTimeout(resetTimer);
+  resetTimer = undefined;
+});
+
 async function checkConnect() {
   isTestingConnectRef.value = true;
   try {
     connectStatusRef.value = (await checkFn()) ? connectStatus.success : connectStatus.error;
   } catch (e) {
     connectStatusRef.value = connectStatus.error;
-    if (resetTimeout) {
-      setTimeout(() => (connectStatusRef.value = connectStatus.default), resetTimeout);
-    }
+    scheduleReset();
   } finally {
     isTestingConnectRef.value = false;
     emits("after:checkConnect");

@@ -823,6 +823,7 @@
       "title": "请选择本地需要导出的内容"
     },
     "RestoreDialog": {
+      "partialSuccess": "恢复完成，但有 {count} 个 Cookie 没能写回（相关站点可能需要重新登录）",
       "decryptKey": "解密密钥",
       "expandCookieMinutes": "尝试延长Cookies期限（单位：分钟）",
       "failure": "恢复失败: {error}",

@@ -191,7 +191,7 @@ onMessage("exportBackupData", async ({ data: { backupServerId, backupFields } })
 export async function restoreBackupData(
   restoreData: IBackupData, // 已经解密了的数据
   restoreOptions: IRestoreOptions = {},
-): Promise<boolean> {
+): Promise<{ success: boolean; cookieFailedCount: number }> {
   const { fields = [], expandCookieMinutes = -1, keepExistUserInfo = true } = restoreOptions;
 
   const restoreDataExistFields = Object.keys(restoreData.manifest?.files ?? {});
@@ -260,6 +260,11 @@ export async function restoreBackupData(
     }
   }
 
+  // 本次恢复有多少个 cookie 没能写回（0 = 全成功）。
+  // 记在函数作用域里而不是日志里：调用方需要它来如实告诉用户「恢复完成，但有 N 个
+  // cookie 没写进去」，否则用户看到的还是「恢复成功」，而浏览器的登录状态是残缺的。
+  let cookieFailedCount = 0;
+
   // 恢复已添加站点的Cookie
   if (restoreFields.includes("cookies")) {
     const now = new Date().getTime() / 1000;
@@ -270,26 +275,44 @@ export async function restoreBackupData(
     // 期间整个 offscreen 被占死。p-queue 限并发避免一次性打爆 background。
     const cookieQueue = new PQueue({ concurrency: 16 });
 
-    await Promise.all(
-      Object.values(restoreData.cookies!).flatMap((cookieData) =>
-        cookieData.map((cookie) =>
-          cookieQueue.add(async () => {
-            // 延长 cookie 过期时间
-            if (expandCookieMinutes > 0) {
-              cookie.expirationDate = Math.max(cookie.expirationDate ?? 0, now) + expandCookieMinutes * 60;
-            }
+    // ⚠️ Promise.all 短路：上千个 cookie 里只要有一个 setCookie 失败（站点已注销、
+    // 权限被拒、值格式不对），整批 reject —— 后面排队的全都还没跑，
+    // 而「恢复」对外报的是成功（见调用方，它只看这里有没有抛）。
+    // 用户于是得到一份「恢复成功」但实际只写回了几十个 cookie 的浏览器 ——
+    // 表现为「登录状态全没了」，且没有任何提示。
+    // 改成 allSettled + 计数，跑完整批再报失败数。
+    const cookieJobs = Object.values(restoreData.cookies!).flatMap((cookieData) =>
+      cookieData.map((cookie) =>
+        cookieQueue.add(async () => {
+          // 延长 cookie 过期时间
+          if (expandCookieMinutes > 0) {
+            cookie.expirationDate = Math.max(cookie.expirationDate ?? 0, now) + expandCookieMinutes * 60;
+          }
 
-            await sendMessage("setCookie", cookie as unknown as chrome.cookies.SetDetails);
-          }),
-        ),
+          await sendMessage("setCookie", cookie as unknown as chrome.cookies.SetDetails);
+        }),
       ),
     );
+
+    const cookieResults = await Promise.allSettled(cookieJobs);
+    const cookieFailed = cookieResults.filter((r) => r.status === "rejected");
+    cookieFailedCount = cookieFailed.length;
+    if (cookieFailedCount > 0) {
+      console.error(
+        `[PTD] restore cookies partially failed: ${cookieFailedCount}/${cookieResults.length}`,
+        cookieFailed.slice(0, 5).map((r) => (r as PromiseRejectedResult).reason),
+      );
+    }
   }
 
-  return true;
+  // 部分 cookie 没写回去时**仍返回 true**：其余字段（metadata / settings /
+  // downloadHistory 等）已经成功恢复了，抛错会把它们一起作废，那比少几个 cookie
+  // 严重得多。调用方拿 cookieFailedCount 去给用户一句如实提示。
+  return { success: true, cookieFailedCount };
 }
 
 onMessage("restoreBackupData", async ({ data: { restoreData, restoreOptions = {} } }) => {
+  // 返回值原样透传：调用方要靠 cookieFailedCount 区分「全成功」与「部分 cookie 失败」
   return await restoreBackupData(restoreData, restoreOptions);
 });
 

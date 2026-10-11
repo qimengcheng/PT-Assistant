@@ -156,8 +156,17 @@ function doRestore() {
   }
 
   sendMessage("restoreBackupData", { restoreData: restoreData.value!, restoreOptions: restoreOptions.value })
-    .then(() => {
-      runtimeStore.showSnakebar(t("SetBackup.RestoreDialog.success"), { color: "success" });
+    .then((result) => {
+      // 部分 cookie 没写回去时要如实说，不能只报「恢复成功」——
+      // 用户看到的浏览器是「登录状态大半没了」，却又没有任何提示
+      if (result?.cookieFailedCount > 0) {
+        runtimeStore.showSnakebar(t("SetBackup.RestoreDialog.partialSuccess", { count: result.cookieFailedCount }), {
+          color: "warning",
+          timeout: 8,
+        });
+      } else {
+        runtimeStore.showSnakebar(t("SetBackup.RestoreDialog.success"), { color: "success" });
+      }
       showDialog.value = false;
     })
     .catch((err) => {

@@ -784,7 +784,20 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
       );
     }
 
-    await Promise.all(requests);
+    // ⚠️ Promise.all 短路：上传限速与下载限速是两个独立请求，一个失败整批 reject，
+    // 于是「只设了下载限速」这种情况既不会生效、也不会返回 false —— 调用方
+    // （限速弹窗）把它当成功，界面无提示，用户以为限速设上了。
+    // allSettled + 计数：全成功才 true，部分成功按「整体失败」返回（宁可让用户
+    // 重来一次，也不要静默半套）。
+    const settled = await Promise.allSettled(requests);
+    const failedCount = settled.filter((r) => r.status === "rejected").length;
+    if (failedCount > 0) {
+      console.error(
+        `[qBittorrent] setTorrentSpeedLimit partially failed (${failedCount}/${settled.length})`,
+        settled.filter((r) => r.status === "rejected").map((r) => (r as PromiseRejectedResult).reason),
+      );
+      return false;
+    }
     return true;
   }
 

@@ -823,6 +823,7 @@
       "title": "Select content to export locally"
     },
     "RestoreDialog": {
+      "partialSuccess": "Restore finished, but {count} cookie(s) could not be written back — those sites may need you to log in again",
       "decryptKey": "Decryption Key",
       "expandCookieMinutes": "Try to extend Cookies expiry (minutes)",
       "failure": "Restore failed: {error}",

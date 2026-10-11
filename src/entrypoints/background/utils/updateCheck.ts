@@ -42,7 +42,7 @@ function notifyText(
   const zh = lang === "zh_CN";
   if (download === "done") {
     return zh
-      ? { title: "PT Assistant 有新版本", message: `v${latestVersion} 的安装包已下到浏览器下载目录，解压后替换原目录即可` }
+      ? { title: "PT Assistant 有新版本", message: `v${latestVersion} 的安装包已下载到浏览器下载目录，解压后替换原目录即可` }
       : {
           title: "PT Assistant update available",
           message: `The v${latestVersion} package is in your downloads folder. Unzip it over the old folder.`,
@@ -50,14 +50,14 @@ function notifyText(
   }
   if (download === "downloading") {
     return zh
-      ? { title: "PT Assistant 有新版本", message: `v${latestVersion} 的安装包正在下到浏览器下载目录` }
+      ? { title: "PT Assistant 有新版本", message: `v${latestVersion} 的安装包正在下载到浏览器下载目录` }
       : {
           title: "PT Assistant update available",
           message: `The v${latestVersion} package is being saved to your downloads folder.`,
         };
   }
   return zh
-    ? { title: "PT Assistant 有新版本", message: `v${latestVersion} 已发布，点此前往下载页` }
+    ? { title: "PT Assistant 有新版本", message: `v${latestVersion} 已发布，点击前往下载页面` }
     : { title: "PT Assistant update available", message: `v${latestVersion} is out. Click to open the download page.` };
 }
 

@@ -1,5 +1,5 @@
 /**
- * 自动辅种那条链上的**五类**通知（四类进展 + 一类要人处理的「下不动了」）：文案与时长格式化只有这一份。
+ * 自动辅种那条链上的**五类**通知（四类进展 + 一类要人处理的「下载停滞」）：文案与时长格式化只有这一份。
  *
  * 为什么不走 i18n：service worker 里拿不到 `useI18n`（同 `background/utils/updateCheck.ts`
  * 的 `notifyText` 那条取舍）。而这一份文案有**两个出口** —— 用户不在插件页面时由后台弹
@@ -47,13 +47,13 @@ export function reseedNoticeColor(kind: TReseedNoticeKind): "success" | "info" |
 }
 
 /**
- * 把一段时长说成人话（「还要多久」和「已经多久没动」用的是同一套档位）。
- * 判据按档位走：不到 1 分钟 / N 分 / N 小时 M 分 / N 天 M 小时。
+ * 把一段时长说成可读的话（「还需多久」和「已多久无进展」用的是同一套档位）。
+ * 判据按档位走：不足 1 分钟 / N 分钟 / N 小时 M 分 / N 天 M 小时。
  * 不给「1.4 小时」这种小数 —— 通知栏里读一个小数还要心算，不如给整数档位。
  */
 export function formatDurationSec(sec: number, zh: boolean): string {
   const s = Math.max(0, Math.round(Number(sec) || 0));
-  if (s < 60) return zh ? "不到 1 分钟" : "under a minute";
+  if (s < 60) return zh ? "不足 1 分钟" : "under a minute";
   const min = Math.round(s / 60);
   if (min < 60) return zh ? `${min} 分钟` : `${min} min`;
   const hours = Math.floor(min / 60);
@@ -71,53 +71,53 @@ export function reseedNoticeText(notice: IReseedNotice, lang: string | undefined
 
   if (kind === "baseStarted") {
     return zh
-      ? { title: "辅种开始下载基准", message: `「${title}」已交给下载器，等它把全量下完就自动去辅种` }
+      ? { title: "辅种基准开始下载", message: `「${title}」已提交至下载器，待其下载完成后将自动开始辅种` }
       : {
           title: "Reseed base downloading",
-          message: `"${title}" was handed to the downloader. Reseeding starts once it finishes.`,
+          message: `"${title}" was submitted to the downloader. Reseeding starts once it finishes.`,
         };
   }
 
   if (kind === "baseHalfway") {
-    // 没速度就没 ETA，那一半句子直接不写 —— 编一个「预计未知」比少说一句更糟
-    const eta = typeof etaSec === "number" && Number.isFinite(etaSec) ? (zh ? `，预计还要 ${formatDurationSec(etaSec, true)}` : `, about ${formatDurationSec(etaSec, false)} left`) : "";
+    // 没有速度就没有 ETA，那半句整个不写 —— 编一个「预计未知」比少说一句更糟
+    const eta = typeof etaSec === "number" && Number.isFinite(etaSec) ? (zh ? `，预计还需 ${formatDurationSec(etaSec, true)}` : `, about ${formatDurationSec(etaSec, false)} left`) : "";
     const pct = typeof progress === "number" ? Math.round(progress) : 50;
     return zh
-      ? { title: "辅种基准下到一半", message: `「${title}」已下 ${pct}%${eta}` }
+      ? { title: "辅种基准下载过半", message: `「${title}」已下载 ${pct}%${eta}` }
       : { title: "Reseed base halfway", message: `"${title}" is ${pct}% downloaded${eta}` };
   }
 
   if (kind === "baseStalled") {
-    // 措辞说的是「没有进展」，不是「一点没下」—— 判据看的是已下字节有没有变（见 planAutoReseed），
+    // 措辞说的是「无下载进展」，不是「一点没下」—— 判据看的是已下字节有没有变（见 planAutoReseed），
     // 下到 3% 停住那种同样会进来，写成「一点没下」就是另一句假话。
     const durSec = typeof stalledSec === "number" && Number.isFinite(stalledSec) ? stalledSec : undefined;
-    // 拿不到时长时不写「很久」去补那半句（编一个档位是假话，「已经 很久没有…」的中文也不成句），
-    // 整句换成不需要数的写法。后台那条路永远给得出时长，这一支只是兜底。
+    // 拿不到时长时不编一个档位，也不用「很久」去补那半句（不成句），整句换成不需要数的写法。
+    // 后台那条路永远给得出时长，这一支只是兜底。
     const when = zh
       ? durSec === undefined
-        ? "有一阵没有再下动"
-        : `已经 ${formatDurationSec(durSec, true)}没有再下动`
+        ? "已有一段时间无下载进展"
+        : `已有 ${formatDurationSec(durSec, true)}无下载进展`
       : durSec === undefined
         ? "has made no progress for a while"
         : `has made no progress for ${formatDurationSec(durSec, false)}`;
     // 判据用 typeof 而不是真假值：他截图那一格就是 0%，`progress &&` 会把这条最该说的读数吞掉
-    const pct = typeof progress === "number" ? (zh ? `，进度 ${Math.round(progress)}%` : `, at ${Math.round(progress)}%`) : "";
+    const pct = typeof progress === "number" ? (zh ? `，当前进度 ${Math.round(progress)}%` : `, at ${Math.round(progress)}%`) : "";
     return zh
       ? {
-          title: "辅种基准下不动了",
-          message: `「${title}」的基准${when}${pct}，去看一眼下载器是不是没有源`,
+          title: "辅种基准下载停滞",
+          message: `「${title}」的基准${when}${pct}，请检查下载器是否存在可用来源`,
         }
       : {
           title: "Reseed base stalled",
-          message: `"${title}": the base ${when}${pct}. Check whether it has any peers.`,
+          message: `"${title}": the base ${when}${pct}. Check whether the torrent has any peers.`,
         };
   }
 
   if (kind === "baseDone") {
     return zh
       ? {
-          title: "基准已下完，正在辅种",
-          message: `「${title}」下完了，已把 ${count ?? 0} 条辅种种子推给下载器`,
+          title: "基准下载完成，正在辅种",
+          message: `「${title}」已完成下载，已推送 ${count ?? 0} 条辅种种子至下载器`,
         }
       : {
           title: "Base finished, reseeding",
@@ -126,7 +126,7 @@ export function reseedNoticeText(notice: IReseedNotice, lang: string | undefined
   }
 
   return zh
-    ? { title: "辅种完成", message: `「${title}」那几条现在都在正常做种` }
+    ? { title: "辅种完成", message: `「${title}」的全部条目均已正常做种` }
     : { title: "Reseed done", message: `"${title}": every torrent is seeding normally.` };
 }
 

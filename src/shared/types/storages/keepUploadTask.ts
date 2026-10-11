@@ -42,7 +42,7 @@ export interface IKeepUploadTaskItem {
    * 认的是 `CTorrent.infoHash`）。
    *
    * 建任务那一步就有这个值：每条子种子都要下载 .torrent 算三层指纹（`ITorrentInfoForVerification.infoHash`），
-   * 不记下来就得再下一遍。**旧任务没有这一项**，界面上那一条会写「没记下 infoHash」而不是假装查过。
+   * 不记下来就得再下一遍。**旧任务没有这一项**，界面上那一条会写「未记录 infoHash」而不是假装查过。
    */
   hash?: string;
   [key: string]: any; // 其他属性
@@ -103,7 +103,7 @@ export interface IKeepUploadTaskAutoState {
    *
    * 为什么必须做到**逐条**：v0.65.7 之前只有上面那个整体标记，而发送那一圈是「一颗抛错就跳出整批」，
    * 于是一颗链接失效 / 站点接口报错的种子会把排在它后面的每一条永远挡住 —— 每分钟从同一颗重开，
-   * 界面上永远是「下载器里没有」（他 2026-10-10 那一条 yemapt 就是这个形状）。
+   * 界面上永远是「下载器中未找到」（他 2026-10-10 那一条 yemapt 就是这个形状）。
    */
   othersSent?: Record<string, number>;
   /** 上一次后台跑这一条的时刻（只为排查，判据不看它） */
@@ -132,7 +132,7 @@ export interface IKeepUploadTaskAutoState {
   notifiedBaseDone?: number;
   /**
    * 上一轮看到的「基准那条已下字节」（下载器报的 `totalDownloaded`）。
-   * 判「下不动」要看的是**字节有没有变**，不是界面那个整数百分比：1.8 GiB 的种子下到 0.5%
+   * 判「下载停滞」要看的是**字节有没有变**，不是界面那个整数百分比：1.8 GiB 的种子下到 0.5%
    * 界面上还是写 0%，可它明明在动 —— 拿百分比判会把慢种报成卡死。
    */
   baseBytes?: number;
@@ -143,7 +143,7 @@ export interface IKeepUploadTaskAutoState {
    * 那种「动一阵、又停 15 分钟」的反复是新的故障，不该被第一条挡住。
    */
   notifiedBaseStall?: number;
-  /** 后台折出来的进度阶段。界面上那一列在没人手动回查时读它，否则后台都在暂停种子了、页面还写「没查过」 */
+  /** 后台折出来的进度阶段。界面上那一列在没人手动回查时读它，否则后台都在暂停种子了、页面还写「未回查」 */
   stage?: TReseedStage;
 }
 
@@ -151,7 +151,7 @@ export interface IKeepUploadTaskAutoState {
  * 最近一次「拿下载器那边的状态和任务对账」的结论，连时刻一起存。
  *
  * 为什么必须落盘（v0.68.1）：这一份原先只存在页面组件的一个 `ref` 里，换一页 / 重加载设置页就没了，
- * 于是明明五分钟前刚查过、还把某条停了，界面上又写回「没查过」（他 2026-10-10 报的就是这个）。
+ * 于是明明五分钟前刚查过、还把某条停了，界面上又写回「未回查」（他 2026-10-10 报的就是这个）。
  * `at` 是**这条结论自己的**时刻，界面上那句「查于 N 分钟前」读它 —— 不能用 `autoState.lastRunAt`，
  * 那个是「后台上次跑过这一条」，开了自动辅种的任务每分钟都在推进度，跟查没查到不是一回事。
  *
@@ -187,7 +187,7 @@ export interface IKeepUploadTask {
   autoReseed?: boolean;
   /** 自动辅种走到哪一步了，见 `IKeepUploadTaskAutoState` */
   autoState?: IKeepUploadTaskAutoState;
-  /** 最近一次对账查到的结论，见 `IKeepUploadTaskVerify`。没查过就没这一项，界面上写「没查过」 */
+  /** 最近一次对账查到的结论，见 `IKeepUploadTaskVerify`。没查过就没这一项，界面上写「未回查」 */
   verify?: IKeepUploadTaskVerify;
 }
 

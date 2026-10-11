@@ -80,7 +80,7 @@ async function notifyUser(
 /** 通知文案：SW 里拿不到 useI18n，按 config.lang 选一份（同 updateCheck.ts 的 notifyText） */
 function notifyText(lang: string | undefined, title: string, count: number): { title: string; message: string } {
   return lang === "zh_CN"
-    ? { title: "辅种没有成功", message: `「${title}」有 ${count} 条没在做种，已自动暂停，进「辅种任务」看是哪几条` }
+    ? { title: "辅种未成功", message: `「${title}」有 ${count} 条未正常做种，已自动暂停，请在「辅种任务」页查看具体条目` }
     : {
         title: "Reseed not seeding",
         message: `"${title}": ${count} torrent(s) were not seeding and have been paused. Open Reseed tasks to see which.`,
@@ -100,8 +100,8 @@ function pathMismatchText(
 ): { title: string; message: string } {
   return lang === "zh_CN"
     ? {
-        title: "辅种没有发送",
-        message: `「${title}」的基准数据在 ${mismatch.basePath}，而任务目录是 ${mismatch.taskPath}，两者不是同一个地方。进「辅种任务」选一种处置`,
+        title: "辅种已停止发送",
+        message: `「${title}」的基准数据位于 ${mismatch.basePath}，而任务目录为 ${mismatch.taskPath}，两者不一致。请在「辅种任务」页选择处置方式`,
       }
     : {
         title: "Reseed paused",
@@ -158,8 +158,8 @@ async function sendOne(task: IKeepUploadTask, item: IKeepUploadTaskItem, downloa
  *
  * 只给基准做这件事，而且**不写回任务**：认亲要求唯一匹配，每分钟重算出来的是同一个结果，
  * 不必存；而写回整条任务会把用户在这一分钟里改的东西（那颗「自动辅种」开关、换基准、改保存路径）
- * 一起盖回旧值。其余没记 hash 的那几条照旧当「没认出」—— 发送本来就不需要 hash，只是盯不到它的状态，
- * 界面上那行「另有 N 条没认出」会把这件事说清楚；用户点一次「回查」就补上了（那条路在页面里，写回是安全的）。
+ * 一起盖回旧值。其余没记 hash 的那几条照旧当「未匹配」—— 发送本来就不需要 hash，只是盯不到它的状态，
+ * 界面上那行「另有 N 条未匹配」会把这件事说清楚；用户点一次「回查」就补上了（那条路在页面里，写回是安全的）。
  */
 function resolveBaseHash(task: IKeepUploadTask, torrents: readonly CTorrent[] | undefined): string {
   if (task.baseLocal) return String(task.baseLocal.hash).toLowerCase();
@@ -426,7 +426,7 @@ async function autoReseedTick() {
         /**
          * 卡在「目录不一致」上不会自己解开 —— 要人挑一种处置（改任务目录 / 把数据搬过去）。
          * 所以弹一次系统通知就够：一条任务只弹一次，等它真的解开了再把标记清掉。
-         * 只在「基准已下完、确实有东西要发」时弹，不然刚建好的任务会被一条还没发生的卡住打扰。
+         * 只在「基准下载完成、确实有内容要发」时弹，不然刚建好的任务会被一条还没发生的卡住打扰。
          */
         if (
           baseMismatch &&
@@ -487,7 +487,7 @@ async function autoReseedTick() {
         }
 
         /**
-         * ④「那几条现在都在正常做种」。判据是「第一次走到 done 那一档」（见 planAutoReseed）；
+         * ④「全部条目均已正常做种」。判据是「第一次走到 done 那一档」（见 planAutoReseed）；
          * 后来某条坏了又修好的话会再报一次 —— 那是用户想知道的第二件事。
          */
         if (tick.firstDone) {

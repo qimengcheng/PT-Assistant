@@ -87,7 +87,7 @@ const columns = computed<TableColumnsType<ITaskRow>>(() => [
     title: t("KeepUploadTask.recheck.col"),
     key: "seedState",
     align: "center",
-    // 150 是按这一列最长的那句量的：「基准在下 100%」+ 下面那行「1 条没正常做种」
+    // 150 是按这一列最长的那句量的：「基准下载中 100%」+ 下面那行「1 条未正常做种」
     width: 150,
     // 排的是结论的严重度档位，不是那一格显示的文字 —— 文字带着条数，
     // 按字符串排会让「10 条在做种」排在「2 条在做种」前面。
@@ -315,7 +315,7 @@ onMounted(() => {
 
 /**
  * 后台那条自动辅种每分钟把结论写回任务（`autoState`），而这一页原本只在打开时读一次 ——
- * 不刷新的话用户看到的是「没查过」，而种子其实一分钟前就被后台停了。
+ * 不刷新的话用户看到的是「未回查」，而种子其实一分钟前就被后台停了。
  *
  * 不走 `loadTasks`：那颗 `loading` 是给整张表套一层 Spin（AGENTS §3.4「轮询的表不许翻 loading」），
  * 每分钟把整页暗一下、遮罩期间还点不动，比迟一分钟看到更新更糟。
@@ -558,7 +558,7 @@ const rechecking = ref(false);
 /**
  * 对账结论**不在这个组件里存副本**了（原先是 `reseedStatuses` + `reseedStatusesAt` 两个 ref）：
  * 那份只活在组件里，换一页 / 重加载设置页就清空，于是明明刚查过、还把某条停了，
- * 界面上又写回「没查过」。现在它落在任务自己的 `verify` 上，见 `IKeepUploadTaskVerify`。
+ * 界面上又写回「未回查」。现在它落在任务自己的 `verify` 上，见 `IKeepUploadTaskVerify`。
  */
 const autoRecheckTimers = new Set<number>();
 
@@ -586,7 +586,7 @@ function trackableItems(task: IKeepUploadTask) {
  *
  * 判据只有一条：**查它的人把结论写在了任务上**（`verify`，见 `IKeepUploadTaskVerify`）。
  * 手动点「回查」、发送后 18 秒那次延迟查、后台每分钟那一轮，写的都是同一块，谁最后查谁覆盖 ——
- * 所以这里不再需要「页面那份 vs 后台那份」比时间（那正是它原先会退回「没查过」的地方）。
+ * 所以这里不再需要「页面那份 vs 后台那份」比时间（那正是它原先会退回「未回查」的地方）。
  */
 function reseedStatusSource(task: IKeepUploadTask): Record<string, IReseedItemStatus> | undefined {
   return task.verify?.statuses;
@@ -717,7 +717,7 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
         }
       }
     }
-    // 结论要落进 IDB：这一份原先只活在组件的 ref 里，换一页就没了，界面上于是又写回「没查过」
+    // 结论要落进 IDB：这一份原先只活在组件的 ref 里，换一页就没了，界面上于是又写回「未回查」
     for (const task of touched) {
       await sendMessage("updateKeepUploadTask", task);
     }
@@ -837,10 +837,10 @@ const stageColorOf = (task: IKeepUploadTask) => RESEED_STAGE_COLOR[taskStage(tas
 function stageText(task: IKeepUploadTask): string {
   const info = taskStage(task);
   const stage = info.stage;
-  // wrong 那一档直接报数，不写「没正常做种」再在第二行重复一遍条数
+  // wrong 那一档直接报数，不写「未正常做种」再在第二行重复一遍条数
   if (stage === "wrong") return t("KeepUploadTask.recheck.stage.wrong", { count: info.wrongCount });
   const label = reseedStageLabel.value[stage];
-  // 没报进度就只说「基准在下」，不替下载器编一个 0%（同 v0.60.3 那条 `toPercent` 的口径）
+  // 没报进度就只说「基准下载中」，不替下载器编一个 0%（同 v0.60.3 那条 `toPercent` 的口径）
   if (stage === "baseDownloading") {
     return typeof info.progress === "number" ? `${label} ${Math.round(info.progress)}%` : label;
   }
@@ -908,7 +908,7 @@ function reseedSummary(
  * 这套序**不是**上面那条「最该说出口」的优先级：那条在有正常项时会让「在做种」盖过少数派
  * （4 条正常 + 1 条认不出 → 徽标报在做种），而排序要的是「越该先看的排前面」，
  * 所以「认不出」（等于完全没法判）压在「在做种」之上。两套混成一套会有一边说谎。
- * 「没查过」单独给最低一档：它不是一个结论，不该挤在结论中间。
+ * 「未回查」单独给最低一档：它不是一个结论，不该挤在结论中间。
  */
 const RESEED_RANK: Record<TReseedKind, number> = {
   seeding: 1,
@@ -944,7 +944,7 @@ function reseedRows(record: IKeepUploadTask) {
  *
  * 数据就是「做种状态」列悬停明细那一份（`reseedStatusSource` 挑出来的那份，按 infoHash 存），这里只是换个地方摆出来 ——
  * 不另算一套判据，否则同一页会出现两个说法。
- * 「还没查过」单独一档：那不是一个结论，把它写成「下载器里没有」是骗人（他 2026-10-09 要的就是这一列能在每条上看到）。
+ * 「未回查」单独一档：那不是一个结论，把它写成「下载器中未找到」是骗人（他 2026-10-09 要的就是这一列能在每条上看到）。
  */
 const RESEED_VERDICT_COLOR: Record<TReseedVerdict, string> = {
   seeding: "success",
@@ -1177,11 +1177,11 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           {{ formatSize(rowSize(record)) }}
         </template>
 
-        <!-- 这一列第一行是**进度阶段**（他 2026-10-09：「要能看到现在是已发基准、基准已下完还是在辅种」）。
+        <!-- 这一列第一行是**进度阶段**（他 2026-10-09：「要能看到现在是已发基准、基准下载完成还是在辅种」）。
              原先这一格只有折出来的结论（异常优先），报的是「有没有问题」，不是「走到哪一步」。
              第二行只放阶段那个词装不下的数（几条没正常做种 / 几条没记 infoHash）。
              悬停看逐条明细，含客户端原样的状态串：判据要是不对，人自己能看出是哪一条折错了。
-             没查过时老实写「没查过」而不是留空、更不是「正常」—— 替用户说过「没问题」而其实没看过，
+             没查过时老实写「未回查」而不是留空、更不是「正常」—— 替用户说过「没问题」而其实没看过，
              是会比报错更糟的谎。 -->
         <template v-else-if="column.key === 'seedState'">
           <div v-if="record.kind === 'task'">

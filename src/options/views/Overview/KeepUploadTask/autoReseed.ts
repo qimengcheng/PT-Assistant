@@ -12,7 +12,7 @@
  *   设置页弹窗开关 → 任务上记 `autoReseed: true`
  *   后台 `entrypoints/background/utils/autoReseed.ts` 每分钟醒一次 → 取下载器列表、
  *   调这里的 `planAutoReseed` 决定动作、执行发送/暂停、写回进度、必要时弹系统通知
- *   设置页那一列读后台写回来的 `autoState.stage` / `statuses`（没人手动回查时不至于显示「没查过」）
+ *   设置页那一列读后台写回来的 `autoState.stage` / `statuses`（没人手动回查时不至于显示「未回查」）
  */
 import { format } from "date-fns";
 
@@ -225,7 +225,7 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
    * 的整数百分比：1.8 GiB 的种子下到 0.5% 时那一格还是 0%，可它明明在动。
    *
    * `base.downloading === true` 这一条把「人自己按了暂停」挡在外面：`pausedDL` 不在
-   * 「正在下」那一族里（v0.65.2 就是为这个把它排除的），停着的种子字节永远不变，报「下不动了」
+   * 「正在下」那一族里（v0.65.2 就是为这个把它排除的），停着的种子字节永远不变，报「下载停滞」
    * 是把他的操作说成故障。代价：某个客户端既不给原样状态、归一又不是 `downloading` 时不报 ——
    * 那种情况下确实分不出「停着」和「没源」，宁可不报。
    * （`baseBytes` / `baseBytesAt` / `notifiedBaseStall` 那三个变量在上面「重发作废」那一节已经声明，

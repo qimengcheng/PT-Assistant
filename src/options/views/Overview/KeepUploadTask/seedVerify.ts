@@ -21,7 +21,7 @@ export interface IReseedProbe {
   rawState?: string;
   /** 0~100（`CTorrent.progress` 那边已经是百分数，qBittorrent 乘过 100） */
   progress?: number;
-  /** 下载器自己说「下完了」—— 判「基准已下完」用它，不拿 progress 猜（100 也可能是差一字节） */
+  /** 下载器自己说「下完了」—— 判「基准下载完成」用它，不拿 progress 猜（100 也可能是差一字节） */
   isCompleted?: boolean;
 }
 
@@ -228,8 +228,8 @@ export function linkItemToTorrent(
  * 5. 基准下完了再看其余：一条都没进列表 → `baseReady`；全在做种/停着 → `done`；否则 `reseeding`。
  *
  * `baseLocal` 那种任务的基准是下载器里已有的另一条，本来就在、也不用发，所以第 3、4 档整个跳过。
- * 有「没记 infoHash、压根没法查」的条目时不许报 `done`：那不是一个已完成的进度，
- * 降一档报 `reseeding`，具体是哪几条由界面上那行「另有 N 条没认出」去说。
+ * 有「未记录 infoHash、无法查询」的条目时不许报 `done`：那不是一个已完成的进度，
+ * 降一档报 `reseeding`，具体是哪几条由界面上那行「另有 N 条未匹配」去说。
  */
 export type TReseedStage =
   | "idle"

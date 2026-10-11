@@ -1656,6 +1656,7 @@
       "exclude": "Exclude",
       "generate": "Generate",
       "keywords": "Keywords",
+      "matchedCount": "{matched} of {total} torrents match",
       "required": "Required",
       "reset": "Reset Filter",
       "site": "@:common.site",

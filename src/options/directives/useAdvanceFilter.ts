@@ -485,74 +485,99 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
     }
   }
 
-  function tableFilterFn(value: any, query: string, item: any): boolean {
-    const rawItem = item.raw as ItemType;
+  /**
+   * 把「一份已解析的过滤字典」做成一个逐条判断函数。
+   *
+   * 表格那条路（下面的 `tableFilterFn`）与高级筛选对话框的实时预览**共用这一份判据** ——
+   * 预览要是另写一套，「对话框里说能筛出 12 条、点生成之后表格只剩 9 条」就是必然结果。
+   */
+  function createItemMatcherFn(parsed: TFilter): (rawItem: ItemType) => boolean {
+    const { text, exclude } = parsed;
 
-    const { text, exclude } = tableParsedFilterRef.value;
+    return (rawItem: ItemType): boolean => {
+      /**
+       * 惰性构造标题串：原来每行都无条件做一遍 titleFields.map(get) + flattenDeep + join + toLowerCase。
+       * 搜索结果上万行时，改一次过滤词就是几万次这样的开销；而像「size:>10GB」这种
+       * 只有区间条件的过滤压根用不到标题，却照样全算一遍。
+       */
+      let cachedTitle: string | undefined;
+      let cachedTitleLower: string | undefined;
+      const getTitle = () => {
+        if (cachedTitle === undefined) {
+          cachedTitle = flattenDeep(titleFields.map((key) => get(rawItem, key)))
+            .filter(Boolean)
+            .join("|$|")
+            .toString();
+          cachedTitleLower = cachedTitle.toLowerCase();
+        }
+        return cachedTitle;
+      };
+      const matchesText = (keyword: string): boolean => {
+        const normalizedKeyword = normalizeFilterValue(keyword);
+        if (typeof normalizedKeyword !== "string") return false;
+        const regex = toRegexIfValid(normalizedKeyword);
+        return regex ? regex.test(getTitle()) : (cachedTitleLower ??= getTitle().toLowerCase()).includes(normalizedKeyword.toLowerCase());
+      };
 
-    /**
-     * 惰性构造标题串：原来每行都无条件做一遍 titleFields.map(get) + flattenDeep + join + toLowerCase。
-     * 搜索结果上万行时，改一次过滤词就是几万次这样的开销；而像「size:>10GB」这种
-     * 只有区间条件的过滤压根用不到标题，却照样全算一遍。
-     */
-    let cachedTitle: string | undefined;
-    let cachedTitleLower: string | undefined;
-    const getTitle = () => {
-      if (cachedTitle === undefined) {
-        cachedTitle = flattenDeep(titleFields.map((key) => get(rawItem, key)))
-          .filter(Boolean)
-          .join("|$|")
-          .toString();
-        cachedTitleLower = cachedTitle.toLowerCase();
-      }
-      return cachedTitle;
-    };
-    const matchesText = (keyword: string): boolean => {
-      const normalizedKeyword = normalizeFilterValue(keyword);
-      if (typeof normalizedKeyword !== "string") return false;
-      const regex = toRegexIfValid(normalizedKeyword);
-      return regex ? regex.test(getTitle()) : (cachedTitleLower ??= getTitle().toLowerCase()).includes(normalizedKeyword.toLowerCase());
-    };
-
-    if (text) {
-      const includeText = Array.isArray(text) ? text : [text];
-      if (!includeText.every(matchesText)) {
-        return false;
-      }
-    }
-
-    if (parseOptions.keywords) {
-      for (const keyword of parseOptions.keywords) {
-        if (checkKeywordValue(tableParsedFilterRef.value, rawItem, keyword, format) === false) return false;
-      }
-    }
-
-    if (parseOptions.ranges) {
-      for (const keyword of parseOptions.ranges) {
-        if (checkRangeValue(tableParsedFilterRef.value, rawItem, keyword, format) === false) return false;
-      }
-    }
-
-    if (exclude) {
-      const { text: exText } = exclude;
-
-      if (exText) {
-        const excludesText = Array.isArray(exText) ? exText : [exText];
-        if (excludesText.some(matchesText)) {
+      if (text) {
+        const includeText = Array.isArray(text) ? text : [text];
+        if (!includeText.every(matchesText)) {
           return false;
         }
       }
 
       if (parseOptions.keywords) {
         for (const keyword of parseOptions.keywords) {
-          if (checkKeywordValue(exclude, rawItem, keyword, format, true) === true) return false;
+          if (checkKeywordValue(parsed, rawItem, keyword, format) === false) return false;
         }
       }
 
-      // NOTE： search-query-parser 不支持 range 的 exclude
-    }
+      if (parseOptions.ranges) {
+        for (const keyword of parseOptions.ranges) {
+          if (checkRangeValue(parsed, rawItem, keyword, format) === false) return false;
+        }
+      }
 
-    return true;
+      if (exclude) {
+        const { text: exText } = exclude;
+
+        if (exText) {
+          const excludesText = Array.isArray(exText) ? exText : [exText];
+          if (excludesText.some(matchesText)) {
+            return false;
+          }
+        }
+
+        if (parseOptions.keywords) {
+          for (const keyword of parseOptions.keywords) {
+            if (checkKeywordValue(exclude, rawItem, keyword, format, true) === true) return false;
+          }
+        }
+
+        // NOTE： search-query-parser 不支持 range 的 exclude
+      }
+
+      return true;
+    };
+  }
+
+  function tableFilterFn(value: any, query: string, item: any): boolean {
+    return createItemMatcherFn(tableParsedFilterRef.value)(item.raw as ItemType);
+  }
+
+  /**
+   * 按**此刻那份中间态字典**预数有多少条会命中：走的是 `stringifyFilterDictFn` → 解析 →
+   * 同一个 matcher，所以它与点「生成」之后表格看到的结果同源。
+   * 只数，不写回过滤器字符串 —— 也就不会动表格。
+   */
+  function countMatchingFn(items: ItemType[]): number {
+    const parsed = searchQueryParser.parse(stringifyFilterDictFn(), parseOptions) as TFilter;
+    const matches = createItemMatcherFn(parsed);
+    let hit = 0;
+    for (const item of items) {
+      if (matches(item)) hit++;
+    }
+    return hit;
   }
 
   return {
@@ -565,6 +590,7 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
     buildFilterDictFn,
     stringifyFilterDictFn,
     tableFilterFn,
+    countMatchingFn,
     reBuildFilterCountRef,
     reBuildAdvanceFilter,
     updateTableFilterValueFn,

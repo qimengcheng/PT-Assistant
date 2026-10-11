@@ -24,6 +24,21 @@ export const tableCustomFilter = useTableCustomFilter({
     },
     time: "date",
     size: "size",
+    /**
+     * 上传/下载/完成人数：**只给 build，不给 parse**。
+     *
+     * 为什么必须给 build：`stringifyFilterDictFn` 把区间交给 search-query-parser 拼串，而它
+     * 对**数字 0** 是整条丢弃的（实测 `stringify({seeders:{from:0,to:0}})` 出空串，
+     * 写成字符串 `"0"` 才出 `seeders:0-0`）。于是「把某一档拖到 0 ~ 0」点生成等于没筛 ——
+     * 表格那样，新加的实时预览也照着那样（预览与表格同源，所以预览没算错）。
+     *
+     * 为什么不能顺手改成 `format: "number"`：那份的 parse 会把**条目自己的值**也转成字符串，
+     * `checkRangeValue` 就变成字符串比较 —— `"14" <= "9"` 按字典序是 true，多位数的上界全错。
+     * 只改 build 才够：出去时是字符串，回来时条目值仍是数字，比较走数值。
+     */
+    seeders: { build: (value: number | string) => String(value) },
+    leechers: { build: (value: number | string) => String(value) },
+    completed: { build: (value: number | string) => String(value) },
   },
 });
 

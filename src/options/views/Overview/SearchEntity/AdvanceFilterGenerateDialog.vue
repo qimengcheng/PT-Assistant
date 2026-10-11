@@ -10,11 +10,13 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { addDays, startOfDay } from "date-fns";
+import { refDebounced } from "@vueuse/core";
 import { preDefinedTorrentTagNameSet, sortTorrentTags } from "@ptd/site";
 import { PushpinOutlined } from "@antdv-next/icons";
 
 import { formatDate, formatSize } from "@/options/utils.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
+import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { tableCustomFilter } from "@/options/views/Overview/SearchEntity/utils/filter.ts";
 import { TORRENT_STATUS_META } from "@/options/views/Overview/SearchEntity/torrentStatusMeta.ts";
 import { setDateRangeByDatePicker, getThisDateUnitRange } from "@/options/directives/useAdvanceFilter.ts";
@@ -30,6 +32,7 @@ const showDialog = defineModel<boolean>();
 
 const { t } = useI18n();
 const configStore = useConfigStore();
+const runtimeStore = useRuntimeStore();
 
 const {
   advanceItemPropsRef,
@@ -38,7 +41,27 @@ const {
   toggleKeywordStateFn,
   reBuildAdvanceFilter,
   updateTableFilterValueFn,
+  countMatchingFn,
 } = tableCustomFilter;
+
+/**
+ * 实时预览「这一批条件会筛出多少条」。
+ *
+ * 判据不在这份文件里：`countMatchingFn` 走的是 `stringifyFilterDictFn` → 解析 → 与表格同一个
+ * matcher（`useAdvanceFilter.ts` 的 `createItemMatcherFn`）。这里另写一套字符串判断的话，
+ * 「对话框里说 12 条、点生成之后表格剩 9 条」就是必然 —— 那是两条独立演化的过滤路径。
+ *
+ * 分母是**本次搜索的全部结果**，不是当前表格已经筛剩的那几条 —— 他要的是「这么改会捞到多少」，
+ * 拿已筛的当分母会让每一次收窄都显示成「只剩这些」，读不出全貌。
+ *
+ * 120ms 合并：区间滑块每移动一像素就 v-model 写一次，而上万行的搜索结果逐条判断一遍要几毫秒，
+ * 不合并的话拖动本身就卡。他读到的仍然是「改一下当场变」。
+ */
+const matchedCount = refDebounced(
+  computed(() => (showDialog.value ? countMatchingFn(runtimeStore.search.searchResult) : 0)),
+  120,
+);
+const totalCount = computed(() => runtimeStore.search.searchResult.length);
 
 /**
  * 五档做种状态：图标/颜色/键名与搜索页那颗快速筛选、以及「大小」下面那行进度条共用一份
@@ -317,6 +340,8 @@ function formatSizeTooltip(value?: number) {
 
     <template #footer>
       <AdvanceFilterFooter
+        :matched="matchedCount"
+        :total="totalCount"
         @reset="reBuildAdvanceFilter(true)"
         @cancel="showDialog = false"
         @generate="updateTableFilter"

@@ -446,6 +446,7 @@ export const useConfigStore = defineStore("config", {
     updateCheck: {
       enabled: true,
       notify: true,
+      autoDownload: true,
     },
   }),
   getters: {

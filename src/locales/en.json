@@ -1304,9 +1304,17 @@
     "gotoReleaseNote": "Read the release notes",
     "autoCheck": "Check once a day",
     "notify": "Notify me when a new version is out",
+    "autoDownload": "Download the update package automatically",
+    "labelPackage": "Package",
+    "download": {
+      "downloading": "Saving the package to your downloads folder…",
+      "done": "The package is in your downloads folder",
+      "failed": "Automatic download failed — use \"Open download page\" to get it yourself",
+      "showInFolder": "Show in folder"
+    },
     "info": {
       "description": "Version info comes from this project's GitHub repository: every release ships a Chrome and a Firefox package, and \"Open download page\" points at the one for your browser.",
-      "privacy": "Checking for updates is a single public request to api.github.com: no account, no site cookies, no site data. With \"Check once a day\" off, the extension goes online for this only when you press \"Check now\"."
+      "privacy": "Checking for updates is a single public request to api.github.com: no account, no site cookies, no site data. With \"Check once a day\" off, the extension goes online for this only when you press \"Check now\". With \"Download the update package automatically\" on there is one more step: when a new version is out it fetches that zip for your browser into your downloads folder (still just pulling a public file down — nothing is uploaded). Unzip it over the old folder, or turn the switch off."
     }
   },
   "SetNativeBridge": {

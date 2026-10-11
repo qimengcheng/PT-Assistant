@@ -49,7 +49,22 @@ export function emptyUpdateState(): IUpdateCheckState {
     via: "",
     rateLimitResetsAt: 0,
     fallbackOutcome: "",
+    downloadedFor: "",
+    downloadId: 0,
+    downloadState: "",
+    downloadError: "",
   };
+}
+
+/**
+ * 那条 `downloadUrl` 是不是真的 Release 资产直链。
+ *
+ * 必须分开判：拿不到资产（或整次走的是备用通道）时，`downloadUrl` 回落成 Release **网页**本身。
+ * 把网页交给 `chrome.downloads` 会存下来一个名字像 zip、内容却是 HTML 的文件 ——
+ * 那比不下载更糟，用户解压才发现上当。
+ */
+export function isReleaseAssetUrl(url: string): boolean {
+  return /^https:\/\/[^/]+\/[^/]+\/[^/]+\/releases\/download\/[^?#]+\.zip$/i.test(url);
 }
 
 /** `v0.42.0` / `0.42.0+abc123` → `0.42.0`；拿不出三段的一律返回空串（当作"不知道"）。 */

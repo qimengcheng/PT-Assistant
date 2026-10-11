@@ -53,6 +53,9 @@ export type TUpdateCheckVia = "" | "api" | "html";
  */
 export type TUpdateCheckFallback = "" | "noTag" | "threw";
 
+/** 自动下载那个安装包走到哪一步了（"" = 从没下过） */
+export type TUpdateDownloadState = "" | "downloading" | "done" | "failed";
+
 /**
  * 「检查更新」的结果缓存。
  *
@@ -91,4 +94,19 @@ export interface IUpdateCheckState {
   rateLimitResetsAt: number;
   /** 第二条路这次的失败形状（见 TUpdateCheckFallback）；成功或没试都为 "" */
   fallbackOutcome: TUpdateCheckFallback;
+  /**
+   * 已经为哪个版本自动下载过安装包（同一版本只下一次，不然每天查一次就每天下一个）。
+   * "" = 从没下过。
+   */
+  downloadedFor: string;
+  /** `chrome.downloads` 给那次下载的 id；0 = 没有（没下过，或发起就失败了） */
+  downloadId: number;
+  /** 那次自动下载到哪一步了（见 TUpdateDownloadState） */
+  downloadState: TUpdateDownloadState;
+  /**
+   * 失败原因原文（`chrome.downloads` 的 error 枚举，如 `SERVER_NOT_FOUND`）。
+   * **只进日志不进界面** —— 那是浏览器给的英文枚举名，端给用户就是内部标识进 UI；
+   * 界面按 downloadState 取本地化文案，要查因看运行日志。
+   */
+  downloadError: string;
 }

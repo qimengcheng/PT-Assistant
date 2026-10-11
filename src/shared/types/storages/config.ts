@@ -284,12 +284,20 @@ export interface IConfigPiniaStorageSchema {
   /**
    * 检查更新（v0.42.0 起）。
    *
-   * 两个开关的默认值都是 true，所以**不需要版本门**：`persistWebExt` 的 `$patch` 只用
+   * 三个开关的默认值都是 true，所以**不需要版本门**：`persistWebExt` 的 `$patch` 只用
    * storage 里存在的键覆盖，存量数据没有 `updateCheck` 这一片，拿到的就是这里的默认值，
    * 用户主动关掉才会落盘 false。（对照 `developerMode` 那条注释里的同一个理由。）
    */
   updateCheck: {
     enabled: boolean; // 是否每天自动查一次仓库的 Release 记录
     notify: boolean; // 发现新版本时是否发系统通知（同一版本只提醒一次）
+    /**
+     * 发现新版本时是否把与当前浏览器匹配的那个安装包下到浏览器下载目录。
+     *
+     * 对从 Release 页拿 zip 自己加载的用户，这是「解压 + 换加载目录」之前那一步；
+     * 商店安装的用户用不上（Chrome 自己会更新），关掉就是了。
+     * 只在拿得出**真资产直链**时才下 —— 备用通道给的是网页，见 `isReleaseAssetUrl`。
+     */
+    autoDownload: boolean;
   };
 }

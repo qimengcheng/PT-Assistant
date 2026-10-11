@@ -39,6 +39,18 @@ const showReleaseLink = computed(
 );
 
 /**
+ * 「安装包」那一行的措辞。三个键按字面写死，不用 `t("前缀" + 状态)`：
+ * 拼出来的键防线③看不见，写错一个状态名就是界面上多一条键路径（AGENTS §3.4）。
+ */
+const downloadTextKey = computed(() =>
+  state.value.downloadState === "done"
+    ? "SetUpdate.download.done"
+    : state.value.downloadState === "downloading"
+      ? "SetUpdate.download.downloading"
+      : "SetUpdate.download.failed",
+);
+
+/**
  * 失败那行的补充说明。两个片段都可能没有，所以拼不出来就不给 description
  * （a-alert 少了 description 会退回单行标题的紧凑形状，不会留一条空缝）。
  */
@@ -81,6 +93,16 @@ async function checkNow() {
   }
 }
 
+/** 在文件管理器里定位那个已下载的包；下载记录被清过就没什么可做的 */
+function showDownloadedPackage() {
+  if (!state.value.downloadId) return;
+  try {
+    browser.downloads?.show?.(state.value.downloadId);
+  } catch (e) {
+    console.debug("[PTD] downloads.show failed:", e);
+  }
+}
+
 onMounted(refresh);
 </script>
 
@@ -106,6 +128,18 @@ onMounted(refresh);
         </a-descriptions-item>
         <a-descriptions-item v-if="state.latestVersion" :label="t('SetUpdate.labelPublished')">
           <span class="plain-text">{{ fmtPublished(state.publishedAt) }}</span>
+        </a-descriptions-item>
+        <!-- 只在真的动手下载过之后才出现这一行：没开开关、或那次走的是备用通道（没有直链）时，
+             摆一行「没下过」是凭空多出来的噪声。
+             说明与那颗按钮包在一层 div 里：a-descriptions 非 bordered 时把同一格里多个子节点
+             当横排摆，会挤在一起（AGENTS §3.4 那条「一格只放一个子节点」）。 -->
+        <a-descriptions-item v-if="state.downloadedFor" :label="t('SetUpdate.labelPackage')">
+          <div class="package-line">
+            <span class="plain-text">{{ t(downloadTextKey) }}</span>
+            <a-button v-if="state.downloadState === 'done'" type="link" size="small" @click="showDownloadedPackage">
+              {{ t("SetUpdate.download.showInFolder") }}
+            </a-button>
+          </div>
         </a-descriptions-item>
       </a-descriptions>
 
@@ -162,6 +196,11 @@ onMounted(refresh);
           />
           <span class="label">{{ t("SetUpdate.notify") }}</span>
         </div>
+        <!-- 自动下载不依赖「每天自动检查」：手动点一次查出新版本，也照这条走（同一处判据不拆两份） -->
+        <div class="switch-item">
+          <a-switch v-model:checked="configStore.updateCheck.autoDownload" size="small" />
+          <span class="label">{{ t("SetUpdate.autoDownload") }}</span>
+        </div>
       </div>
     </div>
 
@@ -194,5 +233,14 @@ onMounted(refresh);
 
 .release-note-link {
   font-size: 12px;
+}
+
+/* 「安装包」那一格：说明 + 那颗「在目录里显示」。同一格里多个子节点必须自己包一层 flex，
+   否则非 bordered 的 descriptions 会把它们横排且零间距贴边（AGENTS §3.4）。 */
+.package-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 </style>

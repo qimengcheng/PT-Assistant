@@ -1,8 +1,20 @@
 {
-  "generatedAt": "2026-10-11 10:01:21",
-  "headSha": "ec8c9d5",
+  "generatedAt": "2026-10-11 10:17:57",
+  "headSha": "20cbac1",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.71.0",
+      "date": "2026-10-11 10:17:35",
+      "added": [
+        "第一次打开扩展落在首页（那里有「最近更新」和添加站点的入口），之后点工具栏图标直接进搜索页，不用再跳过一次首页"
+      ],
+      "addedTotal": 1,
+      "improved": [
+        "从站点划词、右键菜单、地址栏搜索、通知和书签进来的仍然直达它们各自那一页；在首页按 F5 也不会被弹去搜索页"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.70.0",
       "date": "2026-10-11 10:00:09",

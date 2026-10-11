@@ -149,6 +149,44 @@ export const routes: RouteRecordRaw[] = [
   },
 ];
 
+/**
+ * 「打开插件」这一趟落在哪一页：装机后第一次进首页（那里有「最近更新」和添加站点的入口），
+ * 之后每次直接进搜索页 —— 天天用的人点开就是搜种子，首页对他只是一次多余的跳转。
+ *
+ * 只在**裸开**时改：进来那一刻 hash 是空的（点工具栏图标、从「扩展程序」详情打开，都是
+ * `options.html` 不带 hash）。划词搜索、omnibox、点通知、书签深链都带着自己的 hash，
+ * 那些一律不动。
+ * 实测过一条关键区分（`.tmp-build/bench-hash/`，vue-router 4 + createWebHashHistory）：
+ * 空 hash 进来、路由 ready 之后 URL 里已经写着 `#/` —— 所以「在首页按 F5」不算裸开，
+ * 不会把人弹去搜索页。判据要是写成「hash 为空**或就是 `#/`**」，那条就错了。
+ *
+ * 写在 createRouter **之前**而不是路由守卫里，有两个理由：
+ * - 守卫会在用户点侧栏「首页」时也触发，那就永远回不到首页了；
+ * - `createWebHashHistory()` 在 createRouter 那一刻就读掉初始 hash，晚一步只能
+ *   `router.replace()` 补，会先闪一下首页。
+ *
+ * 用 localStorage 而不是 config store：这一趟要在挂载**前**同步读完，而 persistWebExt
+ * 那份是异步水合的（AGENTS §3.2 防线⑤拦的就是"等不及就去读 store"）。
+ */
+const HAS_OPENED_KEY = "ptd.options.hasOpenedBefore";
+
+function pickLandingRoute(): void {
+  // 拿不到 location / localStorage（非浏览器环境、隐私模式、配额满）就什么都不做：
+  // 停在首页是原来就有的行为，比替用户猜一个去处安全。
+  let hash: string;
+  try {
+    hash = window.location.hash;
+    if (hash !== "" && hash !== "#") return;
+    const isFirstOpen = window.localStorage.getItem(HAS_OPENED_KEY) !== "1";
+    window.localStorage.setItem(HAS_OPENED_KEY, "1");
+    if (!isFirstOpen) window.location.hash = "/search";
+  } catch {
+    return;
+  }
+}
+
+pickLandingRoute();
+
 export const routerInstance = createRouter({
   history: createWebHashHistory(),
   routes,

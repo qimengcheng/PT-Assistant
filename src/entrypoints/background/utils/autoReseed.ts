@@ -30,6 +30,8 @@ import {
 import { judgeReseedTorrent, linkItemToTorrent } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
+import { estimateEtaSec, reseedNoticeText, type IReseedNotice, type TReseedNoticeKind } from "@/shared/reseedNotice.ts";
+import { isPluginPageVisible, pushReseedNotice } from "@/shared/reseedPresence.ts";
 
 import { whenOffscreenReady } from "./offscreen.ts";
 
@@ -37,6 +39,43 @@ const JOB_ID = "autoReseed";
 const TICK_MS = 60 * 1000;
 
 const jobs = defineJobScheduler();
+
+/**
+ * 一条进展该弹给谁看：**人在插件页面里 → 界面的 snakebar；不在 → 浏览器系统通知**。
+ *
+ * 「在不在」由页面自己每 10 秒报一次可见时刻（`src/shared/reseedPresence.ts`）——
+ * `chrome.runtime.getContexts()` 只能告「有没有一个活的 options 页面」，告不出它是不是前台；
+ * 而 manifest 里没有 `tabs` 权限，也不该为这件事加权限。
+ *
+ * 文案两边共用 `reseedNoticeText`（SW 里拿不到 useI18n，同 `notifyText` 那条取舍）。
+ * 写存储失败（session 配额那种极端情况）就退到系统通知，不能因为选不了通道就不吭声。
+ */
+async function notifyUser(
+  kind: TReseedNoticeKind,
+  task: IKeepUploadTask,
+  lang: string | undefined,
+  extra: Pick<IReseedNotice, "progress" | "etaSec" | "count"> = {},
+): Promise<void> {
+  const notice: IReseedNotice = { kind, taskId: task.id, title: task.title, at: Date.now(), ...extra };
+  try {
+    if (await isPluginPageVisible()) {
+      await pushReseedNotice(notice);
+      return;
+    }
+  } catch (e) {
+    void sendMessage("logger", {
+      msg: `Auto-reseed: 进展通知改走系统通知栏 (${e instanceof Error ? e.message : e})`,
+    });
+  }
+  const { title, message } = reseedNoticeText(notice, lang);
+  // 同一个 kind + 任务用同一个 id：再 create 是替换，不会在通知栏堆一排
+  chrome.notifications?.create(`reseed-${kind}-${task.id}`, {
+    type: "basic",
+    iconUrl: chrome.runtime.getURL("icon/128.png"),
+    title,
+    message,
+  });
+}
 
 /** 通知文案：SW 里拿不到 useI18n，按 config.lang 选一份（同 updateCheck.ts 的 notifyText） */
 function notifyText(lang: string | undefined, title: string, count: number): { title: string; message: string } {
@@ -145,6 +184,11 @@ function worthWriting(task: IKeepUploadTask, next: IKeepUploadTask["autoState"])
     "stage",
     "notifiedWrong",
     "notifiedPathMismatch",
+    // 这三条是「弹过没有」的记账。漏在这里的话，标记写不进存储 ——
+    // 下一轮又读到 undefined，用户每分钟收到一条同样的通知。
+    "notifiedBaseStarted",
+    "notifiedHalfway",
+    "notifiedBaseDone",
   ]) {
     if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return true;
   }
@@ -281,6 +325,19 @@ async function autoReseedTick() {
 
         const next = { ...tick.next };
 
+        /**
+         * ① 基准下到一半。判据（一条任务只弹一次、下完了不补报、baseLocal 不报）都在
+         * `planAutoReseed`，它已经把 `notifiedHalfway` 写进 `next` 了；这里只补它算不出的那半句
+         * —— 预计剩余时间要吃下载器的实时字节数和速度，那是这一层才有的东西。
+         */
+        if (tick.notifyHalfway) {
+          const entry = index.get(baseHash);
+          await notifyUser("baseHalfway", task, config?.lang, {
+            progress: base?.progress,
+            etaSec: entry ? estimateEtaSec(entry) : undefined,
+          });
+        }
+
         const downloader = metadata?.downloaders?.[downloaderId];
         let acted = false;
 
@@ -289,6 +346,12 @@ async function autoReseedTick() {
             await sendOne(task, task.items[0], downloader, siteNameOf(metadata, task.items[0].site));
             next.baseSentAt = Date.now();
             void sendMessage("logger", { msg: `Auto-reseed: base torrent sent for [${task.title}]` });
+            // ②「基准已交给下载器，开始下全量」。一条任务只报一次；那次发送没落地被放开重发时，
+            // 判据会把标记清掉，于是重发成功会再报一次 —— 那是又一次真的进展，不是重复轰炸。
+            if (next.notifiedBaseStarted === undefined) {
+              next.notifiedBaseStarted = Date.now();
+              await notifyUser("baseStarted", task, config?.lang);
+            }
           } catch (e) {
             next.baseSendFails = (next.baseSendFails ?? 0) + 1;
             void sendMessage("logger", {
@@ -327,6 +390,12 @@ async function autoReseedTick() {
                 `Auto-reseed: ${sentKeys.length} reseed torrent(s) sent for [${task.title}]` +
                 (failed.length > 0 ? `（另有 ${failed.length} 条失败，下一轮只重试这几条）` : ""),
             });
+            // ③「基准下完了，那几条已推给下载器」。只报第一次成功 —— 后面那些重试轮次再报一遍，
+            // 用户读到的是同一件事。N 说的是这一轮真的发出去几条，不是这批一共几条。
+            if (next.notifiedBaseDone === undefined) {
+              next.notifiedBaseDone = Date.now();
+              await notifyUser("baseDone", task, config?.lang, { count: sentKeys.length });
+            }
           }
           acted = true;
         }
@@ -392,6 +461,14 @@ async function autoReseedTick() {
             message,
           });
           void sendMessage("logger", { msg: `Auto-reseed: ${count} torrent(s) not seeding for [${task.title}], paused` });
+        }
+
+        /**
+         * ④「那几条现在都在正常做种」。判据是「第一次走到 done 那一档」（见 planAutoReseed）；
+         * 后来某条坏了又修好的话会再报一次 —— 那是用户想知道的第二件事。
+         */
+        if (tick.firstDone) {
+          await notifyUser("allSeeded", task, config?.lang);
         }
 
         if (acted || worthWriting(task, next)) {

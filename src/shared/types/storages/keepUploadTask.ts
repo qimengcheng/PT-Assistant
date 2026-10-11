@@ -120,6 +120,16 @@ export interface IKeepUploadTaskAutoState {
    * 这一种卡住不会自己解开（要人挑处置），每分钟弹一次只是把通知栏刷满。
    */
   notifiedPathMismatch?: number;
+  /**
+   * 「基准已交给下载器、开始下全量」那条通知弹过的时刻。
+   * 没这一项 = 还没弹过。基准那次发送没落地、被放开重发时清掉（见 `planAutoReseed`），
+   * 于是重发成功会再弹一次 —— 那是真的又发生了一回，不是重复轰炸。
+   */
+  notifiedBaseStarted?: number;
+  /** 「基准下到一半（带预计剩余时间）」那条通知弹过的时刻：一条任务只弹一次 */
+  notifiedHalfway?: number;
+  /** 「基准下完、辅种那几条已推给下载器」那条通知弹过的时刻：一条任务只弹一次 */
+  notifiedBaseDone?: number;
   /** 后台折出来的进度阶段。界面上那一列在没人手动回查时读它，否则后台都在暂停种子了、页面还写「没查过」 */
   stage?: TReseedStage;
 }

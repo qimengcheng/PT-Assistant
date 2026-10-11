@@ -84,6 +84,18 @@ export interface IAutoReseedTick {
   pauseBase: boolean;
   /** 这一轮要不要弹一次系统通知（条数没再变多就不重复轰炸） */
   notify: boolean;
+  /**
+   * 这一轮该弹「基准下到一半」那一条。
+   * 一条任务只弹一次（判据是 `state.notifiedHalfway` 还没写过）—— 后台每分钟醒一次，
+   * 不记账的话从 50% 到 100% 那段会连着弹十几条。
+   */
+  notifyHalfway: boolean;
+  /**
+   * 这一轮是**第一次**走到「全部正常辅种」那一档。
+   * 记在 `completedAt` 上（它本来就是「上一次走到 done 的时刻」，离开那一档就清掉），
+   * 所以不需要第二个标记：做完 → 后来某条坏了 → 又修好，这种回头路会再通知一次，是对的。
+   */
+  firstDone: boolean;
   /** 界面上那一列读的进度阶段 */
   stage: TReseedStage;
   /** 这一轮判出来的、要写回任务的那一份进度（发送成功与否由调用方补） */
@@ -116,6 +128,9 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
   // —— 第 2 档：那次「已发出」有没有落地 ——
   let baseSentAt = state.baseSentAt;
   let baseSendFails = state.baseSendFails ?? 0;
+  // 那两条进展通知的记账（弹过就写时刻）。基准被放开重发时要一起清掉，见下面那一支。
+  let notifiedBaseStarted = state.notifiedBaseStarted;
+  let notifiedHalfway = state.notifiedHalfway;
   if (
     reachable &&
     baseSentAt !== undefined &&
@@ -125,6 +140,9 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     // 发出去 5 分钟了列表里还没有它 —— 那次发送算失败，记一笔并放开重发（封顶见下）
     baseSendFails += 1;
     baseSentAt = undefined;
+    // 那两条「刚开始下 / 下到一半」的通知也跟着作废：重发成功之后那是又一次真的进展
+    notifiedBaseStarted = undefined;
+    notifiedHalfway = undefined;
   }
   const sendBase =
     reachable &&
@@ -153,14 +171,36 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
 
   const notify = reachable && wrongCount > (state.notifiedWrong ?? 0);
 
+  /**
+   * 「下到一半」那一档。三条约束都必要：
+   * - `!baseLocal`：基准是下载器里已有的那条，根本没有「下」这件事，弹它就是假话；
+   * - `base?.completed !== true`：下完了不该再补一条「刚过半」；
+   * - `notifiedHalfway === undefined`：后台每分钟醒一次，从 50% 到 100% 中间有十几轮，
+   *   不记账就是十几条通知。
+   * 一分钟能下完的种子会**跳过**这一档（那一轮直接看到 completed）—— 这是对的，
+   * 它没有「还要等很久」这件事要告诉用户。
+   */
+  const notifyHalfway =
+    reachable &&
+    !baseLocal &&
+    notifiedHalfway === undefined &&
+    base?.completed !== true &&
+    typeof base?.progress === "number" &&
+    base.progress >= 50;
+  if (notifyHalfway) notifiedHalfway = now;
+
   // 「完成时间」那一列读这一条：只在真的走到 `done` 那一档时留下时刻，离开就清掉。
   // 连不上下载器的那一轮不改它（阶段本身也没重算，见上）—— 不然一次断网就把已完成任务的完成时间抹了。
   const completedAt = reachable ? (stage === "done" ? (state.completedAt ?? now) : undefined) : state.completedAt;
+  /** 第一次走到「全部正常做种」= 上一条通知的判据（离开那一档会清 completedAt，再回来会再报一次） */
+  const firstDone = reachable && stage === "done" && state.completedAt === undefined;
 
   const next: IKeepUploadTaskAutoState = {
     ...state,
     baseSentAt,
     baseSendFails,
+    notifiedBaseStarted,
+    notifiedHalfway,
     lastRunAt: now,
     completedAt,
     stage,
@@ -173,6 +213,8 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     pauseIndexes: reachable ? wrongIndexes : [],
     pauseBase: reachable && pauseBase,
     notify,
+    notifyHalfway,
+    firstDone,
     stage,
     next,
   };

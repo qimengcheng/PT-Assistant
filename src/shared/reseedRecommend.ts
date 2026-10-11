@@ -23,6 +23,53 @@ export interface IReseedBaseCandidate {
    */
   seeders?: unknown;
   tags?: { name: string }[] | null;
+  /**
+   * 该站的分享率（`metadataStore.lastUserInfo[site].ratio`，与「我的数据」那一列同一个数）。
+   * 同样写成 unknown：这个字段是可选的，站点不报或还没刷过用户信息时就是 undefined，
+   * 判据要能区分「报得出且低于 1」与「压根没数」——见 `reseedRatioVerdict`。
+   */
+  ratio?: unknown;
+}
+
+/**
+ * 分享率这一档的三种事实。
+ *
+ * 为什么基准要看分享率（用户 2026-10-11：「辅种界面分享率低于 1 的站点不能作为基准种子」）：
+ * 基准那一条是**要真下一遍**的（其余各条跳过校验、直接算 100%），所以下了它的那一站会被
+ * 记上一整份下载量、分享率往下走；其余各条只上传不下载，是把分享率往上抬的那几条。
+ * 已经低于 1 的站点再背这一份，就是往错的方向推。
+ */
+export type TReseedRatioVerdict = "ok" | "low" | "unknown";
+
+/** 基准这一档的下限：等于 1 算达标（不亏），低于它才拦 */
+export const BASE_RATIO_FLOOR = 1;
+
+/** 报不出（不是数字、NaN、Infinity）一律 `unknown` 而不是 `low`：判不出就不假装知道 */
+export function reseedRatioVerdict(ratio: unknown): TReseedRatioVerdict {
+  if (typeof ratio !== "number" || !Number.isFinite(ratio)) return "unknown";
+  return ratio < BASE_RATIO_FLOOR ? "low" : "ok";
+}
+
+/** 能不能拿这一条当基准：只有明确「低于 1」才拦，报不出的照旧可当（用户 2026-10-11 定的口径） */
+export function canBeReseedBase(candidate: IReseedBaseCandidate): boolean {
+  return reseedRatioVerdict(candidate.ratio) !== "low";
+}
+
+/** 一个能达标的都没有（全都被明确报成低于 1）—— 界面上那句退让提示的判据 */
+export function allBasesTooLow(list: IReseedBaseCandidate[]): boolean {
+  return list.length > 0 && list.every((item) => reseedRatioVerdict(item.ratio) === "low");
+}
+
+/**
+ * 默认拿哪一条当基准：列表里**第一条能当基准的**。
+ *
+ * 一个都不许当（全都低于 1）时退回列表第一条 —— 基准总得有一条，而把人堵死在建不出任务上
+ * 不是这条规则的本意（用户 2026-10-11 选的就是「照旧允许，只给一句提示」）。
+ * 空列表返回 null，由界面自己决定那一行长什么样。
+ */
+export function pickDefaultBaseId(list: IReseedBaseCandidate[]): string | null {
+  const eligible = list.find((item) => canBeReseedBase(item));
+  return (eligible ?? list[0])?.id ?? null;
 }
 
 export type TReseedRecommendKind = "mostSeeders" | "mostSeedersFree";
@@ -74,17 +121,25 @@ function pickTop(list: IReseedBaseCandidate[]): { id: string; seeders: number } 
 /**
  * 给出两组推荐（做种最多 / 免费里做种最多）。
  *
- * 三条边界：
+ * 候选先过一道分享率：分享率明确低于 1 的那几条**不进推荐池**（推荐就是替他挑，
+ * 挑一条不能当基准的当推荐是给出一个点下去必然错的答案）。池子被清空时退回整份 ——
+ * 与 `pickDefaultBaseId` 同一个退让口径，界面上另有那句「这批候选都低于 1」的提示。
+ *
+ * 四条边界：
  *  1. 一条都拿不出做种数 → 空数组（界面上那一行整个不出，而不是摆两颗假按钮）；
  *  2. 没有任何免费条目 → 只出第一组；
  *  3. 两组指向同一条 → 只报 `mostSeeders` 一组 —— 一行里出现两个词指的是同一份数据，
  *     读起来像有两个答案，其实没有。
+ *  4. 全部候选分享率都低于 1 → 照旧给推荐（退让），不做成「一颗按钮都不出」。
  */
 export function pickBaseRecommendations(list: IReseedBaseCandidate[]): IReseedRecommendation[] {
-  const topAll = pickTop(list);
+  const eligible = list.filter((item) => canBeReseedBase(item));
+  const pool = eligible.length > 0 ? eligible : list;
+
+  const topAll = pickTop(pool);
   if (!topAll) return [];
 
-  const topFree = pickTop(list.filter((item) => isFreeTorrent(item.tags)));
+  const topFree = pickTop(pool.filter((item) => isFreeTorrent(item.tags)));
   if (!topFree || topFree.id === topAll.id) {
     return [{ kind: "mostSeeders", id: topAll.id, seeders: topAll.seeders }];
   }

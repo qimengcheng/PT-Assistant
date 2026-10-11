@@ -33,7 +33,13 @@ import {
 } from "@/shared/fingerprint/index.ts";
 import { formatSize } from "@/options/utils.ts";
 import { countText, toCount } from "@/shared/torrentCount.ts";
-import { pickBaseRecommendations, type TReseedRecommendKind } from "@/shared/reseedRecommend.ts";
+import {
+  allBasesTooLow,
+  pickBaseRecommendations,
+  pickDefaultBaseId,
+  reseedRatioVerdict,
+  type TReseedRecommendKind,
+} from "@/shared/reseedRecommend.ts";
 import { detectBasePathMismatch } from "@/shared/reseedPath.ts";
 import type { TCategoryKind } from "@/shared/category.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -392,19 +398,55 @@ const baseId = computed(() => verifiedItemsOrder.value[0] ?? "");
 const baseItem = computed(() => verifiedItems.value.get(baseId.value) ?? null);
 
 /**
- * 两组推荐基准（做种最多 / 免费里做种最多），判据在 `@/shared/reseedRecommend.ts`。
+ * 「能当基准的候选」这一份清单，三个出口共用：两组推荐、默认基准挪哪一条、那句退让提示。
  *
  * 只在这张表真的靠「列表第一条」当基准时才有意义：基准取自下载器（`useLocalBase`）或只勾一条时
- * 列表里没有「当基准」这一说 —— 跟角色列同一判据（所以那一列撤掉时这两颗按钮也一起撤）。
- * 候选还要过一道 `!!item.torrent`：没拿到种子文件的那一条点不动，推荐它等于给一颗死按钮。
+ * 列表里没有「当基准」这一说 —— 跟角色列同一判据（所以那一列撤掉时这三样也一起撤，
+ * 用户 2026-10-11 定的适用范围就是「只拦列表里挑基准那条路」）。
+ * 还要过一道 `!!item.torrent`：没拿到种子文件的那一条点不动，推荐它等于给一颗死按钮。
+ */
+const listBaseCandidates = computed(() => {
+  if (isSingleMode.value || useLocalBase.value) return [];
+  return includedItems.value
+    .filter((item) => !!item.torrent)
+    .map((item) => ({
+      id: item.id,
+      seeders: item.data.seeders,
+      tags: item.data.tags,
+      ratio: metadataStore.lastUserInfo?.[item.data.site]?.ratio,
+    }));
+});
+
+/** 这一条所在站的分享率报不报得出、低于不低于 1（判据在 `@/shared/reseedRecommend.ts`） */
+function ratioVerdictOf(item: IVerifiedItem) {
+  return reseedRatioVerdict(metadataStore.lastUserInfo?.[item.data.site]?.ratio);
+}
+
+// 角色列那颗标签的两截文字。写成函数而不是在模板里摆两个三元：
+// `:title="x === "low" ? …"` 这种嵌套双引号会把模板解析炸掉（实测 TS1003），抽出来顺带去掉重复判断。
+const ratioTagLabels = computed<Record<"low" | "unknown", { text: string; tip: string }>>(() => ({
+  low: { text: t("SearchEntity.KeepUploadDialog.baseRatio.low"), tip: t("SearchEntity.KeepUploadDialog.baseRatio.lowTip") },
+  unknown: {
+    text: t("SearchEntity.KeepUploadDialog.baseRatio.unknown"),
+    tip: t("SearchEntity.KeepUploadDialog.baseRatio.unknownTip"),
+  },
+}));
+
+/** 这一行那颗分享率标签（文字 + 悬停说明）。达标的那一档模板不会走到这里 */
+function ratioTag(item: IVerifiedItem) {
+  return ratioTagLabels.value[ratioVerdictOf(item) === "low" ? "low" : "unknown"];
+}
+
+/**
+ * 一个达标的都没有 —— 那一行退让提示的判据（措辞见 locale 里的 baseRatio.allLow） */
+const allBaseRatiosLow = computed(() => allBasesTooLow(listBaseCandidates.value));
+
+/**
+ * 两组推荐基准（做种最多 / 免费里做种最多），判据在 `@/shared/reseedRecommend.ts`。
+ * 分享率那一档已经在 `listBaseCandidates` 里带着，由判据自己筛。
  */
 const recommendations = computed(() => {
-  if (isSingleMode.value || useLocalBase.value) return [];
-  const list = pickBaseRecommendations(
-    includedItems.value
-      .filter((item) => !!item.torrent)
-      .map((item) => ({ id: item.id, seeders: item.data.seeders, tags: item.data.tags })),
-  );
+  const list = pickBaseRecommendations(listBaseCandidates.value);
   // 站点名在这里一起算好：SiteName 那一栏要它，而按钮里没有可靠的 index/id 反查
   return list.map((r) => ({ ...r, site: verifiedItems.value.get(r.id)?.data.site ?? "" }));
 });
@@ -462,9 +504,19 @@ const columns = computed<TableColumnsType<IVerifiedItem>>(() => {
   ];
 });
 
-/** 能不能把某一条挪成基准：只有「基准取自列表第一条」那条路有意义，且它得已经拿到种子信息 */
+/**
+ * 能不能把某一条挪成基准：只有「基准取自列表第一条」那条路有意义，它得已经拿到种子信息，
+ * 而且所在站的分享率不能明确低于 1（基准那一条要真下一遍，会把这一站的分享率继续往下拉）。
+ * 报不出分享率的照旧可挑 —— 判不出就不假装知道，见 `reseedRatioVerdict`。
+ */
 function canPromote(item: IVerifiedItem): boolean {
-  return item.id !== baseId.value && !isSingleMode.value && !useLocalBase.value && !!item.torrent;
+  return (
+    item.id !== baseId.value &&
+    !isSingleMode.value &&
+    !useLocalBase.value &&
+    !!item.torrent &&
+    ratioVerdictOf(item) !== "low"
+  );
 }
 
 // 状态文本
@@ -571,6 +623,28 @@ const includedItems = computed(() =>
 );
 
 const includedVerifiedCount = computed(() => includedItems.value.filter((item) => item.verified).length);
+
+/**
+ * 分享率明确低于 1 的那一条不能当基准，所以列表头一项落在它身上时，把第一条能当的挪到最前。
+ *
+ * 为什么可以放心代换：这类行压根没有「设为基准种子」那颗按钮（见 `canPromote`），
+ * 用户没法显式选它 —— 它排在头一位只可能是勾选顺序带进来的。
+ * 全都低于 1 时 `pickDefaultBaseId` 退回头一条，这个 watch 因此不动手，界面另有那句提示。
+ *
+ * ⚠️ 这一段必须排在 `includedItems` **之后**：`immediate: true` 会在 setup 里就把
+ * `listBaseCandidates` 求一遍值，而那份 computed 读的就是 `includedItems` —— 放在它上面是
+ * `ReferenceError: Cannot access 'includedItems' before initialization`（整个弹窗炸掉，
+ * 台架实测到的；computed 本身写在那儿没事，因为它要到渲染才第一次求值）。
+ */
+watch(
+  listBaseCandidates,
+  (list) => {
+    const want = pickDefaultBaseId(list);
+    if (want && want !== baseId.value) setItemBase(want);
+  },
+  // immediate：候选在挂载时就可能已经齐了（重开弹窗、缓存命中），不等一次变化才挪
+  { immediate: true },
+);
 
 /**
  * 表格上方那行汇总的分档计数 —— 各档之和恒等于 `total`，也就是表里的行数。
@@ -1267,6 +1341,12 @@ async function createKeepUploadTask() {
       </a-tooltip>
     </div>
 
+    <!-- 一个达标的都没有时规则退让（照旧拿列表第一条当基准），但要说清为什么退让 ——
+         否则他刚看到那一行的「低分享率」标记，转头又发现被标着的这条就是基准，两句互相矛盾。 -->
+    <a-alert v-if="allBaseRatiosLow" class="mb-2" type="warning" show-icon>
+      <template #message>{{ t("SearchEntity.KeepUploadDialog.baseRatio.allLow") }}</template>
+    </a-alert>
+
     <!-- 汇总那一行：这张表里现在有几条判定通过、还剩几条要人处理。放在表格正上方（而不是弹窗标题里）
          是因为它数的就是下面这些行；数字怎么分档见 `verifySummary` 的注释。
          一条都还没有时整行不出 —— 空表下面挂一句「验证通过 0 / 共 0 条」是新 bug，不是信息。 -->
@@ -1307,6 +1387,13 @@ async function createKeepUploadTask() {
                  同大小的结果并排，光靠站名对不到具体哪一行。包成一个 flex 列，两颗标签不零间距贴边。 -->
             <div v-if="recommendOf(record)" class="role-recommend">
               <a-tag color="gold">{{ recommendKindShort[recommendOf(record)!.kind] }}</a-tag>
+            </div>
+            <!-- 分享率那一档为什么标在角色列：它说的就是「这一条能不能当基准」，与上面那颗标记同一件事。
+                 低于 1 的行没有「设为基准种子」（见 canPromote），不标一下就成了静默消失。 -->
+            <div v-if="ratioVerdictOf(record) !== 'ok'" class="role-recommend role-ratio">
+              <a-tag :color="ratioVerdictOf(record) === 'low' ? 'volcano' : 'default'" :title="ratioTag(record).tip">
+                {{ ratioTag(record).text }}
+              </a-tag>
             </div>
           </template>
 

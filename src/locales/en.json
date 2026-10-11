@@ -607,9 +607,16 @@
         "seedersCount": "{n} seeders",
         "alreadyBase": "This one is already the base"
       },
+      "baseRatio": {
+        "low": "Low ratio",
+        "lowTip": "This site's ratio is below 1: the base torrent is downloaded in full, which pushes this site's ratio down further, so it is not offered as a base candidate.",
+        "unknown": "Ratio unknown",
+        "unknownTip": "No ratio has been fetched for this site yet (refresh user data in My Data), so it is still treated as eligible.",
+        "allLow": "Every candidate site here has a ratio below 1, so there is nothing to fall back to - the first entry is used as the base."
+      },
       "localBase": {
         "byFiles": "File lists match - selected for you",
-        "byList": "Nothing picked - the first entry in the list is the base",
+        "byList": "Nothing picked - the first eligible entry in the list is the base",
         "bySize": "This one only matches by size, which is not enough evidence - check it yourself",
         "byTitleSize": "This one only matches by title and size, which is not enough evidence - check it yourself",
         "noIndex": "The torrent list from this downloader has not been read yet. Try 'Rebuild local fingerprint index' above",

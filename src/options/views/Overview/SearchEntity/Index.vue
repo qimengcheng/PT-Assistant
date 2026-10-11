@@ -47,6 +47,7 @@ import SetSearchSolutionPage from "@/options/views/Settings/SetSearchSolution/In
 import { tableCustomFilter } from "./utils/filter";
 import { countCompare, commentsHref, countText } from "@/shared/torrentCount.ts";
 import { bumpSearchGeneration, doSearch, retrySearch, searchPlanStatus, searchQueue } from "./utils/search";
+import { pageOfSortedRows, pickSortColumns, scrollRowIntoView } from "./utils/locate.ts";
 import RecommendationMenu from "@/options/views/Layout/RecommendationMenu.vue";
 
 // 本文件名为 Index.vue，与 MyData/Index.vue 同名；<script setup> 推断出的
@@ -367,6 +368,46 @@ const tableSelectedRowKeys = computed(() => tableSelectedRaw.value.map((x) => x.
 
 function onRowSelectionChange(_keys: any, rows: any[]) {
   tableSelectedRaw.value = rows;
+}
+
+/**
+ * 「跳到那几行」（工具条上那颗定位图标递下来的）。按顺序做三件事：
+ * ① 当前没在按大小排序就先按大小**降序** —— 这一档的判据是「字节完全相同」（`shared/bestReseed.ts`），
+ *   按大小排就把它们连成一段；而最佳那一档常常是体积最大的一份，降序时它落在最前面。
+ *   已经在按大小排（哪个方向都一样）就不动 —— 那是他挑的。
+ * ② 算出它在哪一页并切过去：a-table 是「整份排完再切当前页」，目标行不在这一页时 DOM 里
+ *   压根没有那个节点，光 `scrollIntoView` 是空转。
+ * ③ 等排序与翻页都落进 DOM，再把那一行滚进视野。
+ *
+ * 比较函数取的是渲染出去那份列定义里的（`tableHeader`），不在这里另算一套 ——
+ * 「分类」那一列有自己的 compare（要按折过的规范类别排），抄一份通用的就会算错页码。
+ */
+async function locateReseedRows(rows: ISearchResultTorrent[]) {
+  const target = rows[0];
+  if (!target) return;
+
+  const hasSizeSort = sortBy.value.some((item) => item.key === "size");
+  const spec = hasSizeSort ? sortBy.value : [{ key: "size", order: "desc" as const }];
+  if (!hasSizeSort) configStore.updateTableBehavior("SearchEntity", "sortBy", spec);
+
+  const pagination = tablePagination.value;
+  // 分页条没出（一页放得下全部）时整份就在第 1 页
+  const pageSize = pagination === false ? tableItems.value.length : Number(pagination?.pageSize) || tableItems.value.length;
+  const { index, page } = pageOfSortedRows({
+    rows: tableItems.value,
+    spec,
+    columns: pickSortColumns(tableHeader.value),
+    isTarget: (row) => row.uniqueId === target.uniqueId,
+    pageSize,
+  });
+  if (index < 0) return;
+  tablePage.value = page ?? 1;
+
+  // 两次 nextTick：第一次给排序（写的是 configStore，表头要重算一遍才带上 sortOrder），
+  // 第二次给翻页之后的重绘 —— 少一次就会在旧 DOM 上找那一行。
+  await nextTick();
+  await nextTick();
+  scrollRowIntoView(tableWrapperRef.value, String(target.uniqueId));
 }
 
 // ============================================================================
@@ -828,6 +869,7 @@ const hasSearchStatus = computed<boolean>(() => {
         class="site-filter-notice"
         :selected-torrents="tableSelectedRaw"
         :all-torrents="tableItems"
+        @locate="locateReseedRows"
       />
 
       <!-- `--pt-table-body-h` 把这里已经实测好的表体高递给全局样式：空态那条规则要撑满

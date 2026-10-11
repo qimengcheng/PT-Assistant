@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useBreakpoint } from "antdv-next";
-import { BranchesOutlined, CheckCircleFilled, GlobalOutlined, HddOutlined, UnorderedListOutlined } from "@antdv-next/icons";
+import { AimOutlined, BranchesOutlined, CheckCircleFilled, GlobalOutlined, HddOutlined, UnorderedListOutlined } from "@antdv-next/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { formatSize } from "@/options/utils.ts";
@@ -26,6 +26,7 @@ const { selectedTorrents, allTorrents } = defineProps<{
 
 const { t } = useI18n();
 const configStore = useConfigStore();
+const emit = defineEmits<{ locate: [rows: ISearchResultTorrent[]] }>();
 
 /**
  * useBreakpoint() 返回的是**单个 Ref**，其 .value 上挂着 { xs, sm, md, lg, xl, ... }。
@@ -86,6 +87,15 @@ function useReseedGroup(group: IReseedGroup<ISearchResultTorrent> | null | undef
 
 function openBestReseedDialog() {
   useReseedGroup(bestGroup.value);
+}
+
+/**
+ * 那颗定位图标：把这一组在列表里的位置找出来。排序、翻页、滚动都住在页面那一层
+ * （只有它拿着 a-table 和分页状态），这里只递出「要跳到的是哪几行」——
+ * 递的是快照，理由与上面开弹窗那条一样：结果是一条一条陆续回包的。
+ */
+function locateBestGroup() {
+  if (bestGroup.value) emit("locate", [...bestGroup.value.items]);
 }
 
 function openReseedGroupDialog() {
@@ -215,6 +225,14 @@ function selectSite(siteId: string) {
              要辅种哪几条由判据选好（不重排、不要求用户先勾）。 -->
         <template v-if="bestGroup">
           <a-divider orientation="vertical" class="mx-2" />
+          <!-- 定位：同一份数据那几条散在几十行里（大小相同的那些就是它们），这颗把它们找出来 ——
+               没按大小排序时先按大小排、翻到它们所在那一页、滚进视野。
+               单独一颗而不并进右边那颗 chip：那颗点下去是开辅种检测，两件事不该共用一个点击区。 -->
+          <a-tooltip :title="t('SearchEntity.bestReseed.locate')">
+            <span class="locate-btn" @click="locateBestGroup">
+              <AimOutlined />
+            </span>
+          </a-tooltip>
           <a-tooltip :title="t('SearchEntity.bestReseed.tip')">
             <a-tag class="chip chip_limit_width" color="green" @click.stop="openBestReseedDialog">
               <span class="chip-inner">
@@ -347,6 +365,19 @@ function selectSite(siteId: string) {
 /** chip 本体不许带上下外边距：父级是 align-center 的 flex，单侧 mb-1 会让这一排比左边那颗高 2px */
 .chip.ant-tag {
   margin-block: 0;
+}
+
+/**
+ * 那颗定位图标。高度钉成 14px 与右边 chip 的内容盒同档（`.chip-inner` 那条实测），
+ * 不然它按自己的行盒算高，这一排里会比旁边的图标高/低一两像素。
+ * 颜色一律继承（不写死）：这颗落在淡蓝的 alert 上，图标要跟正文同色才够对比度。
+ */
+.locate-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 14px;
+  margin-inline-end: 4px;
+  cursor: pointer;
 }
 
 /**

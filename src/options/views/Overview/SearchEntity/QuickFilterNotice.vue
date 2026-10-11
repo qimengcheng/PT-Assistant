@@ -7,7 +7,9 @@ import { BranchesOutlined, CheckCircleFilled, GlobalOutlined, HddOutlined, Unord
 import { useConfigStore } from "@/options/stores/config.ts";
 import { formatSize } from "@/options/utils.ts";
 import { findAllReseedGroups, type IReseedGroup } from "@/shared/bestReseed.ts";
+import { ETorrentStatus } from "@ptd/site";
 import type { ISearchResultTorrent } from "@/shared/types/storages/runtime.ts";
+import { TORRENT_STATUS_META } from "./torrentStatusMeta.ts";
 
 import { tableCustomFilter } from "./utils/filter.ts";
 
@@ -104,6 +106,35 @@ function updateQuickSiteFilter() {
   updateTableFilterValueFn();
 }
 
+/** 下拉里的五档（标签现取：切语言要跟着变） */
+const statusOptions = computed(() =>
+  TORRENT_STATUS_META.map((meta) => ({ value: meta.value as string, label: t(meta.labelKey) }))
+);
+
+/**
+ * 这批结果里**真的报得出**哪些做种状态。取的是 `advanceItemPropsRef.status` —— 那份由
+ * `utils/search.ts` 在搜索队列空闲时从**未过滤**的整份结果算出来，所以：
+ * ① 用它当「这颗下拉有没有意义」的判据不会被自己的筛选结果反过来影响（选了「做种中」之后
+ *    下拉不该只剩一档）；② 站点一条都不报这一列时整颗下拉不出 —— 一排只有「未知」可选的
+ *    筛选器等于把全部结果再筛一遍，是噪音。
+ */
+const knownStatuses = computed<string[]>(() => (advanceItemPropsRef.value.status as string[]) ?? []);
+const statusFilterShown = computed(() => knownStatuses.value.some((value) => value !== ETorrentStatus.unknown));
+
+/** 当前选中的档：直接读那份筛选字典，不另起第二份状态（对话框改了我们这边跟着变） */
+const statusFilter = computed<string[]>(() => (advanceFilterDictRef.value.status?.required as string[]) ?? []);
+
+/**
+ * 只动 `required`，`exclude` 原样留着 —— 这一颗和高级筛选对话框写的是**同一个字段**，
+ * 清空下拉不该把人在对话框里勾的那几项「不要」一起抹掉。代价是这一排看不见排除项（对话框里看得见）。
+ */
+function onStatusFilterChange(value: unknown) {
+  const dict = advanceFilterDictRef.value.status;
+  if (!dict) return;
+  dict.required = Array.isArray(value) ? (value as string[]) : [];
+  updateTableFilterValueFn();
+}
+
 /**
  * v-chip-group(filter + mandatory) 在 antd 里没有等价物，改为可横向滚动的 a-tag 行：
  * 选中项用实心 tag 表示，点任意一个站点即快速筛选该站点。
@@ -161,6 +192,24 @@ function selectSite(siteId: string) {
             </a-tag>
           </div>
         </template>
+
+        <!-- 做种状态快速筛选。这一档原先只能从「过滤搜索结果」那颗漏斗打开的高级筛选对话框里挑，
+             而它恰恰是挑辅种候选时最常按的一档（哪几站报「我在做种」、哪几站是「我没下过」）。
+             写的是**同一份**筛选字典（`advanceFilterDictRef.status`），不另起第二条过滤路径：
+             这一排、那颗漏斗里的对话框、上面那排站点 chip 看到的永远是同一个条件。
+             宽度写在行内 style：a-select 的根元素拿不到本组件的 data-v-*，scoped class 选不中它。 -->
+        <a-select
+          v-if="statusFilterShown"
+          :value="statusFilter"
+          mode="multiple"
+          :max-tag-count="1"
+          :options="statusOptions"
+          :placeholder="t('SearchEntity.statusFilter.label')"
+          :popup-match-select-width="false"
+          allow-clear
+          style="margin-inline-start: 8px; min-width: 128px; max-width: 220px"
+          @change="onStatusFilterChange"
+        />
 
         <!-- 最佳辅种：这批结果里被最多站点共有的那一份，点一下直接开辅种检测，
              要辅种哪几条由判据选好（不重排、不要求用户先勾）。 -->

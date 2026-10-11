@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { ETorrentStatus } from "@ptd/site";
-import { ArrowDownOutlined, ArrowUpOutlined, CheckOutlined, DisconnectOutlined } from "@antdv-next/icons";
 
+import { torrentStatusMeta } from "./torrentStatusMeta.ts";
 import { type ISearchResultTorrent } from "@/shared/types.ts";
 
 const { torrent } = defineProps<{
@@ -10,44 +9,13 @@ const { torrent } = defineProps<{
 }>();
 
 /**
- * antd 的图标是组件而不是 mdi 字符串，所以这里返回组件本身，
- * 交给 <component :is> 渲染。
+ * 图标与颜色取自那份共用元数据（高级筛选对话框、搜索页那颗快速筛选读的是同一份）。
+ *
+ * 换掉的是一个 `default:` 也返回绿色上箭头的 switch：上箭头 = 「做种中」，也就是**认不出的值被画成
+ * 一个明确的档位**。今天这一格还有一道 `Index.vue` 的 v-if 把 unknown 挡在外面，所以那半句在界面上
+ * 看不出来；但搜索页新加的按档筛选里「未知」是一档能选的，画色不能再靠 default 兜到一个真档位上。
  */
-const icon = computed(() => {
-  switch (torrent.status) {
-    case ETorrentStatus.downloading:
-      return ArrowDownOutlined;
-
-    case ETorrentStatus.completed:
-      return CheckOutlined;
-
-    case ETorrentStatus.inactive:
-      return DisconnectOutlined;
-
-    case ETorrentStatus.seeding:
-    default:
-      return ArrowUpOutlined;
-  }
-});
-
-/**
- * 原来返回的是 Vuetify 的语义色名（info / grey / success），
- * antd 的 stroke-color 与图标颜色都要真实色值，故在此映射。
- */
-const color = computed(() => {
-  switch (torrent.status) {
-    case ETorrentStatus.downloading:
-      return "#1677ff"; // info
-
-    case ETorrentStatus.completed:
-    case ETorrentStatus.inactive:
-      return "#8c8c8c"; // grey
-
-    case ETorrentStatus.seeding:
-    default:
-      return "#52c41a"; // success
-  }
-});
+const meta = computed(() => torrentStatusMeta(torrent.status));
 </script>
 
 <template>
@@ -56,12 +24,12 @@ const color = computed(() => {
        span 2 折出来不到 6px，14px 的箭头溢出压在进度条上，条子只剩 span 22 那点宽度 ——
        就是「箭头和进度条重叠了，而且进度条也太短了」。 -->
   <div class="process-row pt-1">
-    <component :is="icon" :style="{ color }" class="process-icon" />
+    <component :is="meta.icon" :style="{ color: meta.color }" class="process-icon" />
     <a-progress
       class="process-bar"
       :percent="torrent.progress!"
       :show-info="false"
-      :stroke-color="color"
+      :stroke-color="meta.color"
       size="small"
     />
   </div>

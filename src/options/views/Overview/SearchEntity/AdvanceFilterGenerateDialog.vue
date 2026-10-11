@@ -10,19 +10,13 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { addDays, startOfDay } from "date-fns";
-import { ETorrentStatus, preDefinedTorrentTagNameSet, sortTorrentTags } from "@ptd/site";
-import {
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  CheckOutlined,
-  DisconnectOutlined,
-  PushpinOutlined,
-  QuestionCircleOutlined,
-} from "@antdv-next/icons";
+import { preDefinedTorrentTagNameSet, sortTorrentTags } from "@ptd/site";
+import { PushpinOutlined } from "@antdv-next/icons";
 
 import { formatDate, formatSize } from "@/options/utils.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { tableCustomFilter } from "@/options/views/Overview/SearchEntity/utils/filter.ts";
+import { TORRENT_STATUS_META } from "@/options/views/Overview/SearchEntity/torrentStatusMeta.ts";
 import { setDateRangeByDatePicker, getThisDateUnitRange } from "@/options/directives/useAdvanceFilter.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
@@ -46,40 +40,18 @@ const {
   updateTableFilterValueFn,
 } = tableCustomFilter;
 
-// 种子状态选项 - 使用 i18n 支持
-// icon / color 改为 antd 图标组件与真实色值（Vuetify 的 mdi 字符串 + 语义色名不再适用）
-const statusOptions = computed(() => [
-  {
-    value: ETorrentStatus.unknown,
-    label: t("torrent.status.unknown"),
-    icon: QuestionCircleOutlined,
-    color: "#8c8c8c",
-  },
-  {
-    value: ETorrentStatus.downloading,
-    label: t("torrent.status.downloading"),
-    icon: ArrowDownOutlined,
-    color: "#1677ff",
-  },
-  {
-    value: ETorrentStatus.seeding,
-    label: t("torrent.status.seeding"),
-    icon: ArrowUpOutlined,
-    color: "#52c41a",
-  },
-  {
-    value: ETorrentStatus.inactive,
-    label: t("torrent.status.inactive"),
-    icon: DisconnectOutlined,
-    color: "#8c8c8c",
-  },
-  {
-    value: ETorrentStatus.completed,
-    label: t("torrent.status.completed"),
-    icon: CheckOutlined,
-    color: "#8c8c8c",
-  },
-]);
+/**
+ * 五档做种状态：图标/颜色/键名与搜索页那颗快速筛选、以及「大小」下面那行进度条共用一份
+ * （`torrentStatusMeta.ts`）。computed 是因为标签里有 t()，一次性求值的话切语言不重算。
+ */
+const statusOptions = computed(() =>
+  TORRENT_STATUS_META.map((meta) => ({
+    value: meta.value,
+    label: t(meta.labelKey),
+    icon: meta.icon,
+    color: meta.color,
+  }))
+);
 
 const torrentTags = computed(() => sortTorrentTags(advanceItemPropsRef.value.tags));
 

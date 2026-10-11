@@ -252,6 +252,14 @@ function selectSite(siteId: string) {
 
 .site-filter-scroll {
   overflow-x: auto;
+  /* 这一条的滚动条不许占布局。全局那条 `scrollbar-width: thin`（style.css）是**经典**滚动条，
+     要真吃掉 10px 高：chip 一多到溢出，这一格就被顶高 10px，而父级是 align-center 的 flex ——
+     行变高之后外面那几颗（「全部站点」/「已选中 N 条」）跟着居中到新的行中线，里面这排还贴在顶部，
+     台架 .tmp-build/bench-chips 实测差 **5.2px**（正好半个滚动条），界面表现就是他报的
+     「满了之后这块会往上偏移，没有水平对齐」。改成不画轨道、只保留可滚（滚轮 / 触控板 / 拖选照旧）：
+     右边那颗被切一半的 chip 已经是「还有更多」的提示，不靠这条 10px 的轨道说话。
+     两套写法都给，与 style.css 那条同口径（老 Chrome / Edge 只认伪元素那条）。 */
+  scrollbar-width: none;
   /* chip 之间原先靠每颗自带 mr-1（4px），「全部」那颗没有 → 两颗零间距贴边。
      改成容器给 gap，颗颗同缝，也不再有人多出 4px（那条 mb-1 还会把整排顶高 2px，见下）。 */
   gap: 4px;
@@ -259,6 +267,11 @@ function selectSite(siteId: string) {
   /* 不需要再补 min-width:0：flex item 的 min-width:auto 只对**非滚动容器**才等于内容宽，
      这一条自己有 overflow-x:auto，规范里那个 auto 已经折成 0。台架 600px 容器实测：
      提示条 scrollWidth == clientWidth（574，零溢出），超出部分由这一条自己横滚（462 > 289）。 */
+}
+
+.site-filter-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /**

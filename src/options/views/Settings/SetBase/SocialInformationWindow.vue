@@ -56,7 +56,7 @@ const configStore = useConfigStore();
         <a-row :gutter="24">
           <a-col :span="12">
             <a-form-item
-              label="Bangumi API Key"
+              :label="t('SetBase.SocialInformationWindow.bangumiKeyLabel')"
               :extra="t('SetBase.SocialInformationWindow.bangumiHint')"
             >
               <a-input-password
@@ -68,7 +68,7 @@ const configStore = useConfigStore();
           </a-col>
           <a-col :span="12">
             <a-form-item
-              label="AniDB Client"
+              :label="t('SetBase.SocialInformationWindow.anidbClientLabel')"
               :extra="t('SetBase.SocialInformationWindow.anidbHint')"
             >
               <a-input-password

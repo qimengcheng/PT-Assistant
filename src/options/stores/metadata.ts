@@ -28,6 +28,7 @@ import { sendMessage } from "@/messages.ts";
 import { i18n } from "@/options/plugins/i18n.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
+import { tOutside } from "@/options/i18nOutside.ts";
 
 type TSimplePatchFieldKey = keyof Pick<
   IMetadataPiniaStorageSchema,
@@ -339,7 +340,7 @@ export const useMetadataStore = defineStore("metadata", {
           return await sendMessage("getSearchResultSnapshotData", id);
         } else {
           const runtimeStorage = useRuntimeStore();
-          runtimeStorage.showSnakebar("未找到该搜索快照...", { color: "error" });
+          runtimeStorage.showSnakebar(tOutside("SearchEntity.index.snapshotNotFound"), { color: "error" });
           return;
         }
       };
@@ -535,7 +536,7 @@ export const useMetadataStore = defineStore("metadata", {
       const searchSnapshotData = runtimeStorage.search;
 
       if (searchSnapshotData.isSearching) {
-        runtimeStorage.showSnakebar("你不能创建一个正在搜索中的快照...", { color: "error" });
+        runtimeStorage.showSnakebar(tOutside("SearchEntity.index.snapshotWhileSearching"), { color: "error" });
         return;
       }
 

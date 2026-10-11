@@ -636,6 +636,8 @@
       "title": "Search Status of [{0}]"
     },
     "index": {
+      "snapshotNotFound": "That search snapshot was not found…",
+      "snapshotWhileSearching": "Cannot create a snapshot while a search is running…",
       "needSite": "Add at least one site before searching",
       "nothingToRetry": "There is no search plan to retry",
       "snapshotLoadFailed": "Failed to load the snapshot — it may have been deleted",
@@ -1089,6 +1091,8 @@
       "invalidFileFormat": "Invalid file format: select the backup zip exported by PT-Plugin-Plus (containing userdatas.json) or that json file itself"
     },
     "SocialInformationWindow": {
+      "anidbClientLabel": "AniDB client ID",
+      "bangumiKeyLabel": "Bangumi API Key",
       "groupPtGen": "PTGen (general wiki information dump service)",
       "ptGenEndpoint": "PTGen API endpoint",
       "ptGenEndpointHint": "Point it at your own deployment. The URL must keep the <site> and <sid> placeholders (replace them the way the example line above does). Leave it empty to use the built-in public endpoint; even when you fill it in, the built-in fallback is probed at the same time and whichever answers first wins.",
@@ -1337,6 +1341,9 @@
     }
   },
   "SetSearchSolution": {
+    "nothingToExport": "There is no search solution to export",
+    "importReadFailed": "Failed to read the import file",
+    "importInvalidJson": "The imported search solution file is not valid JSON",
     "CustomSolutionDialog": {
       "requestConfig": "Request Config",
       "requestConfigHint": "Please configure request parameters in JSON format",

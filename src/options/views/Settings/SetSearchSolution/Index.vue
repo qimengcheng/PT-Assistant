@@ -82,11 +82,11 @@ function importSearchSolution(file: File) {
         }
       }
     } catch {
-      runtimeStore.showSnakebar("Invalid JSON format when import search solution", { color: "error" });
+      runtimeStore.showSnakebar(t("SetSearchSolution.importInvalidJson"), { color: "error" });
     }
   };
   r.onerror = () => {
-    runtimeStore.showSnakebar("Invalid JSON format when load import file", { color: "error" });
+    runtimeStore.showSnakebar(t("SetSearchSolution.importReadFailed"), { color: "error" });
   };
   r.readAsText(file);
   return false;
@@ -104,7 +104,8 @@ function exportSearchSolutions(solutionIds: TSolutionKey[]) {
     const exportedSolutionBlob = new Blob([JSON.stringify(exportedSolutions)], { type: "application/json" });
     saveAs(exportedSolutionBlob, `search-solutions-export-${formatDate(new Date(), "yyyyMMdd'T'HHmm")}.json`);
   } else {
-    runtimeStore.showSnakebar("No solutions to export", { color: "error" });
+    // 顺带修语义：没东西可导是「无事可做」而不是「出错」，原先用 color:"error" 弹一条红色报错
+    runtimeStore.showSnakebar(t("SetSearchSolution.nothingToExport"), { color: "warning" });
   }
 }
 

@@ -636,6 +636,8 @@
       "title": "方案 [{0}] 搜索状态"
     },
     "index": {
+      "snapshotNotFound": "未找到该搜索快照…",
+      "snapshotWhileSearching": "不能在搜索进行中创建快照…",
       "needSite": "请至少添加一个站点进行搜索",
       "nothingToRetry": "没有需要重试的搜索计划",
       "snapshotLoadFailed": "快照装载失败，它可能已被删除",
@@ -1089,6 +1091,8 @@
       "invalidFileFormat": "文件格式无效：请选择 PT-Plugin-Plus 导出的备份 zip（内含 userdatas.json）或该 json 文件本身"
     },
     "SocialInformationWindow": {
+      "anidbClientLabel": "AniDB 客户端标识",
+      "bangumiKeyLabel": "Bangumi 访问令牌",
       "groupPtGen": "PTGen（通用百科信息转储服务）",
       "ptGenEndpoint": "PTGen API 端点",
       "ptGenEndpointHint": "填你自己部署的地址，里面必须带 <site> 和 <sid> 两个占位符（照上面那行的样子换掉就行）。留空则用内置的公共端点；填了也仍会同时试一次内置的备用端点，谁先返回用谁。",
@@ -1337,6 +1341,9 @@
     }
   },
   "SetSearchSolution": {
+    "nothingToExport": "没有可导出的搜索方案",
+    "importReadFailed": "读取导入文件失败",
+    "importInvalidJson": "导入的搜索方案文件不是合法 JSON",
     "CustomSolutionDialog": {
       "requestConfig": "请求配置",
       "requestConfigHint": "请按JSON格式配置请求参数",

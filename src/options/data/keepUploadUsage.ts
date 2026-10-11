@@ -115,6 +115,7 @@ export const usageZh: IUsageDoc = {
       points: [
         { title: "第一步", text: "基准那条不在下载器里，就先把基准发过去，而且这一条**不**跳过校验 —— 它是要真的把内容下下来的那一条。" },
         { title: "第二步", text: "每分钟查基准下完没有，认的是下载器自己报的「已完成」，不是「状态看着像做种」。一开始基准就已经下完（或者基准选的本来就是下载器里那条在做种的）就直接进第三步。" },
+        { title: "第二步卡住了", text: "基准那条要是 15 分钟一点没往下动（没连上 peer、被限速成 0 那种），会弹一条通知说它「下不动了」，写清卡了多久、现在停在百分之几 —— 只吭声，不会替你暂停它，也不会重发。你自己按了暂停的那条不算（那种情况字节当然不动），基准是下载器里本来就在做种的那条也不算。" },
         { title: "第三步", text: "基准下完，把其余几条一起发过去，这几条跳过校验 —— 内容在建任务那一步已经比过文件清单。" },
         { title: "之后", text: "持续盯这一任务里每一条的做种状态。判成「没有正常做种」的那几条（文件缺失、客户端报错、或者变成了正在下载）会立刻被暂停，并弹一条系统通知说清有几条、进哪一页看。" },
         { text: "「做种状态」那一列显示的就是它走到哪一步了（已发基准 / 基准在下 x% / 基准已下完 / 辅种中 n/m / 辅种完成 / 有 N 条异常），不用你手动点「回查做种状态」也有数。" },
@@ -219,6 +220,7 @@ export const usageEn: IUsageDoc = {
       points: [
         { title: "Step 1", text: "If the base entry is not in the downloader, the base gets sent first - and this one does NOT skip hash checking, because it's the entry that has to actually bring the data down." },
         { title: "Step 2", text: "Every minute it asks whether the base has finished, believing only the downloader's own 'is completed' report, not 'the state looks like seeding'. If the base was already complete from the start (or you picked an entry that is already seeding in the downloader) it goes straight to step 3." },
+        { title: "When step 2 stalls", text: "If the base's downloaded bytes don't move for 15 minutes (no peers, throttled down to 0), you get a notification saying so, with how long it has been stuck and the percentage it stopped at. It only tells you - it does not pause the base or re-send it. A torrent you paused yourself never triggers this (its byte count obviously doesn't move), and neither does a base that was already seeding in your downloader." },
         { title: "Step 3", text: "Once the base is complete, the remaining entries are sent together, those with hash checking skipped - their contents were already compared file-by-file when the task was created." },
         { title: "After that", text: "It keeps watching every entry's seeding state. Anything found 'not seeding properly' (missing files, a client error, or turned into an actual download) is paused immediately, and one system notification says how many and where to look." },
         { text: "The 'Seeding' column shows exactly which step it reached (base sent / base downloading x% / base ready / reseeding n/m / done / N entries wrong) - you get that without pressing 'Check seeding' yourself." },

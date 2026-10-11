@@ -720,9 +720,16 @@ export default class SynologyDownloadStation extends AbstractBittorrentClient<To
           }
         }
 
-        const isCompleted = task.additional!.detail!.completed_time > 0;
-        const upload = task.additional!.transfer!.size_uploaded;
-        const download = task.additional!.transfer!.size_downloaded;
+        // ⚠️ 原来三行都是 additional!.detail!.xxx 连环非空断言：DS 对畸形任务
+        // （刚创建、正在建索引、被别的客户端接管）返回的 additional 可能缺 detail
+        // 或 transfer，一个 TypeError 就把**整个列表**的 map 打断 —— 而这里在
+        // getTorrentsBy 的 map 里，抛错等于这一页全空，用户看到「任务列表没了」。
+        // 逐级 ?? 兜底：缺就当 0 / 未完成 / 空路径，列表其余条目照常显示。
+        const detail = task.additional?.detail;
+        const transfer = task.additional?.transfer;
+        const isCompleted = (detail?.completed_time ?? 0) > 0;
+        const upload = transfer?.size_uploaded ?? 0;
+        const download = transfer?.size_downloaded ?? 0;
 
         // 上面 switch 算出的 state 不含「已完成」这一档的完整语义，
         // 而 completed_only 要按 isCompleted 筛，所以先算出来在这里过滤
@@ -735,15 +742,15 @@ export default class SynologyDownloadStation extends AbstractBittorrentClient<To
           infoHash: task.id, // 注意DS的返回信息中没有info_hash，故使用id替代
           name: task.title,
           state,
-          dateAdded: task.additional!.detail!.created_time,
+          dateAdded: detail?.created_time ?? 0,
           isCompleted,
           // 契约是「完成百分比0-100」（见 types.ts），其余 8 个客户端都乘了 100
           progress: task.size > 0 ? (download / task.size) * 100 : 0,
-          savePath: task.additional!.detail!.destination,
+          savePath: detail?.destination ?? "",
           totalSize: task.size,
           ratio: download > 0 ? upload / download : 0,
-          uploadSpeed: task.additional!.transfer!.speed_upload,
-          downloadSpeed: task.additional!.transfer!.speed_download,
+          uploadSpeed: transfer?.speed_upload ?? 0,
+          downloadSpeed: transfer?.speed_download ?? 0,
           totalUploaded: upload,
           totalDownloaded: download,
           raw: task,

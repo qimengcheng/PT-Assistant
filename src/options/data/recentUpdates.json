@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-11 09:24:00",
-  "headSha": "7334156",
+  "generatedAt": "2026-10-11 09:27:13",
+  "headSha": "a65fbf1",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.69.3",
+      "date": "2026-10-11 09:26:51",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "下载器里有一条数据不完整的种子时，不再把整个任务列表弄空 —— 那一条按 0 / 未完成显示，其余照常",
+        "从 Gist 恢复备份时，如果备份里声明的内容在 Gist 上找不到，会明确报恢复失败，不再静默给一份少了 cookies 或设置的残缺数据"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.69.2",
       "date": "2026-10-11 09:23:46",

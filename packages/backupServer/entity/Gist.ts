@@ -187,22 +187,30 @@ export default class Gist extends AbstractBackupServer<GistConfig> {
       const { hash: manifestContentHash, name: fileName } = value;
 
       let fileRawContent = files[fileName]?.content;
-      if (fileRawContent) {
-        if (files[fileName].truncated) {
-          const rawContentReq = await this.request<string>(files[fileName].raw_url);
-          fileRawContent = rawContentReq.data;
-        }
+      // ⚠️ manifest 声明了、但 Gist 里没有的条目，原先被 if (fileRawContent)
+      // 静默跳过 —— 恢复流程照样走完并报「成功」，用户却发现 cookies/settings
+      // 没回来。与 zip 那条路径（jsZipBlobToBackupData）保持一致：显式抛错，
+      // 让调用方报「恢复失败」而不是给一份残缺的数据。
+      // Gist 单文件有 1MB 上限，大备份会被截断 —— 那时 manifest 也可能对不上，
+      // 所以这一条不是理论风险。
+      if (fileRawContent === undefined) {
+        throw new Error(`Backup file missing in Gist: ${fileName} (key: ${key})`);
+      }
 
-        const fileContentHash = CryptoJS.MD5(fileRawContent).toString();
-        if (fileContentHash !== manifestContentHash) {
-          throw new Error(`File hash mismatch for ${fileName}.`);
-        }
+      if (files[fileName].truncated) {
+        const rawContentReq = await this.request<string>(files[fileName].raw_url);
+        fileRawContent = rawContentReq.data;
+      }
 
-        try {
-          result[key] = this.decryptData(fileRawContent);
-        } catch (e) {
-          throw new Error(`Failed to decrypt file.`);
-        }
+      const fileContentHash = CryptoJS.MD5(fileRawContent).toString();
+      if (fileContentHash !== manifestContentHash) {
+        throw new Error(`File hash mismatch for ${fileName}.`);
+      }
+
+      try {
+        result[key] = this.decryptData(fileRawContent);
+      } catch (e) {
+        throw new Error(`Failed to decrypt file: ${fileName}`);
       }
     }
 

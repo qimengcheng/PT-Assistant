@@ -59,13 +59,29 @@ const runtimeStore = useRuntimeStore();
 /** 判定依据（第 2/3 层指纹，或退回旧的文件逐条比对） */
 type TVerifiedBy = "infoHash" | "pieces" | "files" | "legacy";
 
+/**
+ * 一条的结论档位（`statusText` 的那八个键）。
+ *
+ * 存档位而不是存文案：locale 是活值，把 `t()` 的结果留在条目上，切语言之后行里挂的还是旧文案，
+ * 而下面那行汇总要**按档位分桶计数** —— 照文案比就会在切语言当场把每一条都算进「未通过」。
+ */
+type TVerifyStatus =
+  | "downloading"
+  | "waiting"
+  | "downloaded"
+  | "success"
+  | "failed"
+  | "downloadFailed"
+  | "missingFiles"
+  | "needManual";
+
 interface IVerifiedItem {
   id: string; // Map key
   data: ITorrent;
   torrent: ITorrentInfoForVerification | null;
   loading: boolean;
   verified: boolean;
-  status: string;
+  status: TVerifyStatus;
   error: boolean;
   /** 与基准种子的比对结论 */
   baseMatch?: IFingerprintMatchResult;
@@ -464,6 +480,16 @@ const statusText = computed(() => ({
   needManual: t("SearchEntity.KeepUploadDialog.status.needManual"),
 }));
 
+/**
+ * 档位 → 当前语言的文案（状态那一列和那颗 tooltip 都读它）。
+ *
+ * 写成函数而不是在模板里直接 `statusText[record.status]`：`#bodyCell` 的 record 是 any，
+ * 拿 any 去索引上面那个字面量对象会被判成隐式 any（TS7053）。
+ */
+function statusLabel(item: IVerifiedItem): string {
+  return statusText.value[item.status];
+}
+
 // 打开对话框时初始化
 watch(showDialog, (val) => {
   if (val) {
@@ -546,6 +572,71 @@ const includedItems = computed(() =>
 
 const includedVerifiedCount = computed(() => includedItems.value.filter((item) => item.verified).length);
 
+/**
+ * 表格上方那行汇总的分档计数 —— 各档之和恒等于 `total`，也就是表里的行数。
+ *
+ * 主数字取「指纹判定通过」那一档，不是 `verified` 的条数：`verified` 里还混着基准免检那条和用户点
+ * 「+」认下的那条，它们的状态列写的都不是「验证通过」，拿它当主数字，用户照着状态列数一遍就对不上。
+ * 而 `verified` 那条数才是「创建任务」实际会带走的条数 —— 所以它拆成「基准 / 人工确认」两档摆在同一行里，
+ * 两个数都在场、各说各的话。
+ *
+ * 分桶读的是 `item.status` 这个档位而不是界面文案：文案由 locale 现算，切语言后旧文案还留在条目上，
+ * 按文案比会把每一条都算进「未通过」。
+ */
+const verifySummary = computed(() => {
+  const items = includedItems.value;
+  const acc = { total: items.length, passed: 0, base: 0, confirmed: 0, needManual: 0, checking: 0, failed: 0 };
+  for (const item of items) {
+    if (item.loading || item.status === "downloading" || item.status === "waiting") {
+      acc.checking += 1;
+    } else if (item.status === "success") {
+      acc.passed += 1;
+    } else if (item.verified && item.status === "downloaded") {
+      acc.base += 1;
+    } else if (item.verified) {
+      // 用户点「添加到辅种列表」认下的：算进任务，但机器判定那两档（通过 / 未通过）不动它
+      acc.confirmed += 1;
+    } else if (item.status === "needManual") {
+      acc.needManual += 1;
+    } else {
+      acc.failed += 1;
+    }
+  }
+  return acc;
+});
+
+/** 主数字之外的几档：只列非零的，一条都没有就不占位 */
+const verifyBuckets = computed(() => {
+  const s = verifySummary.value;
+  const buckets: { key: string; text: string; bad?: boolean }[] = [];
+  if (s.base) {
+    buckets.push({ key: "base", text: t("SearchEntity.KeepUploadDialog.verifySummary.base", { n: s.base }) });
+  }
+  if (s.confirmed) {
+    buckets.push({
+      key: "confirmed",
+      text: t("SearchEntity.KeepUploadDialog.verifySummary.confirmed", { n: s.confirmed }),
+    });
+  }
+  if (s.needManual) {
+    buckets.push({
+      key: "needManual",
+      text: t("SearchEntity.KeepUploadDialog.verifySummary.needManual", { n: s.needManual }),
+    });
+  }
+  if (s.failed) {
+    buckets.push({
+      key: "failed",
+      text: t("SearchEntity.KeepUploadDialog.verifySummary.failed", { n: s.failed }),
+      bad: true,
+    });
+  }
+  if (s.checking) {
+    buckets.push({ key: "checking", text: t("SearchEntity.KeepUploadDialog.verifySummary.checking", { n: s.checking }) });
+  }
+  return buckets;
+});
+
 /** 逐条重算「与本地已有种子的比对」，索引异步到达后补调用 */
 function refreshLocalDecisions() {
   const lookup = localLookup.value;
@@ -626,7 +717,7 @@ function startVerification() {
       torrent: null,
       loading: true,
       verified: false,
-      status: statusText.value.downloading,
+      status: "downloading",
       error: false,
     });
     verifiedItemsOrder.value.push(id);
@@ -647,13 +738,13 @@ async function getTorrent(torrent: ITorrent, id: string): Promise<ITorrentInfoFo
     // 边界检查：确保项仍然存在
     const item = verifiedItems.value.get(id);
     if (!item) return null;
-    item.status = statusText.value.waiting;
+    item.status = "waiting";
     return result;
   } catch (e) {
     // 边界检查：确保项仍然存在
     const item = verifiedItems.value.get(id);
     if (item) {
-      item.status = statusText.value.downloadFailed;
+      item.status = "downloadFailed";
       item.error = true;
     }
     throw e;
@@ -684,9 +775,9 @@ function applyBaseComparison(item: IVerifiedItem) {
     if (verdict === "same") {
       item.verified = true;
       item.verifiedBy = pieces === "match" ? "pieces" : "files";
-      item.status = statusText.value.success;
+      item.status = "success";
     } else {
-      item.status = verdict === "unknown" ? statusText.value.needManual : statusText.value.failed;
+      item.status = verdict === "unknown" ? "needManual" : "failed";
     }
     applyLocalDecision(item);
     return;
@@ -694,14 +785,14 @@ function applyBaseComparison(item: IVerifiedItem) {
 
   if (item === listItemBase.value) {
     item.verified = true;
-    item.status = statusText.value.downloaded;
+    item.status = "downloaded";
     applyLocalDecision(item);
     return;
   }
 
   const base = baseTorrent.value;
   if (!base || !listItemBase.value?.verified) {
-    item.status = statusText.value.failed;
+    item.status = "failed";
     applyLocalDecision(item);
     return;
   }
@@ -735,11 +826,11 @@ function applyBaseComparison(item: IVerifiedItem) {
   }
 
   item.status = item.verified
-    ? statusText.value.success
+    ? "success"
     : // 没通过时顺手说明原因：是「基准种子更大、本地缺文件」还是压根不是同一份数据
       hasAllFilesOf(info, base)
-      ? statusText.value.missingFiles
-      : statusText.value.failed;
+      ? "missingFiles"
+      : "failed";
   applyLocalDecision(item);
 }
 
@@ -794,7 +885,7 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
       return;
     }
     item.verified = false;
-    item.status = statusText.value.failed;
+    item.status = "failed";
     return;
   }
 
@@ -825,7 +916,7 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
   item.loading = false;
   if (!baseItem?.verified) {
     item.verified = false;
-    item.status = statusText.value.failed;
+    item.status = "failed";
     return;
   }
   if (!torrent) return;
@@ -889,7 +980,7 @@ function reDownload(id: string) {
   const item = verifiedItems.value.get(id);
   if (!item) return;
   item.loading = true;
-  item.status = statusText.value.downloading;
+  item.status = "downloading";
 
   getTorrent(item.data, id)
     .then((result) => {
@@ -1176,6 +1267,23 @@ async function createKeepUploadTask() {
       </a-tooltip>
     </div>
 
+    <!-- 汇总那一行：这张表里现在有几条判定通过、还剩几条要人处理。放在表格正上方（而不是弹窗标题里）
+         是因为它数的就是下面这些行；数字怎么分档见 `verifySummary` 的注释。
+         一条都还没有时整行不出 —— 空表下面挂一句「验证通过 0 / 共 0 条」是新 bug，不是信息。 -->
+    <div v-if="verifySummary.total" class="verify-summary mb-2">
+      <span class="verify-summary-main">
+        {{ t("SearchEntity.KeepUploadDialog.verifySummary.pass", { n: verifySummary.passed, total: verifySummary.total }) }}
+      </span>
+      <span
+        v-for="bucket in verifyBuckets"
+        :key="bucket.key"
+        class="verify-summary-bucket text-body-small"
+        :class="bucket.bad ? 'text-red' : 'text-grey'"
+      >
+        {{ bucket.text }}
+      </span>
+    </div>
+
     <!-- 这里不再自己当滚动容器（原先是 `style="max-height: 80vh"` + 下面那条 overflow-y）：
          弹窗 body 已经由 v0.42.4 那条 flex 链负责限高与滚动，两层都在滚就是双竖向滚动条。 -->
     <div class="keep-upload-list">
@@ -1265,7 +1373,7 @@ async function createKeepUploadTask() {
 
           <!-- 判定依据单独一行：它决定这条结论有多硬，混在状态后面会被当成状态的一部分读掉 -->
           <template v-else-if="column.key === 'status'">
-            <div>{{ record.status }}</div>
+            <div>{{ statusLabel(record) }}</div>
             <div v-if="verifiedByText(record)" class="text-body-small text-grey">{{ verifiedByText(record) }}</div>
           </template>
 
@@ -1305,7 +1413,7 @@ async function createKeepUploadTask() {
               {{ t("SearchEntity.KeepUploadDialog.setAsBase") }}
             </a-button>
 
-            <a-tooltip :title="record.status">
+            <a-tooltip :title="statusLabel(record)">
               <a-button type="text" size="small" :loading="record.loading">
                 <template v-if="record.verified" #icon>
                   <CheckOutlined style="color: #52c41a" />
@@ -1424,6 +1532,20 @@ async function createKeepUploadTask() {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+/* 汇总那一行：一句主数字 + 若干灰色分档。用文字而不是标签/按钮 —— 两颗 a-tag 并排会让人去点它，
+   而这里没有任何可点的动作。行间距 12px：这些句子是一回事，读的时候要连着扫成一行。
+   `align-items: baseline` 让主数字（默认 13px）和小字档同一条基线，不然混字号会看着一高一低。 */
+.verify-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+}
+
+.verify-summary-main {
+  font-weight: 500;
 }
 
 .recommend-label {

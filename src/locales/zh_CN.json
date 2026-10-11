@@ -616,6 +616,14 @@
         "placeholder": "选一条下载器里已有的种子",
         "title": "基准种子（下载器里已有的那一条）",
         "working": "正在从下载器里找同一份数据…"
+      },
+      "verifySummary": {
+        "pass": "验证通过 {n} 条 / 共 {total} 条",
+        "base": "基准免检 {n} 条",
+        "confirmed": "你已确认 {n} 条",
+        "needManual": "待你确认 {n} 条",
+        "failed": "未通过 {n} 条",
+        "checking": "检测中 {n} 条"
       }
     },
     "SaveSnapshotDialog": {

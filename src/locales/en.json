@@ -616,6 +616,14 @@
         "placeholder": "Pick an entry the downloader already has",
         "title": "Base torrent (an entry your downloader already has)",
         "working": "Looking for the same data in the downloader..."
+      },
+      "verifySummary": {
+        "pass": "{n} passed verification / {total} in the list",
+        "base": "{n} base (no check needed)",
+        "confirmed": "{n} you confirmed",
+        "needManual": "{n} awaiting your confirmation",
+        "failed": "{n} failed",
+        "checking": "{n} still checking"
       }
     },
     "SaveSnapshotDialog": {

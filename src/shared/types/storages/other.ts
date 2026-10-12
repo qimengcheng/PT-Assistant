@@ -2,6 +2,7 @@
  * 本处存放未使用 pinia 管理的其他 chrome.storage.local 使用到的存储结构类型
  */
 import type { TSiteID } from "@ptd/site";
+import type { IDownloadTorrentOption } from "../common/download.ts";
 import type { IStoredUserInfo, TSearchSnapshotKey } from "./metadata.ts";
 import type { ISearchData } from "./runtime.ts";
 
@@ -30,6 +31,30 @@ export type TCookieRenewalStorageSchema = Record<string, number>;
  * 下一次刷新数据时以站点给的数字为准。
  */
 export type TSiteMessageReadStorageSchema = Record<TSiteID, Record<string, number>>;
+
+/**
+ * 一条正在等「站点最小重下载间隔」到点的重推任务。
+ *
+ * 存的是**绝对到点时刻**而不是剩余毫秒：这份存档的唯一用途就是让 SW 重启之后还能把等待中的
+ * 任务认领回来（判据在 @/shared/reDownloadWait.ts），剩余额度那种写法一重启就把「什么时候下的」
+ * 丢了，只能从重启那一刻重新等一整轮。
+ */
+export interface IPendingReDownload {
+  /** 到点原样重发的那份下载参数（含 downloadId，所以到点能对上那条下载历史） */
+  downloadOption: IDownloadTorrentOption;
+  /** 什么时候该真的重推（毫秒时间戳） */
+  retryAt: number;
+}
+
+/**
+ * 等待中的重推任务：键是 downloadId（`String()` 化，chrome.storage 的键只能是字符串）。
+ *
+ * 单独一个键而不是塞进 metadata / 下载历史：写它的只有 service worker，而下载历史在
+ * IndexedDB 里 —— MV3 的 SW 根本没有 `indexedDB`，读一次要绕 offscreen 一条消息，
+ * 而这条存档恰恰是「SW 醒来第一件事就要读」的。
+ * 它是转瞬即逝的运行状态（到点就销账），所以不进备份清单（同 cookieRenewals / updateCheck）。
+ */
+export type TPendingReDownloadStorageSchema = Record<string, IPendingReDownload>;
 
 /** 检查更新的失败原因。存的是码不是句子：界面按码取当前语言的文案（§3.5 内部标识符不进 UI）。 */
 export type TUpdateCheckError = "" | "network" | "http" | "badData" | "rateLimited";

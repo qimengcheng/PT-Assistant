@@ -2,8 +2,10 @@
  * 后台定时任务（平移自 PT-depiler background/utils/alarms.ts）。
  * - 自动刷新用户站点数据（支持每日时段、间隔与失败重试）
  * - 备份服务器按 backupInterval 自动备份
- * - 下载冷却结束后的种子重新推送（短等待直接 sleep；长等待排一个 now+30s 的一次性任务，
- *   到点重下后由 offscreen/utils/download.ts 重算剩余间隔，不够就再排 30s —— 实为 30s 一轮轮询）
+ * - 下载冷却结束后的种子重新推送：等多久、走哪条路压在哪一层，判据在 @/shared/reDownloadWait.ts；
+ *   长等待按「到点时刻」排一次闹钟，并把这条等待写进 pendingReDownload 存档，
+ *   由本文件末尾的 recoverPendingReDownload 在每次 SW 启动时认领回来
+ *   （改造前那是「每 30 秒醒一轮」的轮询，且没有存档 —— 成因见那个函数的注释）。
  */
 import { format } from "date-fns";
 import { defineJobScheduler } from "@webext-core/job-scheduler";
@@ -11,7 +13,13 @@ import { EResultParseStatus, type TSiteID } from "@ptd/site/types/base.ts";
 
 import { extStore } from "@/storage.ts";
 import { onMessage, sendMessage } from "@/messages.ts";
-import type { IDownloadTorrentOption, IMetadataPiniaStorageSchema } from "@/shared/types.ts";
+import { planReDownload, splitPendingReDownload } from "@/shared/reDownloadWait.ts";
+import type {
+  IDownloadTorrentOption,
+  IMetadataPiniaStorageSchema,
+  IPendingReDownload,
+  TTorrentDownloadKey,
+} from "@/shared/types.ts";
 
 import { whenOffscreenReady } from "./offscreen.ts";
 import { sleep } from "~/helper.ts";
@@ -226,40 +234,141 @@ jobs.scheduleJob({
   execute: autoBackup(),
 });
 
-function doReDownloadTorrent(downloadOption: IDownloadTorrentOption) {
-  return async () => {
+/**
+ * 等待中的重推任务在存档里的键。
+ *
+ * 正常来路（offscreen/utils/download.ts 那句 sendMessage）在发这条消息之前已经把下载历史写好了，
+ * 所以 downloadId 必有；那个 `?? "unknown"` 只是兜住「协议里这一项是可选的」这一形，
+ * 不让它在 String(undefined) 之外留下一个看不出是谁的键。
+ */
+function pendingKeyOf(downloadId: TTorrentDownloadKey | undefined): string {
+  return String(downloadId ?? "unknown");
+}
+
+function reDownloadJobId(downloadId: TTorrentDownloadKey | undefined): string {
+  return `${EJobType.ReDownloadTorrent}-${pendingKeyOf(downloadId)}`;
+}
+
+/**
+ * 记下一条正在等冷却的任务。
+ *
+ * 用整键读-改-写而不是 `patchItem`：`patchItem` 读到 null 时直接 return（键从没写过的时候
+ * 它建不出外层那个对象），而这条键恰恰是「第一次要等就得先建」。
+ * 写者只有 SW 这一个上下文，且每一跳的写都排在上一跳之后，所以本上下文这条写队列够用。
+ */
+async function rememberPendingReDownload(entry: IPendingReDownload): Promise<void> {
+  const store = { ...(await extStore.getItem("pendingReDownload")) };
+  store[pendingKeyOf(entry.downloadOption.downloadId)] = entry;
+  await extStore.setItem("pendingReDownload", store);
+}
+
+/** 批量销账：一次读-改-写把这几条都去掉，同一次唤醒里逐条销会互相盖回去 */
+async function forgetPendingReDownloads(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  const store = { ...(await extStore.getItem("pendingReDownload")) };
+  let touched = false;
+  for (const key of keys) {
+    if (key in store) {
+      delete store[key];
+      touched = true;
+    }
+  }
+  if (!touched) return; // 没账可销就不白写一次存储
+  await extStore.setItem("pendingReDownload", store);
+}
+
+/**
+ * 把下载历史标成 failed（写的是 IndexedDB，经 offscreen 代写）。
+ * 这里必须 catch —— 裸发的 sendMessage 在 offscreen 未就绪时会 reject，而它已经在 catch 分支里，
+ * 再抛就成了 SW 的 unhandled rejection。
+ * ⚠️ handler 不能省：实测 `p.catch()`（不传参）等价于 then(undefined, undefined)，
+ * 派生出来的那个 promise 照样带着同一个 rejection 没人管，等于没接。
+ */
+function markDownloadHistoryFailed(downloadId: TTorrentDownloadKey | undefined): void {
+  if (downloadId === undefined) return;
+  void sendMessage("setDownloadHistoryStatus", { downloadId, status: "failed" }).catch(() => {});
+}
+
+/**
+ * 到点重推这一条。整条链上「无声什么都不发生」的失败点都收在这里，所以兜到底：
+ * 重推抛错就把下载历史标成 failed，至少界面上看得见这一条没成。
+ */
+async function fireReDownload(downloadOption: IDownloadTorrentOption): Promise<void> {
+  try {
+    await forgetPendingReDownloads([pendingKeyOf(downloadOption.downloadId)]);
+  } catch {
+    // 销账失败不挡重推：下一次唤醒会把它当「已过期」再补跑一次
+  }
+  try {
     await whenOffscreenReady();
     // 按照相同的方式重新下载种子到下载器
     await sendMessage("downloadTorrent", downloadOption);
-  };
+  } catch {
+    markDownloadHistoryFailed(downloadOption.downloadId);
+  }
 }
 
 onMessage("reDownloadTorrent", async ({ data }) => {
-  // 把下载历史标成 failed：写的是 IndexedDB，经 offscreen 代写。
-  // 这里必须 catch —— 裸发的 sendMessage 在 offscreen 未就绪时会 reject，
-  // 而它已经在.catch 回调里，再抛就成了 SW 的 unhandled rejection。
-  // ⚠️  handler 不能省：实测 `p.catch()`（不传参）等价于 then(undefined, undefined)，
-  // 派生出来的那个 promise 照样带着同一个 rejection 没人管，等于没接。
-  const markFailed = () => {
-    if (data.downloadId === undefined) return;
-    void sendMessage("setDownloadHistoryStatus", {
-      downloadId: data.downloadId,
-      status: "failed",
-    }).catch(() => {});
-  };
+  const { retryAt, via } = planReDownload(data.leftInterval, Date.now());
 
-  // 如果需要等待的时间小于 30s，那么直接在 service worker 中等待
-  if ((data.leftInterval ?? 0) < 30 * 1000) {
-    await sleep(data.leftInterval ?? 0);
-    doReDownloadTorrent(data)().catch(markFailed);
-  } else {
-    jobs
-      .scheduleJob({
-        id: EJobType.ReDownloadTorrent + "-" + data.downloadId,
-        type: "once",
-        date: Date.now() + 1000 * 30, // 0.5 minute later
-        execute: doReDownloadTorrent(data),
-      })
-      .catch(markFailed);
+  // 先落存档，再排等待：这条等待必须经得起「等待中途 SW 被终止」（末尾那个函数解释为什么）
+  await rememberPendingReDownload({ downloadOption: data, retryAt });
+
+  if (via === "sleep") {
+    // 短等待就地睡完：这条消息的通道一直挂着，SW 在这一段里不会被判空闲终止
+    await sleep(retryAt - Date.now());
+    void fireReDownload(data);
+    return;
+  }
+
+  try {
+    await jobs.scheduleJob({
+      id: reDownloadJobId(data.downloadId),
+      type: "once",
+      date: retryAt, // 冷却到点的那一刻，不是「半小时后再看一眼」
+      execute: () => fireReDownload(data),
+    });
+  } catch {
+    // 闹钟排不上（alarms 权限没了这类）：干等没有意义，明说这一条失败了
+    try {
+      await forgetPendingReDownloads([pendingKeyOf(data.downloadId)]);
+    } catch {
+      // 连账也销不掉时只能留给下一次唤醒处理，这里不再往下抛
+    }
+    markDownloadHistoryFailed(data.downloadId);
   }
 });
+
+/**
+ * SW 每次启动都要从存档里把等待中的重推任务认领回来。
+ *
+ * 为什么必须有这一步（改造前那条链就断在这里）：`@webext-core/job-scheduler` 的 `once` 任务
+ * 在 chrome.alarms 那边只留下一个闹钟，**execute 回调存在它自己那张内存表里**，`onAlarm` 是
+ * 拿闹钟名字去那张表查的；而 MV3 的 SW 空闲 30 秒就被终止，站点冷却通常是 15~30 分钟，
+ * 等闹钟到点把 SW 唤醒时那张表是刚建好的空表 —— 查不到回调就什么也不做，`once` 闹钟烧掉
+ * 就不再回来。于是「等冷却后重推」几乎必然静默失效，下载历史永远停在「等待中」。
+ *
+ * 已过期那一拨当场补跑，而不是重新排闹钟：错过的那个点不会再有第二次闹钟替它兑现。
+ */
+async function recoverPendingReDownload(): Promise<void> {
+  try {
+    const store = await extStore.getItem("pendingReDownload");
+    const { due, waiting } = splitPendingReDownload(store, Date.now());
+    await forgetPendingReDownloads(due.map((entry) => pendingKeyOf(entry.downloadOption.downloadId)));
+    for (const entry of due) void fireReDownload(entry.downloadOption);
+    for (const entry of waiting) {
+      await jobs.scheduleJob({
+        id: reDownloadJobId(entry.downloadOption.downloadId),
+        type: "once",
+        date: entry.retryAt,
+        execute: () => fireReDownload(entry.downloadOption),
+      });
+    }
+  } catch {
+    // 认领失败不该拖垮 SW 启动：这份读不到，下一次唤醒还会再来一遍
+  }
+}
+
+// 挂在模块级而不是 chrome.runtime.onStartup：那个事件只在浏览器启动时发，
+// 而这里的「认领」是每次 SW 被唤醒都要做一遍的事（上面两个 job 的注册也在同一层）。
+void recoverPendingReDownload();

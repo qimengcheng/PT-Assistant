@@ -10,6 +10,7 @@ import type {
   TKeepUploadTaskStorageSchema,
   TCookieRenewalStorageSchema,
   TSiteMessageReadStorageSchema,
+  TPendingReDownloadStorageSchema,
   IUpdateCheckState,
 } from "@/shared/types.ts";
 
@@ -38,6 +39,9 @@ export interface IExtensionStorageSchema {
 
   /** 站内信的本地已读记账，见 shared/types/storages/other.ts 的说明 */
   siteMessageRead: TSiteMessageReadStorageSchema;
+
+  /** 正在等站点重下载冷却到点的任务，见 shared/reDownloadWait.ts 与 other.ts 的说明 */
+  pendingReDownload: TPendingReDownloadStorageSchema;
 
   /** 「检查更新」的结果缓存，见 shared/types/storages/other.ts 的说明 */
   updateCheck: IUpdateCheckState;
@@ -70,6 +74,7 @@ const items = {
   keepUploadTask: storage.defineItem<TKeepUploadTaskStorageSchema | null>("local:keepUploadTask"),
   cookieRenewals: storage.defineItem<TCookieRenewalStorageSchema | null>("local:cookieRenewals"),
   siteMessageRead: storage.defineItem<TSiteMessageReadStorageSchema | null>("local:siteMessageRead"),
+  pendingReDownload: storage.defineItem<TPendingReDownloadStorageSchema | null>("local:pendingReDownload"),
   updateCheck: storage.defineItem<IUpdateCheckState | null>("local:updateCheck"),
 };
 

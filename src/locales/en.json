@@ -593,6 +593,7 @@
         }
       },
       "keepUpload": "Reseed Check",
+      "noReseedTarget": "Nothing to reseed: for every verified torrent the downloader already holds a copy seeded on that same site",
       "noVerifiedItem": "No verified torrents",
       "otherTorrent": "Other Torrents",
       "redownload": "Re-download torrent info",

@@ -593,6 +593,7 @@
         }
       },
       "keepUpload": "辅种检测",
+      "noReseedTarget": "没有可以辅种的条目：验证通过的每一条，下载器里都已经挂着同一站点的那份",
       "noVerifiedItem": "没有验证通过的种子",
       "otherTorrent": "其他种子",
       "redownload": "重新下载种子信息",

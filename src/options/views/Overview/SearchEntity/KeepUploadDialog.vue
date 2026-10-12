@@ -1182,12 +1182,40 @@ function localBadges(item: IVerifiedItem): IFingerprintBadge[] {
 }
 
 // 创建辅种任务
+/**
+ * 这一条就是基准本身 —— 下载器里已经挂着它，不是「要辅种的条目」。
+ *
+ * 用的不是新判据，是界面上已经画出来给用户看的那一颗「同站已挂」徽标（`localDecision.reason`
+ * 由指纹层按「命中的本地条目已挂在这个站上」判的），外加一条更硬的：infoHash 与所选基准相同。
+ * 私有站 announce 里带 passkey，同一份内容两次下载算出的 hash 可以不一样，所以只认 hash 会漏 ——
+ * 用户截图那一行写的是「文件清单指纹一致」而不是「infoHash 一致」，走的正是徽标那一条。
+ */
+function isTheBaseItself(item: IVerifiedItem): boolean {
+  if (!useLocalBase.value) return false;
+  if (item.localDecision?.reason === "same-site-already") return true;
+  const base = chosenLocalBase.value?.entry.hash;
+  const own = item.torrent?.infoHash;
+  return !!base && !!own && String(own).toLowerCase() === String(base).toLowerCase();
+}
+
 async function createKeepUploadTask() {
   if (!canCreateTask.value || !selectedDownloaderId.value) return;
 
   const verifiedList = includedItems.value.filter((item) => item.verified);
   if (verifiedList.length === 0) {
     runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.noVerifiedItem"), { color: "error" });
+    return;
+  }
+
+  /**
+   * 验证通过的那几条全是「下载器里已经挂着的那一份」时拒建（用户 2026-10-12 的要求）：
+   * 这种任务一条都不用它辅 —— 基准取自下载器时，后台把 `items` 里每一条都当成要挂上去的辅种
+   * （`allOthers = task.items`，见 `KeepUploadTask/autoReseed.ts`），于是建出来是一条空任务，
+   * 界面上是「种子数 1、唯一那条就是基准本身」。
+   * 这里**只拦创建**，不改 `items` 的组成 —— 哪些行该进任务是另一件事，没在这次范围里。
+   */
+  if (verifiedList.every((item) => isTheBaseItself(item))) {
+    runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.noReseedTarget"), { color: "error" });
     return;
   }
 

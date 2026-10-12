@@ -132,6 +132,16 @@ onMessage("addContextMenu", async ({ data }) => addContextMenu(data));
 onMessage("removeContextMenu", async ({ data }) => removeContextMenu(data));
 onMessage("clearContextMenus", async () => clearContextMenus());
 
+/**
+ * 右键菜单那两条「推送成功 / 推送失败」的瞬时回执：点一下就该消失。
+ * 它没有要跳的地方，所以只 clear；`notifications.onClicked` 是全局事件，
+ * 别的通知（辅种进展、检查更新）各按自己的 id 前缀认领，这里不许顺手把它们清掉或跳转。
+ */
+chrome.notifications?.onClicked.addListener((notificationId) => {
+  if (!notificationId.startsWith("ctxmenu-")) return;
+  chrome.notifications?.clear(notificationId);
+});
+
 /** 打开 options 页指定路由（带 query，经 urlencode 后拼到 hash 路由上）—— 复用 base.ts 的实现 */
 
 async function downloadLinkPush(
@@ -160,8 +170,10 @@ async function downloadLinkPush(
     }
   }
 
+  /** 这一类是「推送成功/失败」的瞬时回执：点掉就该消失，不该留在通知中心里 */
+  let notifySeq = 0;
   const notify = (msg: string) => {
-    chrome.notifications?.create({
+    chrome.notifications?.create(`ctxmenu-${Date.now()}-${notifySeq++}`, {
       type: "basic",
       iconUrl: chrome.runtime.getURL("icon/128.png"),
       title: "PT Assistant",

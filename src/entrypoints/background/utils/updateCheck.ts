@@ -212,6 +212,12 @@ onMessage("checkForUpdate", async () => {
  * 只认 https —— 这个 URL 来自远端接口，不能不加判据就交给 tabs.create。
  */
 chrome.notifications?.onClicked.addListener(async (notificationId) => {
+  /**
+   * 只认自己那条（`update-<版本号>`）。`notifications.onClicked` 是**全局事件**，
+   * 不看 id 的话场上任何一条通知（辅种进展、目录不一致）点下去都会跑到这里来，
+   * 用户看到的就是「点辅种完成的通知，跳去了 GitHub 下载页」（2026-10-12 报的）。
+   */
+  if (!notificationId.startsWith("update-")) return;
   chrome.notifications?.clear(notificationId);
   const state = await readUpdateState();
   if (state.downloadState === "done" && state.downloadId) {

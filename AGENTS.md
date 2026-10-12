@@ -508,7 +508,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 （`dist/`）才能判，它会被自动收进来在构建前假报错 —— 那种守卫要单独给一步排到
 `Build and package` 之后，并加进 `check-all.mjs` 的 `EXCLUDED`。
 
-前六条与 11 是**静态扫描**，7、8、10 是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
+前六条与 11、12 是**静态扫描**，7、8、10 是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
 不需要 loader、不引入新依赖），9 是**数据快照自检**：
 
 | # | 脚本 | 防的静默失效 |
@@ -524,6 +524,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 | 9 | `check-recent-updates` | 首页「最近更新」那份快照被裁掉条目、时间戳写成只有日期、或 `date` 对不上那次提交的真实时间（§3.7） |
 | 10 | `check-category-map` | 搜索结果「分类」折类判据（§3.8）：同一内容的各种写法必须折到同一类、**别名顺序敏感的那几对不许互撞**、站点覆盖必须压过规则，外加 `common.categoryKind.*` 这批**动态拼出来**的 i18n 键两侧都在（防线 ③ 看不见这种键） |
 | 11 | `check-confirm-danger` | 确认框那颗键走了 legacy 的 `okType: "danger"` —— 它出来是红描边不是实心红，而 class 里照样带 `.ant-btn-dangerous`（§3.4 那条，判据是扫 `src/` 里的 `okType` / `ok-type` 字样，注释不算） |
+| 12 | `check-notification-ids` | 系统通知的 id 与认领。`chrome.notifications.onClicked` 是**全局事件**（不按 id 分发），所以 ① `create` 不传 id 的那条永远没人认领得了，② 任何一个不看 `notificationId` 的监听器都会把**别处**的通知接走 —— 点「辅种完成」那条被更新检查的监听器跳去 GitHub 下载页（用户 2026-10-12 报的），不报错、不进 vue-tsc、只有点下去那一刻才知道。判据 B 要的是「同一行里既点名形参又做了比较」，跨行写的认领会被它报出来 |
 
 第六条守的是 §3.2：从两个无 DOM / 必须轻量 的上下文出发，静态 import 闭包不许走到 `sizzle`、
 不许命中 `@ptd/site` / `@ptd/social` 根入口，entrypoint 的 `import.meta.glob` 必须根绝对，

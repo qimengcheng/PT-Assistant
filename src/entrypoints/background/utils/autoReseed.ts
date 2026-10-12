@@ -42,6 +42,7 @@ import {
 import { isPluginPageVisible, pushReseedNotice } from "@/shared/reseedPresence.ts";
 
 import { whenOffscreenReady } from "./offscreen.ts";
+import { openOptionsPage } from "./base.ts";
 
 const JOB_ID = "autoReseed";
 const TICK_MS = 60 * 1000;
@@ -608,6 +609,22 @@ function runAutoReseedTick(): Promise<void> {
 // ⚠️ 回包**等这一轮真的跑完**（原先是 `void`，立刻回包）：调用点拿它当「已经推进过了」的证据，
 // 回得太早的话，它随后拉回来的还是上一轮的状态，界面表现为「我点了回查，什么都没发生」。
 onMessage("runAutoReseedTick", () => runAutoReseedTick());
+
+/**
+ * 点辅种那几条通知 → 跳到「辅种任务」那一页（处置按钮、状态列都在那儿）。
+ *
+ * ⚠️ `notifications.onClicked` 是**全局事件**，不是按通知 id 分发的：谁 add 的监听器都会收到
+ * 所有通知的点击。原先场上只有 `updateCheck` 那一个监听器、又不看 `notificationId`，
+ * 于是点这条「辅种完成」被它拿去开了更新包的下载链接（用户 2026-10-12 报的）。
+ * 所以每条通知都按自己的 id 前缀认领，别人的 id 一律不动 —— 前缀见下面三处 `create`：
+ * `reseed-<kind>`（合并卡片）、`auto-reseed-path-<任务>`、`auto-reseed-<任务>`。
+ */
+const RESEED_NOTIFICATION_ID = /^(?:auto-)?reseed-/;
+chrome.notifications?.onClicked.addListener((notificationId) => {
+  if (!RESEED_NOTIFICATION_ID.test(notificationId)) return;
+  chrome.notifications?.clear(notificationId);
+  openOptionsPage("/keep-upload-task");
+});
 
 // noinspection JSIgnoredPromiseFromCall
 jobs.scheduleJob({

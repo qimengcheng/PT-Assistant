@@ -1,38 +1,38 @@
 {
   "_comment": "本文件由 `node scripts/gen-agent-stats.mjs` 从 git 历史生成，请勿手改；提交历史变了就重跑。",
-  "generatedAt": "2026-10-10",
-  "headSha": "41d2248",
-  "headVersion": "0.65.2",
+  "generatedAt": "2026-10-12",
+  "headSha": "d5164fb",
+  "headVersion": "0.91.1",
   "span": {
-    "commits": 275,
-    "matched": 275,
-    "feat": 61,
+    "commits": 364,
+    "matched": 364,
+    "feat": 87,
     "firstDate": "2026-10-02",
-    "lastDate": "2026-10-10",
+    "lastDate": "2026-10-12",
     "versionFrom": "0.1.0",
-    "versionTo": "0.65.2"
+    "versionTo": "0.91.1"
   },
   "totals": {
-    "handAdd": 72981,
-    "handDel": 14132,
-    "bulkAdd": 90607
+    "handAdd": 85099,
+    "handDel": 16713,
+    "bulkAdd": 92386
   },
   "agents": [
     {
       "name": "Qoder",
-      "commits": 188,
-      "feat": 48,
-      "handAdd": 23859,
-      "handDel": 6603,
-      "bulkAdd": 1156,
+      "commits": 272,
+      "feat": 74,
+      "handAdd": 35634,
+      "handDel": 9074,
+      "bulkAdd": 2758,
       "firstDate": "2026-10-03",
-      "lastDate": "2026-10-10",
+      "lastDate": "2026-10-12",
       "versionFrom": "0.19.1",
-      "versionTo": "0.65.2",
+      "versionTo": "0.91.1",
       "partners": [
         {
           "name": "Qwen3.8-Flash",
-          "count": 188
+          "count": 272
         }
       ]
     },
@@ -118,19 +118,19 @@
     },
     {
       "name": "OpenCode",
-      "commits": 3,
+      "commits": 8,
       "feat": 0,
-      "handAdd": 722,
-      "handDel": 589,
-      "bulkAdd": 0,
+      "handAdd": 1065,
+      "handDel": 699,
+      "bulkAdd": 177,
       "firstDate": "2026-10-05",
-      "lastDate": "2026-10-06",
+      "lastDate": "2026-10-11",
       "versionFrom": "0.22.17",
-      "versionTo": "0.24.3",
+      "versionTo": "0.69.3",
       "partners": [
         {
           "name": "Space Bunny",
-          "count": 3
+          "count": 8
         }
       ]
     }
@@ -138,19 +138,19 @@
   "models": [
     {
       "name": "Qwen3.8-Flash",
-      "commits": 206,
-      "feat": 49,
-      "handAdd": 30612,
-      "handDel": 7185,
-      "bulkAdd": 1159,
+      "commits": 290,
+      "feat": 75,
+      "handAdd": 42387,
+      "handDel": 9656,
+      "bulkAdd": 2761,
       "firstDate": "2026-10-02",
-      "lastDate": "2026-10-10",
+      "lastDate": "2026-10-12",
       "versionFrom": "0.5.0",
-      "versionTo": "0.65.2",
+      "versionTo": "0.91.1",
       "partners": [
         {
           "name": "Qoder",
-          "count": 188
+          "count": 272
         },
         {
           "name": "千问办公",
@@ -160,27 +160,27 @@
     },
     {
       "name": "Space Bunny",
-      "commits": 42,
+      "commits": 47,
       "feat": 7,
-      "handAdd": 14002,
-      "handDel": 4164,
-      "bulkAdd": 1162,
+      "handAdd": 14345,
+      "handDel": 4274,
+      "bulkAdd": 1339,
       "firstDate": "2026-10-02",
-      "lastDate": "2026-10-06",
+      "lastDate": "2026-10-11",
       "versionFrom": "0.4.3",
-      "versionTo": "0.24.3",
+      "versionTo": "0.69.3",
       "partners": [
         {
           "name": "DeepSeek Harness",
           "count": 31
         },
         {
-          "name": "WorkBuddy",
+          "name": "OpenCode",
           "count": 8
         },
         {
-          "name": "OpenCode",
-          "count": 3
+          "name": "WorkBuddy",
+          "count": 8
         }
       ]
     },
@@ -264,19 +264,19 @@
     },
     {
       "name": "ZEN",
-      "commits": 1,
+      "commits": 6,
       "feat": 0,
-      "handAdd": 12,
-      "handDel": 10,
-      "bulkAdd": 0,
+      "handAdd": 355,
+      "handDel": 120,
+      "bulkAdd": 177,
       "firstDate": "2026-10-06",
-      "lastDate": "2026-10-06",
+      "lastDate": "2026-10-11",
       "versionFrom": "0.24.3",
-      "versionTo": "0.24.3",
+      "versionTo": "0.69.3",
       "partners": [
         {
           "name": "OpenCode",
-          "count": 1
+          "count": 6
         }
       ]
     }

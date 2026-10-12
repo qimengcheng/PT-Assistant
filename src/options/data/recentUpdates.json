@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-12 16:33:26",
-  "headSha": "ea62fe5",
+  "generatedAt": "2026-10-12 16:45:30",
+  "headSha": "d5164fb",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.91.2",
+      "date": "2026-10-12 16:45:18",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「特别感谢」页的贡献统计重算到 v0.91.1：收录的提交从 275 次涨到 364 次，各智能体 / 模型 / 模型平台的提交数、代码量与起止版本一起刷新（那一页底部「统计截至」也跟着更新）"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.91.1",
       "date": "2026-10-12 16:33:14",

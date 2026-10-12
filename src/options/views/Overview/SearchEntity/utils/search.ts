@@ -214,7 +214,7 @@ export async function doSearchEntity(
       }
 
       runtimeStore.search.searchPlan[solutionKey].status = searchStatus;
-      searchStatusMsg && (runtimeStore.search.searchPlan[solutionKey].statusMsg = searchStatusMsg);
+      if (searchStatusMsg) runtimeStore.search.searchPlan[solutionKey].statusMsg = searchStatusMsg;
 
       // 优化：批量处理搜索结果，减少响应式更新次数
       const newItems: ISearchResultTorrent[] = [];

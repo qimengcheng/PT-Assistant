@@ -3,7 +3,6 @@ import { computed, h, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { UploadFile } from "antdv-next";
 import {
-  CheckCircleOutlined,
   CloseCircleOutlined,
   CloudUploadOutlined,
   InboxOutlined,

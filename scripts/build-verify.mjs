@@ -198,7 +198,7 @@ function runWxt() {
 }
 
 const release = acquireLock();
-let code = 1;
+let code;
 try {
   if (sessionTag && !rawSession) {
     log(`未设 PTD_SESSION，按 ${sessionTag} 构建（要复现 CI 那条 .output 路径就 CI=true pnpm build）`);

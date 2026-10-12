@@ -42,6 +42,9 @@ export interface ISearchSnapshotMetadata {
   recordCount: number; // 记录数
 }
 
+// 这里要的是一个**有名字**的类型（存档记录、日志、IndexedDB store 都按 `IStoredUserInfo` 说话），
+// 不是 `IUserInfo` 的别名 —— 空 body 是刻意的，所以豁免这条。
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface IStoredUserInfo extends IUserInfo {}
 
 export type TDownloaderKey = string;

@@ -7,7 +7,7 @@
  */
 import { computed, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { Modal, message } from "antdv-next";
+import { Modal } from "antdv-next";
 import {
   definitionList,
   EResultParseStatus,

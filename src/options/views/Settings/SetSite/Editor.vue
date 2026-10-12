@@ -120,7 +120,6 @@ watch(siteId, (newValue) => {
 //
 // 提示文案复用 formValidateRules 的默认信息，与旧表单实际显示的文本一致
 const requiredHint = String(formValidateRules.require()(undefined));
-const urlHint = String(formValidateRules.url()(undefined));
 
 const nameMissing = computed(() => !siteName.value || String(siteName.value).trim() === "");
 const sortIndexMissing = computed(() => typeof siteUserConfig.value.sortIndex !== "number" || Number.isNaN(siteUserConfig.value.sortIndex));

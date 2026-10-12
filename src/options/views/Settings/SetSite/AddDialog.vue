@@ -154,7 +154,7 @@ function filterSiteOption(input: string, option?: { site?: ISiteMetadata }): boo
     </div>
     <!-- 具体配置站点 -->
     <div v-else>
-      <Editor ref="editor" v-model="selectedSiteId!" @update:form-valid="(v: boolean) => (isFormValid = v)" />
+      <Editor v-model="selectedSiteId!" @update:form-valid="(v: boolean) => (isFormValid = v)" />
     </div>
 
     <template #footer>

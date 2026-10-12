@@ -44,6 +44,10 @@
 | 30 | 版本号 | 口头规矩没写进文档，守卫又把 minor 判成跳号 —— 守卫上线那天规矩就失效了 |
 | 31 | 存储 | 失败值 NO_IMAGE 被当抓取结果落库，图标永久空白；三处判据统一成「失败不算命中」 |
 | 32 | store 水合 | `immediate: true` 的 watch 在挂载帧同步读未水合的 store：冷启动跳搜索页必弹「请至少添加一个站点」 |
+| 33 | i18n | 缺 key 渲染的是**键路径**不是中文；另一半是压根没走 i18n 的硬编码文案（v0.29.8 收口常量那一类） |
+| 34 | 分页 | 每页条数按面板实高测算（`useAutoFitPageSize` + `toPagination.fitSize`），三条不许改回去的边界 |
+| 35 | 检查更新 | 一条公开接口、一个写者、一天一次；不走 `requestUpdateCheck` |
+| 36 | ESLint | 冷接入口径（error 才 gate / 上游只降不修）+ 三条实测：核心 `no-restricted-syntax` 看不见 Vue 模板 AST |
 | 0 | 读史须知 | 版本重编号：`0.5.x` 已不存在，别按旧号找提交 |
 
 ## 读史须知：版本重编号（§0）
@@ -200,7 +204,9 @@ CI 的 `scripts/smoke-background.mjs` 守的就是这一类，见 README「工�
 **现象**：不弹窗，且返回 `false` —— 于是「确认删除」这类操作变成**默默取消**，看起来像按钮坏了。
 
 **现在的做法**：所有确认框统一走 antdv 的 `modal.confirm`（`App.useApp()`）。
-禁止照搬旧项目里的 `confirm()`。**⚠️ 无静态守卫**，靠 code review。
+禁止照搬旧项目里的 `confirm()`。v0.90.5 起**有守卫了**：ESLint 的 `no-restricted-globals`
+（裸 `confirm` / `alert` / `prompt`）+ 一条 `MemberExpression[object.name='window'][property.name=/^(confirm|alert|prompt)$/]`
+（`window.confirm()` 那种成员访问，`no-restricted-globals` 看不见它），见 §36。
 
 ### 10. `vue-konva` 不在 main.ts 全局 `use`
 
@@ -215,6 +221,8 @@ CI 的 `scripts/smoke-background.mjs` 守的就是这一类，见 README「工�
 
 **现在的做法**：不要直接 `import dayjs`。日期区间用 range-picker `@change` 的第二参数 `dateStrings` + 原生 `Date`。
 2026-10-12 起这条不再只靠口头约定 —— 布局换成 isolated 后顶层没有 `dayjs` 了（实测），裸 `import` 会直接报模块找不到；
+v0.90.5 起另有一条 `no-restricted-imports` 点名禁它，并把「改用 dateStrings，或者先显式声明」写进报错信息
+（`ERR_MODULE_NOT_FOUND` 说不了这句话，见 §36）。
 全仓 `src` + `packages` + `scripts` 共 668 个文件里现在零处这种写法。要用它就得显式声明进 `package.json`。
 
 ### 12. 宽表格溢出要双修
@@ -616,6 +624,60 @@ configStore 是同一条链上的另一个受害者：不等它，用户设的�
 
 **同类没查的**：其它 `immediate: true` 的 watch 里有没有同样的命令式读取，还没系统扫过
 （这条守卫同样看不见）。
+
+### 36. 接入 ESLint：哪些老防线真能被它接手（v0.90.5，2026-10-12）
+
+**装了什么**：`eslint@10.12.0` + `eslint-plugin-vue@10.11.1` + `typescript-eslint@8.71.1` +
+`vue-eslint-parser@10.4.1` + `globals` + **`@eslint/js`**（最后这个必须显式声明 —— 它是 eslint 的
+传递依赖，裸 `import "@eslint/js"` 在 isolated 布局下当场取不到，正是 §3 换来的那条判据自己咬人）。
+配置是扁平格式（eslint 10 只认这个），文件在 `eslint.config.mjs`，门禁入口是防线 ⑬
+`scripts/check-eslint.mjs`（自动进 `check-all` 聚合，本地与 CI 同一条）。
+
+**冷接入口径**（要改这里的人先看这段，别直接加严）：**只有 error 判失败**。首轮量到 713 条问题、
+其中 129 条 error；把 error 全修完之后是 **0 error / 638 warning**，warning 里
+`@typescript-eslint/no-explicit-any` 一条就占 424 —— 把它们当失败，等于让「装 linter」这条提交先去
+改 424 处与功能无关的东西。`packages/**`（上游零修改平移件）在配置里把报出来的 error 逐条降成 warn，
+理由也写在配置注释里。
+
+**三条实测，每条都会让「看起来接管了」变成静默失效**：
+
+1. **核心 `no-restricted-syntax` 看不见 Vue 模板 AST**。探针：一个只写
+   `<a-popconfirm ok-type="danger" />` 的 .vue 文件，对 `VAttribute`、`VAttribute[key.name='ok-type']`、
+   `VElement[name='a-popconfirm']` 三条 selector **全部零命中**（同文件里 `window.confirm` 的成员访问
+   选择器倒是正常报出来，所以不是没解析）。结论：模板侧必须换插件自己的
+   `vue/no-restricted-static-attribute`（静态 `ok-type="danger"`）+ `vue/no-restricted-v-bind`
+   （动态 `:ok-type` / `:okType` / `v-bind:ok-type` 三种都覆盖，实测各打中一次且正确写法零命中）。
+   这原话是「防线 ⑪ 整条换成 esquery」—— 那句话是错的，换成两条规则才叫接管。
+2. **`--fix` 会顺手改上游、还会铺一遍观感重排**。第一次 `eslint . --fix` 改了 46 个文件，其中
+   `packages/**` 5 个（上游件，已 `git checkout` 还原），另有 20 多个视图文件被 `vue/attributes-order`
+   重排属性 —— 那类改动与功能无关，却会把热点文件的 blame 打散。两条出路：`--fix` 的范围写死在
+   `pnpm lint:fix`（只有 `src scripts eslint.config.mjs`）；要临时关掉某条再修时注意
+   **`--fix-type problem,suggestion` 分不开 `vue/attributes-order`**（它的 `meta.type` 就是 suggestion，
+   实测照改），只能把那条规则临时设 `off`。
+3. **`excludes` 这一版不认**：`ConfigError: Unexpected key "excludes"`。子块内排除文件要用 `ignores`。
+   同理 `Linter#defineRule` 在 eslint 10 已移除，探针脚本得走 `plugins: { 名称: { rules: {...} } }`。
+
+**逐条盘点 12 条老防线**（结论：**只撤掉 1 条**，其余都替不掉，但凭空多出 3 条）：
+
+| 防线 | 能不能交给 ESLint | 判据 |
+|---|---|---|
+| ① `check-antd-tags` | **不能** | 判据是「实跑 `install()` 得到的 139 个注册名」，ESLint 没有组件注册表可查 |
+| ② `check-content-antd-lite` | **不能** | 要 import 闭包 + 注册表两样 |
+| ③ `check-locale-keys` | **不能** | 要把 `t("a.b.c")` 拿到两份 locale JSON 里解析 |
+| ④ `check-dead-props` | **不能** | 要每个组件真实 props / slots 声明（同样是跑出来的） |
+| ⑤ `check-store-hydration` | **不能** | 判的是「异步水合的 store 在挂载帧是初始值」这条运行时语义 |
+| ⑥ `check-sw-graph` | **不能**（想过，量完否决） | 它判的是**从两个入口出发的可达性**。`no-restricted-imports` 只会按文件路径分块 —— 而 `src/content-script/app/**` 里现存 4 处 `@ptd/site` 根入口 import（`import { type ITorrent }` 那种会被 TS 擦除、`ETorrentStatus` 那种是真值），按路径一刀切要么误伤要么漏放 |
+| ⑦ `check-indexdb-retry` | **不能** | 行为断言（懒开的两条不变量） |
+| ⑧ `check-fingerprint` | **不能** | 行为断言，属测试范畴（Vitest 那条待办才是它的归宿） |
+| ⑨ `check-recent-updates` | **不能** | 数据快照 + 与 `git log` 的真实时间对账 |
+| ⑩ `check-category-map` | **不能** | 3281 种声明名的折类断言 |
+| ⑪ `check-confirm-danger` | **能，已撤** | 两种拼法分别由 `no-restricted-syntax`（脚本侧 `okType`）+ `vue/no-restricted-static-attribute` / `vue/no-restricted-v-bind`（模板侧）接手；夹具实测五种坏拼法全打中、两种正确写法零命中。附带好处：原守卫要手工剥注释才不被反例喂成假 PASS，AST 规则天然不看注释 |
+| ⑫ `check-notification-ids` | **不整条撤** | A 条（`create` 不带 id）ESLint 的选择器能打中，但**只有字面 `chrome.notifications.create(` 这一种形状** —— 先 `const n = chrome.notifications` 再 `n.create({...})` 它看不见，而原守卫按文本扫得到。B 条（监听器必须按 id 认领）是数据流，静态规则结构上判不了 |
+| 新增 | **三条以前只有口头约定** | 原生 `confirm` / `alert` / `prompt`（PLAYBOOK §9 长期标 ⚠️ 无守卫，`no-restricted-globals` + 一条成员访问 selector 接手）；裸 `import dayjs`（§11，`no-restricted-imports` 带原因）；站内信正文禁 `v-html`（`vue/no-v-html`） |
+
+**没验的**：`--fix` 之外那些 warning 的实际观感影响（比如 19 条 `vue/attributes-order` 要不要专门铺一次）
+—— 那是按页取向，不是缺陷，留给用户拍板。
+
 
 ### 28. i18n 守卫上线即扫出真问题
 

@@ -15,12 +15,12 @@
 /** 分隔符：空白、点、下划线、连字符、全角间隔号（归一成单个空格） */
 const SEPARATOR_PATTERN = /[\s._\-+·・－—―]+/g;
 /** 成对符号一律当成分隔符处理 */
-const PAIRED_SYMBOL_PATTERN = /[\[\]［］()（）{}｛｝【】〔〕「」『』《》〈〉<>]/g;
+const PAIRED_SYMBOL_PATTERN = /[[\]［］()（）{}｛｝【】〔〕「」『』《》〈〉<>]/g;
 /** 其余零散标点 */
 const LOOSE_PUNCTUATION_PATTERN = /[,;:!?'"`~@#$%^&*=+|\\/]/g;
 
 /** 结尾的 [Group] / （Group） / 【Group】 / {Group}，内容不含数字时才算压制组尾标 */
-const TRAILING_BRACKET_GROUP = /[\[［(（{｛【《]\s*([^[\]］)）}｝】》\n]{1,40}?)\s*[\]］)）}｝】》]\s*$/;
+const TRAILING_BRACKET_GROUP = /[[［(（{｛【《]\s*([^[\]］)）}｝】》\n]{1,40}?)\s*[\]］)）}｝】》]\s*$/;
 /** 结尾的 -Group（不含数字），且前缀必须落在「像发布名」的语境里 */
 const TRAILING_DASH_GROUP = /-\s*([^\s\-[\]]{1,15})\s*$/;
 /** 4 位年份，用于判断 -Group 的前缀是否像发布名 */

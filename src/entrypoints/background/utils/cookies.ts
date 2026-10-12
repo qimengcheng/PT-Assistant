@@ -55,7 +55,7 @@ onMessage("getCookie", async ({ data: detail }) => {
  * @param force 是否强制设置，为true时跳过过期检查直接设置
  */
 export async function setCookie(cookie: chrome.cookies.SetDetails, force: boolean = false): Promise<void> {
-  let new_cookie = {} as chrome.cookies.SetDetails;
+  const new_cookie = {} as chrome.cookies.SetDetails;
 
   (
     [

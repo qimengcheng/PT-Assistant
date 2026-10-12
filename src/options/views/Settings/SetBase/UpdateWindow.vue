@@ -176,8 +176,7 @@ onMounted(refresh);
           :href="state.releaseUrl"
           target="_blank"
           rel="noopener noreferrer"
-          >{{ t("SetUpdate.gotoReleaseNote") }}</a
-        >
+          >{{ t("SetUpdate.gotoReleaseNote") }}</a>
       </div>
     </div>
 

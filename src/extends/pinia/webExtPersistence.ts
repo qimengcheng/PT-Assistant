@@ -70,6 +70,8 @@ export interface PersistedStateOptions {
 }
 
 declare module "pinia" {
+  // 模块增强必须与被增强接口同 arity，这两个类型参数名就是占位（不写会报「接口不兼容」）。
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   export interface DefineStoreOptionsBase<S, Store> {
     /**
      * Persist store in storage.
@@ -115,7 +117,7 @@ export function piniaWebExtPersistencePlugin(context: PiniaPluginContext) {
   let hydrated = false;
 
   beforeRestore?.(context);
-  let restorePromise = restore(key, {
+  const restorePromise = restore(key, {
     initialValue: store.$state,
     storage: storageArea,
     writeDefaults: writeDefaultState,

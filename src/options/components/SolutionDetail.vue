@@ -13,7 +13,10 @@ import {
 } from "@/options/views/Settings/SetSearchSolution/utils.ts";
 
 const props = defineProps<{
-  solution: ISearchSolution;
+  // 可以是 undefined：模板第 50 行本来就写着 `v-if="solution"`，而调用点之一是
+  // `solutions[planKey]?.solutions.find(...)`（找不到就是 undefined）。原先声明成必填，
+  // 等于让调用点用 `!` 向类型系统撒谎。
+  solution?: ISearchSolution;
 }>();
 
 const siteMetaCategory = shallowRef<ISearchCategories[]>([]);

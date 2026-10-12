@@ -32,7 +32,7 @@ export async function generateSiteSearchSolution(
   siteId: TSiteID,
   selectCategory: TSelectCategory,
 ): Promise<ISearchSolution> {
-  let id = nanoid(); // 通过这种panel生成的solution，其 entries 只有一个值，所以可以直接将id作为entries的id
+  const id = nanoid(); // 通过这种panel生成的solution，其 entries 只有一个值，所以可以直接将id作为entries的id
   const searchSolution: ISearchSolution = {
     id,
     siteId: siteId,

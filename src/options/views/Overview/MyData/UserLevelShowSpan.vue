@@ -135,8 +135,7 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
       @dblclick="toggleIntervalDisplay"
       style="cursor: pointer; user-select: none"
     >
-      {{ getIntervalDisplay(levelRequirement.interval).text }} </span
-    >;
+      {{ getIntervalDisplay(levelRequirement.interval).text }} </span>;
   </template>
   <template v-if="levelRequirement.uploaded">
     <ArrowUpOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.uploaded')" />
@@ -197,8 +196,7 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
       @dblclick="toggleNumberSimplification"
       style="cursor: pointer; user-select: none"
     >
-      {{ formatBonus("bonus") }} </span
-    >;
+      {{ formatBonus("bonus") }} </span>;
   </template>
 
   <template v-if="levelRequirement.seedingBonus">
@@ -208,8 +206,7 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
       @dblclick="toggleNumberSimplification"
       style="cursor: pointer; user-select: none"
     >
-      {{ formatBonus("seedingBonus") }} </span
-    >;
+      {{ formatBonus("seedingBonus") }} </span>;
   </template>
 
   <template v-if="levelRequirement.bonusPerHour">

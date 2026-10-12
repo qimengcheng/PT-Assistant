@@ -22,7 +22,7 @@ const {
     :user-info="userInfo"
     :level-requirement="levelRequirement"
     :hide-ratio-in-table="hideRatioInTable"
-    :useJoinTimeAsRef="useJoinTimeAsRef"
+    :use-join-time-as-ref="useJoinTimeAsRef"
   />
   <template v-if="levelRequirement.alternative">
     <TableOutlined class="level-icon" />
@@ -33,7 +33,7 @@ const {
         :user-info="userInfo"
         :level-requirement="alternative"
         :hide-ratio-in-table="hideRatioInTable"
-        :useJoinTimeAsRef="useJoinTimeAsRef"
+        :use-join-time-as-ref="useJoinTimeAsRef"
       />
       ]
     </template>

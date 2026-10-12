@@ -1,6 +1,6 @@
 {
   "name": "pt-assistant-wxt",
-  "version": "0.90.4",
+  "version": "0.90.5",
   "private": true,
   "type": "module",
   "description": "PT Assistant — PT-depiler 的 WXT + Vue 3 全新架构重写版（骨架）",
@@ -11,6 +11,8 @@
     "build:firefox": "node scripts/build-verify.mjs -b firefox",
     "zip": "node scripts/build-verify.mjs --wxt-cmd=zip",
     "compile": "vue-tsc --noEmit",
+    "lint": "node ./node_modules/eslint/bin/eslint.js .",
+    "lint:fix": "node ./node_modules/eslint/bin/eslint.js src scripts eslint.config.mjs --fix",
     "check:all": "node scripts/check-all.mjs",
     "version:next": "node scripts/check-version.mjs --next",
     "version:check": "node scripts/check-version.mjs --committed",
@@ -57,6 +59,7 @@
     "webdav": "^5.11.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bencode": "^4.0.0",
     "@types/chrome": "^0.3.0",
     "@types/crypto-js": "^4.2.2",
@@ -65,8 +68,13 @@
     "@types/parse-torrent": "^11.0.1",
     "@types/sizzle": "^2.3.10",
     "@wxt-dev/module-vue": "^1.0.3",
+    "eslint": "^10.12.0",
+    "eslint-plugin-vue": "^10.11.1",
+    "globals": "^17.13.0",
     "tinyexec": "^1.3.1",
     "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.3.11",
     "wxt": "^0.21.0"
   }

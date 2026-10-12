@@ -46,7 +46,6 @@ function autoFlushUserInfo(retryIndex: number = 0) {
     const intervalMs = interval * 60 * 60 * 1000; // interval 的单位是小时（设置页标签也这么写）
     const curDate = new Date();
     const curDateFormat = format(curDate, "yyyy-MM-dd");
-    let metadataStore: IMetadataPiniaStorageSchema;
 
     // 自动刷新只有这一条全局闸：每日时段（在 afterTime 之前不干活）。重试轮不受它管。
     if (retryIndex === 0) {
@@ -88,7 +87,7 @@ function autoFlushUserInfo(retryIndex: number = 0) {
     // ⚠️ 不能用 `!`：空库（还没装过站点）时 getItem 返回 null，这里直接 TypeError，
     // 于是这个 job 每轮都在同一处崩、lastUserInfoAutoFlushAt 永远推不进去。
     // 没有可刷的站点就正常收尾（对齐下面 autoBackup 的守卫写法）。
-    metadataStore = ((await extStore.getItem("metadata")) ?? {}) as IMetadataPiniaStorageSchema;
+    const metadataStore = ((await extStore.getItem("metadata")) ?? {}) as IMetadataPiniaStorageSchema;
     for (const [siteId, siteConfig] of Object.entries(metadataStore.sites ?? {})) {
       if (siteConfig.isOffline || !siteConfig.allowQueryUserInfo) continue;
       try {

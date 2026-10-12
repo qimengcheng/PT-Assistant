@@ -181,6 +181,8 @@ export const RULES: Array<{ kind: TCategoryKind; alias: string[] }> = [
 ];
 
 /** 纯 ASCII 别名走词首匹配；含 CJK 的走子串匹配 */
+// \x00-\x7f 就是「ASCII 全集」的唯一写法，不是漏了转义。
+// eslint-disable-next-line no-control-regex
 const ASCII_ONLY = /^[\x00-\x7f]+$/;
 
 // 别名表里 ASCII 项是按人好读的大小写混写的（OVA / MV / XXX），而待判字符串是小写的：

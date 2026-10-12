@@ -197,7 +197,7 @@ const visibleLevelRequirements = computed(() => {
               <UserLevelsComponent
                 :user-info="userInfo"
                 :level-requirement="userLevel"
-                :useJoinTimeAsRef="true"
+                :use-join-time-as-ref="true"
               />
             </span>
 

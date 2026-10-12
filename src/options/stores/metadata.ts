@@ -69,7 +69,7 @@ export const useMetadataStore = defineStore("metadata", {
       });
     },
 
-    getSortedAddedSites(state): Array<ISiteUserConfig & { id: string }> {
+    getSortedAddedSites(): Array<ISiteUserConfig & { id: string }> {
       return this.getAddedSites.sort((a, b) => {
         return (b.sortIndex ?? 0) - (a.sortIndex ?? 0);
       });
@@ -89,7 +89,7 @@ export const useMetadataStore = defineStore("metadata", {
       return sitesGroupData;
     },
 
-    getSiteMetadata(state) {
+    getSiteMetadata() {
       return async (siteId: TSiteID): Promise<ISiteMetadata> => {
         return await getDefinedSiteMetadata(siteId);
       };
@@ -105,7 +105,7 @@ export const useMetadataStore = defineStore("metadata", {
       };
     },
 
-    getSiteMergedMetadata(state) {
+    getSiteMergedMetadata() {
       return async <T extends keyof ISiteMetadata>(
         siteId: TSiteID,
         field: T,
@@ -120,13 +120,13 @@ export const useMetadataStore = defineStore("metadata", {
       };
     },
 
-    getSiteName(state) {
+    getSiteName() {
       return async (siteId: TSiteID): Promise<string> => {
         return await this.getSiteMergedMetadata(siteId, "name", siteId);
       };
     },
 
-    getSiteUrl(state) {
+    getSiteUrl() {
       return async (siteId: TSiteID): Promise<string> => {
         const siteConfig = await this.getSiteUserConfig(siteId);
         if (siteConfig.url) {
@@ -137,7 +137,7 @@ export const useMetadataStore = defineStore("metadata", {
       };
     },
 
-    getSiteCategory(state) {
+    getSiteCategory() {
       return async (siteId: TSiteID, categoryKey?: string): Promise<ISearchCategories | ISearchCategories[]> => {
         const siteMetadataCategory = await this.getSiteMergedMetadata(siteId, "category", []);
         if (categoryKey) {
@@ -147,14 +147,14 @@ export const useMetadataStore = defineStore("metadata", {
       };
     },
 
-    getSiteCategoryName(state) {
+    getSiteCategoryName() {
       return async (siteId: TSiteID, categoryKey: string): Promise<string> => {
         const siteMetadataCategory = (await this.getSiteCategory(siteId, categoryKey)) as ISearchCategories;
         return siteMetadataCategory?.name ?? categoryKey;
       };
     },
 
-    getSiteCategoryOptionName(state) {
+    getSiteCategoryOptionName() {
       return async (
         siteId: TSiteID,
         categoryKey: string,
@@ -206,7 +206,7 @@ export const useMetadataStore = defineStore("metadata", {
          * 站点定义里真正的 searchEntry 配置（selectors / requestConfig）永久抹成
          * {id, name, enabled}，该站点的搜索随即完全失效。
          */
-        let searchEntries = { ...(siteMetadata.searchEntry ?? { default: {} }) };
+        const searchEntries = { ...(siteMetadata.searchEntry ?? { default: {} }) };
         for (const [key, value] of Object.entries(siteUserConfig?.merge?.searchEntry ?? {})) {
           if (searchEntries[key] && typeof value.enabled === "boolean") {
             /**
@@ -358,13 +358,13 @@ export const useMetadataStore = defineStore("metadata", {
       return Object.values(state.downloaders).filter((downloader) => downloader.enabled);
     },
 
-    getSortedEnabledDownloaders(state): Array<IDownloaderMetadata> {
+    getSortedEnabledDownloaders(): Array<IDownloaderMetadata> {
       return this.getEnabledDownloaders.sort((a, b) => {
         return (b.sortIndex ?? 0) - (a.sortIndex ?? 0);
       });
     },
 
-    getEnabledDownloadersBySite(state) {
+    getEnabledDownloadersBySite() {
       return (siteId: string): IDownloaderMetadata[] => {
         const configStore = useConfigStore();
         if (!configStore.download.allowDownloaderFilterForSite) {
@@ -374,7 +374,7 @@ export const useMetadataStore = defineStore("metadata", {
       };
     },
 
-    getSortedEnabledDownloadersBySite(state) {
+    getSortedEnabledDownloadersBySite() {
       return (siteId: string): IDownloaderMetadata[] => {
         return [...this.getEnabledDownloadersBySite(siteId)].sort((a, b) => {
           return (b.sortIndex ?? 0) - (a.sortIndex ?? 0);

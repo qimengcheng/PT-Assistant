@@ -53,7 +53,7 @@ const siteSelectItems = computed(() => [
 // 站点 id 下拉（旧实现直接把字符串数组丢给 v-autocomplete，antd Select 需要 {label,value}）
 const siteIdOptions = computed(() => definitionList.map((x) => ({ label: x, value: x })));
 
-const piniaStoreContent = import.meta.glob<Record<string, Function>>("@/options/stores/*.ts");
+const piniaStoreContent = import.meta.glob<Record<string, () => unknown>>("@/options/stores/*.ts");
 const piniaStoreName: Array<{ label: string; value: string }> = Object.keys(piniaStoreContent).map((x) => ({
   label: x.replace(/^.+\//, "").replace(/\.ts$/, ""),
   value: x,
@@ -65,7 +65,10 @@ const resetting = ref(false);
 
 const metadataStore = useMetadataStore();
 
-const simpleServer = ref<Record<string, { selected: string; piniaKey: keyof typeof metadataStore; getFn: Function }>>({
+/** 这三颗是把 store 里的一份配置转成展示字符串的函数；用各自真实的签名，不用 `Function` */
+type ServerLabelGetter = typeof getDownloader | typeof getMediaServer | typeof getBackupServer;
+
+const simpleServer = ref<Record<string, { selected: string; piniaKey: keyof typeof metadataStore; getFn: ServerLabelGetter }>>({
   Downloader: { selected: "", piniaKey: "downloaders", getFn: getDownloader },
   MediaServer: { selected: "", piniaKey: "mediaServers", getFn: getMediaServer },
   BackupServer: { selected: "", piniaKey: "backupServers", getFn: getBackupServer },

@@ -5,7 +5,6 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   DownloadOutlined,
-  ExclamationCircleOutlined,
   PauseCircleOutlined,
   QuestionCircleOutlined,
   ReloadOutlined,

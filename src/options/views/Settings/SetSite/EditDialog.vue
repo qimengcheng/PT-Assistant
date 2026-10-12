@@ -45,7 +45,7 @@ function dialogEnter() {
 
 
     <div class="editor-body">
-      <Editor v-model="props.siteId" @update:form-valid="(v: boolean) => (isFormValid = v)" />
+      <Editor :model-value="props.siteId" @update:form-valid="(v: boolean) => (isFormValid = v)" />
     </div>
 
     <template #footer>

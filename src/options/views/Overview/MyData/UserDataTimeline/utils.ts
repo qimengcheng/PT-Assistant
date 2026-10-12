@@ -1,6 +1,6 @@
 import { ref, shallowRef, computed } from "vue";
 import { differenceInDays } from "date-fns";
-import { EResultParseStatus, type ISiteUserConfig, type IUserInfo, type TSiteID } from "@ptd/site";
+import { EResultParseStatus, type IUserInfo, type TSiteID } from "@ptd/site";
 
 import { formatSize, simplifyNumber } from "@/options/utils.ts";
 import { useResetableRef } from "@/options/directives/useResetableRef.ts";
@@ -71,7 +71,6 @@ export function canThisSiteShow(siteId: TSiteID) {
     return false;
   }
 
-  const siteUserConfig = (metadataStore.sites[siteId] ?? {}) as ISiteUserConfig;
   const siteMetadata = (allAddedSiteMetadata[siteId] ?? {}) as TOptionSiteMetadatas[typeof siteId];
 
   // 对于已死站点，只要有有效的用户信息就可以显示
@@ -152,7 +151,7 @@ export const timelineDataRef = useResetableRef<ITimelineData>(
 
     const userNames: Record<string, number> = {};
     const addedSiteInfo: IStoredUserInfo[] = [];
-    for (let userInfo of fixedLastUserInfoComputed.value) {
+    for (const userInfo of fixedLastUserInfoComputed.value) {
       // 未勾选的站点不展示
       if (!selectedSites.value.includes(userInfo.site)) {
         continue;

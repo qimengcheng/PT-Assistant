@@ -6,7 +6,6 @@ import {
   DownloadOutlined,
   FilterOutlined,
   MinusOutlined,
-  ReloadOutlined,
   SearchOutlined,
   SyncOutlined,
 } from "@antdv-next/icons";
@@ -15,7 +14,6 @@ import type { TableColumnsType } from "antdv-next";
 import { sendMessage } from "@/messages.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { formatDate } from "@/options/utils.ts";
-import { useConfigStore } from "@/options/stores/config.ts";
 import type {
   ITorrentDownloadMetadata,
   TTorrentDownloadKey,
@@ -42,7 +40,6 @@ import {
 } from "./utils.ts"; // <-- 主要方法
 
 const { t } = useI18n();
-const configStore = useConfigStore();
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 
 const { tableFilterRef, tableWaitFilterRef, tableFilterFn } = tableCustomFilter;

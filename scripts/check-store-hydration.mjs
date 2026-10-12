@@ -151,7 +151,7 @@ function functionBodies(src) {
     const from = arrow + 2;
     const brace = src.indexOf("{", from);
     const paren = src.indexOf("(", from);
-    let span = null;
+    let span;
     if (brace >= 0 && (paren < 0 || brace < paren)) span = balanced(src, brace);
     else {
       // 表达式体：截到行尾（够用，且刻意保守 —— 宁可少看也不多看）

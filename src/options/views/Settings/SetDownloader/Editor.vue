@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { computedAsync } from "@vueuse/core";
-import { format } from "date-fns";
 
 import type { IDownloaderMetadata } from "@/shared/types.ts";
 import { formValidateRules } from "@/options/utils.ts";
@@ -19,8 +18,6 @@ const clientMeta = computedAsync<TorrentClientMetaData>(
     clientConfig.value?.type ? await getDownloaderMetaData(clientConfig.value.type) : ({} as TorrentClientMetaData),
   {} as TorrentClientMetaData,
 );
-
-const showPassword = ref<boolean>(false);
 
 const formRef = ref();
 
@@ -103,13 +100,6 @@ function formatTimeout(ms: number) {
   const s = totalSeconds % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
-
-const timeoutColor = computed(() => {
-  const ms = clientConfig.value?.timeout ?? 0;
-  if (ms > 8 * 60e3) return "red";
-  if (ms > 5 * 60e3) return "orange";
-  return "green";
-});
 
 const advanceOptions = computed(() => clientMeta.value?.advanceAddTorrentOptions ?? []);
 const showAutoStart = computed(() => clientMeta.value?.feature?.DefaultAutoStart?.allowed === true);

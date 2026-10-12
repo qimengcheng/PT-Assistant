@@ -10,7 +10,6 @@ import {
   type CAddTorrentOptions,
   type CTorrent,
   type CTorrentFile,
-  type CTorrentFileSelection,
   type CTorrentPeer,
   type CTorrentTracker,
   type TorrentClientStatus,
@@ -349,12 +348,15 @@ async function downloadTorrent(downloadOption: IDownloadTorrentOption) {
     downloadOption.downloadId = downloadId = await setDownloadHistory(downloadHistory);
   }
   logger({ msg: `generate download torrent task #${downloadOption.downloadId}`, data: downloadOption });
-  let downloadStatus = await setDownloadStatus(downloadId!, "pending");
+  // 这一次「pending」是要写进下载历史的（有副作用），但它的返回值没人读 ——
+  // 下面进 try 之后马上被 "downloading" 覆盖，所以只调用、不接返回值。
+  await setDownloadStatus(downloadId!, "pending");
+  let downloadStatus: TTorrentDownloadStatus;
   let errorMessage: string | undefined;
 
   // 2. 构建下载链接的请求配置
   let downloadRequestConfig: AxiosRequestConfig = { url: torrent.link, method: "GET", timeout: 30e3 };
-  let siteInstance: Awaited<ReturnType<typeof getSiteInstance<"public">>> | null = null;
+  let siteInstance: Awaited<ReturnType<typeof getSiteInstance<"public">>>;
 
   if (torrent.site) {
     // 生成站点，并检查站点下载间隔，如果触及到站点下载间隔，则将下载任务放入到 alarms 中等待
@@ -438,7 +440,8 @@ async function downloadTorrentToLocalFile(
   downloadOption: TLocalDownloadOption,
   downloadRequestConfig: AxiosRequestConfig,
 ): Promise<Pick<IDownloadTorrentResult, "downloadStatus" | "errorMessage">> {
-  let { torrent, localDownloadMethod = "web", downloadId } = downloadOption;
+  const { torrent, downloadId } = downloadOption;
+  let { localDownloadMethod = "web" } = downloadOption;
   let downloadStatus: TTorrentDownloadStatus = "downloading";
   let errorMessage: string | undefined;
 

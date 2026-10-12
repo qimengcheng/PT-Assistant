@@ -32,7 +32,7 @@ const dialogTitle = computed(() =>
 );
 
 function getSearchSolution(planKey: string, entryName: string) {
-  return metadataStore.solutions[planKey]?.solutions.find((x) => x.id === entryName)!;
+  return metadataStore.solutions[planKey]?.solutions.find((x) => x.id === entryName);
 }
 
 const statusFilterRef = ref<EResultParseStatus[]>([]);
@@ -112,7 +112,7 @@ const filteredSearchPlan = computed(() => {
             </span>
           </div>
           <br />
-          <span class="text-label-large text-grey"> <{{ searchPlan.searchEntryName }}> </span>
+          <span class="text-label-large text-grey"> &lt;{{ searchPlan.searchEntryName }}&gt; </span>
         </div>
         <span class="text-label-large text-end status-msg">
           <ResultParseStatus :status="searchPlan.status" />

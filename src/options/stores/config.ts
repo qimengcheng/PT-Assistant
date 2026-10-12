@@ -473,7 +473,7 @@ export const useConfigStore = defineStore("config", {
       }
     },
 
-    getUserNames(state) {
+    getUserNames() {
       const metadataStore = useMetadataStore();
 
       const userNames = {

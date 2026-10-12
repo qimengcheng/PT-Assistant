@@ -89,15 +89,13 @@ export async function updatePageType(ptdData: IPtdData = {}) {
       const metadata = siteInstance.value.metadata;
 
       // 首先判断是否为 list 页面
-      let listUrlPatterns = [];
-      if (metadata.list && metadata.list.length > 0) {
-        listUrlPatterns = metadata.list.flatMap((item) => item.urlPattern ?? []).filter(Boolean);
-      } else {
-        listUrlPatterns = uniq([
-          ...(metadata.search?.requestConfig?.url ? [metadata.search.requestConfig.url] : []),
-          ...(Object.values(metadata.searchEntry ?? {}).map((entry) => entry.requestConfig?.url) ?? []),
-        ]).filter(Boolean);
-      }
+      const listUrlPatterns =
+        metadata.list && metadata.list.length > 0
+          ? metadata.list.flatMap((item) => item.urlPattern ?? []).filter(Boolean)
+          : uniq([
+              ...(metadata.search?.requestConfig?.url ? [metadata.search.requestConfig.url] : []),
+              ...(Object.values(metadata.searchEntry ?? {}).map((entry) => entry.requestConfig?.url) ?? []),
+            ]).filter(Boolean);
 
       const excludeListUrlPatterns =
         metadata.list?.flatMap((item) => item.excludeUrlPattern ?? []).filter(Boolean) ?? [];
@@ -109,7 +107,7 @@ export async function updatePageType(ptdData: IPtdData = {}) {
         pageType.value = "list";
       } else {
         // 如果不是 list 页面，再判断是否为 detail 页面
-        let detailUrlPatterns = metadata.detail?.urlPattern ?? [];
+        const detailUrlPatterns = metadata.detail?.urlPattern ?? [];
 
         if (detailUrlPatterns.some((pattern) => matchesUrlPattern(pattern, url))) {
           pageType.value = "detail";

@@ -18,7 +18,7 @@ const searchEntryEnabledStatus = reactive<Record<string, boolean>>({});
 
 onMounted(() => {
   for (const [entryKey, entry] of Object.entries(item.metadata.searchEntry ?? {})) {
-    let entryEnabledStatus = false;
+    let entryEnabledStatus: boolean;
     if (typeof item.userConfig.merge?.searchEntry?.[entryKey]?.enabled === "boolean") {
       entryEnabledStatus = item.userConfig.merge.searchEntry[entryKey]!.enabled!;
     } else {

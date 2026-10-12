@@ -22,7 +22,7 @@ onMessage("getSiteSearchResult", async ({ data: { siteId, keyword = "", searchEn
   });
   const site = await getSiteInstance<"public">(siteId);
 
-  let searchResult = await site.getSearchResult(keyword, searchEntry);
+  const searchResult = await site.getSearchResult(keyword, searchEntry);
 
   if (searchResult.data.length > 0) {
     let autoDetectOfficialGroupFromTitlePattern: TPatterns | undefined;

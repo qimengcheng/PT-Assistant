@@ -9,7 +9,6 @@ import {
   type ISiteMessageActionResult,
   type ISiteMessageContentResult,
   type ISiteMessagesResult,
-  type TSiteID,
 } from "@ptd/site";
 
 import { onMessage } from "@/messages.ts";

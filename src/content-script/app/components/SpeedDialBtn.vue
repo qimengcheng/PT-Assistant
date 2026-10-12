@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useAttrs, useTemplateRef, Transition, type TransitionProps } from "vue";
+import { computed, useAttrs, useTemplateRef, type TransitionProps } from "vue";
 import { useElementHover } from "@vueuse/core";
 
 import { useConfigStore } from "@/options/stores/config.ts";

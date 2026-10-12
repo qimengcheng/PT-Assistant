@@ -53,7 +53,6 @@ for (const file of walk(path.join(ROOT, SCAN))) {
   files++;
   const rel = path.relative(ROOT, file).split(path.sep).join("/");
   const text = stripComments(fs.readFileSync(file, "utf8"));
-  const lines = text.split("\n");
   const at = (idx) => text.slice(0, idx).split("\n").length;
 
   for (const m of text.matchAll(new RegExp(CREATE_NO_ID.source, "g"))) {

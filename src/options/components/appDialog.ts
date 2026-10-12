@@ -53,7 +53,9 @@ export type TPromptInDialog = (
  * 所以这里直接给最终那两个 prop：`{ type: "primary", danger: true }` 才走到
  * `button.js:65` 那条 `["danger", "solid"]`。
  * 形参因此叫 `tone` 而不是 `okType` —— 全仓 `src/` 里不许再出现那个词，
- * 有它就是在用坏掉的那条入口（判据：`scripts/check-confirm-danger.mjs`）。
+ * 有它就是在用坏掉的那条入口。判据在 ESLint（v0.90.5 起；原 `check-confirm-danger.mjs` 已撤）：
+ * 脚本侧 `no-restricted-syntax` 选 `Property[key.name='okType']`，模板侧
+ * `vue/no-restricted-static-attribute` + `vue/no-restricted-v-bind`。
  */
 export function makeConfirmDanger(modal: IDialogModalApi, t: TTranslate) {
   return function confirmDanger(

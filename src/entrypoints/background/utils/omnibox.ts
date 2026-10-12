@@ -83,7 +83,7 @@ chrome.omnibox?.onInputChanged.addListener(async (text, suggest) => {
 chrome.omnibox?.onInputEntered.addListener(async (text) => {
   let solutionName = "";
   let solutionId = "default";
-  let key = "";
+  let key: string;
 
   if (text.indexOf(splitString) != -1) {
     const solutions = await getSearchSolution(true);

@@ -69,6 +69,8 @@ export const isTableLoading = computed<boolean>(() => isLoadingSiteMetadata.valu
  */
 export const tableData = computed<IUserInfoItem[]>(() => {
   // 显式依赖异步加载结果：定义没到位时不过滤条件算不出来（siteMeta.type / isDead 来自站点定义）
+  // 这一行读的是**依赖**不是值：computed 必须订阅它，站点刷新后才会重算。
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   addedSiteIds.value;
 
   const configStore = useConfigStore();

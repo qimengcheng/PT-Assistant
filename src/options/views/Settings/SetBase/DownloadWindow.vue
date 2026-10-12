@@ -8,7 +8,6 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useConfigStore } from "@/options/stores/config.ts";
-import { LocalDownloadMethod } from "@/shared/types/common/download.ts";
 
 const { t } = useI18n();
 const configStore = useConfigStore();

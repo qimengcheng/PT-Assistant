@@ -52,6 +52,48 @@ import { openOptionsPage } from "./base.ts";
 const JOB_ID = "autoReseed";
 const TICK_MS = 60 * 1000;
 
+/**
+ * 任务卡在「基准正往任务目录搬」时的那几趟快查。
+ *
+ * 为什么要有这一串（用户 2026-10-12：「添加完了之后应该马上就回查啊…过几秒就得查一下啊，
+ * 查到移动完了就赶紧推种子啊，不要一开始就等 1 分钟」）：新旧目录在同一个盘符时 qBittorrent 只是
+ * 改个路径，几秒就完；而发送那道闸看的是**基准此刻的实际路径**，只有再查一轮才拿得到。
+ * 页面里那套盯梢（`KeepUploadTask/Index.vue` 的 `watchBaseMoveLanded`）是页内定时器，
+ * 从搜索页建完任务就没人起它 —— 那种情况下唯一会再查的就是这一串。
+ *
+ * 6 → 15 → 30 → 60 秒四趟，之后交回每分钟那一轮（它本来就在，不算放弃）。
+ * 第一趟给 6 秒是贴着用户那句「过几秒」，代价要说清：下载器那份列表自己有 15 秒缓存闸
+ * （`qBittorrent.ts` 的 `getSyncData`），所以 6 秒那一趟大概率拿回同一份快照 —— 它查的是内存里
+ * 那份缓存，不打网络，白跑一趟不贵，但别指望它落地；真正可能落地的是 15 秒那一趟。
+ */
+const MOVE_RECHECK_DELAYS_MS = [6_000, 15_000, 30_000, 60_000];
+let moveRecheckStep = 0;
+let moveRecheckTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * 每一轮末尾交回来一次：这一轮还看见有任务在搬就排下一趟，一趟都没看见就把阶梯归零
+ * （下一次再搬仍从 6 秒起，而不是接着上一次的 60 秒）。
+ */
+function scheduleMoveRecheck(pending: boolean): void {
+  if (moveRecheckTimer !== undefined) {
+    clearTimeout(moveRecheckTimer);
+    moveRecheckTimer = undefined;
+  }
+  if (!pending) {
+    moveRecheckStep = 0;
+    return;
+  }
+  if (moveRecheckStep >= MOVE_RECHECK_DELAYS_MS.length) return;
+  const delay = MOVE_RECHECK_DELAYS_MS[moveRecheckStep];
+  moveRecheckStep += 1;
+  // 这几趟都在 30 秒以内，用 setTimeout 就够：SW 空闲 30 秒才会被收走，而每一轮本身就把
+  // 这个时钟拨回去了。超过那一档的（最后那趟 60 秒）落空也不要紧 —— 每分钟的定时器是兜底。
+  moveRecheckTimer = setTimeout(() => {
+    moveRecheckTimer = undefined;
+    void runAutoReseedTick();
+  }, delay);
+}
+
 const jobs = defineJobScheduler();
 
 /**
@@ -280,12 +322,17 @@ async function autoReseedTick() {
    * 他 2026-10-10 那句「应该自动去检查啊，非得用户手动去刷新吗」说的就是这个。
    */
   const tasks = all ?? [];
-  if (tasks.length === 0) return;
+  if (tasks.length === 0) {
+    scheduleMoveRecheck(false);
+    return;
+  }
 
   const metadata = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema | undefined;
   const config = await extStore.getItem("config");
   /** 这一轮的进展：任务循环里只登记，函数末尾一次性投递（合并 + 选通道都在那儿） */
   const notices = createReseedNotifier(config?.lang);
+  /** 这一轮有没有看见任务还卡在「基准正往任务目录搬」—— 决定末尾要不要提前起下一轮 */
+  let movePending = false;
 
   // 同一台下载器只拉一次列表，多个任务共用那份（qBittorrent 那边 15 秒才刷一次，多拉没意义）
   const byDownloader = new Map<string, IKeepUploadTask[]>();
@@ -357,6 +404,9 @@ async function autoReseedTick() {
          * 手动点回查。放在 `autoReseed` 那道闸**前面** —— 关着自动辅种的任务同样会搬目录。
          */
         if (torrents) await persistBaseLocalPath(task, torrents, categories);
+        // 路径没落地时 `moveToTaskPath` 仍挂着（`refreshBaseLocalPaths` 只在**确定**一致时才清它）——
+        // 这一轮就没法往下推，别等下一分钟的定时器，见 `scheduleMoveRecheck`。
+        if (task.baseLocal?.moveToTaskPath) movePending = true;
 
         // 没开自动辅种的到这儿就结束：**只看不动手** —— 不发种子、不暂停、不弹通知。
         // 「查」和「动他的种子」是两件事，用户关的是后者，不是前者。
@@ -595,6 +645,7 @@ async function autoReseedTick() {
    * 「那一条任务不吭声」这一层，其余任务和这一行的 flush 都照常走到。
    */
   await notices.flush();
+  scheduleMoveRecheck(movePending);
 }
 
 /**

@@ -1689,7 +1689,8 @@
       "required": "必要项",
       "reset": "重置搜索词",
       "site": "@:common.site",
-      "title": "生成高级过滤词"
+      "title": "生成高级过滤词",
+      "triStateHint": "横杠表示该条目不参与筛选：点击一次列入必要项，再点击一次列入排除项。要恢复为不参与筛选，请使用底部「重置搜索词」。"
     },
     "action": "操作",
     "advancedSettings": "高级设置",

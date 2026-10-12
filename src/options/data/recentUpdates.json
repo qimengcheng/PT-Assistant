@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-12 08:59:58",
-  "headSha": "68e6763",
+  "generatedAt": "2026-10-12 09:05:44",
+  "headSha": "e5382ae",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.88.0",
+      "date": "2026-10-12 09:05:36",
+      "added": [
+        "「生成高级过滤词」对话框里多了一行说明：三态复选框的横杠表示该条目不参与筛选，点一次列入必要项、再点一次列入排除项，要回到不参与筛选用底部「重置搜索词」"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.87.5",
       "date": "2026-10-12 08:59:48",

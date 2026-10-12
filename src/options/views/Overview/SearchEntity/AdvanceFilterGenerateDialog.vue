@@ -25,6 +25,7 @@ import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import FilterKeywordsSection from "@/options/components/AdvanceFilter/FilterKeywordsSection.vue";
 import FilterCheckboxSection from "@/options/components/AdvanceFilter/FilterCheckboxSection.vue";
+import TriStateHint from "@/options/components/AdvanceFilter/TriStateHint.vue";
 import FilterRangeSlider from "@/options/components/AdvanceFilter/FilterRangeSlider.vue";
 import AdvanceFilterFooter from "@/options/components/AdvanceFilter/AdvanceFilterFooter.vue";
 
@@ -138,6 +139,7 @@ function formatSizeTooltip(value?: number) {
       </a-row>
       <FilterKeywordsSection v-model="advanceFilterDictRef.text" />
 
+      <TriStateHint />
       <a-row :gutter="0">
         <a-col :span="24" class="text-label-large">{{ t("common.AdvanceFilterGenerateDialog.site") }}</a-col>
       </a-row>

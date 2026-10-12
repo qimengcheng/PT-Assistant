@@ -15,6 +15,7 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import DownloaderLabel from "@/options/components/DownloaderLabel.vue";
 import FilterKeywordsSection from "@/options/components/AdvanceFilter/FilterKeywordsSection.vue";
 import FilterCheckboxSection from "@/options/components/AdvanceFilter/FilterCheckboxSection.vue";
+import TriStateHint from "@/options/components/AdvanceFilter/TriStateHint.vue";
 import FilterRangeSlider from "@/options/components/AdvanceFilter/FilterRangeSlider.vue";
 import AdvanceFilterFooter from "@/options/components/AdvanceFilter/AdvanceFilterFooter.vue";
 
@@ -62,6 +63,7 @@ function enterDialog() {
       <div class="section-title">{{ t("common.AdvanceFilterGenerateDialog.keywords") }}</div>
       <FilterKeywordsSection v-model="advanceFilterDictRef.text" />
 
+      <TriStateHint />
       <div class="section-title">{{ t("common.AdvanceFilterGenerateDialog.site") }}</div>
       <FilterCheckboxSection
         v-model:required="advanceFilterDictRef.siteId.required"

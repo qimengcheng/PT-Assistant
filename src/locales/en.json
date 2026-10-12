@@ -1689,7 +1689,8 @@
       "required": "Required",
       "reset": "Reset Filter",
       "site": "@:common.site",
-      "title": "Generate Advanced Filter"
+      "title": "Generate Advanced Filter",
+      "triStateHint": "A dash means the item does not filter at all: one click adds it to Required, the next adds it to Exclude. To put it back to not filtering, use \"Reset Filter\" at the bottom."
     },
     "action": "Action",
     "advancedSettings": "Advanced Settings",

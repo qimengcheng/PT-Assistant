@@ -595,12 +595,18 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           <span>{{ t("MyClient.columnSelector") }}</span>
         </a-button>
 
-        <a-input
-          v-model:value="searchText"
-          :placeholder="t('MyClient.searchPlaceholder')"
-          allow-clear
-          style="width: 300px"
-        >
+        <!--
+          200px 是量出来的，不是目测的。`.page` 把工具条那一行钉在 `minmax(48px, auto)`（style.css:312），
+          而这一排的自然宽（左组 401.6 + 缝 8 + 右端那一组）超过容器时，`wrap` 会把右端整组
+          甩到第二行 —— 界面表现就是用户报的「排版错位」。
+          台架（`.tmp-build/bench-myclientbar`，真组件 + 真文案 + token fontSize 13）在他那一栏的
+          实宽 1609 CSS px 下逐档扫过：搜索框 300 / 260 / 220 都还在两行（220 只差 1.6px），
+          200 起条高回到 48.0 一行。那一趟**是带着**那颗「只选了一个下载器」才出现的标签量的
+          （+72），所以 200 已经含了最坏一档，余量 18px；没有标签时余量 90px。
+          代价说清：占位文案「搜索种子名称、Hash、标签、路径」实测 260 完整、220 起被截断，
+          所以这一档那行提示语会缺尾巴（原生 placeholder 只裁、不加省略号）。
+        -->
+        <a-input v-model:value="searchText" :placeholder="t('MyClient.searchPlaceholder')" allow-clear style="width: 200px">
           <template #prefix><SearchOutlined /></template>
         </a-input>
       </a-flex>

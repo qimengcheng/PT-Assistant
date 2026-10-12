@@ -26,6 +26,7 @@ import {
 import { EResultParseStatus, type ISiteMessage, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";
+import { sanitizeSiteMessageError } from "@/shared/siteMessageError.ts";
 import { formatDate } from "@/options/utils.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -48,6 +49,8 @@ interface IGroup {
   siteName: string;
   state: TGroupState;
   messages: ISiteMessage[];
+  /** 那一趟的真实原因（offscreen 侧已清洗）；空 = 拿不到，只留那句猜测 */
+  failNote: string;
 }
 
 const groups = ref<IGroup[]>([]);
@@ -291,6 +294,7 @@ async function loadOne(siteId: TSiteID) {
     collapseBody();
   }
   group.state = "loading";
+  group.failNote = "";
   try {
     const result = await sendMessage("getSiteMessages", siteId);
     group.messages = result.messages;
@@ -299,8 +303,11 @@ async function loadOne(siteId: TSiteID) {
       : result.status !== EResultParseStatus.success
         ? "failed"
         : "ok";
-  } catch {
+    group.failNote = group.state === "failed" ? result.errorNote ?? "" : "";
+  } catch (e) {
     group.state = "failed";
+    // 连回包都没有（消息通道本身挂了），原因只能就地取
+    group.failNote = sanitizeSiteMessageError(e);
   }
 }
 
@@ -313,6 +320,7 @@ async function loadAll() {
     siteName: row.siteName,
     state: "loading" as TGroupState,
     messages: [],
+    failNote: "",
   }));
   selected.value = new Set();
   try {
@@ -557,6 +565,11 @@ watch(
 
         <div v-else-if="group.state === 'failed'" class="am-hint am-hint--row">
           <span>{{ t("MyData.allMessages.failed") }}</span>
+          <!-- 有真话就说真话：那句「可能是登录态失效，或站点改版」是猜测，超时 / DNS / 站点没返回
+               信箱表格都会被它盖成一个样子（用户 2026-10-12 要的就是把原因带进来）。 -->
+          <span v-if="group.failNote" class="am-fail-note">
+            {{ t("MyData.allMessages.failReason", { reason: group.failNote }) }}
+          </span>
           <a-button size="small" @click="loadOne(group.siteId)">
             <template #icon>
               <SyncOutlined />
@@ -753,6 +766,16 @@ watch(
 
 .am-hint--row {
   padding: 6px 0 6px 26px;
+  /* 失败那一档下面可能再挂一行诊断信息（见 .am-fail-note），不换行的话会把「重试」那颗挤扁 */
+  flex-wrap: wrap;
+}
+
+/* 诊断信息次要于上面那句结论：小一号、淡一档、自己占一行、允许折行（错误串可能较长） */
+.am-fail-note {
+  flex-basis: 100%;
+  font-size: 12px;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
 }
 
 /* 正文块自己已经有内衬了，这条只把提示的那份 padding 撤掉，别叠两层 */

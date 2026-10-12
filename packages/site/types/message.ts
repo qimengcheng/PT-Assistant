@@ -20,6 +20,13 @@ export interface ISiteMessagesResult {
   supported: boolean;
   status: EResultParseStatus;
   messages: ISiteMessage[];
+  /**
+   * 读失败时那一趟的真实原因（超时？401？DNS？）。
+   *
+   * 只有出错那一趟会带；界面显示前必须过 `@/shared/siteMessageError.ts` 那道清洗
+   * （错误串里可能嵌着带 passkey 的 URL），不要把原值直接画进界面。
+   */
+  errorNote?: string;
 }
 
 export interface ISiteMessageContentResult {
@@ -30,6 +37,8 @@ export interface ISiteMessageContentResult {
    * 用 v-html 塞进选项页等于把 XSS 面开给站点（扩展页能调 chrome.* 消息）。
    */
   content?: string;
+  /** 同 `ISiteMessagesResult.errorNote` */
+  errorNote?: string;
 }
 
 /**
@@ -43,4 +52,6 @@ export interface ISiteMessageActionResult {
   supported: boolean;
   status: EResultParseStatus;
   handled: number;
+  /** 同 `ISiteMessagesResult.errorNote` */
+  errorNote?: string;
 }

@@ -12,6 +12,7 @@ import { CheckOutlined, ExportOutlined, InboxOutlined, SyncOutlined } from "@ant
 import { EResultParseStatus, type ISiteMessage, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";
+import { sanitizeSiteMessageError } from "@/shared/siteMessageError.ts";
 import { formatDate } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
@@ -37,6 +38,8 @@ const messages = ref<ISiteMessage[]>([]);
 /** null = 还没取过；false = 该站 schema 不支持；true = 支持 */
 const supported = ref<boolean | null>(null);
 const loadFailed = ref(false);
+/** 那一趟的真实原因（已在 offscreen 侧清洗过）；空 = 拿不到，界面就只留那句猜测 */
+const loadFailNote = ref("");
 
 const activeIndex = ref<number>(-1);
 const activeContent = ref("");
@@ -54,6 +57,7 @@ async function openSitePage() {
 async function loadMessages(id: TSiteID) {
   isLoading.value = true;
   loadFailed.value = false;
+  loadFailNote.value = "";
   messages.value = [];
   supported.value = null;
   activeIndex.value = -1;
@@ -64,12 +68,15 @@ async function loadMessages(id: TSiteID) {
     supported.value = result.supported;
     messages.value = result.messages;
     loadFailed.value = result.supported && result.status !== EResultParseStatus.success;
+    loadFailNote.value = loadFailed.value ? result.errorNote ?? "" : "";
     if (!loadFailed.value) {
       reconcileBadgeWithList(id, result.messages);
     }
-  } catch {
+  } catch (e) {
     supported.value = true;
     loadFailed.value = true;
+    // 这一趟连回包都没有（消息通道本身挂了），原因只能就地取
+    loadFailNote.value = sanitizeSiteMessageError(e);
   } finally {
     isLoading.value = false;
   }
@@ -272,6 +279,9 @@ function itemClasses(index: number, item: ISiteMessage) {
 
         <div v-else-if="loadFailed" class="msg-hint msg-hint--stack">
           <span>{{ t("MyData.messages.loadFailed") }}</span>
+          <!-- 有真话就说真话：那句「可能是登录态失效，或站点改版」是猜测，超时/DNS/站点没返回表格
+               都会被它盖成一个样子。取不到原因时仍然只留那句猜测，不编一个。 -->
+          <span v-if="loadFailNote" class="msg-fail-note">{{ t("MyData.messages.failReason", { reason: loadFailNote }) }}</span>
           <a-button size="small" @click="siteId && loadMessages(siteId)">
             <template #icon><SyncOutlined /></template>
             {{ t("MyData.messages.retry") }}
@@ -440,5 +450,12 @@ function itemClasses(index: number, item: ISiteMessage) {
 .msg-hint--stack {
   flex-direction: column;
   align-items: flex-start;
+}
+
+/* 那一行是诊断信息，比上面那句猜测次要，所以小一号、淡一档，并允许换行（错误串可能较长） */
+.msg-fail-note {
+  font-size: 12px;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
 }
 </style>

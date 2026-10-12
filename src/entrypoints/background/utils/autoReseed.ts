@@ -507,15 +507,10 @@ async function autoReseedTick() {
 
         /**
          * 卡在「目录不一致」上不会自己解开 —— 要人挑一种处置（改任务目录 / 把数据搬过去）。
-         * 所以弹一次系统通知就够：一条任务只弹一次，等它真的解开了再把标记清掉。
-         * 只在「基准下载完成、确实有内容要发」时弹，不然刚建好的任务会被一条还没发生的卡住打扰。
+         * 所以一条任务只弹一次，判据与记账都在 `planAutoReseed`（为什么还要看「这一轮到底有没有
+         * 真的挡住事」，见那里的 `pathMismatchHolds`）。
          */
-        if (
-          baseMismatch &&
-          othersToSend.length > 0 &&
-          base?.completed === true &&
-          !task.autoState?.notifiedPathMismatch
-        ) {
+        if (tick.notifyPathMismatch && baseMismatch) {
           const { title, message } = pathMismatchText(config?.lang, task.title, baseMismatch);
           chrome.notifications?.create(`auto-reseed-path-${task.id}`, {
             type: "basic",
@@ -523,14 +518,19 @@ async function autoReseedTick() {
             title,
             message,
           });
-          next.notifiedPathMismatch = Date.now();
           void sendMessage("logger", {
             msg:
               `Auto-reseed: [${task.title}] 的辅种暂停发送 —— 基准那份在 ${baseMismatch.basePath}，` +
               `任务目录是 ${baseMismatch.taskPath}`,
           });
-        } else if (!baseMismatch && next.notifiedPathMismatch) {
-          next.notifiedPathMismatch = undefined;
+        } else if (task.autoState?.notifiedPathMismatch !== undefined && next.notifiedPathMismatch === undefined) {
+          /**
+           * 那道闸不再挡事了（搬完了，或那几条本来就在做种）→ 把这条通知撤掉。
+           * 通知只在**被点击时**才清（见下面那个 `onClicked`），所以没人点它的话，一句已经过期的
+           * 「已停止发送」会一直挂在通知中心里，和后来的「辅种完成」同时在场 —— 用户 2026-10-12
+           * 问的「同时发这两个通知不矛盾吗」，过期这一半就是这么来的。
+           */
+          chrome.notifications?.clear(`auto-reseed-path-${task.id}`);
         }
 
         // 要暂停的那几条：基准 + 其余里判成 wrong 的那些。id 用下载器列表里那一条的 id

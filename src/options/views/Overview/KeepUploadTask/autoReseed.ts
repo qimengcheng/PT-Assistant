@@ -112,6 +112,11 @@ export interface IAutoReseedTick {
    */
   notifyStall: boolean;
   /**
+   * 这一轮该弹「辅种已停止发送」（基准那份不在任务目录里）那一条。
+   * 判据与记账都在下面那一节的 `pathMismatchHolds` —— 调用方只管弹通知、以及它过期时把通知撤掉。
+   */
+  notifyPathMismatch: boolean;
+  /**
    * 这一轮是**第一次**走到「全部正常辅种」那一档。
    * 记在 `completedAt` 上（它本来就是「上一次走到 done 的时刻」，离开那一档就清掉），
    * 所以不需要第二个标记：做完 → 后来某条坏了 → 又修好，这种回头路会再通知一次，是对的。
@@ -254,6 +259,22 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
   /** 第一次走到「全部正常做种」= 上一条通知的判据（离开那一档会清 completedAt，再回来会再报一次） */
   const firstDone = reachable && stage === "done" && state.completedAt === undefined;
 
+  /**
+   * 「辅种已停止发送」那条通知的判据。三条各自挡一种假话：
+   *  - 那道闸**真的还挡着事**：基准下完了、发送台账上还有没发出去的条目；
+   *  - `stage !== "done"`：这一条是关键。发送台账（我们记的「发过没有」）和下载器实况是两套口径 ——
+   *    台账说「还有几条没发」而实况说「它们都在做种」时，那道闸其实一条都没拦住（那几条早就在做种了，
+   *    多半是人自己发出去的、或台账被整条写回抹过一次）。这时弹「已停止发送」，就和同一轮弹出去的
+   *    「辅种完成」互相矛盾（用户 2026-10-12 就是同时看到这两条来问的）；
+   *  - `state.notifiedPathMismatch === undefined`：一条任务只弹一次，解开了再卡住算第二次。
+   *
+   * 标记跟着判据一起走：不再挡事就清成 `undefined`，调用方据此把那条已经过期的系统通知撤掉。
+   */
+  const pathMismatchHolds =
+    !!input.pathMismatch && reachable && base?.completed === true && othersPending > 0 && stage !== "done";
+  const notifyPathMismatch = pathMismatchHolds && state.notifiedPathMismatch === undefined;
+  const notifiedPathMismatch = pathMismatchHolds ? (notifyPathMismatch ? now : state.notifiedPathMismatch) : undefined;
+
   const next: IKeepUploadTaskAutoState = {
     ...state,
     baseSentAt,
@@ -263,6 +284,7 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     baseBytes,
     baseBytesAt,
     notifiedBaseStall,
+    notifiedPathMismatch,
     lastRunAt: now,
     completedAt,
     stage,
@@ -277,6 +299,7 @@ export function planAutoReseed(input: IAutoReseedTickInput): IAutoReseedTick {
     notify,
     notifyHalfway,
     notifyStall,
+    notifyPathMismatch,
     firstDone,
     stage,
     next,

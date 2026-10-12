@@ -13,16 +13,28 @@ import { useI18n } from "vue-i18n";
 import type { ITorrent } from "@ptd/site";
 
 import { formatSize } from "@/options/utils.ts";
+import { useConfigStore } from "@/options/stores/config.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
-import { assessRatioBatch, fillRatioRowNames, type IRatioRisk } from "@/shared/ratioGuard.ts";
+import { assessRatioBatch, fillRatioRowNames, ratioMuteAfterConfirm, type IRatioRisk } from "@/shared/ratioGuard.ts";
 import { makeRatioGuardUi } from "@/shared/ratioGuardUi.ts";
 
 export function useRatioGuard() {
   const { modal } = App.useApp();
   const { t } = useI18n();
   const metadataStore = useMetadataStore();
+  const configStore = useConfigStore();
 
-  const guard = makeRatioGuardUi({ modal, notify: notification, t, formatSize });
+  const guard = makeRatioGuardUi({
+    modal,
+    notify: notification,
+    t,
+    formatSize,
+    confirmPolicy: () => configStore.download.ratioConfirmPolicy,
+    confirmMute: () => configStore.download.ratioConfirmMute,
+    rememberConfirm: (sites) => {
+      configStore.download.ratioConfirmMute = ratioMuteAfterConfirm(configStore.download.ratioConfirmMute, sites);
+    },
+  });
 
   /**
    * 一批种子 → 三档「下完这批之后的分享率」。

@@ -1126,6 +1126,9 @@
       "saveLastDownloader": "记住上一次使用的下载器",
       "initDownloaderTorrentOnEnter": "进入下载器页面时自动刷新列表",
       "allowDownloaderFilterForSite": "允许为下载器配置站点过滤器",
+      "ratioConfirmPolicy": "低分享率发送前的确认",
+      "ratioPolicyAlways": "每次都提示",
+      "ratioPolicyDay": "当天确认过就不再提示",
       "groupDownloadHistory": "下载历史",
       "saveDownloadHistory": "保存下载历史记录"
     },

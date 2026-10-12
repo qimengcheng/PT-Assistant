@@ -5,6 +5,7 @@ import type { TLangCode } from "@/options/plugins/i18n.ts";
 import type { ITimelineUserInfoField } from "@/options/views/Overview/MyData/UserDataTimeline/utils.ts";
 
 import type { TLocalDownloadMethod } from "../common/download.ts";
+import type { IRatioConfirmMute, TRatioConfirmPolicy } from "@/shared/ratioGuard.ts";
 
 export const supportTheme = ["auto", "light", "dark"] as const;
 export type supportThemeType = (typeof supportTheme)[number];
@@ -216,6 +217,10 @@ export interface IConfigPiniaStorageSchema {
     allowDirectSendToClient: boolean;
     // 是否使用快速发送到客户端功能（展平 下载器和下载目录 ）
     useQuickSendToClient: boolean;
+    /** 低分享率确认框的重弹策略（判据与语义见 `@/shared/ratioGuard.ts`） */
+    ratioConfirmPolicy: TRatioConfirmPolicy;
+    /** 当天已经确认过的那些站；`day` 不是今天时整份作废 */
+    ratioConfirmMute: IRatioConfirmMute | null;
   };
 
   searchEntity: {

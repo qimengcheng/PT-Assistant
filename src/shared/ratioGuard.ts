@@ -229,3 +229,45 @@ export function formatRatioText(ratio: unknown): string {
   if (normalized === null) return "-";
   return normalized.toFixed(2);
 }
+
+/**
+ * 低分享率确认框的重弹策略（用户 2026-10-12：「已经确认过的站用户可以选择当天不提示或者每次都提示」）。
+ *
+ * - `always`：每次都问（v0.84.0 起的老行为，也是这里的默认 —— 这是一道拦误操作的闸，
+ *   默认值不该悄悄把闸放轻）；
+ * - `day`：同一批站点当天确认过一次就不再问，过了当天（按本地日期）重新生效。
+ */
+export type TRatioConfirmPolicy = "always" | "day";
+
+/** 当天已确认过的那些站。`day` 是本地日期串，跨天即整体作废（不做逐站过期） */
+export interface IRatioConfirmMute {
+  day: string;
+  sites: string[];
+}
+
+/**
+ * 本地日期串（`YYYY-MM-DD`）。
+ *
+ * 故意不用 `toISOString()`：那是 UTC，晚上十点确认的站会在凌晨两点「过期」，
+ * 而用户心里的「今天」从来都是本地那一天。
+ */
+export function ratioDayKey(at: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}
+
+/** 今天已经免掉的那些站；记录不是今天的那一份时一律作废（返回空表）。存 null = 还没有记录 */
+export function ratioMutedSites(mute?: IRatioConfirmMute | null, today: string = ratioDayKey()): string[] {
+  if (!mute || mute.day !== today) return [];
+  return mute.sites ?? [];
+}
+
+/** 用户刚确认过这些站：并进当天的那一份记录（跨天从空表起算，不去重则反复发送会把数组撑大） */
+export function ratioMuteAfterConfirm(
+  mute: IRatioConfirmMute | null | undefined,
+  sites: string[],
+  today: string = ratioDayKey(),
+): IRatioConfirmMute {
+  const base = ratioMutedSites(mute, today);
+  return { day: today, sites: [...new Set([...base, ...sites])] };
+}

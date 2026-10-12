@@ -1126,6 +1126,9 @@
       "saveLastDownloader": "Remember the last used downloader",
       "initDownloaderTorrentOnEnter": "Refresh the list automatically when the downloader page opens",
       "allowDownloaderFilterForSite": "Allow configuring site filters for downloaders",
+      "ratioConfirmPolicy": "Confirmation before sending to a low-ratio site",
+      "ratioPolicyAlways": "Ask every time",
+      "ratioPolicyDay": "Ask once per day per site",
       "groupDownloadHistory": "Download history",
       "saveDownloadHistory": "Save download history"
     },

@@ -387,6 +387,9 @@ export const useConfigStore = defineStore("config", {
       localDownloadMethod: "browser",
       ignoreSiteDownloadIntervalWhenLocalDownload: true,
       useQuickSendToClient: true,
+      // 默认「每次都提示」：这是一道拦误操作的闸，默认值不该悄悄把它放轻（老用户行为不变）
+      ratioConfirmPolicy: "always",
+      ratioConfirmMute: null,
     },
 
     searchEntity: {

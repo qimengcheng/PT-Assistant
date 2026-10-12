@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-12 09:05:44",
-  "headSha": "e5382ae",
+  "generatedAt": "2026-10-12 09:23:00",
+  "headSha": "6580048",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.89.0",
+      "date": "2026-10-12 09:22:48",
+      "added": [
+        "低分享率发送前的确认可选「当天确认过就不再提示」（基础设置 → 下载与推送），默认仍是每次都提示；同一天里新出现的低分享率站点照常拦，取消确认不算已确认"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.88.0",
       "date": "2026-10-12 09:05:36",

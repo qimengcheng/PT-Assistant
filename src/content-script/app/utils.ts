@@ -30,6 +30,7 @@ import { formatSize } from "@/options/utils.ts";
 import {
   assessRatioBatch,
   fillRatioRowNames,
+  ratioMuteAfterConfirm,
   type IRatioRisk,
   type ISizeBearingTorrent,
 } from "@/shared/ratioGuard.ts";
@@ -169,6 +170,15 @@ const ratioGuardUi = makeRatioGuardUi({
   notify: { warning: (config) => notification.warning(config) },
   t: (key, named) => i18nInstance.global.t(key, named ?? {}),
   formatSize,
+  // 重弹策略与那份「当天已确认」的记录住在同一份持久化配置里，所以两边（选项页 / content）说的是一套话。
+  // 这里在回调里现取 store，不吃模块作用域的那份引用：本文件是模块级构造的，
+  // 而 pinia 要等 init.ts 装好 —— 取数发生在用户点发送那一刻，那时必然已经装上了。
+  confirmPolicy: () => useConfigStore().download.ratioConfirmPolicy,
+  confirmMute: () => useConfigStore().download.ratioConfirmMute,
+  rememberConfirm: (sites) => {
+    const configStore = useConfigStore();
+    configStore.download.ratioConfirmMute = ratioMuteAfterConfirm(configStore.download.ratioConfirmMute, sites);
+  },
 });
 
 /**

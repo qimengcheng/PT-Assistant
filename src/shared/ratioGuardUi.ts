@@ -13,7 +13,13 @@
  */
 import { h, type VNode } from "vue";
 
-import { formatRatioText, type IRatioRow } from "./ratioGuard.ts";
+import {
+  formatRatioText,
+  ratioMutedSites,
+  type IRatioConfirmMute,
+  type IRatioRow,
+  type TRatioConfirmPolicy,
+} from "./ratioGuard.ts";
 
 /** App 上下文的 modal 与静态 Modal 都满足这个形状 */
 export interface IRatioGuardModal {
@@ -100,22 +106,43 @@ export function makeRatioGuardUi(deps: {
   notify: IRatioGuardNotify;
   t: TRatioGuardTranslate;
   formatSize: TRatioGuardFormatSize;
+  /**
+   * 重弹策略。三个都是**取数/写数的回调**而不是值：策略与那份「当天已确认」的记录住在 config store
+   * （选项页与 content 侧共用同一份持久化配置），而这一层要能在 Node 里直接跑断言，
+   * 不许 import store。三个都不传时按 `always` 走 —— 也就是 v0.84.0 起的老行为。
+   */
+  confirmPolicy?: () => TRatioConfirmPolicy;
+  confirmMute?: () => IRatioConfirmMute | null | undefined;
+  rememberConfirm?: (sites: string[]) => void;
 }): IRatioGuardUi {
   const { modal, notify, t, formatSize } = deps;
 
   return {
-    confirmDangerSites(rows) {
-      if (rows.length === 0) return Promise.resolve(true);
-      return new Promise<boolean>((resolve) => {
+    async confirmDangerSites(rows) {
+      if (rows.length === 0) return true;
+
+      /**
+       * 「当天不再提示」只放过**今天真在这里确认过的那些站**：
+       * 新冒出来的低分享率站照样拦，同一天里换了别的站也照样拦 —— 免的是重复问同一件事，
+       * 不是把这道闸按天关掉。
+       */
+      const policy = deps.confirmPolicy?.() ?? "always";
+      const muted = policy === "day" ? new Set(ratioMutedSites(deps.confirmMute?.())) : null;
+      const ask = muted ? rows.filter((row) => !muted.has(row.site)) : rows;
+      if (ask.length === 0) return true;
+
+      const ok = await new Promise<boolean>((resolve) => {
         modal.confirm({
           title: t("common.ratioGuard.confirmTitle"),
-          content: h("div", null, [h("div", t("common.ratioGuard.confirmBody")), siteList(rows, t, formatSize)]),
+          content: h("div", null, [h("div", t("common.ratioGuard.confirmBody")), siteList(ask, t, formatSize)]),
           okText: t("common.ratioGuard.confirmOk"),
           cancelText: t("common.dialog.cancel"),
           onOk: () => resolve(true),
           onCancel: () => resolve(false),
         });
       });
+      if (ok && policy === "day") deps.rememberConfirm?.(ask.map((row) => row.site));
+      return ok;
     },
 
     notifyLowRatio(warn, unknown) {

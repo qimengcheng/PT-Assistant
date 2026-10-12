@@ -19,6 +19,12 @@ const localMethodOptions = computed(() => [
   { value: "browser", label: t("SetBase.DownloadWindow.methodBrowser") },
   { value: "extension", label: t("SetBase.DownloadWindow.methodExtension") },
 ]);
+
+// 同样是 computed：这一组 label 里有 t()，切语言要跟着重算
+const ratioPolicyOptions = computed(() => [
+  { value: "always", label: t("SetBase.DownloadWindow.ratioPolicyAlways") },
+  { value: "day", label: t("SetBase.DownloadWindow.ratioPolicyDay") },
+]);
 </script>
 
 <template>
@@ -49,6 +55,18 @@ const localMethodOptions = computed(() => [
             <a-switch v-model:checked="configStore.download.allowDownloaderFilterForSite" size="small" />
             <span class="label">{{ t("SetBase.DownloadWindow.allowDownloaderFilterForSite") }}</span>
           </div>
+        </div>
+        <!-- 低分享率确认框的重弹策略（用户 2026-10-12：「已经确认过的站用户可以选择当天不提示或者每次都提示」）。
+             默认「每次都提示」：这是一道拦误操作的闸，默认值不该悄悄把它放轻。
+             选「当天不再提示」时免掉的也只是**今天在这里确认过的那些站**，新冒出来的低分享率站照样拦
+             （判据在 `@/shared/ratioGuard.ts` 的 ratioMutedSites）。 -->
+        <div class="switch-item" style="margin-top: 10px">
+          <span class="label" style="min-width: 110px">{{ t("SetBase.DownloadWindow.ratioConfirmPolicy") }}</span>
+          <a-select
+            v-model:value="configStore.download.ratioConfirmPolicy"
+            :options="ratioPolicyOptions"
+            style="width: 280px"
+          />
         </div>
       </div>
 

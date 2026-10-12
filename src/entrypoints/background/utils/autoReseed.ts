@@ -30,7 +30,12 @@ import {
 } from "@/options/views/Overview/KeepUploadTask/autoReseed.ts";
 import { judgeReseedTorrent, linkItemToTorrent } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
-import { detectBasePathMismatch, isCategorySavePath, type IClientCategory } from "@/shared/reseedPath.ts";
+import {
+  detectBasePathMismatch,
+  isCategorySavePath,
+  refreshBaseLocalPaths,
+  type IClientCategory,
+} from "@/shared/reseedPath.ts";
 import {
   estimateEtaSec,
   reseedNoticeGroupMessage,
@@ -246,6 +251,25 @@ async function persistVerify(
   await sendMessage("patchKeepUploadTaskVerify", { taskId: task.id, verify });
 }
 
+/**
+ * 把这一轮从下载器看到的「基准那份此刻在哪个目录」写回任务。
+ *
+ * 界面上那条「目录不一致」读的是任务里记的 `baseLocal.savePath` —— 那是**建任务时的快照**，
+ * 而这一轮后台手里就是实时值。不写回去的话，用户自己搬完文件、或点过「把本地文件移到任务目录」
+ * 之后，那一行会一直挂着旧警告，非得他手动点一次「回查做种状态」才掉（用户 2026-10-12 两次报的
+ * 都是这个形状：右边已经「辅种完成 5/5」，左边还在说目录不一致）。
+ * 判据与页面那两处共用 `refreshBaseLocalPaths`，路径没变就一条都不写。
+ */
+async function persistBaseLocalPath(
+  task: IKeepUploadTask,
+  torrents: CTorrent[],
+  categories: Record<string, IClientCategory> | null,
+): Promise<void> {
+  if (!task.baseLocal) return;
+  if (refreshBaseLocalPaths([task], torrents, categories).length === 0) return;
+  await sendMessage("patchKeepUploadTaskBaseLocal", { taskId: task.id, baseLocal: task.baseLocal });
+}
+
 async function autoReseedTick() {
   await whenOffscreenReady();
 
@@ -328,6 +352,11 @@ async function autoReseedTick() {
           }
         }
         await persistVerify(task, statuses, reachable);
+        /**
+         * 「查」的一半：这一轮看到的实时路径也顺手写回任务，界面上那条「目录不一致」才不用等人
+         * 手动点回查。放在 `autoReseed` 那道闸**前面** —— 关着自动辅种的任务同样会搬目录。
+         */
+        if (torrents) await persistBaseLocalPath(task, torrents, categories);
 
         // 没开自动辅种的到这儿就结束：**只看不动手** —— 不发种子、不暂停、不弹通知。
         // 「查」和「动他的种子」是两件事，用户关的是后者，不是前者。

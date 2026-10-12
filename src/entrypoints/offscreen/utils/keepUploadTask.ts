@@ -95,6 +95,17 @@ onMessage("patchKeepUploadTaskVerify", async ({ data }) => {
 });
 
 /**
+ * 后台每分钟那一轮**只**往任务里写 `baseLocal`（基准那份此刻在哪个目录）。
+ * 同上面两条：不拿整条任务写回，任务不在了也不凭空造一条。
+ */
+onMessage("patchKeepUploadTaskBaseLocal", async ({ data }) => {
+  const { taskId, baseLocal } = data;
+  const tasks = (await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema | null;
+  if (!tasks || !tasks[taskId]) return;
+  await extStore.patchItem(STORAGE_KEY, `${taskId}.baseLocal`, baseLocal);
+});
+
+/**
  * 删除辅种任务
  */
 export async function deleteKeepUploadTask(taskId: TKeepUploadTaskKey): Promise<void> {

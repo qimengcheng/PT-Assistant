@@ -46,6 +46,7 @@ import type {
   ITorrentDownloadMetadata,
   IKeepUploadTask,
   IKeepUploadTaskAutoState,
+  IKeepUploadTaskLocalBase,
   IKeepUploadTaskVerify,
   TKeepUploadTaskKey,
   TSearchSnapshotKey,
@@ -255,6 +256,12 @@ export interface ProtocolMap {
    * 和上面那条同样的理由：不拿整条任务写回，就不盖用户这一分钟里改的开关。
    */
   patchKeepUploadTaskVerify(data: { taskId: TKeepUploadTaskKey; verify: IKeepUploadTaskVerify }): void;
+  /**
+   * 只写任务里 `baseLocal` 那一块（基准那份数据**此刻**在哪个目录，以及「用户要搬过去」那位意图）。
+   * 后台每分钟那一轮从下载器读到的是实时路径，不写回来的话界面上那条「目录不一致」会一直挂在
+   * 建任务时的快照上。同上面两条：不拿整条任务写回，任务不在了也不凭空造一条。
+   */
+  patchKeepUploadTaskBaseLocal(data: { taskId: TKeepUploadTaskKey; baseLocal: IKeepUploadTaskLocalBase }): void;
   deleteKeepUploadTask(taskId: TKeepUploadTaskKey): void;
   clearKeepUploadTasks(): void;
 

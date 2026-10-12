@@ -293,20 +293,22 @@ CI=true pnpm build                # 本地复现 CI 那条路径 → 默认 .out
   `.wxt/` 与 `node_modules/.vite/` 上打架。锁只管 `build`/`zip`，不管 `pnpm dev`（长跑，占着锁会堵死别人；
   dev 也就**不会换指 `dist-verify`**，用 dev 调试时加载路径得另说）。
 
-- **本地只构建 Chrome**。**不要在本地跑 `pnpm build:firefox` / `dev:firefox`** ——
-  纯浪费时间（Firefox 产物由 CI 统一构建，见 §2.4）。
-- ⚠️ **「不跑 Firefox 构建」≠「不验证 Firefox 能构建」，也不等于可以不碰产物级检查。**
-  CI 的 `build` job 比本地这套多跑两条命令，两条都各有必要性：
-
-  | CI 独有步骤 | 本地为什么也得跑 |
-  | --- | --- |
-  | `wxt zip -b firefox` | Firefox 分支的产物路径与 Chrome 不同（`firefox-mv2`、manifest 变体），本地只构建 Chrome **覆盖不到**它 |
-  | `node scripts/smoke-background.mjs` | 唯一一处**把打包产物真的 import 一次**的地方，抓「模块顶层执行浏览器 API」这类 vue-tsc / 源码审查 / Chrome 构建全都看不见的 SW 崩溃 |
-
-  为什么本地也要跑：这类 SW 崩溃（模块顶层执行浏览器 API）**只有跑产物才抓得到**，
-  vue-tsc 和源码审查都看不见；一旦漏到 CI 才暴露，报的是最后一个 push 的人名下
-  （一次 push 只打一个 tag，见 §2.4）。实例见 PLAYBOOK §25、§23。
-  **推之前跑完这两条，十分钟内能确认自己没往主线扔一颗雷。**
+- **本地只构建 Chrome，也不产 zip**。**不要在本地跑 `pnpm build:firefox` / `dev:firefox` / `wxt zip -b firefox`** ——
+  Firefox 产物由 CI 统一构建（见 §2.4）。用户 2026-10-12 第二次明确这条：
+  本地那条 `wxt zip -b firefox` 一次往 `.output/` 根下写**两个** zip（firefox + sources），
+  文件名带版本号 → 后一次不覆盖前一次，也没有任何一步删它们，`wxt build` 只清
+  `chrome-mv3` / `firefox-mv2` 两个子目录、管不到根下的包。于是每次 push 前跑一遍就攒下两个，
+  本地实测堆到 **20.2 GB / 388 个 zip**。而 `-sources` 那个包更虚：它按仓库根扫，wxt 默认排除
+  只有 `node_modules` / 测试 / `.output/**`（`node_modules/wxt/dist/core/resolve-config.mjs:202-209`），
+  **不含 `dist-*/`**，所以把各会话的构建目录全打进去（0.69.0 那个 192 MB，其中 136 MB 是 `dist-qoder-0.68.0/`）。
+- ⚠️ **推之前本地要跑的产物级检查只剩一条**：`node scripts/smoke-background.mjs`
+  （它读 `.output/chrome-mv3/background.js`，所以前面得跟一次 CI 风格构建：`CI=true pnpm build`）。
+  它是唯一一处**把打包产物真的 import 一次**的地方 —— 抓「模块顶层执行浏览器 API」这类
+  vue-tsc / 源码审查 / Chrome 构建全都看不见的 SW 崩溃。这类崩溃**只有跑产物才抓得到**，
+  一旦漏到 CI 才暴露，报的是最后一个 push 的人名下（一次 push 只打一个 tag，见 §2.4）。
+  实例见 PLAYBOOK §25、§23。
+  **代价要说清**：不再本地跑 firefox zip，意味着 Firefox 分支单独构建失败在本地发现不了，
+  要等 CI 那条 job 报。用户要的是「本地不堆 zip」，这个代价他清楚。
 - 构建报 `remove C:\...\Temp\esbuild-*: Access is denied` 时（PLAYBOOK §13，杀软句柄导致，
   时好时坏），**别重启机器**，把临时目录指到仓库内已 gitignore 的 `.tmp-build/` 即可：
   `PTD_SESSION=<标识> TEMP="$PWD/.tmp-build" TMP="$PWD/.tmp-build" TMPDIR="$PWD/.tmp-build" pnpm build`。

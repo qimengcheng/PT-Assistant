@@ -57,7 +57,7 @@ export function isSameTorrentPath(a?: string | null, b?: string | null): boolean
  * qBittorrent 那一套「按分类落目录」的写法前缀。这一格存的不是目录而是分类名，
  * 真实目录由下载器决定。单一来源在这里：`SentToDownloaderDialog/categoryMatch.ts` 与
  * 辅种那三处判据都从这一处拿（`packages/downloader/entity/qBittorrent.ts` 的 `category_prefix`
- * 是零修改平移来的包内代码，不动它，靠 `reseed-path-test` 那条比对断言钉住两边同值）。
+ * 是平移过来的包内代码，不做批量改写，靠 `reseed-path-test` 那条比对断言钉住两边同值）。
  */
 export const CATEGORY_FOLDER_PREFIX = "category:";
 

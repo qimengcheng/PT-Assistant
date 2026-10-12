@@ -328,6 +328,11 @@ CI=true pnpm build                # 本地复现 CI 那条路径 → 默认 .out
   口径与三条实测
   坑（核心 `no-restricted-syntax` 看不见 Vue 模板 AST / `--fix-type` 分不开 `attributes-order` /
   `excludes` 这一版不认）见 PLAYBOOK §36。
+- **行为断言：`pnpm test`**（Vitest，v0.92.7 起）。用例住 `tests/`，**判据本体仍在 `src/` / `packages/`** ——
+  两边都不抄第二份实现，否则测的是那份抄的。门禁入口是防线 ⑭（`scripts/check-vitest.mjs`，自动进 `check-all`）。
+  `tests/**` 按「我方」算（防线 ⑬ 的分界是按路径开头是不是 `packages/`），所以那里连 warning 都不许留。
+  本机刚改过 `package.json` 时 `pnpm test` 可能被那次锁文件校验卡住（本节末尾那条），
+  这时直接 `node scripts/check-vitest.mjs` —— 同一条判据，不经 pnpm。
 - **依赖布局是 `nodeLinker: isolated`**（pnpm 默认，v0.90.4 起；换掉 `hoisted` 的依据与实测见 PLAYBOOK §3）。
   两条后果：① 脚本 / 代码要拿**传递依赖**，只能走宿主包自己的导出（`vue/compiler-sfc` 那类）或在
   `package.json` 里显式声明 —— 裸写未声明的包名会直接报模块找不到，`dayjs` / `@vue/compiler-sfc` 都是这类；
@@ -528,7 +533,8 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 `Build and package` 之后，并加进 `check-all.mjs` 的 `EXCLUDED`。
 
 前六条与 12、13 是**静态扫描**，7、8、10 是**行为断言**（直接 import `src/` 下的源码，不需要构建产物、
-不需要 loader、不引入新依赖），9 是**数据快照自检**。11 已于 v0.90.5 撤下（由 13 的 ESLint 接手，编号留空
+不需要 loader），14 也是行为断言但走 **Vitest**（用例住在 `tests/`，判据本身仍在 `src/` 与 `packages/`），
+9 是**数据快照自检**。11 已于 v0.90.5 撤下（由 13 的 ESLint 接手，编号留空
 是为了不烂掉历史引用 —— 别的提交与注释里写过「防线 ⑪」）：
 
 | # | 脚本 | 防的静默失效 |
@@ -546,6 +552,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 | ~~11~~ | ~~`check-confirm-danger`~~ **v0.90.5 撤下** | 确认框那颗 legacy `okType: "danger"`。脚本删了，判据没丢 —— 交给防线 ⑬ 的三条规则：脚本侧 `no-restricted-syntax` 选 `Property[key.name='okType']`，模板侧 `vue/no-restricted-static-attribute`（`ok-type="danger"`）+ `vue/no-restricted-v-bind`（`:ok-type` / `:okType` / `v-bind:ok-type`）。**为什么不能整条换成 esquery**：核心 `no-restricted-syntax` 看不见 Vue 模板 AST（实测三条模板 selector 零命中），换插件自己的规则才行；详见 PLAYBOOK §36 |
 | 12 | `check-notification-ids` | 系统通知的 id 与认领。`chrome.notifications.onClicked` 是**全局事件**（不按 id 分发），所以 ① `create` 不传 id 的那条永远没人认领得了，② 任何一个不看 `notificationId` 的监听器都会把**别处**的通知接走 —— 点「辅种完成」那条被更新检查的监听器跳去 GitHub 下载页（用户 2026-10-12 报的），不报错、不进 vue-tsc、只有点下去那一刻才知道。判据 B 要的是「同一行里既点名形参又做了比较」，跨行写的认领会被它报出来。① 那条 ESLint 也能查（`no-restricted-syntax` 打 `chrome.notifications.create` 少首参），但它只认**字面那条链**，`const n = chrome.notifications; n.create({...})` 就看不见 —— 所以这条脚本留着 |
 | 13 | `check-eslint` | 跑 ESLint 10（`eslint.config.mjs`：`@eslint/js` + `typescript-eslint` + `eslint-plugin-vue`）。**判据分三档，分界线是「这份代码谁写的」**：error 一律 FAIL；我方（`src` / `scripts` / 根配置）连 warning 都不许留（v0.90.9 把 `no-explicit-any` 221→0、`ban-ts-comment` 10→0 收口后升成 error）；`packages/**` 是上游平移件（**不是「零修改」**：实测 96 个文件有内容差异，这一档的真实理由是「不是我方写的，不做批量改写」），按 `scripts/eslint-packages-baseline.json` **逐规则**只拦回涨，重录用 `--update-packages-baseline`。按规则记而不记总数：清掉一条 `prefer-const` 会腾出总额度，总数判据就会放过一条新进的 `any`。冷接入的口径、`packages/**` 为什么逐条降成 warn、`--fix` 的两条坑、以及「它替掉了哪条老防线、替不掉哪些」的逐条结论都在 PLAYBOOK §36。它还自带两条结构性自检：`src` / `packages` / `scripts` 任一块一个文件都没扫到就 FAIL（配置写歪时「一条 error 都没有」是假 PASS），基线文件读不到也 FAIL |
+| 14 | `check-vitest` | 跑 `tests/` 下的 Vitest 行为断言（v0.92.7 接入）。四条反「假 PASS」的判据：起不来 vitest / 报告解不开 / **报告里的文件数 ≠ 磁盘上 `tests` 里 `.test.ts` 的个数**（`include` 写歪时报的是「0 个文件、0 条失败」，已拿改坏的 include 实测反证过）/ 留着 skip 或 todo 的用例。`vitest.config.ts` 的别名与 `wxt.config.ts` 逐条同构 —— 判据文件里保持仓库真名（`@/…`、`@ptd/…`），不许为了跑得起来改成相对路径 |
 
 第六条守的是 §3.2：从两个无 DOM / 必须轻量 的上下文出发，静态 import 闭包不许走到 `sizzle`、
 不许命中 `@ptd/site` / `@ptd/social` 根入口，entrypoint 的 `import.meta.glob` 必须根绝对，

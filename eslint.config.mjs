@@ -4,8 +4,10 @@
  * 冷接入的取向，写在前面免得后来人以为这套规则可以随便加严：
  *  - **CI 只 gate error**，warning 不算失败。首轮把「观感类」全降成 warning，是为了让
  *    「接入 ESLint」这一条提交本身能落地；真要收口时逐条升 error，升之前先看它报了多少处。
- *  - **`packages/**` 是上游零修改平移**（site 340 个定义、downloader / social 等），
- *    不能为了喂饱一个新装的 linter 去改上游代码，所以那一块只留「确定是 bug」的档。
+ *  - **`packages/**` 是从上游平移过来的那一片**（site 340 个定义、downloader / social 等）。
+ *    注意它**不是「零修改」**：实测 96 个文件有内容差异（见 README「架构决策」的站点定义行），
+ *    但那些是一条一条的定点修正，不是批量改写 —— 所以不能为了喂饱一个新装的 linter 去改它，
+ *    那一块只留「确定是 bug」的档。
  *  - 现有 12 条静态防线里哪些能被 ESLint 替掉、哪些替不掉，结论在 README「工程化体系」那张表旁边。
  *
  * 用法：`node ./node_modules/eslint/bin/eslint.js .`（与 `pnpm lint` 同一个入口）
@@ -59,9 +61,21 @@ export default tseslint.config(
     },
   },
 
-  // —— 构建 / 守卫脚本：Node 全局，那边没有 window
+  // —— 构建 / 守卫脚本 / 测试配置：Node 全局，那边没有 window
   {
-    files: ["scripts/**/*.mjs", "wxt.config.ts", "*.mjs"],
+    files: ["scripts/**/*.mjs", "wxt.config.ts", "vitest.config.ts", "*.mjs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+  },
+
+  // —— tests/**：跑在 Node 里的行为断言（vitest），用的也是 Node 全局。
+  //    这一片按「我方代码」算 —— check-eslint 的那三档判据里，不以 packages/ 开头的都算我方，
+  //    所以这里连 warning 都不许留，别把它当测试目录就放松。
+  {
+    files: ["tests/**/*.ts"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

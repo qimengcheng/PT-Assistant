@@ -1,5 +1,5 @@
 {
-  "_comment": "packages/**（上游零修改平移件）的 ESLint warning 基线，按规则分别记条数。重录：node scripts/check-eslint.mjs --update-packages-baseline。判据在 check-eslint.mjs。",
+  "_comment": "packages/**（上游平移件，不做批量改写）的 ESLint warning 基线，按规则分别记条数。重录：node scripts/check-eslint.mjs --update-packages-baseline。判据在 check-eslint.mjs。",
   "total": 407,
   "rules": {
     "@typescript-eslint/no-explicit-any": 230,

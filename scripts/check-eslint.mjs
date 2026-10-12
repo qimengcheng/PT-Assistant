@@ -10,7 +10,9 @@
  *     `no-explicit-any` 与 `ban-ts-comment` 已逐文件收口并升成 error，剩下那几条观感类
  *     （vue/attributes-order 等）也清干了。要留一处 `any` 就写行级 eslint-disable-next-line，
  *     并在上面把实测依据讲清楚（`TKonvaConfig` 是先例：改成 unknown 会断 13 条 vue-tsc）。
- *  3. **`packages/**` 是上游零修改平移件**，不能为了喂饱 linter 去改它，所以那一块按
+ *  3. **`packages/**` 是从上游平移过来的那一片**（不是「零修改」，实测 96 个文件有内容差异 ——
+ *     见 README「架构决策」的站点定义行；这一档的真实理由是「不是我方写的，不做批量改写」），
+ *     不能为了喂饱 linter 去改它，所以那一块按
  *     `scripts/eslint-packages-baseline.json` 里那份「每条规则多少条」的快照**只拦回涨**：
  *     涨了 FAIL，降了提示可以重录基线（重录：`node scripts/check-eslint.mjs --update-packages-baseline`）。
  *     为什么按规则分别记而不是记一个总数：清掉一条 `prefer-const` 会腾出额度，
@@ -90,7 +92,7 @@ if (process.argv.includes("--update-packages-baseline")) {
   const body = `${JSON.stringify(
     {
       _comment:
-        "packages/**（上游零修改平移件）的 ESLint warning 基线，按规则分别记条数。" +
+        "packages/**（上游平移件，不做批量改写）的 ESLint warning 基线，按规则分别记条数。" +
         "重录：node scripts/check-eslint.mjs --update-packages-baseline。判据在 check-eslint.mjs。",
       total: pkgWarnings.length,
       rules: Object.fromEntries([...pkgByRule.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))),

@@ -4,7 +4,7 @@
  * 为什么拦在 console 这一层，而不是逐个调用点包一层 logger：
  *  - 用户报的噪声里有一条**压根不是我们打的** —— `Restoring state for key: config from
  *    storage: local` 来自 pinia 的持久化插件，逐个调用点包办不到它；
- *  - `packages/**` 是上游零修改平移件，那 7 处旧前缀不许改（改了下次同步就冲突），所以
+ *  - `packages/**` 是从上游平移过来的那一片，那 7 处旧前缀不改（改了下次与上游对不上），所以
  *    「所有日志的前缀都统一」这件事只能落在下面这一道出口改写里。我方源码里的字面量
  *    已经改成新前缀，改写只兜住上游那一份。
  *
@@ -19,9 +19,10 @@
  *  3. offscreen 文档拿不到 `chrome.storage`（只有 `chrome.runtime`），所以它这一路只有首屏
  *     那一次读；`storage.onChanged` 在那里根本不存在，取之前要先探。
  *
- * 这个模块**刻意没有任何静态 import**：`@/storage.ts` 只在 syncFlag 里动态取。为的是它能在
- * Node 里直接 import 做行为断言（`.tmp-build/console-log-test.mjs`）—— 与
- * `shared/levelProgress.ts` 不 import `@ptd/site` 是同一个理由。
+ * 这个模块**刻意没有任何静态 import**：`@/storage.ts` 只在 syncFlag 里动态取。两个理由到现在都成立 ——
+ * 一是「导入即读存储」正是 AGENTS §3.2 拦的那一类，二是判据文件因此能在任何环境里被直接 import
+ * （行为断言在 `tests/shared/consoleLog.test.ts`，与 `shared/levelProgress.ts` 不 import
+ * `@ptd/site` 是同一个理由）。
  */
 
 /** 被这一档管住的级别。error 故意不在里面，理由见文件头 */

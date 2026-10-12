@@ -438,7 +438,8 @@
       "unmetCount": "未达标 {n} 项",
       "bottleneck": "瓶颈项完成度 {pct}%",
       "expandLadder": "等级表",
-      "collapseLadder": "收起等级表"
+      "collapseLadder": "收起等级表",
+      "currentValues": "当前值"
     },
     "HistoryDataView": {
       "action": {

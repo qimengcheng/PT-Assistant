@@ -36,6 +36,43 @@ const DERIVED_KEYS = new Set(["level", "passTime", "bonusNeededInterval", "seedi
 /** 要求是「不得超过」的字段：完成度不能按 当前 ÷ 要求 算 */
 const LT_KEYS = new Set(["hnrUnsatisfied", "hnrPreWarning"]);
 
+/**
+ * 等级定义上不是「要求」的字段。`id` / `name` 两边都有但含义完全不同（等级序列 vs 用户 ID、
+ * 等级名 vs 用户名），照键名去 userInfo 取值会拿错东西，所以先按名字挡掉。
+ */
+const NOT_A_REQUIREMENT_FIELD = new Set([
+  "id",
+  "name",
+  "nameAka",
+  "groupType",
+  "isKept",
+  "privilege",
+  "downgrade",
+  ...DERIVED_KEYS,
+]);
+
+/**
+ * 下一级那一行的「当前值」：只取该级要求里出现过的字段，值原样从 userInfo 搬过来。
+ *
+ * 为什么按要求筛、而不是把 userInfo 全铺出来：铺全是一排十几个图标，跟需求值并排时认不出
+ * 哪一项对哪一项；筛过之后两串同字段、同图标、同单位（同一份 `UserLevelShowSpan` 渲染）。
+ *
+ * 只认有限数值：Gazelle 系抓不到魔力会写字符串 "N/A"，那种当前值宁可不出现 —— 走
+ * `formatBonus` 的 `Number("N/A") || 0` 就画成了一个 0，那是替数据源编一个数。
+ * `interval` 同理天然缺席：`IUserInfo` 把它 Omit 掉了，入站时长那一档的当前值要么自己再算
+ * 一遍 elapsed，要么就没有，这里不新写第二份判据。
+ */
+export function buildCurrentValues(userInfo: IUserInfo, requirement: ILevelRequirement): IImplicitUserInfo {
+  const userDict = userInfo as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(requirement)) {
+    if (NOT_A_REQUIREMENT_FIELD.has(key)) continue;
+    const value = userDict[key];
+    if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+  }
+  return out as IImplicitUserInfo;
+}
+
 const SIZE_KEYS = new Set([
   "totalTraffic",
   "downloaded",

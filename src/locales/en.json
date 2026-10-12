@@ -438,7 +438,8 @@
       "unmetCount": "{n} requirement(s) not met",
       "bottleneck": "Bottleneck at {pct}% complete",
       "expandLadder": "Levels",
-      "collapseLadder": "Hide levels"
+      "collapseLadder": "Hide levels",
+      "currentValues": "Current"
     },
     "HistoryDataView": {
       "action": {

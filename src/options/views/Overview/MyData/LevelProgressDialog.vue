@@ -22,7 +22,7 @@ import { compareLevelProgress, type TLevelProgressState } from "@/shared/levelPr
 
 import { tableData } from "./utils/lastUserData.ts";
 import { allAddedSiteMetadata } from "./utils/siteMetadata.ts";
-import { buildLevelProgressRow, type ILevelProgressRow } from "./utils/levelProgressData.ts";
+import { buildLevelProgressRow, buildCurrentValues, type ILevelProgressRow } from "./utils/levelProgressData.ts";
 import UserLevelsComponent from "./UserLevelsComponent.vue";
 import UserNextLevelUnMet from "./UserNextLevelUnMet.vue";
 
@@ -86,19 +86,36 @@ function dotItems(row: ILevelProgressRow) {
   return row.ladder.map(() => ({}));
 }
 
-/** 展开后的纵向阶梯：每级一行，等级名 + 该级要求 + 特权说明 */
+/**
+ * 「下一级」那一行左边的当前值。只摆在那一级 —— 要回答的是「我离这一级还差什么」，
+ * 每级都挂一串自己的数字会把表压成两列数字，反而看不出对照的是哪一行。
+ * 一项都对不上时整块不出（该级只要求入站时长，或这些字段站点压根没报数），不留一个空壳。
+ */
+function currentValuesChip(row: ILevelProgressRow, level: ILevelRequirement) {
+  const values = buildCurrentValues(row.userInfo, level);
+  if (Object.keys(values).length === 0) return null;
+  return h("div", { class: "lp-current" }, [
+    h("span", { class: "lp-current-label" }, t("MyData.levelProgress.currentValues")),
+    h(UserLevelsComponent, { userInfo: row.userInfo, levelRequirement: values, useJoinTimeAsRef: true }),
+  ]);
+}
+
+/** 展开后的纵向阶梯：每级一行，等级名 + 该级要求（下一级那一行前面并上当前值）+ 特权说明 */
 function detailItems(row: ILevelProgressRow) {
   return row.ladder.map((level) => ({
     title: level.name,
     content: h("div", { class: "lp-detail" }, [
-      /**
-       * 必须再包一层 div：`UserLevelsComponent` 往下到 `UserLevelShowSpan` 是**多根 fragment**
-       * （每档要求 = 图标 + 值 + 一枚字面量 `;`，全是平级的根节点）。fragment 直接当 flex 子项时，
-       * 这些节点会被逐个提成 flex 项，而 `.lp-detail` 是 column → 图标、数值、分号各占一行
-       * （用户截图上那个「🕐 / 2W / ;」就是这么来的）。包成普通块级元素后它们回到行内流，
-       * 一排读下来和「我的数据」表格里那一格一致。
-       */
-      h("div", { class: "lp-detail-req" }, h(UserLevelsComponent, { userInfo: row.userInfo, levelRequirement: level, useJoinTimeAsRef: true })),
+      h("div", { class: "lp-detail-line" }, [
+        row.nextLevel?.id === level.id ? currentValuesChip(row, level) : null,
+        /**
+         * 必须再包一层 div：`UserLevelsComponent` 往下到 `UserLevelShowSpan` 是**多根 fragment**
+         * （每档要求 = 图标 + 值 + 一枚字面量 `;`，全是平级的根节点）。fragment 直接当 flex 子项时，
+         * 这些节点会被逐个提成 flex 项，而 `.lp-detail` 是 column → 图标、数值、分号各占一行
+         * （用户截图上那个「🕐 / 2W / ;」就是这么来的）。包成普通块级元素后它们回到行内流，
+         * 一排读下来和「我的数据」表格里那一格一致。
+         */
+        h("div", { class: "lp-detail-req" }, h(UserLevelsComponent, { userInfo: row.userInfo, levelRequirement: level, useJoinTimeAsRef: true })),
+      ]),
       level.privilege ? h("div", { class: "lp-privilege" }, level.privilege) : null,
     ]),
   }));
@@ -398,6 +415,29 @@ function rankText(row: ILevelProgressRow): string {
 }
 
 .lp-detail-ladder :deep(.lp-privilege) {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 下一级那一行：当前值摆在需求值左边。两串走的是同一个 UserLevelShowSpan，图标与单位一一对得上，
+   所以并排读就是逐字段对照；放不下时整行换行，而不是把其中一串压扁。 */
+.lp-detail-ladder :deep(.lp-detail-line) {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 淡蓝底 = 「这一串是你的数」，与等级浮层里「你当前所在那一级」的高亮同族 */
+.lp-detail-ladder :deep(.lp-current) {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgba(22, 119, 255, 0.06);
+}
+
+.lp-detail-ladder :deep(.lp-current-label) {
   color: rgba(0, 0, 0, 0.45);
 }
 </style>

@@ -26,7 +26,12 @@ import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vu
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
-import { detectBasePathMismatch, isCategorySavePath, type IClientCategory } from "@/shared/reseedPath.ts";
+import {
+  detectBasePathMismatch,
+  isCategorySavePath,
+  refreshBaseLocalPaths,
+  type IClientCategory,
+} from "@/shared/reseedPath.ts";
 import { watchReseedNotice } from "@/shared/reseedPresence.ts";
 import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
 import {
@@ -230,7 +235,8 @@ function baseLocalLine(record: IKeepUploadTask) {
  * 见 `shared/reseedPath.ts`。
  *
  * 读的是任务上记的那份 `baseLocal.savePath`，它会在每次「回查」时被下载器报的实路径刷新
- * （见 `recheckSeeding` 里那一段）—— 所以手动搬过文件的人点一次回查，这条提示就会自己消失。
+ * （见 `recheckSeeding` 与 `watchBaseMoveLanded` 那两处）—— 所以手动搬过文件的人点一次回查，
+ * 这条提示就会自己消失；点过「把本地文件移到任务目录」的那几条不用点，页面会自己盯到它落地。
  */
 function basePathMismatchOf(task: IKeepUploadTask) {
   return task.baseLocal
@@ -311,8 +317,9 @@ async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
     task.baseLocal!.moveToTaskPath = true;
     await sendMessage("updateKeepUploadTask", task).catch(() => {});
     runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveSent"), { color: "success" });
-    // 搬完就该接着发。催一轮而不是等定时器：数据没挪动时那一轮仍然判得出「还是不一致」，
-    // 不会替用户把闸放开；真落地了就在这一次把还没发的那几条推下去。
+    // 盯到它落地，落地那一刻当场接着发（见 MOVE_WATCH_DELAYS_MS 那一段）。
+    // 这一趟催轮是顺手的：数据没挪动时后台仍然判得出「还是不一致」，不会替用户把闸放开。
+    watchBaseMoveLanded(task.id);
     await advanceAutoReseed();
   } catch (e) {
     runtimeStore.showSnakebar(
@@ -334,11 +341,47 @@ async function loadTasks() {
   loading.value = true;
   try {
     tasks.value = await sendMessage("getKeepUploadTasks", undefined);
+    // 列表一到位就把「上次点过移到任务目录、界面还挂着不一致」的那几条过一遍（见那处的注释）
+    void refreshPendingBaseMoves();
   } catch (e) {
     console.error("Failed to load keep upload tasks:", e);
     tasks.value = [];
   } finally {
     loading.value = false;
+  }
+}
+
+/**
+ * 打开这一页时，把「点过那颗『把本地文件移到任务目录』、但界面上还挂着目录不一致」的那几条
+ * 按下载器实时路径过一遍。
+ *
+ * 为什么要有这一趟：盯到落地的那几趟是**页内定时器**（`watchBaseMoveLanded`），页面关了就没有了 ——
+ * 而更新扩展、换一页都会关掉这一页。那种情况下 `baseLocal.savePath` 一直停在搬之前的快照上，
+ * 提示要挂到用户下一次手动点「回查做种状态」才掉（后台那一侧读的是实时路径，它其实早就继续发了，
+ * 于是表现为「明明在辅种，这一行还说目录不一致」）。
+ *
+ * 只查一趟、不催发送、不弹提示：这一趟管的是清残留，盯梢是点了那颗键之后才要的东西。
+ */
+async function refreshPendingBaseMoves() {
+  const pending = tasks.value.filter((task) => task.baseLocal?.moveToTaskPath);
+  if (pending.length === 0) return;
+
+  const byDownloader = new Map<string, IKeepUploadTask[]>();
+  for (const task of pending) {
+    const id = task.downloadOptions.downloaderId;
+    const group = byDownloader.get(id) ?? [];
+    group.push(task);
+    byDownloader.set(id, group);
+  }
+  for (const [downloaderId, group] of byDownloader) {
+    try {
+      const torrents = await sendMessage("getClientTorrents", downloaderId);
+      for (const task of refreshBaseLocalPaths(group, torrents, categoryTables.value[downloaderId])) {
+        await sendMessage("updateKeepUploadTask", task).catch(() => {});
+      }
+    } catch {
+      // 连不上就算了：这一趟不该在打开页面时报错，那一行留着原样就是实话
+    }
   }
 }
 
@@ -640,6 +683,59 @@ function scheduleAutoRecheck(taskId: string) {
   autoRecheckTimers.add(id);
 }
 
+/**
+ * 点过那颗「把本地文件移到任务目录」之后，盯到它真的落地为止。
+ *
+ * 为什么要盯（用户 2026-10-12：「其实已经搬完了，但是还是提示这个，新旧目录在同一个盘符的时候
+ * 移动是很快的，应该过几秒就检查的」）：界面上那条「目录不一致」读的是任务里记的
+ * `baseLocal.savePath`，只有查过下载器才会更新，而发送又被这条不一致挡着 ⇒ 发送成功之后
+ * 那趟 18 秒自动回查永远不会发生。于是同盘那种几秒就搬完的移动，警告可以一直挂着，
+ * 直到用户手动点「回查做种状态」。
+ *
+ * 第一趟 6 秒、之后逐趟拉长到 2 分半：下载器那份列表自己有 15 秒缓存闸
+ * （`qBittorrent.ts` 的 `getSyncData`：`Date.now() > lastSyncTimestamp + 15e3`），
+ * 上一趟刚查过就只会拿回旧快照；拉长的那几档是给跨盘 / 大体积留时间。
+ * 落地与否仍只有 `refreshBaseLocalPaths` 那一条判据，这里不另判一套。
+ */
+const MOVE_WATCH_DELAYS_MS = [6_000, 15_000, 30_000, 60_000, 120_000];
+
+function watchBaseMoveLanded(taskId: TKeepUploadTaskKey, attempt = 0) {
+  const id = window.setTimeout(() => {
+    autoRecheckTimers.delete(id);
+    void checkBaseMoveLanded(taskId, attempt);
+  }, MOVE_WATCH_DELAYS_MS[attempt]);
+  autoRecheckTimers.add(id);
+}
+
+async function checkBaseMoveLanded(taskId: TKeepUploadTaskKey, attempt: number) {
+  const task = tasks.value.find((x) => x.id === taskId);
+  /** 已经落地（或被别的流程清掉 / 任务已删）就不再盯 */
+  if (!task?.baseLocal?.moveToTaskPath) return;
+
+  try {
+    const downloaderId = task.downloadOptions.downloaderId;
+    const torrents = await sendMessage("getClientTorrents", downloaderId);
+    if (refreshBaseLocalPaths([task], torrents, categoryTables.value[downloaderId]).length > 0) {
+      // 写不回存储不打断这一趟：界面已经按新路径走，后台那一轮读的也是实时路径
+      await sendMessage("updateKeepUploadTask", task).catch(() => {});
+    }
+    if (!task.baseLocal?.moveToTaskPath) {
+      runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.movedLanded"), { color: "success" });
+      // 搬完了，还没发出去的那几条当场就推下去，不等下一分钟的定时器
+      await advanceAutoReseed();
+      return;
+    }
+  } catch {
+    // 连不上下载器既不算落地也不算失败：下一趟再看，最后那趟仍然没落地才说一次
+  }
+
+  if (attempt + 1 >= MOVE_WATCH_DELAYS_MS.length) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveTimeout"), { color: "warning", timeout: 12 });
+    return;
+  }
+  watchBaseMoveLanded(taskId, attempt + 1);
+}
+
 /** 这一条任务里能拿去和下载器对账的那些（没记 infoHash 的要先走下面那条自动认亲） */
 function trackableItems(task: IKeepUploadTask) {
   return task.items.filter((item) => String(item.hash ?? "").trim() !== "");
@@ -716,22 +812,11 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
             unlinked++;
           }
         }
-
-        /**
-         * 顺手把「基准那份在哪」按下载器报的实路径刷新一次。
-         * 不刷的话，用户自己搬完文件、或上一次点的那颗「把本地文件移过去」已经落地，界面上那条
-         * 「目录不一致」的警告还会挂着 —— 拿一个建任务时的快照去判现在的事实，就是误报。
-         */
-        if (task.baseLocal) {
-          const baseHash = String(task.baseLocal.hash).toLowerCase();
-          const livePath = torrents.find((x) => String(x.infoHash).toLowerCase() === baseHash)?.savePath;
-          if (livePath && livePath !== task.baseLocal.savePath) {
-            task.baseLocal.savePath = livePath;
-            if (!basePathMismatchOf(task)) delete task.baseLocal.moveToTaskPath;
-            dirty.add(task);
-          }
-        }
       }
+
+      // 顺手把「基准那份在哪」按下载器报的实路径刷新一次（判据与移动盯梢共用同一份）
+      for (const task of refreshBaseLocalPaths(group, torrents, categoryTables.value[downloaderId])) dirty.add(task);
+
       for (const task of dirty) {
         await sendMessage("updateKeepUploadTask", task);
       }

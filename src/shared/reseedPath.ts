@@ -121,3 +121,58 @@ export function detectBasePathMismatch(input: {
   }
   return isSameTorrentPath(basePath, taskPath) ? null : { basePath, taskPath };
 }
+
+/** 这条任务里「基准那份」与「这一批要挂到哪」两点，写成结构型好造夹具 */
+export interface IBasePathBearer {
+  baseLocal?: { hash?: string | null; savePath?: string | null; moveToTaskPath?: boolean } | null;
+  downloadOptions?: { savePath?: string | null } | null;
+}
+
+/** 下载器列表里这一处用得上的两点 */
+export interface ILiveTorrentPath {
+  infoHash?: string | null;
+  savePath?: string | null;
+}
+
+/**
+ * 这一格任务目录**此刻判不判得出**（`detectBasePathMismatch` 返回 null 有两种意思，
+ * 这里要的是「判得出且一致」那一种）：占位符展开后每条各是一个目录、分类名还没翻出真实目录，
+ * 都属于「不知道」，不能当成「已经对上了」。
+ */
+function isTaskPathResolvable(
+  taskPath?: string | null,
+  categories?: Record<string, IClientCategory> | null,
+): boolean {
+  if (!taskPath || PATH_PLACEHOLDER.test(taskPath)) return false;
+  return !isCategorySavePath(taskPath) || !!resolveCategoryTaskPath(taskPath, categories);
+}
+
+/**
+ * 按下载器刚报的那份列表，把「基准那份数据此刻在哪」刷新一遍，返回**真的改过路径**的那几条
+ * （写回存储归调用方）。
+ *
+ * 不刷的话，用户自己搬完文件、或刚点过那颗「把本地文件移到任务目录」已经落地，界面上那条
+ * 「目录不一致」还会挂着 —— 拿一个建任务时记下的快照去判现在的事实，就是误报。
+ * 「落地没有」**只有这一条判据**（路径变了、且按新路径确定地对上了），盯移动的那几趟不另判一套。
+ * 注意「确定」那两个字：判不出（分类表还没取到 / 目录里带占位符）时**不清** `moveToTaskPath`，
+ * 否则盯梢会把「不知道」报成「已搬到任务目录」。
+ */
+export function refreshBaseLocalPaths<T extends IBasePathBearer>(
+  list: T[],
+  torrents: ILiveTorrentPath[],
+  categories?: Record<string, IClientCategory> | null,
+): T[] {
+  const dirty: T[] = [];
+  for (const task of list) {
+    if (!task.baseLocal) continue;
+    const baseHash = String(task.baseLocal.hash ?? "").toLowerCase();
+    const livePath = torrents.find((x) => String(x.infoHash ?? "").toLowerCase() === baseHash)?.savePath;
+    if (!livePath || livePath === task.baseLocal.savePath) continue;
+    task.baseLocal.savePath = livePath;
+    const taskPath = task.downloadOptions?.savePath;
+    const sameNow = !detectBasePathMismatch({ basePath: livePath, taskPath, categories });
+    if (isTaskPathResolvable(taskPath, categories) && sameNow) delete task.baseLocal.moveToTaskPath;
+    dirty.push(task);
+  }
+  return dirty;
+}

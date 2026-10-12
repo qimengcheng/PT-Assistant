@@ -14,7 +14,7 @@
 |---|---|---|
 | 1 | Vite 8 / rolldown | 裸类型导入必须写 `import type`；已翻回 Vite 8，构建 37s → 5.5s |
 | 2 | pnpm 12 | `overrides` 只能写进 `pnpm-workspace.yaml` |
-| 3 | pnpm 12 布局 | `nodeLinker: hoisted` 是**当前布局**，不是临时绕过 |
+| 3 | pnpm 12 布局 | 现为 pnpm 默认的 `isolated`（10-02 记的「isolated 出半成品 node_modules」2026-10-12 逐条查链接未复现，`hoisted` 已撤）。「状态文件说已完成、普通 install 不补」这半是真的，认出来后用 `pnpm install --force` |
 | 4 | 未声明依赖 | `tinyexec` 要显式 `pnpm add -D` |
 | 5 | tsconfig | 只放宽 `noUncheckedIndexedAccess`；`verbatimModuleSyntax: true` 是 §1 的闸门 |
 | 6 | service worker | `defineBackground({ type: "module" })` **必须**；产物 3.52MB → 1.92MB |
@@ -91,13 +91,32 @@ git log --format=%s | grep "v0\.X\.Y\b"
 ⚠️ **键名坑**：构建白名单的新键名是 `allowBuilds`（对象形式），旧键 `onlyBuiltDependencies` 在 pnpm 12 下**静默失效**，
 表现为 `ERR_PNPM_IGNORED_BUILDS`。
 
-### 3. pnpm 12 isolated 布局在本机出现半成品 node_modules
+### 3. pnpm 12 布局：`hoisted` 的依据是 10-02 的一次误诊，2026-10-12 已翻回 `isolated`
 
-**现象**：scoped 包有链接、非 scoped 全缺，而且状态文件标记「已完成」，后续 `install` 直接跳过，
-越修越乱。
+**当时的现象（10-02，无物证）**：isolated 装出半成品 node_modules —— scoped 包有链接、非 scoped 全缺，
+而状态文件标记「已完成」，后续 `install` 直接跳过，越修越乱。
 
-**现在的做法**：`pnpm-workspace.yaml` 里 `nodeLinker: hoisted`（npm 式扁平布局）。
-这是**长期状态**，不是临时绕过 —— 但它有副作用：未声明的传递依赖会被顺手扁平上来，能跑不代表声明正确，见 §4、§11 和 README「工程化体系」的 `@ant-design/fast-color` 警告。
+**当时的做法**：`pnpm-workspace.yaml` 写 `nodeLinker: hoisted`（npm 式扁平布局），并把它记成**长期状态**。
+那句话当时没有复现步骤，而同一次提交的「踩坑 1」对 rolldown 病因的诊断后来已被实测推翻（§1）——
+同一批记录，可信度要一起打折。
+
+**2026-10-12 重测（pnpm 12.8.1 / Node 24，与 10-02 同版本）**：仓库外空目录只放 `package.json` +
+`pnpm-lock.yaml` 装一份 isolated，11.2s 退出 0；**逐个声明的直接依赖查到 `node_modules/<名>/package.json`
+读得开，46 个一个不缺**。判据必须是逐条查而不是数顶层条目 —— 后一种数法会把 scoped 目录算成一个，
+本机 46 个声明只摊出 39 个条目，拿它当「全在」会把结论建立在错判据上（我第一版探针就错在这儿）。
+「半成品」那半没复现，所以 `hoisted` 撤了。
+
+**「状态文件标已完成、普通 `install` 不修」这半是真的**，2026-10-12 原样复现过一次：顶层缺两个链接，
+`pnpm install` 只回一句 "Already up to date"。但**根因不是布局** —— 那两个依赖（`linkedom` / `vitest`）
+是并行会话刚写进 `package.json` 还没装完的，用户当场把它停了。所以留两条可复用的结论：
+① 判 node_modules 完不完整要逐条查链接；② 认出来之后一条命令补齐，`pnpm install --force`（实测 38.8s）。
+
+**换过去当场照出来的东西**：`check-dead-props.mjs` 报 `Cannot find module '@vue/compiler-sfc'` ——
+那是 `vue` 的传递依赖，hoisted 下被顺手扁平上来才一直能跑（`createRequire` 动态 require，静态扫描看不见）。
+已改成走 `vue` 自己的导出 `vue/compiler-sfc`（顺带也不会与 vue 版本漂移）。这就是这一档的用处：
+「import 了但没声明」从此直接报错，而不再静默蒙对 —— §4 的 `tinyexec`、§11 的 `dayjs` 都属于这类。
+
+**代价**：脚本 / 代码要拿传递依赖，必须走宿主包的导出路径或在 `package.json` 里显式声明，不能裸写包名。
 
 ### 4. WXT 的 cli-utils.mjs 引用 `tinyexec` 但未声明依赖
 
@@ -192,9 +211,11 @@ CI 的 `scripts/smoke-background.mjs` 守的就是这一类，见 README「工�
 
 ### 11. `dayjs` 是未声明的传递依赖
 
-**现象**：它只是 antdv-next 的传递依赖，没写进 `package.json`，能跑全靠 hoisted 布局（§3）。
+**现象**：它只是 antdv-next 的传递依赖，没写进 `package.json`，在 hoisted 布局下被顺手扁平上来才一直能被裸 `import`（§3）。
 
 **现在的做法**：不要直接 `import dayjs`。日期区间用 range-picker `@change` 的第二参数 `dateStrings` + 原生 `Date`。
+2026-10-12 起这条不再只靠口头约定 —— 布局换成 isolated 后顶层没有 `dayjs` 了（实测），裸 `import` 会直接报模块找不到；
+全仓 `src` + `packages` + `scripts` 共 668 个文件里现在零处这种写法。要用它就得显式声明进 `package.json`。
 
 ### 12. 宽表格溢出要双修
 

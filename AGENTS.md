@@ -315,6 +315,12 @@ CI=true pnpm build                # 本地复现 CI 那条路径 → 默认 .out
 - **不要再绕着调 `./node_modules/.bin/wxt build`**：`pnpm-workspace.yaml` 里已配
   `allowBuilds` 白名单（esbuild / @parcel/watcher），`pnpm build` 现在能正常跑通。
 - 类型检查：`pnpm compile`（= `vue-tsc --noEmit`），CI 前后端分别独立跑。
+- **依赖布局是 `nodeLinker: isolated`**（pnpm 默认，v0.90.4 起；换掉 `hoisted` 的依据与实测见 PLAYBOOK §3）。
+  两条后果：① 脚本 / 代码要拿**传递依赖**，只能走宿主包自己的导出（`vue/compiler-sfc` 那类）或在
+  `package.json` 里显式声明 —— 裸写未声明的包名会直接报模块找不到，`dayjs` / `@vue/compiler-sfc` 都是这类；
+  ② 判 node_modules 完不完整要**逐条查 `node_modules/<名>/package.json` 读不读得开**，不能数顶层条目
+  （scoped 目录只算一个条目），顶层缺链接时 pnpm 会回一句 "Already up to date" 而不补，
+  一条 `pnpm install --force` 补齐（成因与两次误判见 PLAYBOOK §3）。
 - 若报 `ERR_PNPM_IGNORED_BUILDS`，说明 `pnpm-workspace.yaml` 的白名单被回退了。
   ⚠️ **pnpm 12 的键名是 `allowBuilds`（对象形式），旧键 `onlyBuiltDependencies` 会被静默失效**：
 

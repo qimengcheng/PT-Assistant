@@ -39,7 +39,10 @@ const ROOT = process.cwd();
 const toUrl = (p) => "file:///" + path.join(ROOT, p).split(path.sep).join("/");
 
 const { createApp } = createRequire(path.join(ROOT, "noop.js"))("vue");
-const { parse: parseSfc } = createRequire(path.join(ROOT, "noop.js"))("@vue/compiler-sfc");
+// 走 `vue` 自己声明的 `./compiler-sfc` 导出，而不是裸 `@vue/compiler-sfc`：后者是 vue 的**传递**依赖，
+// 顶层 node_modules 里没有它（pnpm 的 isolated 布局只放直接声明过的包），
+// 原先在 hoisted 布局下是蒙对的。2026-10-12 换布局时被这条防线自己当场报了出来。
+const { parse: parseSfc } = createRequire(path.join(ROOT, "noop.js"))("vue/compiler-sfc");
 const antd = await import(toUrl("node_modules/antdv-next/dist/index.js"));
 
 const app = createApp({ render: () => null });

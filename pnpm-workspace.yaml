@@ -1,4 +1,28 @@
-nodeLinker: hoisted
+# pnpm 依赖布局：isolated（pnpm 默认）—— 顶层 node_modules 只放 package.json 声明过的包，
+# 每个依赖只在它自己目录下链它声明的依赖。
+#
+# 【为什么不是原先记的 hoisted】10-02 那次骨架提交（`3dfdffd`，v0.1.0）的「踩坑 3」写着
+# 「isolated 在本机出现半成品 node_modules（非 scoped 全缺、状态文件还标完成）」，
+# 于是 `nodeLinker: hoisted` 被当成**长期状态**记进 PLAYBOOK §3。那句话没有复现物证，
+# 而同一次提交的「踩坑 1」对 rolldown 病因的诊断后来已被实测推翻（真因是叶子文件的裸类型导入，
+# TS1484 335 处 / TS1205 0 处，见下面 overrides 那段）—— 所以这条同样不能当事实。
+# 2026-10-12 干净重测（pnpm 12.8.1 / Node 24，与 10-02 同版本）：仓库外空目录只放
+# package.json + pnpm-lock.yaml 装 isolated，11.2s 退出 0，**46 个声明过的直接依赖逐条查到有链接、
+# 一个不缺**（判据是 `node_modules/<名>/package.json` 读得开，不是数目录条目 —— @types/* 与
+# ESM-only 包用 require.resolve 会误报缺件）。防线② ④ 随后实跑 `createApp().use(Antd)` 注册 139 个名字。
+# 顺带订正 README 那条警告：`@ant-design/fast-color` 是 antdv-next 自己 dependencies 里声明过的
+# （^3.0.1），顶层没有它、但由 antdv-next 目录内照常解析得到，「改回 isolated 就 ERR_MODULE_NOT_FOUND」不成立。
+#
+# 【这一档的真正用处】isolated 会把「import 了但没声明」的幽灵依赖当场照出来。
+# 本仓历史上那两起（§4 的 tinyexec、§11 的 dayjs）在 hoisted 下都是静默蒙对的。
+# 2026-10-12 全仓预检：src + packages + scripts 共 668 个文件，零处未声明裸包名 import，
+# 只有 `check-dead-props.mjs` 里一处 `createRequire` 动态 require 的 `@vue/compiler-sfc`（已改成
+# `vue/compiler-sfc`）—— 那条静态扫描看不见，被这一档当场报出来了。
+#
+# 【换布局那一次必须整树重装】就地换（不 purge）+ 并行会话同时在装东西，会留下顶层缺链接的空档，
+# 而 pnpm 的状态文件只管「跟上次一样不一样」，普通 `install` 这时会答 "Already up to date" 而不去补。
+# 认出来的办法是逐条查链接，修法是一条命令：`pnpm install --force`（2026-10-12 实测 38.8s 补齐）。
+nodeLinker: isolated
 
 overrides:
   # Vite 8 = rolldown + oxc 内核。WXT 0.21.4 的 peerDeps 允许 `^6.3.4 || ^7.0.0 || ^8.0.0-0`，

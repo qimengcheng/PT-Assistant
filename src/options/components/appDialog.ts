@@ -19,7 +19,7 @@ import { h, type VNode } from "vue";
 
 /** App 上下文的 modal 与静态 Modal 都满足这个形状 */
 export interface IDialogModalApi {
-  confirm(config: any): any;
+  confirm(config: Record<string, unknown>): void;
 }
 
 export type TTranslate = (key: string) => string;

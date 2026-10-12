@@ -1,3 +1,4 @@
+import { type Component } from "vue";
 import { ETorrentStatus } from "@ptd/site";
 import {
   ArrowDownOutlined,
@@ -18,7 +19,7 @@ export interface ITorrentStatusMeta {
   value: ETorrentStatus;
   labelKey: string;
   /** antd 的图标组件本身（不是 mdi 字符串） */
-  icon: any;
+  icon: Component;
   /** 真实色值：Vuetify 那套语义色名（info / grey / success）在 antd 的 stroke-color 上用不了 */
   color: string;
 }

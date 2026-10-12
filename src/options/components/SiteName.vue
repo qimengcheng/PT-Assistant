@@ -24,7 +24,7 @@ const href = ref<string>("#");
  * 原来把 attrs 快照进 reactive，父组件后续传的 title/class 等都不会更新
  * （表格排序/过滤复用行实例时尤其明显）。
  */
-const renderProp = computed<Record<string, any>>(() => ({
+const renderProp = computed<Record<string, unknown>>(() => ({
   ...attrs,
   ...(tagIs === "a"
     ? {

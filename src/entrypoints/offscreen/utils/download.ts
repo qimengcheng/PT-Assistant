@@ -542,7 +542,8 @@ async function downloadTorrentToRemote(
       addTorrentOptions.localDownloadOption = downloadRequestConfig;
     }
 
-    const loggerData = { torrent, downloaderId, downloadRequestConfig, addTorrentOptions } as Record<string, any>;
+    // 这一条是给日志用的袋子：addTorrentResult 拿到之后还会再塞进来一项，所以按袋子声明
+    const loggerData: Record<string, unknown> = { torrent, downloaderId, downloadRequestConfig, addTorrentOptions };
     try {
       logger({ msg: "downloadTorrentToDownloader", data: loggerData });
       const addTorrentResult = await downloaderInstance.addTorrent(downloadRequestConfig.url!, addTorrentOptions);

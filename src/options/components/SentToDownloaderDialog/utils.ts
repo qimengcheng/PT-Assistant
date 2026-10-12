@@ -36,7 +36,10 @@ export async function sendTorrentToDownloader(
         { allowEmpty: true },
       );
       if (userInput !== null) {
-        // @ts-ignore
+        // 键是运行期从配置里点出来的（savePath / category / tags …），
+        // 而 addTorrentOptions 各键类型不同 —— TS 索引不到「这个键对应哪种值」，
+        // 上一行的 replace 只在字符串那几档上发生（占位符只出现在字符串里）。
+        // @ts-expect-error 动态键写入，见上面两行
         addTorrentOptions[key] = (addTorrentOptions[key] as string).replace("<...>", userInput.trim());
       } else {
         // 用户取消输入 → 整个推送取消。原先走 Promise.reject，而调用方只挂了 finally，
@@ -94,7 +97,8 @@ export async function sendTorrentToDownloader(
           delete realAddTorrentOptions[key];
         } else {
           for (const [replaceKey, value] of Object.entries(replaceMap)) {
-            // @ts-ignore
+            // 同上：key 是运行期点出来的，`$x$` 这类占位符只可能出现在字符串档里
+            // @ts-expect-error 动态键写入
             realAddTorrentOptions[key] = (realAddTorrentOptions[key]! as string).replace(`$${replaceKey}$`, value);
           }
         }

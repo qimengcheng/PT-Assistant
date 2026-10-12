@@ -7,6 +7,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { message, Modal } from "antdv-next";
+import { errorText } from "@/shared/errorText.ts";
 import {
   ApiOutlined,
   DeleteOutlined,
@@ -206,8 +207,8 @@ async function testConnection(row: IMediaServerMetadata) {
       throw new Error(result?.errorMessage ?? t("SetMediaServer.index.mediaSearchFailed"));
     }
     message.success(t("SetMediaServer.index.connectSuccess", [result.items?.length ?? 0]));
-  } catch (err: any) {
-    message.error(t("SetMediaServer.index.connectFailed", [err?.message ?? err]));
+  } catch (err) {
+    message.error(t("SetMediaServer.index.connectFailed", [errorText(err)]));
   } finally {
     testingIds.value[row.id] = false;
   }

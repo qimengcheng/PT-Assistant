@@ -10,9 +10,9 @@
  */
 
 /** 一列的比较函数：直接从渲染出去的那份列定义里取，**不另算一套** */
-export interface ILocateColumn {
+export interface ILocateColumn<T = unknown> {
   key: string;
-  compare?: (a: any, b: any) => number;
+  compare?: (a: T, b: T) => number;
 }
 
 export interface ILocateSortItem {
@@ -25,7 +25,7 @@ export interface ILocateInput<T> {
   /** 当前生效的排序（configStore 里那份 `sortBy`，按点击先后排） */
   spec: readonly ILocateSortItem[];
   /** 渲染出去的那几列，顺序 = 表头里的左右顺序 */
-  columns: readonly ILocateColumn[];
+  columns: readonly ILocateColumn<T>[];
   isTarget: (row: T) => boolean;
   pageSize: number;
 }
@@ -48,7 +48,7 @@ export interface ILocateResult {
  *
  * 排序里写了、但已被「列显隐」藏掉的列不参与 —— 那一列压根没有 sorter。
  */
-export function pageOfSortedRows<T extends Record<string, any>>(input: ILocateInput<T>): ILocateResult {
+export function pageOfSortedRows<T>(input: ILocateInput<T>): ILocateResult {
   const { rows, spec, columns, isTarget, pageSize } = input;
   const chain = spec
     .map((item) => {
@@ -58,7 +58,7 @@ export function pageOfSortedRows<T extends Record<string, any>>(input: ILocateIn
       return typeof compare === "function" ? { priority, order: item.order, compare } : null;
     })
     .filter(
-      (one): one is { priority: number; order: "asc" | "desc"; compare: (a: any, b: any) => number } => one !== null,
+      (one): one is { priority: number; order: "asc" | "desc"; compare: (a: T, b: T) => number } => one !== null,
     )
     .sort((a, b) => b.priority - a.priority);
 
@@ -87,16 +87,22 @@ export function pageOfSortedRows<T extends Record<string, any>>(input: ILocateIn
  * `{ compare, multiple }`，没开时直接就是那个 compare 函数 —— 两种形状都得吃下，
  * 抄一遍就会在某一档上静默拿到 undefined、于是那一列不参与排序。
  */
-export function pickSortColumns(columns: readonly any[]): ILocateColumn[] {
-  return columns.map((column) => ({
-    key: String(column?.key ?? ""),
-    compare:
-      typeof column?.sorter === "function"
-        ? column.sorter
-        : typeof column?.sorter?.compare === "function"
-          ? column.sorter.compare
-          : undefined,
-  }));
+/** 这一函数只吃渲染出去的列定义里那两件，其余字段一概不看 */
+type TPushedColumn = { key?: unknown; sorter?: unknown };
+
+export function pickSortColumns<T>(columns: readonly TPushedColumn[]): ILocateColumn<T>[] {
+  return columns.map((column) => {
+    // 断言到比较函数这一步是必要的：sorter 在 antd 那边是 boolean | CompareFn | {compare, multiple}
+    // 三档联合，而下面两道 typeof 已经把它收窄到「是函数」/「对象且 compare 是函数」两档。
+    const sorter = column.sorter;
+    const compare =
+      typeof sorter === "function"
+        ? (sorter as (a: T, b: T) => number)
+        : sorter && typeof sorter === "object" && typeof (sorter as { compare?: unknown }).compare === "function"
+          ? (sorter as { compare: (a: T, b: T) => number }).compare
+          : undefined;
+    return { key: String(column.key ?? ""), compare };
+  });
 }
 
 /**

@@ -40,9 +40,10 @@ const configStore = useConfigStore();
 const metadataStore = useMetadataStore();
 const runtimeStore = useRuntimeStore();
 
-const parsePtppSize = (v: any) => (typeof v == "string" ? parseSizeString(v) : v);
+/** PTPP 那份存档里的 size 两档都见过：串（"1.2 GB"）与已经是字节数的数字 */
+const parsePtppSize = (v: unknown) => (typeof v === "string" ? parseSizeString(v) : v);
 
-type TUserInfoTransferFull = { key: keyof IUserInfo; format?: (v: any) => any };
+type TUserInfoTransferFull = { key: keyof IUserInfo; format?: (v: unknown) => unknown };
 
 type TUserInfoTransfer =
   | false // 不导入
@@ -70,7 +71,7 @@ const userInfoTransferMap = {
   lastErrorMsg: false,
   joinTime: {
     key: "joinTime",
-    format: (v: any) => {
+    format: (v: unknown) => {
       if (typeof v === "number") {
         if (v > 1e12) return v; // 13位时间戳
         if (v > 1e9) return v * 1000; // 10位时间戳转13位
@@ -189,7 +190,7 @@ async function doImportInternal() {
     for (const [host, data] of Object.entries(ptppUserData)) {
       if (toImportSite.value.includes(host)) {
         const siteId = allSupportedSiteHostMap.value[host];
-        userInfoStorage[siteId] ??= {} as any;
+        userInfoStorage[siteId] ??= {};
 
         // 仅处理 lastUpdateStatus 为 success，且历史时间大于当前存储的时间（帮助导入 isDead 站点）
         // latest 可能没有（见上方 archiveCountOf 的注释），兜一个 {} 让下面那句

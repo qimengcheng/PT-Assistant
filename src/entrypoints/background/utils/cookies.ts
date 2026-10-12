@@ -57,27 +57,37 @@ onMessage("getCookie", async ({ data: detail }) => {
 export async function setCookie(cookie: chrome.cookies.SetDetails, force: boolean = false): Promise<void> {
   const new_cookie = {} as chrome.cookies.SetDetails;
 
-  (
-    [
-      "name",
-      "value",
-      "domain",
-      "path",
-      "secure",
-      "httpOnly",
-      "sameSite",
-      "expirationDate",
-    ] as (keyof chrome.cookies.SetDetails)[]
-  ).forEach((key) => {
-    if (key == "sameSite" && cookie[key] && cookie[key].toLowerCase() == "unspecified" && import.meta.env.FIREFOX) {
+  const cookieKeys = [
+    "name",
+    "value",
+    "domain",
+    "path",
+    "secure",
+    "httpOnly",
+    "sameSite",
+    "expirationDate",
+  ] as const;
+
+  /**
+   * 同一个键从入参搬到 new_cookie。
+   *
+   * 直接写 `new_cookie[key] = cookie[key]` 会被 TS 拒掉：它按整个联合取类型，
+   * 认不出这两个下标是同一个键。这里用一条泛型小函数把那件事告诉它 ——
+   * 原先是一行 @ts-ignore 盖住的，而那条 ignore 顺带把「键名拼错」也一起盖掉了。
+   */
+  const copyKey = <K extends (typeof cookieKeys)[number]>(key: K) => {
+    new_cookie[key] = cookie[key];
+  };
+
+  for (const key of cookieKeys) {
+    if (key === "sameSite" && cookie[key] && cookie[key].toLowerCase() === "unspecified" && import.meta.env.FIREFOX) {
       // firefox 下 unspecified 会导致cookie无法设置
       // https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/cookies/SameSiteStatus
       new_cookie["sameSite"] = "no_restriction";
     } else {
-      // @ts-ignore
-      new_cookie[key] = cookie[key];
+      copyKey(key);
     }
-  });
+  }
 
   // ⚠️ 整个函数体都要在 try 里：原先只有 chrome.cookies.set 被包住，而它前面的
   // buildCookieUrl(cookie.domain!, …) 与 chrome.cookies.get 都在 try 之外 ——
@@ -129,6 +139,7 @@ onMessage("removeCookie", async ({ data }) => {
   removeCookie.storeId = data.storeId ?? "0";
 
   if (typeof data.url === "undefined") {
+    // 调用方递的是一条 cookie（chrome 的 Cookie 没有 url），按 secure + domain + path 拼
     const setDetails = data as chrome.cookies.SetDetails;
     removeCookie.url = buildCookieUrl(setDetails.secure ?? true, setDetails.domain!, setDetails.path!);
   } else {

@@ -69,7 +69,7 @@ export interface IDownloaderMetadata extends DownloaderBaseConfig {
   excludedSites?: string[]; // 排除的站点列表，在该列表中的站点不会显示该下载器
   autoFlushStatus?: number; // 自动刷新状态，0: 关闭，其他数值表示刷新间隔的秒数
 
-  [key: string]: any; // 其他配置项
+  [key: string]: unknown; // 其他配置项（读已声明的字段不受影响，声明优先于索引签名）
 }
 
 export interface IDefaultDownloaderConfig {
@@ -82,7 +82,7 @@ export type TMediaServerKey = string;
 export interface IMediaServerMetadata extends IMediaServerBaseConfig {
   id: TMediaServerKey;
   enabled: boolean;
-  [key: string]: any; // 其他配置项
+  [key: string]: unknown; // 其他配置项
 }
 
 export const BackupFields = [

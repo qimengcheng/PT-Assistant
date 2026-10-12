@@ -20,7 +20,8 @@ interface IHistoryUserInfo extends IUserInfo {
 }
 
 interface IExportField {
-  key: string;
+  /** 就是 IHistoryUserInfo 上的键：写成 keyof 之后，导出清单里拼错一个字段名会当场编译报错 */
+  key: keyof IHistoryUserInfo;
   label: string;
   required?: boolean;
 }
@@ -150,7 +151,7 @@ function convertToCSV(items: IHistoryUserInfo[]): string {
   const rows = items.map((item) =>
     headers
       .map((key) => {
-        const raw = (item as any)[key];
+        const raw = item[key];
         const val =
           raw === Infinity || raw === -Infinity || (typeof raw === "number" && isNaN(raw)) ? "" : String(raw ?? "");
         if (/[",\n\r]/.test(val)) {
@@ -167,9 +168,9 @@ function convertToJSON(items: IHistoryUserInfo[]): string {
   const activeFields = getActiveFields();
   return JSON.stringify(
     items.map((item) => {
-      const obj: Record<string, any> = {};
+      const obj: Record<string, unknown> = {};
       for (const f of activeFields) {
-        const raw = (item as any)[f.key];
+        const raw = item[f.key];
         obj[f.key] =
           raw === Infinity || raw === -Infinity || (typeof raw === "number" && isNaN(raw)) ? null : (raw ?? null);
       }

@@ -45,7 +45,10 @@ export interface IKeepUploadTaskItem {
    * 不记下来就得再下一遍。**旧任务没有这一项**，界面上那一条会写「未记录 infoHash」而不是假装查过。
    */
   hash?: string;
-  [key: string]: any; // 其他属性
+  // 旧版本 / 别的会话写进任务里的未知字段要能原样往返，所以这里必须留一个索引签名。
+  // 用 unknown 不用 any：读已声明的字段照旧是它们自己的类型（声明优先于索引签名），
+  // 只有真去读一个没声明的键时才会拿到 unknown、逼你看一眼。
+  [key: string]: unknown; // 其他属性
 }
 
 /**

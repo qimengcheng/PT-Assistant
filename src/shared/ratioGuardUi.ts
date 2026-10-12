@@ -23,18 +23,18 @@ import {
 
 /** App 上下文的 modal 与静态 Modal 都满足这个形状 */
 export interface IRatioGuardModal {
-  confirm(config: any): any;
+  confirm(config: Record<string, unknown>): void;
 }
 
 /**
  * 静态 `notification` 与 `App.useApp()` 的 notification 都满足这个形状。
  *
- * 形参写 `any` 而不是 ArgsProps：这一层不许 import antdv（它要能拿 Node 直接跑断言），
- * 而 `Record<string, unknown>` 喂给 `(args: ArgsProps) => void` 会被判不兼容 ——
- * 与上面 `IRatioGuardModal.confirm` 同一个取舍（见 appDialog.ts）。
+ * 形参写 `Record<string, unknown>` 而不是 ArgsProps：这一层不许 import antdv（它要能拿 Node
+ * 直接跑断言），而方法声明走的是双变参数检查，antd 那套 `(args: ArgsProps) => void` 照样能
+ * 赋进来（实测：改成 Record 之后 vue-tsc 一条报错都没有）。原先这里写的是 any。
  */
 export interface IRatioGuardNotify {
-  warning(config: any): void;
+  warning(config: Record<string, unknown>): void;
 }
 
 /** 带插值的 t（vue-i18n 的 global.t 与组件里的 t 都满足） */

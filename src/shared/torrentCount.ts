@@ -41,7 +41,8 @@ export function countText(raw: unknown): string {
  * 比较器吃的档位：判不出的按「比 0 还小」排，升序时这些空格浮到最上面、降序（想看评论最多的那种）沉到最下面。
  */
 export function countCompare(key: "seeders" | "leechers" | "completed" | "comments") {
-  return (a: any, b: any): number => (toCount(a?.[key]) ?? -1) - (toCount(b?.[key]) ?? -1);
+  const pick = (row: unknown) => toCount((row as Record<string, unknown> | null | undefined)?.[key]);
+  return (a: unknown, b: unknown): number => (pick(a) ?? -1) - (pick(b) ?? -1);
 }
 
 /**

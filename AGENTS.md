@@ -318,7 +318,12 @@ CI=true pnpm build                # 本地复现 CI 那条路径 → 默认 .out
 - **代码风格 / 真 bug 扫描：`pnpm lint`**（ESLint 10，扁平配置在 `eslint.config.mjs`）。
   `pnpm lint:fix` 的范围**写死在 `src scripts eslint.config.mjs`**，别改成 `.` —— 实测 `--fix` 会顺手
   改 `packages/**`（上游零修改平移件）并把 20 多个视图文件的模板属性重排一遍（观感噪音，与功能无关）。
-  门禁仍走防线 ⑬（`check-eslint.mjs`，自动进 `check-all`），**只有 error 判失败**；口径与三条实测
+  门禁仍走防线 ⑬（`check-eslint.mjs` + `scripts/eslint-packages-baseline.json`，自动进 `check-all`），
+  **三档判据**：error 一律 FAIL；**我方（`src` / `scripts` / 根配置）连 warning 都不许留**；
+  `packages/**` 按基线快照**逐规则**只拦回涨。所以新增一条 warning 到我方代码里 = CI 红。
+  真要留一处 `any`：写行级 `eslint-disable-next-line`，并在它上面把**实测依据**讲清楚
+  （先例 `TKonvaConfig`：改成 `Record<string, unknown>` 会断 13 条 vue-tsc，那串数字就是依据）。
+  口径与三条实测
   坑（核心 `no-restricted-syntax` 看不见 Vue 模板 AST / `--fix-type` 分不开 `attributes-order` /
   `excludes` 这一版不认）见 PLAYBOOK §36。
 - **依赖布局是 `nodeLinker: isolated`**（pnpm 默认，v0.90.4 起；换掉 `hoisted` 的依据与实测见 PLAYBOOK §3）。
@@ -538,7 +543,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 | 10 | `check-category-map` | 搜索结果「分类」折类判据（§3.8）：同一内容的各种写法必须折到同一类、**别名顺序敏感的那几对不许互撞**、站点覆盖必须压过规则，外加 `common.categoryKind.*` 这批**动态拼出来**的 i18n 键两侧都在（防线 ③ 看不见这种键） |
 | ~~11~~ | ~~`check-confirm-danger`~~ **v0.90.5 撤下** | 确认框那颗 legacy `okType: "danger"`。脚本删了，判据没丢 —— 交给防线 ⑬ 的三条规则：脚本侧 `no-restricted-syntax` 选 `Property[key.name='okType']`，模板侧 `vue/no-restricted-static-attribute`（`ok-type="danger"`）+ `vue/no-restricted-v-bind`（`:ok-type` / `:okType` / `v-bind:ok-type`）。**为什么不能整条换成 esquery**：核心 `no-restricted-syntax` 看不见 Vue 模板 AST（实测三条模板 selector 零命中），换插件自己的规则才行；详见 PLAYBOOK §36 |
 | 12 | `check-notification-ids` | 系统通知的 id 与认领。`chrome.notifications.onClicked` 是**全局事件**（不按 id 分发），所以 ① `create` 不传 id 的那条永远没人认领得了，② 任何一个不看 `notificationId` 的监听器都会把**别处**的通知接走 —— 点「辅种完成」那条被更新检查的监听器跳去 GitHub 下载页（用户 2026-10-12 报的），不报错、不进 vue-tsc、只有点下去那一刻才知道。判据 B 要的是「同一行里既点名形参又做了比较」，跨行写的认领会被它报出来。① 那条 ESLint 也能查（`no-restricted-syntax` 打 `chrome.notifications.create` 少首参），但它只认**字面那条链**，`const n = chrome.notifications; n.create({...})` 就看不见 —— 所以这条脚本留着 |
-| 13 | `check-eslint` | 跑 ESLint 10（`eslint.config.mjs`：`@eslint/js` + `typescript-eslint` + `eslint-plugin-vue`），**只有 error 判失败**。冷接入的口径、`packages/**`（上游件）为什么逐条降成 warn、`--fix` 的两条坑、以及「它替掉了哪条老防线、替不掉哪些」的逐条结论都在 PLAYBOOK §36。它还自带一条结构性自检：`src` / `packages` / `scripts` 任一块一个文件都没扫到就 FAIL —— 配置写歪时「一条 error 都没有」是假 PASS |
+| 13 | `check-eslint` | 跑 ESLint 10（`eslint.config.mjs`：`@eslint/js` + `typescript-eslint` + `eslint-plugin-vue`）。**判据分三档，分界线是「这份代码谁写的」**：error 一律 FAIL；我方（`src` / `scripts` / 根配置）连 warning 都不许留（v0.90.9 把 `no-explicit-any` 221→0、`ban-ts-comment` 10→0 收口后升成 error）；`packages/**` 是上游零修改平移件，按 `scripts/eslint-packages-baseline.json` **逐规则**只拦回涨，重录用 `--update-packages-baseline`。按规则记而不记总数：清掉一条 `prefer-const` 会腾出总额度，总数判据就会放过一条新进的 `any`。冷接入的口径、`packages/**` 为什么逐条降成 warn、`--fix` 的两条坑、以及「它替掉了哪条老防线、替不掉哪些」的逐条结论都在 PLAYBOOK §36。它还自带两条结构性自检：`src` / `packages` / `scripts` 任一块一个文件都没扫到就 FAIL（配置写歪时「一条 error 都没有」是假 PASS），基线文件读不到也 FAIL |
 
 第六条守的是 §3.2：从两个无 DOM / 必须轻量 的上下文出发，静态 import 闭包不许走到 `sizzle`、
 不许命中 `@ptd/site` / `@ptd/social` 根入口，entrypoint 的 `import.meta.glob` 必须根绝对，

@@ -85,11 +85,15 @@ function resetTimelineDataWithControl() {
   }
 }
 
-type KonvaNode = { getNode: () => any; getStage: () => any };
+/**
+ * vue-konva 那个组件实例上的两个取节点方法。泛型参数是 `getNode()` 的那一档 ——
+ * `batchDraw()` 只在 Layer/Stage 上（Node 上没有），所以图层那处要按 Layer 拿。
+ */
+type KonvaNode<T extends Konva.Node = Konva.Node> = { getNode: () => T; getStage: () => Konva.Stage };
 
 const { width: containerWidth } = useElementSize(useTemplateRef("canvasContainer"));
 const canvasStage = useTemplateRef<KonvaNode>("canvasStage");
-const canvasLayer = useTemplateRef<KonvaNode>("canvasLayer");
+const canvasLayer = useTemplateRef<KonvaNode<Konva.Layer>>("canvasLayer");
 
 const realAllSite = shallowRef<string[]>([]);
 
@@ -118,7 +122,7 @@ const stageConfig = computed(() => {
 // 绘制相关辅助函数
 const favicon = (config: TKonvaConfig) => {
   const imageBaseSize = config.size ?? 24;
-  const imageFilters: any[] = [`blur(${control.faviconBlue}px)`];
+  const imageFilters: string[] = [`blur(${control.faviconBlue}px)`];
 
   const siteConfig = allAddedSiteMetadata[config.site];
 
@@ -168,7 +172,7 @@ const favicon = (config: TKonvaConfig) => {
 
 const siteFaviconClipFunc =
   (radius: number = 24, position: [number, number] = [stageConfig.value.width / 2, 0]) =>
-  (ctx: any) => {
+  (ctx: CanvasRenderingContext2D) => {
     ctx.beginPath();
     ctx.arc(position[0], position[1], radius, 0, 2 * Math.PI);
     ctx.strokeStyle = "#fff";
@@ -414,24 +418,27 @@ function saveControl() {
                 <template v-for="(type, index) in topSiteRenderAttr" :key="type.iconFill">
                   <vk-group :config="{ x: 20 + index * 170, y: 0 }">
                     <vk-text :config="icon({ y: 0, fill: type.iconFill, fontSize: 24, text: `󰔸` /* trophy */ })" />
-                    <template v-for="(key, index) in realShowField" :key="key.name">
+                    <!-- 内层循环原先也叫 `index`，把外面那颗「第几名站点」的 index 遮掉了
+                         （`vue/no-template-shadow`）。外层 415 行吃的是外层的它，这里吃自己的，
+                         所以改名而不是删改名 —— 语义一字不动。 -->
+                    <template v-for="(field, fieldIndex) in realShowField" :key="field.name">
                       <vk-group
-                        v-if="timelineData.topInfo[key.name][type.valueKey] > 0"
-                        :config="{ x: 0, y: 30 * (index + 1) }"
+                        v-if="timelineData.topInfo[field.name][type.valueKey] > 0"
+                        :config="{ x: 0, y: 30 * (fieldIndex + 1) }"
                       >
                         <vk-image
                           :ref="(el: any) => el?.getNode()?.cache() /* 挂载即 cache，filter 才生效 */"
                           :config="
                             favicon({
-                              site: timelineData.topInfo[key.name][type.siteKey].site,
+                              site: timelineData.topInfo[field.name][type.siteKey].site,
                               size: 20,
                               canvas: { fillStyle: control.backgroundColor },
                             })
                           "
                         />
                         <vk-text
-                          v-if="timelineData.topInfo[key.name][type.valueKey] > 0"
-                          :config="text({ x: 30, text: key.format(timelineData.topInfo[key.name][type.valueKey]) })"
+                          v-if="timelineData.topInfo[field.name][type.valueKey] > 0"
+                          :config="text({ x: 30, text: field.format(timelineData.topInfo[field.name][type.valueKey]) })"
                         />
                       </vk-group>
                     </template>
@@ -516,12 +523,12 @@ function saveControl() {
                         }"
                       >
                         <vk-text
-                          v-for="(key, index) in realShowField"
-                          :key="key.name"
+                          v-for="(field, fieldIndex) in realShowField"
+                          :key="field.name"
                           :config="
                             text({
-                              y: 20 * (index + 1),
-                              text: `${t('UserDataTimeline.field.' + key.name)}: ${key.format(userInfo[key.name] ?? 0)}`,
+                              y: 20 * (fieldIndex + 1),
+                              text: `${t('UserDataTimeline.field.' + field.name)}: ${field.format(userInfo[field.name] ?? 0)}`,
                               fontSize: 16,
                             })
                           "

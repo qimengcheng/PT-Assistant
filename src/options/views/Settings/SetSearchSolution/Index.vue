@@ -20,6 +20,7 @@ import {
   SearchOutlined,
   ThunderboltOutlined,
 } from "@antdv-next/icons";
+import type { TablePaginationConfig } from "antdv-next";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
@@ -64,9 +65,11 @@ type IExportedSearchSolution = Omit<ISearchSolutionMetadata, "id" | "enabled" | 
  */
 function importSearchSolution(file: File) {
   const r = new FileReader();
-  r.onload = (ev: any) => {
+  r.onload = () => {
     try {
-      const result = JSON.parse(ev.target.result) as IExportedSearchSolution[];
+      // 读的是文本，FileReader 那侧的 result 类型是 string | ArrayBuffer | null，
+      // 所以取 r.result 而不是绕一层 ev.target.result
+      const result = JSON.parse(String(r.result)) as IExportedSearchSolution[];
       for (const solution of result) {
         const importSolution = solution as ISearchSolutionMetadata;
 
@@ -221,7 +224,7 @@ const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 /** 他挑过一档之后仍要量：那一档以实测容量为上限 */
 const pickedSize = computed(() => {
   const behavior = configStore.tableBehavior.SetSearchSolution;
-  return isPageSizePicked(behavior?.itemsPerPage, 10, (behavior as any)?.pageSizePicked);
+  return isPageSizePicked(behavior?.itemsPerPage, 10, behavior?.pageSizePicked);
 });
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,
@@ -242,7 +245,7 @@ const pagination = computed(() =>
   }),
 );
 
-function onTableChange(pag: any) {
+function onTableChange(pag: TablePaginationConfig) {
   // 只有「报回来的档 ≠ 界面上正在显示的那一档」才算他改了尺寸：翻页与排序也带着当前档回来
   const displayed = pagination.value === false ? 0 : pagination.value?.pageSize ?? 0;
   if (pag.pageSize && displayed && pag.pageSize !== displayed) {
@@ -252,8 +255,8 @@ function onTableChange(pag: any) {
   }
 }
 
-function isAllDefaultRow(record: any): record is IAllDefaultRow {
-  return record?.__allDefault === true;
+function isAllDefaultRow(record: ISearchSolutionMetadata | IAllDefaultRow): record is IAllDefaultRow {
+  return "__allDefault" in record && record.__allDefault === true;
 }
 </script>
 

@@ -46,7 +46,7 @@ const permissionLoading = ref(false);
 async function refreshStatus() {
   try {
     status.value = await sendMessage("nativeBridgeGetStatus", undefined);
-  } catch (e: any) {
+  } catch (e) {
     console.debug("[PTD] Failed to get bridge status:", e);
   }
 }
@@ -61,7 +61,7 @@ async function grantPermission() {
     } else {
       console.debug("[PTD]", t("SetNativeBridge.permission.grantFailed"));
     }
-  } catch (e: any) {
+  } catch (e) {
     console.debug("[PTD] Permission request error:", e);
   } finally {
     permissionLoading.value = false;
@@ -73,7 +73,7 @@ async function revokePermission() {
   try {
     await chrome.permissions.remove({ permissions: ["nativeMessaging"] });
     await refreshStatus();
-  } catch (e: any) {
+  } catch (e) {
     console.debug("[PTD] Permission revoke error:", e);
   } finally {
     permissionLoading.value = false;
@@ -84,7 +84,7 @@ async function toggleEnabled(newValue: boolean) {
   loading.value = true;
   try {
     status.value = await sendMessage("nativeBridgeSetEnabled", newValue);
-  } catch (e: any) {
+  } catch (e) {
     console.debug("[PTD] Failed to set enabled:", e);
   } finally {
     loading.value = false;
@@ -137,7 +137,7 @@ async function testConnection() {
     if (token === pollingToken && status.value.state === "connecting") {
       await waitForSettledState(token);
     }
-  } catch (e: any) {
+  } catch (e) {
     console.debug("[PTD] Reconnect failed:", e);
   } finally {
     // 迟到的 finally 不许把**新一轮**的 loading 关掉（卸载那一路也无所谓，ref 已经没人看了）

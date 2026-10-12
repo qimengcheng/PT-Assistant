@@ -8,7 +8,7 @@
  * 现改走 @/options/components/appDialog.ts 的公共对话框实现（原生弹窗挂在页面 origin 上、
  * 阻塞主线程，且在 MV3 扩展页面被禁用）。
  */
-import { computed, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef, type Component } from "vue";
 import { Modal, notification } from "antdv-next";
 import { uniq } from "es-toolkit";
 import type { TSupportSocialSite } from "@ptd/social";
@@ -48,7 +48,8 @@ type TPageType = "unknown" | "social" | "list" | "detail";
 export interface IPtdData {
   siteId?: string;
   socialSite?: TSupportSocialSite;
-  [key: string]: any;
+  // 页面上带回来的其余字段原样往返，界面上只读上面那两个（全仓核对过）
+  [key: string]: unknown;
 }
 
 export const pageType = ref<TPageType>("unknown");
@@ -142,7 +143,7 @@ const confirmDanger = makeConfirmDanger(contentModal, translate);
 const promptInDialog = makePromptInDialog(contentModal, translate);
 
 export async function wrapperConfirmFn(
-  fn: () => any,
+  fn: () => unknown,
   message = translate("contentScript.confirmDefaultAction"),
 ) {
   const configStore = useConfigStore();
@@ -254,7 +255,8 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   }
 }
 
-const routes: Record<TPageType, any> = {
+/** 页面类型 → 挂出去的那个组件（"unknown" 档没有页面，就挂一个原生 div） */
+const routes: Record<TPageType, Component | string> = {
   unknown: "div",
   social: SocialSitePage,
   list: SiteListPage,

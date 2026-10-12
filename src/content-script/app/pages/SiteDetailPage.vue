@@ -98,8 +98,8 @@ function handleSearch() {
     @click="() => handleRemoteDownload()"
   />
   <SpeedDialBtn
-    key="download_default"
     v-if="metadataStore.defaultDownloader?.id"
+    key="download_default"
     :disabled="enabledDownloadersBySite.length === 0"
     color="#1890ff"
     :icon="DownloadOutlined"

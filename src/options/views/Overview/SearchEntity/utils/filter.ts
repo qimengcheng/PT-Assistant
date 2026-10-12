@@ -20,7 +20,14 @@ export const tableCustomFilter = useTableCustomFilter({
   initialItems: computed(() => runtimeStore.search.searchResult),
   format: {
     tags: {
-      parse: (value: ITorrentTag | string) => ((value ?? {}) as ITorrentTag).name ?? value,
+      /**
+       * 标签列两种写法都出现过：`{ name, type }` 对象与纯字符串（各站解析结果不一样），
+       * 所以参数是 `unknown` 再自己收窄 —— 原先标的是 `ITorrentTag | string`，
+       * 而 `IValueFormat.parse` 现在要求「吃得下任何列值」，窄参数在逆变下会被拒（实测）。
+       * 对象又没有 name 时折成空串：原来会把整个对象交给字符串比较去 `regex.test()`。
+       */
+      parse: (value: unknown) =>
+        typeof value === "object" && value !== null ? ((value as ITorrentTag).name ?? "") : String(value ?? ""),
     },
     time: "date",
     size: "size",
@@ -36,9 +43,9 @@ export const tableCustomFilter = useTableCustomFilter({
      * `checkRangeValue` 就变成字符串比较 —— `"14" <= "9"` 按字典序是 true，多位数的上界全错。
      * 只改 build 才够：出去时是字符串，回来时条目值仍是数字，比较走数值。
      */
-    seeders: { build: (value: number | string) => String(value) },
-    leechers: { build: (value: number | string) => String(value) },
-    completed: { build: (value: number | string) => String(value) },
+    seeders: { build: (value: unknown) => String(value) },
+    leechers: { build: (value: unknown) => String(value) },
+    completed: { build: (value: unknown) => String(value) },
   },
 });
 

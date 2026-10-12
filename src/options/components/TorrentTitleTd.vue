@@ -210,8 +210,8 @@ function canAdvanceSearch(site: TSupportSocialSite) {
       </div>
     </div>
     <div
-      class="t_row"
       v-if="configStore.searchEntifyControl.showTorrentTag || configStore.searchEntifyControl.showTorrentSubtitle"
+      class="t_row"
     >
       <!-- 种子标签信息 -->
       <div class="flex-0-0">

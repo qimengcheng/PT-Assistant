@@ -17,8 +17,10 @@ export function toAntdSortOrder(order: "asc" | "desc" | undefined | null): "asce
 }
 
 /** 嵌套 key 取值（"siteUserConfig.sortIndex" → item.siteUserConfig.sortIndex） */
-function getByPath(row: any, path: string): any {
-  return path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), row);
+function getByPath(row: unknown, path: string): unknown {
+  return path
+    .split(".")
+    .reduce<unknown>((acc, k) => (acc == null ? acc : (acc as Record<string, unknown>)[k]), row);
 }
 
 /**
@@ -29,20 +31,42 @@ function getByPath(row: any, path: string): any {
  * antd 内部 getSortFunction 返回 false，排序器被静默跳过（箭头动、数据不排）。
  * 见 AGENTS.md 里记的 antdv-next 踩坑表。
  */
-export function makeSorter<T = any>(path: string) {
+export function makeSorter<T>(path: string) {
   return (a: T, b: T): number => {
     const pick = (row: T) => {
       const v = getByPath(row, path);
-      return v && typeof v === "object" ? ((v as any).name ?? "") : v;
+      return v && typeof v === "object" ? ((v as { name?: unknown }).name ?? "") : v;
     };
     const ra = pick(a);
     const rb = pick(b);
-    const na = typeof ra === "number" ? ra : Number.parseFloat(ra);
-    const nb = typeof rb === "number" ? rb : Number.parseFloat(rb);
+    const na = typeof ra === "number" ? ra : Number.parseFloat(ra as string);
+    const nb = typeof rb === "number" ? rb : Number.parseFloat(rb as string);
     if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
     return String(ra ?? "").localeCompare(String(rb ?? ""), "zh-CN");
   };
 }
+
+/**
+ * 本地表头 = 适配层自己消费的四个字段。
+ *
+ * 这里**故意不带索引签名**：列定义上还夹带着 title / width / align / ellipsis /
+ * customRender 等一整套 antd 列字段，它们只被原样透传，结构上无可校验（页面写在
+ * `computed(() => [...])` 的字面量数组里，`align: "center"` 早已被放宽成 `string`，
+ * 套 antd 的 `AlignType` 会让每个页面都报错）。加了索引签名还会连带要求
+ * 「源类型必须有隐式索引签名」，页面那三个 `interface ITableHeader` 全得改写。
+ * 所以这一层只钉住 key / sortable / sortOrder / compare —— 那个「不带 sortOrder 键
+ * 才是非受控」的语义必须由类型保证，不能靠约定。
+ */
+export type TLocalColumnHeader<T> = {
+  key: string;
+  /** 默认 true，只有显式 false 的列不排（action 列那类） */
+  sortable?: boolean;
+  /** Vuetify 表头残留：列显隐多选里用它标记「这一列不许隐藏」，适配层只负责丢掉它 */
+  props?: { disabled?: boolean };
+  sortOrder?: "ascend" | "descend" | null;
+  /** 显示值 ≠ 存储值时自带比较函数，会顶掉按 dataIndex 取值的默认实现 */
+  compare?: (a: T, b: T) => number;
+};
 
 /**
  * 把「本地表头定义」转成 antd columns。
@@ -56,8 +80,8 @@ export function makeSorter<T = any>(path: string) {
  * @param sortOrderMap 列 key → antd sortOrder（受控排序时传入；未出现在 map 中的列不带 sortOrder，保持非受控）
  * @param options.multiSort 多列排序：sortable 列的 sorter 包装为 { compare, multiple: 列序号 + 1 }
  */
-export function toTableColumns<T = any>(
-  header: Array<Record<string, any>>,
+export function toTableColumns<T>(
+  header: ReadonlyArray<TLocalColumnHeader<T>>,
   sortOrderMap: Record<string, "ascend" | "descend" | null> = {},
   options: { multiSort?: boolean } = {},
 ): TableColumnsType<T> {
@@ -83,7 +107,9 @@ export function toTableColumns<T = any>(
         ...(sortOrder !== undefined ? { sortOrder } : {}),
       };
     },
-  ) as TableColumnsType<T>;
+    // 透传袋子里的值在类型上是 unknown，与 antd 列的具体 prop 类型不可比 —— 这一处断言
+    // 跨过的是「原样保留未知列字段」这件事本身，不是把校验漏给了自己写的四个字段。
+  ) as unknown as TableColumnsType<T>;
 }
 
 /**

@@ -28,5 +28,14 @@ export interface ILoggerItem {
   level?: "log" | "trace" | "debug" | "info" | "warn" | "error"; // 日志级别（不传入时默认为 log）
   module?: string; // 产生该日志的模块
   msg: string; // 日志内容
-  data?: any;
+  data?: unknown; // 附带的上下文（调试页那一列原样 JSON 出来）
+}
+
+declare global {
+  /**
+   * 引导脚本（content.ts）与按需加载的 content-app 是两次独立的模块求值，参数只能先挂在
+   * globalThis 上。声明出来，那三处读写就不必再写 `(globalThis as any)`。
+   * 必须是 `var`：`let` / `const` 声明不会真的挂到 globalThis 上。
+   */
+  var __PTD_CONTENT_PROPS__: Record<string, unknown> | null | undefined;
 }

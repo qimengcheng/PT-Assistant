@@ -853,10 +853,20 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
           // 刚发出去还没进列表）不动它
           if (shouldPauseReseed(status.verdict)) {
             wrong++;
-            try {
-              if (!(await sendMessage("pauseClientTorrent", { downloaderId, id: found?.id }))) pauseFailed++;
-            } catch {
-              pauseFailed++;
+            /**
+             * `found` 这半是消息类型逼出来的：`pauseClientTorrent` 的 `id` 原先标 `any`，
+             * 于是这里写的是 `found?.id` —— 认不出这条时它会把 `undefined` 当 id 发出去，
+             * 下载器回一句失败、那条还被算进「暂停失败，请在下载器中手动暂停」，而那台里
+             * 根本没有这条种子。判 wrong 的前提本来就是「在列表里看到了它」
+             * （`judgeReseedTorrent` 拿不到 probe 时回的是 notFound，见 seedVerify.ts:114），
+             * 所以没有对象就没有可暂停的东西，直接跳过而不是发一个假 id。
+             */
+            if (found) {
+              try {
+                if (!(await sendMessage("pauseClientTorrent", { downloaderId, id: found.id }))) pauseFailed++;
+              } catch {
+                pauseFailed++;
+              }
             }
           }
         }

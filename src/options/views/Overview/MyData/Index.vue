@@ -26,7 +26,7 @@ import {
   TrophyOutlined,
   UnorderedListOutlined,
 } from "@antdv-next/icons";
-import { EResultParseStatus, type ISiteUserConfig, type IUserInfo, type TSiteID } from "@ptd/site";
+import { EResultParseStatus, type TSiteID } from "@ptd/site";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
@@ -48,7 +48,13 @@ import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
 import LevelProgressDialog from "./LevelProgressDialog.vue";
 
 import { bonusFullText, formatRatio } from "./utils/format.ts";
-import { tableData, isTableLoading, cancelFlushSiteLastUserInfo, flushSiteLastUserInfo } from "./utils/lastUserData.ts";
+import {
+  tableData,
+  isTableLoading,
+  cancelFlushSiteLastUserInfo,
+  flushSiteLastUserInfo,
+  type IUserInfoItem,
+} from "./utils/lastUserData.ts";
 
 // 本文件名为 Index.vue，与 SearchEntity/Index.vue 同名；<script setup> 推断出的
 // __name 会是 "Index"，导致 App.vue 的 KeepAlive :include 无法区分两者（会互相顶掉缓存）。
@@ -221,11 +227,6 @@ const joinTimeFormatOptions = computed(() =>
   })),
 );
 
-interface IUserInfoItem extends IUserInfo {
-  siteUserConfig: ISiteUserConfig;
-  siteName: string;
-}
-
 const {
   tableWaitFilterRef,
   tableFilterRef,
@@ -304,8 +305,9 @@ const tableRowSelection = computed(() => ({
   onChange: (keys: (string | number)[]) => {
     tableSelected.value = keys as TSiteID[];
   },
-  // 对应 v-data-table 的 item-selectable="selectable"
-  getCheckboxProps: (record: IUserInfoItem) => ({ disabled: !(record as any).selectable }),
+  // 对应 v-data-table 的 item-selectable="selectable"（判据在 utils/lastUserData.ts：
+  // isDead / isOffline 的站点不让选）
+  getCheckboxProps: (record: IUserInfoItem) => ({ disabled: !record.selectable }),
 }));
 
 /**
@@ -454,9 +456,9 @@ const showLevelProgressDialog = ref(false);
     <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
         <!-- 刷新，取消刷新 -->
-        <a-button type="primary" v-if="runtimeStore.isUserInfoFlush" @click="cancelFlushSiteLastUserInfo"><template #icon><StopOutlined /></template><span>{{ t('MyData.index.flushCancel') }}</span></a-button>
+        <a-button v-if="runtimeStore.isUserInfoFlush" type="primary" @click="cancelFlushSiteLastUserInfo"><template #icon><StopOutlined /></template><span>{{ t('MyData.index.flushCancel') }}</span></a-button>
 
-        <a-button type="primary" v-else @click="multiFlush"><template #icon><SyncOutlined /></template><span>{{ t('MyData.index.flushSelectSite') }}</span></a-button>
+        <a-button v-else type="primary" @click="multiFlush"><template #icon><SyncOutlined /></template><span>{{ t('MyData.index.flushSelectSite') }}</span></a-button>
 
         <a-button :disabled="tableSelected.length === 0" @click="multiOpen"><template #icon><ExportOutlined /></template><span>{{ t('MyData.index.multiOpen') }}</span></a-button>
 

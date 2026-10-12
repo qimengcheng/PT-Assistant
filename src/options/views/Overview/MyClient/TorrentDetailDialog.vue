@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   CheckCircleFilled,
@@ -73,7 +73,7 @@ const priorityItems = computed<Array<{ label: string; value: TorrentFilePriority
   { label: t("MyClient.detail.priorityHighest"), value: "highest" },
 ]);
 
-const trackerStatusIcon: Record<CTrackerState, any> = {
+const trackerStatusIcon: Record<CTrackerState, Component> = {
   unknown: QuestionCircleOutlined,
   working: CheckCircleFilled,
   updating: SyncOutlined,
@@ -429,8 +429,8 @@ function formatTimestamp(timestamp: number | undefined): string {
       <!-- 文件管理 -->
       <div v-else-if="activeTab === 'files'">
         <a-table
-          bordered
           v-if="filesLoading || files.length > 0"
+          bordered
           class="detail-table"
           :loading="filesLoading"
           :columns="fileColumns"
@@ -463,8 +463,8 @@ function formatTimestamp(timestamp: number | undefined): string {
       <!-- Peers -->
       <div v-else-if="activeTab === 'peers'">
         <a-table
-          bordered
           v-if="peersLoading || peers.length > 0"
+          bordered
           class="detail-table"
           :loading="peersLoading"
           :columns="peerColumns"
@@ -506,8 +506,8 @@ function formatTimestamp(timestamp: number | undefined): string {
         </a-space>
 
         <a-table
-          bordered
           v-if="trackersLoading || trackers.length > 0"
+          bordered
           class="detail-table"
           :loading="trackersLoading"
           :columns="trackerColumns"

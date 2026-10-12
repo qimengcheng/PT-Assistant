@@ -58,7 +58,7 @@ function injectSfcStyles(document: Document, shadowRoot: ShadowRoot) {
 }
 
 
-export function mountApp(document: Document, data: Record<string, any> = {}) {
+export function mountApp(document: Document, data: Record<string, unknown> = {}) {
   // 创建挂载点 + shadow DOM：把扩展样式与站点样式彻底隔离
   const contentRoot = document.createElement("div");
   const shadowRoot = contentRoot.attachShadow({ mode: "open" });

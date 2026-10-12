@@ -58,8 +58,8 @@ watch(formValid, (v) => emits("update:form-valid", v), { immediate: true });
  * （CustomSolutionDialog.vue:83 也是这么写的）。只写一个参数时拿到的是 rule，
  * 判据会把 "[object Object]" 当地址去跑正则 —— 合法的地址也会被拒（台架第一轮就是这么撞出来的）。
  */
-function toAsyncValidator(check: (v: any) => boolean | string) {
-  return (_rule: any, value: any) => {
+function toAsyncValidator(check: (v: unknown) => boolean | string) {
+  return (_rule: unknown, value: unknown) => {
     const result = check(value);
     return result === true ? Promise.resolve() : Promise.reject(new Error(String(result)));
   };

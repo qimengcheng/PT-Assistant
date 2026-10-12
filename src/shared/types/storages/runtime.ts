@@ -1,7 +1,7 @@
 /**
  * 此文件用于描述 sessionStorage['__ptd_runtime_store'] 中字段格式
  */
-import type { ISearchResult, ITorrent, TSiteID } from "@ptd/site";
+import type { IAdvanceKeywordSearchConfig, ISearchResult, ITorrent, TSiteID } from "@ptd/site";
 import type { IMediaServerItem, IMediaServerSearchResult } from "@ptd/mediaServer";
 
 import type { TMediaServerKey, TSearchSnapshotKey, TSolutionKey } from "./metadata.ts";
@@ -17,7 +17,11 @@ export interface ISearchResultTorrent extends ITorrent {
 export interface ISearchPlanStatus extends Pick<ISearchResult, "status" | "statusMsg"> {
   siteId: TSiteID;
   searchEntryName: string;
-  searchEntry: Record<string, any>;
+  /**
+   * 这一条搜索入口的配置。界面上还要读它的 `name` 当显示名（站点定义里那批
+   * searchEntries 的每一项都带），而 `IAdvanceKeywordSearchConfig` 本身没有这一项，就地补上。
+   */
+  searchEntry: IAdvanceKeywordSearchConfig & { name?: string };
   queueAt?: number;
   queuePriority?: number;
   startAt?: number;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref } from "vue";
+import { onUnmounted, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { ApiOutlined, CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
 
@@ -19,7 +19,7 @@ enum connectStatus {
   error = "error",
 }
 
-const connectBtnMap: Record<connectStatus, { icon: any; color: string }> = {
+const connectBtnMap: Record<connectStatus, { icon: Component; color: string }> = {
   [connectStatus.default]: { icon: ApiOutlined, color: "default" },
   [connectStatus.success]: { icon: CheckCircleOutlined, color: "success" },
   [connectStatus.error]: { icon: CloseCircleOutlined, color: "danger" },

@@ -25,7 +25,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { buildSortOrderMap, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
 import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
-import type { ISearchResultTorrent } from "@/shared/types.ts";
+import type { IConfigPiniaStorageSchema, ISearchResultTorrent } from "@/shared/types.ts";
 import { categoryKindLabelKey, categoryKindOf, compareCategory } from "@/shared/category.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
@@ -91,7 +91,7 @@ interface ITableColumn {
   /** 默认 true（与 Vuetify 一致：只要有 key 就可排序），action 列显式关掉 */
   sortable?: boolean;
   /** 显示值 ≠ 存储值时自带比较函数（toTableColumns 会用它顶掉按 dataIndex 取值的默认实现） */
-  compare?: (a: any, b: any) => number;
+  compare?: (a: ISearchResultTorrent, b: ISearchResultTorrent) => number;
   props?: { disabled?: boolean };
 }
 
@@ -110,17 +110,17 @@ const siteCategoryMaps = computed(() => {
   return out;
 });
 
-function categoryCell(record: any) {
-  return { raw: record?.category, siteMap: siteCategoryMaps.value[record?.site] };
+function categoryCell(record: ISearchResultTorrent) {
+  return { raw: record.category, siteMap: siteCategoryMaps.value[record.site] };
 }
 
-function categoryKindLabel(record: any): string {
+function categoryKindLabel(record: ISearchResultTorrent): string {
   return t(categoryKindLabelKey(categoryKindOf(categoryCell(record))));
 }
 
 /** 与原样叫法一致时不挂 tooltip：整列几十个悬停组件没有信息量 */
-function categoryOriginal(record: any): string {
-  const raw = String(record?.category ?? "").trim();
+function categoryOriginal(record: ISearchResultTorrent): string {
+  const raw = String(record.category ?? "").trim();
   return raw && raw !== categoryKindLabel(record) ? raw : "";
 }
 
@@ -143,7 +143,8 @@ const fullTableHeader = computed(
         align: "center",
         // 显示的是折过的类别，排序也必须按折过的类别排：按原样叫法排会把拉丁写法的
         // 「Movies」和中文写法的「电影」分到列表两头，同一类内容被劈开
-        compare: (a: any, b: any) => compareCategory(categoryCell(a), categoryCell(b)),
+        compare: (a: ISearchResultTorrent, b: ISearchResultTorrent) =>
+          compareCategory(categoryCell(a), categoryCell(b)),
       },
       // width 是给下面那条进度条留的：这一列由「大小」那一行数字定宽时只有六十来像素，
       // 图标占掉 16 之后条子只剩四十多，看着就是"进度条太短"。
@@ -211,7 +212,7 @@ const {
   clearOnEmpty: true,
 });
 
-const tableHeader = computed<Record<string, any>[]>(() => {
+const tableHeader = computed(() => {
   // 旧 storage 里 columns 可能缺失/非数组（Vuetify 时期格式），守卫回退为全部列
   const savedColumns = configStore.tableBehavior?.SearchEntity?.columns;
   const visibleColumns: string[] = Array.isArray(savedColumns) ? savedColumns : [];
@@ -220,8 +221,8 @@ const tableHeader = computed<Record<string, any>[]>(() => {
   );
 
   // 列生成走公共 toTableColumns：enableTableMultiSort 时 sorter 包成 { compare, multiple }
-  return toTableColumns(
-    visibleHeader as Record<string, any>[],
+  return toTableColumns<ISearchResultTorrent>(
+    visibleHeader,
     buildSortOrderMap(sortBy.value),
     { multiSort: configStore.enableTableMultiSort },
   );
@@ -230,13 +231,13 @@ const tableHeader = computed<Record<string, any>[]>(() => {
 /** a-select(mode="multiple") 的 options 形如 { value, label } */
 const columnOptions = computed(() => fullTableHeader.value.map((item) => ({ value: item.key, label: item.title })));
 
-function onColumnsChange(value: any) {
+function onColumnsChange(value: string[]) {
   configStore.updateTableBehavior("SearchEntity", "columns", value);
 }
 
 /** 显示偏好开关：原来挂在 v-switch 的 v-model + @update:model-value="$save()" 上 */
-function onDisplayPreferenceChange(key: string, checked: any) {
-  (configStore.searchEntifyControl as Record<string, any>)[key] = !!checked;
+function onDisplayPreferenceChange(key: TDisplayPreferenceKey, checked: unknown) {
+  configStore.searchEntifyControl[key] = !!checked;
   configStore.$save();
 }
 
@@ -291,10 +292,10 @@ function onStatusFilterChange(value: unknown) {
  * 防御性约束（v0.7.0）：过滤器/数据异常时「宁可多显示，绝不清空表格」——
  * 单行判断抛错按通过处理，整体 filter 抛错回退为未过滤列表。
  */
-const tableItems = computed<any[]>(() => {
-  const items = (runtimeStore.search.searchResult ?? []) as any[];
+const tableItems = computed(() => {
+  const items = runtimeStore.search.searchResult ?? [];
   try {
-    return items.filter((item: any) => {
+    return items.filter((item) => {
       if (!item || typeof item !== "object") return false; // 脏条目直接丢弃
       try {
         return tableFilterFn(null, tableFilterRef.value, { raw: item });
@@ -408,7 +409,7 @@ const tablePagination = computed(() =>
 /** a-table 没有 v-model，行选择通过 rowSelection.selectedRowKeys + onChange 双向同步 */
 const tableSelectedRowKeys = computed(() => tableSelectedRaw.value.map((x) => x.uniqueId));
 
-function onRowSelectionChange(_keys: any, rows: any[]) {
+function onRowSelectionChange(_keys: unknown, rows: ISearchResultTorrent[]) {
   tableSelectedRaw.value = rows;
 }
 
@@ -623,29 +624,42 @@ function cancelSearchQueue() {
   // 世代号让它回来后自行放弃，否则界面表现是「已取消却还在冒新结果」而 isSearching 已 false。
   bumpSearchGeneration();
   // 将搜索队列中状态设置为跳过
-  for (const key of Object.keys(runtimeStore.search.searchPlan)) {
-    // @ts-ignore
-    if (runtimeStore.search.searchPlan[key]!.status === EResultParseStatus.waiting) {
-      // @ts-ignore
-      runtimeStore.search.searchPlan[key]!.status = EResultParseStatus.passParse;
-      // @ts-ignore
-      runtimeStore.search.searchPlan[key]!.statusMsg = "i18n.userCancel";
+  for (const plan of Object.values(runtimeStore.search.searchPlan)) {
+    if (plan.status === EResultParseStatus.waiting) {
+      plan.status = EResultParseStatus.passParse;
+      plan.statusMsg = "i18n.userCancel";
     }
   }
 
   runtimeStore.search.isSearching = false;
 }
 
-// maxTagCountBeforeGroup / hiddenTagNames 不是开关（下面另有输入控件）。
-// limitTorrentTitleTdWidth 也一并藏起来：标题列现在**一律**限宽（见 .search-entity-title-limit），
-// 这个开关失去了意义；config 字段保留，不动存量数据（同 UiWindow 里那两个已摘掉的开关的做法）。
-const tableNonBooleanControlKey = ["maxTagCountBeforeGroup", "hiddenTagNames", "limitTorrentTitleTdWidth"];
+type TSearchEntifyControl = IConfigPiniaStorageSchema["searchEntifyControl"];
 
-// 过滤出表格控制中非布尔类型的键
+/**
+ * 界面上那一排开关对应的键 —— 判据是「config 类型里值为布尔的那几键」，再排掉
+ * limitTorrentTitleTdWidth：标题列现在**一律**限宽（见 .search-entity-title-limit），
+ * 这个开关失去了意义；config 字段保留，不动存量数据（同 UiWindow 里那两个已摘掉的开关的做法）。
+ * maxTagCountBeforeGroup / hiddenTagNames 由「值为布尔」这一条自然筛掉，不必点名 ——
+ * 原来它们写在一张字符串排除表里，表写错一个键名就会把数字/数组字段当开关写回。
+ */
+type TDisplayPreferenceKey = Exclude<
+  {
+    [K in keyof TSearchEntifyControl]-?: TSearchEntifyControl[K] extends boolean ? K : never;
+  }[keyof TSearchEntifyControl],
+  "limitTorrentTitleTdWidth"
+>;
+
+/** 值确实是布尔、但界面上不给开关的那几键（它们已经不在 TDisplayPreferenceKey 里，所以按全键名写） */
+const hiddenDisplayPreferenceKeys: (keyof TSearchEntifyControl)[] = ["limitTorrentTitleTdWidth"];
+
 const filteredTableBooleanControlKeys = computed(() => {
-  return Object.keys(configStore.searchEntifyControl).filter(
-    (key) => tableNonBooleanControlKey.indexOf(key) === -1,
-  ) as (keyof typeof configStore.searchEntifyControl)[];
+  const control = configStore.searchEntifyControl as Record<string, unknown>;
+  // Object.keys 只会给你 string[]，收窄到上面那个键的合法集靠这一次断言；
+  // typeof 那一趟保证断言不是空口说的（筛掉的正是非布尔那两键）。
+  return (Object.keys(control) as TDisplayPreferenceKey[]).filter(
+    (key) => typeof control[key] === "boolean" && hiddenDisplayPreferenceKeys.indexOf(key) === -1,
+  );
 });
 
 const hiddenTagNamesText = computed({

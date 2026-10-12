@@ -79,7 +79,7 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
     pageSizePicked?: boolean;
     columns?: string[];
     sortBy?: ISortBy[];
-  }> = computed(() => (configStore.tableBehavior as Record<string, any>)[tableKey] ?? {});
+  }> = computed(() => configStore.tableBehavior[tableKey] ?? {});
 
   const itemsPerPage = computed(() => {
     const raw = behavior.value.itemsPerPage;

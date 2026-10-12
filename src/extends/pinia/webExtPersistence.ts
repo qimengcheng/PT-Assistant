@@ -9,11 +9,11 @@ export async function persistent<T>(key: string, newValue: T, storage: chrome.st
   await chrome.storage[storage].set({ [key]: JSON.parse(JSON.stringify(newValue)) });
 }
 
-export interface restoreOptions<T = any> {
+export interface restoreOptions<T = unknown> {
   initialValue?: T | Ref<T>;
   storage?: chrome.storage.AreaName;
   writeDefaults?: boolean;
-  onError?: null | ((e: any) => void);
+  onError?: null | ((e: unknown) => void);
 }
 
 export async function restore<T>(key: string, options: restoreOptions<T> = {}): Promise<T> {
@@ -66,7 +66,7 @@ export interface PersistedStateOptions {
    */
   afterRestore?: (context: PiniaPluginContext) => void;
 
-  onRestoreError?: (e: any) => void;
+  onRestoreError?: (e: unknown) => void;
 }
 
 declare module "pinia" {
@@ -180,7 +180,7 @@ export function piniaWebExtPersistencePlugin(context: PiniaPluginContext) {
     // 2) 水合完成前的 mutation 反正会被 restore 的 $patch 直接覆盖，提前订阅只是白写。
     // afterRestore 里显式调用的 $save 不受影响 —— 它走 hydrated 已置位的正常路径。
     restorePromise.then(() => {
-      store.$subscribe((mutation, state: any) => {
+      store.$subscribe((mutation, state) => {
         if (autoSaveType.includes(mutation.type)) {
           $save(state);
         }

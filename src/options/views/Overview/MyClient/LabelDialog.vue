@@ -57,8 +57,8 @@ async function confirmSetLabel() {
     :cancel-text="t('common.dialog.cancel')"
     :ok-button-props="{ color: 'green', variant: 'text', iconPlacement: 'start', icon: h(CheckCircleOutlined) }"
     :cancel-button-props="{ color: 'blue', variant: 'text', iconPlacement: 'start', icon: h(CloseCircleOutlined) }"
-    @ok="confirmSetLabel"
     :after-open-change="(open: boolean) => open && dialogEnter()"
+    @ok="confirmSetLabel"
   >
 
     <a-divider class="ma-0" />

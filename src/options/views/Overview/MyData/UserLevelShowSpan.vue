@@ -132,8 +132,8 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
     <ClockCircleOutlined class="level-require-icon" :title="t('levelRequirement.interval')" />
     <span
       :title="getIntervalDisplay(levelRequirement.interval).title"
-      @dblclick="toggleIntervalDisplay"
       style="cursor: pointer; user-select: none"
+      @dblclick="toggleIntervalDisplay"
     >
       {{ getIntervalDisplay(levelRequirement.interval).text }} </span>;
   </template>
@@ -193,8 +193,8 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
     <DollarOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.bonus')" />
     <span
       :title="formatNumber(Number(levelRequirement.bonus) || 0)"
-      @dblclick="toggleNumberSimplification"
       style="cursor: pointer; user-select: none"
+      @dblclick="toggleNumberSimplification"
     >
       {{ formatBonus("bonus") }} </span>;
   </template>
@@ -203,8 +203,8 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
     <ThunderboltOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.seedingBonus')" />
     <span
       :title="formatNumber(levelRequirement.seedingBonus)"
-      @dblclick="toggleNumberSimplification"
       style="cursor: pointer; user-select: none"
+      @dblclick="toggleNumberSimplification"
     >
       {{ formatBonus("seedingBonus") }} </span>;
   </template>

@@ -59,7 +59,7 @@ const dialogTitle = computed(() => {
 });
 
 const currentDate = formatDate(+new Date(), "yyyy-MM-dd");
-const jsonData = ref<any>({});
+const jsonData = ref<Partial<IShowUserInfo>>({});
 
 interface IShowUserInfo extends IUserInfo {
   date: string;

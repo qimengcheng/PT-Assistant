@@ -5,7 +5,7 @@ import { computedAsync } from "@vueuse/core";
 import { cloneDeep } from "es-toolkit";
 import type { FormInstance } from "antdv-next";
 import { FilterOutlined } from "@antdv-next/icons";
-import { getBackupServer, getBackupServerMetaData, type IBackupMetadata } from "@ptd/backupServer";
+import { getBackupServer, getBackupServerMetaData, type IBackupConfig, type IBackupMetadata } from "@ptd/backupServer";
 import type { IBackupRetention } from "@ptd/backupServer";
 import { DEFAULT_BACKUP_RETENTION_SAMPLE_RULES, hasBackupRetentionToApply } from "@ptd/backupServer/utils.ts";
 
@@ -174,15 +174,17 @@ const retentionSummary = computed(() => {
   return summary.join(t("SetBackup.RetentionDialog.summary.separator"));
 });
 
-const clientMeta = computedAsync<IBackupMetadata<any>>(
+// getBackupServerMetaData 的返回形状是 IBackupMetadata<IBackupConfig>（不是某个具体服务器
+// 的那一套 —— 类型参数在 packages 那一侧就已经擦成公共形状了），所以这里不再自己补 an
+const clientMeta = computedAsync<IBackupMetadata<IBackupConfig>>(
   async () => {
     const clientType = clientConfig.value?.type;
     if (!clientType) {
-      return { requiredField: [] } as IBackupMetadata<any>;
+      return { requiredField: [] };
     }
     return await getBackupServerMetaData(clientType);
   },
-  { requiredField: [] } as IBackupMetadata<any>,
+  { requiredField: [] },
 );
 
 const formValid = ref<boolean>(false);
@@ -266,9 +268,9 @@ async function checkConnect() {
               v-model:value="clientConfig.config[metaField.key! as string]"
             />
             <a-switch
-              size="small"
               v-else-if="metaField.type === 'boolean'"
               v-model:checked="clientConfig.config[metaField.key! as string]"
+              size="small"
             />
           </a-form-item>
         </a-col>

@@ -22,7 +22,7 @@ import {
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
 } from "@antdv-next/icons";
-import type { TableColumnsType, TableRowSelection } from "antdv-next";
+import type { TableColumnsType, TablePaginationConfig, TableRowSelection } from "antdv-next";
 
 import {
   CTorrentState,
@@ -173,6 +173,20 @@ async function loadVisibleClientMeta() {
 }
 
 // ── table headers ─────────────────────────────────────────────────────────
+/**
+ * 本页的列定义。`toTableColumns` 只吃 key / sortable / props，`title` 给「自定义列」面板
+ * 显示、`align` / `width` 由适配层原样透传给 antd。
+ * 原先这里整条数组挂着 `as any[]`，于是列名拼错、档位写错都不报错。
+ */
+interface IMyClientColumn {
+  key: string;
+  title: string;
+  align?: "start" | "center" | "end";
+  width?: number;
+  sortable?: boolean;
+  props?: { disabled?: boolean };
+}
+
 const fullTableHeader = computed(
   () =>
     [
@@ -196,7 +210,7 @@ const fullTableHeader = computed(
         width: 120,
         props: { disabled: true },
       },
-    ] as any[],
+    ] as IMyClientColumn[],
 );
 
 /**
@@ -210,7 +224,7 @@ const tableHeader = computed<TableColumnsType<CTorrent>>(
   () =>
     toTableColumns<CTorrent>(
       fullTableHeader.value.filter(
-        (item) => item?.props?.disabled || (configStore.tableBehavior["MyClient"] as any)?.columns?.includes(item.key),
+        (item) => item?.props?.disabled || configStore.tableBehavior["MyClient"]?.columns?.includes(item.key),
       ),
       tableSortOrder.value,
     ),
@@ -218,9 +232,9 @@ const tableHeader = computed<TableColumnsType<CTorrent>>(
 
 /** 列显隐多选：v-model 走 configStore，setter 里调 updateTableBehavior 保持原「双写」语义 */
 const selectedColumnKeys = computed<string[]>({
-  get: () => (configStore.tableBehavior["MyClient"] as any)?.columns ?? [],
+  get: () => configStore.tableBehavior["MyClient"]?.columns ?? [],
   set: (v) => {
-    (configStore.tableBehavior["MyClient"] as any).columns = v;
+    configStore.tableBehavior["MyClient"].columns = v;
     configStore.updateTableBehavior("MyClient", "columns", v);
   },
 });
@@ -413,13 +427,13 @@ const tablePage = ref(1);
 // 换筛选条件要回到第 1 页：分页是受控的（tablePage 只由翻页回调写），
 // 停在第 5 页时筛到只剩两行，切出来的那一页是空的 —— 看着像筛坏了而不是筛窄了。
 watch([searchText, stateFilter], () => (tablePage.value = 1));
-const pageSize = computed(() => (configStore.tableBehavior["MyClient"] as any)?.itemsPerPage ?? 25);
+const pageSize = computed(() => configStore.tableBehavior["MyClient"]?.itemsPerPage ?? 25);
 
 // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 /** 他挑过一档之后仍要量：那一档以实测容量为上限 */
 const pickedSize = computed(() => {
-  const behavior = (configStore.tableBehavior as Record<string, any>).MyClient;
+  const behavior = configStore.tableBehavior["MyClient"];
   return isPageSizePicked(behavior?.itemsPerPage, 25, behavior?.pageSizePicked);
 });
 const { fitted: fitPageSize } = useAutoFitPageSize({
@@ -439,16 +453,17 @@ const tablePagination = computed(() =>
   }),
 );
 
-const tableSortOrder = computed(() =>
-  buildSortOrderMap((configStore.tableBehavior["MyClient"] as any)?.sortBy),
-);
+const tableSortOrder = computed(() => buildSortOrderMap(configStore.tableBehavior["MyClient"]?.sortBy));
 
-function handleTableChange(pagination: any, _filters: any, sorter: any) {
+/** a-table 的 @change 第三参：开多列排序时是数组。这里只吃 order 与 columnKey 两件 */
+type TSorterItem = { order?: "ascend" | "descend"; columnKey?: string | number };
+
+function handleTableChange(pagination: TablePaginationConfig, _filters: unknown, sorter: TSorterItem | TSorterItem[]) {
   const s = Array.isArray(sorter) ? sorter : [sorter];
   const next: { key: string; order: "asc" | "desc" }[] = [];
   for (const item of s) {
     if (item?.order && item?.columnKey) {
-      next.push({ key: item.columnKey as string, order: item.order === "descend" ? "desc" : "asc" });
+      next.push({ key: String(item.columnKey), order: item.order === "descend" ? "desc" : "asc" });
     }
   }
   configStore.updateTableBehavior("MyClient", "sortBy", next);

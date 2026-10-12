@@ -278,9 +278,9 @@ function rowExpandable(record: IFieldRow) {
 
         <div v-else ref="detailBodyRef" class="site-defs-table">
           <a-table
-            bordered
             v-if="fieldRows.length > 0"
             v-model:expanded-row-keys="expandedKeys"
+            bordered
             :columns="fieldColumns"
             :data-source="fieldRows"
             :pagination="false"

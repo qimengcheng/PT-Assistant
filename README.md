@@ -29,7 +29,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 站点定义 | 340 个 definition，import.meta.glob 按需加载 | **原样平移，零修改**（packages/site） |
 | Buffer polyfill | 全局注入（background 464KB） | 不注入 |
 | i18n | vue-i18n 双语言全量注册（~118KB） | vue-i18n 双语言全量注册（默认语言静态 import，切换语言动态 import） |
-| 测试 | 无 | 类型检查 + CI 守卫（静态扫描 + 行为断言，条数见「工程化体系」）+ 产物 smoke test（ESLint / Vitest 尚未引入） |
+| 测试 | 无 | 类型检查 + CI 守卫（静态扫描 + 行为断言，条数见「工程化体系」）+ 产物 smoke test + ESLint（10，扁平配置，只有 error 与「我方 warning」判失败）；Vitest 尚未引入 |
 
 > **UI 栈是 antdv-next**，走 CSS-in-JS **运行时注入样式**，
 > 没有「构建期拆 CSS chunk + 动态 `<link>` 注入」那条链路 ——
@@ -67,7 +67,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 防线 ⑩（行为断言） | `scripts/check-category-map.mjs` | 搜索结果「分类」的折类判据：同一内容的各种写法必须折到同一类、顺序敏感的几对不许互撞（纪录片/电视剧、动漫/电影、软件/游戏、综艺/电视剧）、站点覆盖优先于规则，以及 `common.categoryKind.*` 这批**动态拼出来的** i18n 键两侧都在（防线 ③ 看不见这种键） |
 | ~~防线 ⑪~~ | ~~`scripts/check-confirm-danger.mjs`~~ **v0.90.5 撤下** | 确认框那颗键走了 legacy 的 `okType: "danger"` —— 出来是红描边而非实心红，class 里照样带 `.ant-btn-dangerous`（AGENTS.md §3.4）。脚本删了，判据由防线 ⑬ 接手：脚本侧 `no-restricted-syntax` 选 `Property[key.name='okType']`，模板侧 `vue/no-restricted-static-attribute` + `vue/no-restricted-v-bind`（`:ok-type` / `:okType` / `v-bind:ok-type`）。**不能整条换成 esquery** 的原因：核心 `no-restricted-syntax` 看不见 Vue 模板 AST（实测三条模板 selector 全零命中），见 PLAYBOOK §36 |
 | 防线 ⑫ | `scripts/check-notification-ids.mjs` | 系统通知：`create` 必须带 id、监听器必须按 id 前缀认领。`chrome.notifications.onClicked` 是全局事件、不按 id 分发，所以一个不看 `notificationId` 的监听器会把别处的通知接走（点「辅种完成」跳去 GitHub 下载页就是这么来的；AGENTS.md §3.4 表第 12 行） |
-| 防线 ⑬ | `scripts/check-eslint.mjs` | ESLint 10（`eslint.config.mjs` = `@eslint/js` + `typescript-eslint` + `eslint-plugin-vue`），**只有 error 判失败**：接入首轮量到 129 error / 584 warn，error 已全部修完（含 1 处模板解析错、1 处 v-model 写 prop、1 处向类型系统撒谎的 `find(...)!`），warning 留着逐条收。它同时是 PLAYBOOK §9「禁原生 confirm/alert/prompt」、§11「别 import dayjs」、站内信正文「禁 v-html」这三处**第一次真有的守卫**。自检：`src` / `packages` / `scripts` 任一块一个文件都没扫到就 FAIL —— 配置写歪时「一条 error 都没有」是假 PASS |
+| 防线 ⑬ | `scripts/check-eslint.mjs` + `scripts/eslint-packages-baseline.json` | ESLint 10（`eslint.config.mjs` = `@eslint/js` + `typescript-eslint` + `eslint-plugin-vue`）。判据分三档，分界线是**这份代码谁写的**：① error 一律 FAIL（全仓）；② 我方（`src` / `scripts` / 根配置）**连 warning 都不许留** —— v0.90.9 把 `no-explicit-any`（我方那份 221 条 → 0）与 `ban-ts-comment`（10 → 0）逐文件收口后升成 error，其余观感类也清干了；③ `packages/**` 是上游零修改平移件，那一块按基线快照**逐规则**只拦回涨（现记 407 条 / 14 条规则；按规则记而不记总数，是因为清掉一条 `prefer-const` 会腾出总数额度，就会放过一条新进的 `any`）。要留一处 `any` 得写行级 disable 并把实测依据讲清楚（先例：`TKonvaConfig` —— 改成 `unknown` 会断 13 条 vue-tsc）。它同时是 PLAYBOOK §9「禁原生 confirm/alert/prompt」、§11「别 import dayjs」、站内信正文「禁 v-html」、AGENTS §3.4「确认框那颗键」这四处**第一次真有的守卫**。自检：`src` / `packages` / `scripts` 任一块一个文件都没扫到就 FAIL —— 配置写歪时「一条 error 都没有」是假 PASS；基线文件读不到同样 FAIL（缺它等于第 ③ 档没门禁） |
 | 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `build` job 也挂着它 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
@@ -136,9 +136,12 @@ PTD_SESSION=<会话标识> pnpm build  # 同上，只是换个会话桶（多个
 CI=true pnpm build  # 本地复现 CI 那条路径 → .output/chrome-mv3，不建联接、不清理（CI 自己就是这么跑的）
 PTD_SESSION=<会话标识> pnpm dev    # 开发模式（产物 → dist-<会话标识>-<版本号>/chrome-mv3；不加构建锁、不换指 dist-verify）
 pnpm dev            # 裸 dev 不经构建脚本，仍是 .output，且不碰 dist-verify
-pnpm zip            # 打包 zip（Chrome 产物 + Firefox 强制要求的 -sources.zip）
+pnpm zip            # wxt zip 的那条路，只打 Chrome 一档 → .output/ 下 *-chrome.zip 与 -sources.zip。
+                    # Firefox 不在本地打：由 CI 的 build job 统一产（AGENTS §2.1）。
+                    # 本地跑过一次就明白为什么 —— 那两个包带版本号、wxt build 只清子目录，
+                    # 每次 push 前跑一遍就在 .output 根下多攒两个（实测堆到 20.2 GB / 388 个）。
 pnpm compile        # vue-tsc 类型检查
-pnpm lint           # ESLint（扁平配置 eslint.config.mjs）：只有 error 判失败，warning 只报不拦
+pnpm lint           # ESLint（扁平配置 eslint.config.mjs）：error 与我方 warning 判失败，packages 那一片按基线只拦回涨（判据见防线 ⑬）
 pnpm lint:fix       # 同上但动手改 —— 范围写死在 src / scripts / 配置文件，不会碰 packages（上游件）也不会铺模板属性重排
 pnpm version:next   # 下一个该用的号，修订号档（等价 check-version.mjs --next）
 node scripts/check-version.mjs --next --type feat   # 下一个该用的号，feat 档（次版本 +1，修订号归零）
@@ -169,7 +172,7 @@ node scripts/versioned-commit.mjs -m "[agent名]-[模型名] @next feat: 描述"
 ## Roadmap（待办）
 
 - [ ] `reDownloadTorrent` 延时调度（站点最小重下载间隔，job-scheduler 已就位）
-- [ ] ESLint (eslint-plugin-vue + typescript-eslint) + Vitest
+- [ ] Vitest（ESLint 已于 v0.90.5 接入，判据见「工程化体系」的防线 ⑬）
 - [ ] axios → ofetch 迁移评估（新代码先行）
 - [ ] 模板清理完成后删掉 `src/entrypoints/options/vuetify-compat.css`（见「架构决策」的兼容层说明）
 

@@ -115,10 +115,30 @@ const formatDict = {
   size: (value: number) => formatSize(value),
 } as const;
 
+/**
+ * 两个 tooltip 回调实际读到的那几件。
+ *
+ * 为什么不直接用 ECharts 自己的 `CallbackDataParams`：那个类型挂在 dist 的深路径上
+ * （`echarts/types/dist/echarts`），从那里 import 会把一条非公开路径变成编译依赖；
+ * 而形参这一侧写成 `unknown` 才是这条回调的真实形状 —— ECharts 递进来的是
+ * `CallbackDataParams | CallbackDataParams[]`，这两页的 tooltip 全是 `trigger: "axis"`，
+ * 所以场上拿到的永远是数组，收到数组这一步只断言一次。
+ */
+type TTooltipParam = {
+  name: string;
+  marker: string;
+  seriesName: string;
+  seriesIndex: number;
+  color: string;
+  value: number;
+  data: number;
+};
+
 function createTotalInfoTooltipFormatter(type: (keyof typeof formatDict)[]) {
-  return function (params: any) {
+  return function (raw: unknown) {
+    const params = (Array.isArray(raw) ? raw : [raw]) as TTooltipParam[];
     let result = "<div>" + params[0].name + "</div>";
-    params.forEach(function (param: any) {
+    params.forEach(function (param) {
       const formatFunction = formatDict[type[param.seriesIndex] ?? "number"];
 
       result +=
@@ -235,7 +255,7 @@ const totalSiteSeedingInfoChartOptions = computed(() => {
 // Echart 不支持在 tooltip 中直接获取鼠标悬停的系列索引，所以需要通过 mousemove 事件手动记录
 const lastHoveredSeriesIndex = ref<number>(-1);
 
-function updateLastHoveredSeriesIndex(data: any) {
+function updateLastHoveredSeriesIndex(data: { seriesIndex?: number } | undefined) {
   lastHoveredSeriesIndex.value = data?.seriesIndex ?? -1;
 }
 
@@ -283,7 +303,8 @@ function createPerSiteChartOptionsFn(
         axisPointer: {
           type: "shadow",
         },
-        formatter: (params: any[]) => {
+        formatter: (raw: unknown) => {
+          const params = (Array.isArray(raw) ? raw : [raw]) as TTooltipParam[];
           let ret = "";
           const date = params?.[0]?.name ?? "No Date";
           ret += `<span class="font-weight-bold">${escapeHtml(date)}</span><br>`;

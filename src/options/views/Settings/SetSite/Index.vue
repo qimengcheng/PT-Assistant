@@ -292,7 +292,7 @@ const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 /** 他挑过一档之后仍要量：那一档以实测容量为上限 */
 const pickedSize = computed(() => {
   const behavior = configStore.tableBehavior.SetSite;
-  return isPageSizePicked(behavior?.itemsPerPage, 50, (behavior as any)?.pageSizePicked);
+  return isPageSizePicked(behavior?.itemsPerPage, 50, behavior?.pageSizePicked);
 });
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,

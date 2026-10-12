@@ -128,7 +128,7 @@ const localExtStore: IExtStore = {
    */
   async patchItem<K extends TExtensionStorageKey>(key: K, path: string, value: unknown): Promise<void> {
     await serialize(key, async () => {
-      const store = (await items[key].getValue()) as Record<string, any> | null;
+      const store = (await items[key].getValue()) as Record<string, unknown> | null;
       if (!store) {
         return;
       }

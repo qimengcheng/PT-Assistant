@@ -5,7 +5,12 @@ import { MutationType, defineStore } from "pinia";
 import { has, unset } from "es-toolkit/compat";
 import { usePreferredDark } from "@vueuse/core";
 
-import type { IConfigPiniaStorageSchema, supportThemeType } from "@/shared/types.ts";
+import type {
+  IConfigPiniaStorageSchema,
+  UiTableBehaviorItem,
+  UiTableBehaviorKey,
+  supportThemeType,
+} from "@/shared/types.ts";
 
 import { useMetadataStore } from "./metadata.ts";
 
@@ -82,7 +87,7 @@ export const useConfigStore = defineStore("config", {
     autoSaveType: [MutationType.direct, MutationType.patchObject, MutationType.patchFunction],
     afterRestore: (context) => {
       // 清理已废弃的配置项
-      const state = context.store.$state as any;
+      const state = context.store.$state as IConfigPiniaStorageSchema;
       let needsSave = false;
 
       // 清理已废弃的配置项
@@ -97,7 +102,7 @@ export const useConfigStore = defineStore("config", {
       if (state.tableBehavior?.DownloadHistory?.sortBy) {
         const sortBy = state.tableBehavior.DownloadHistory.sortBy;
         // 过滤掉基于 id 字段的排序项
-        const filteredSortBy = sortBy.filter((sort: any) => sort.key !== "id");
+        const filteredSortBy = sortBy.filter((sort) => sort.key !== "id");
 
         // 如果过滤后数组长度发生变化，说明移除了基于 id 的排序项
         if (filteredSortBy.length !== sortBy.length) {
@@ -500,9 +505,20 @@ export const useConfigStore = defineStore("config", {
     },
   },
   actions: {
-    updateTableBehavior(table: string, key: string, data: any) {
-      // @ts-ignore
-      this.tableBehavior[table][key] = data;
+    /**
+     * 写某一页的表格行为。泛型 K 把「键」和「值的形状」绑在一起：
+     * 原来这条签名是 `(table: string, key: string, data: any)` 再加一行 @ts-ignore，
+     * 于是键拼错、值形状不对全都静默通过（那个 @ts-ignore 挡的就是泛型下标赋值）。
+     */
+    updateTableBehavior<K extends keyof UiTableBehaviorItem>(
+      table: UiTableBehaviorKey,
+      key: K,
+      data: UiTableBehaviorItem[K],
+    ) {
+      // 桶不在默认 state 里时先补一个：原先直接 this.tableBehavior[table][key] = data，
+      // 新页面忘了在默认里登记就会当场 TypeError（Record<string, …> 让类型看不出这一点）。
+      const bucket = (this.tableBehavior[table] ??= {});
+      bucket[key] = data;
       if (this.saveTableBehavior) {
         this.$save();
       }

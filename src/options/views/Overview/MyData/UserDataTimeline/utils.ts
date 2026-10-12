@@ -234,6 +234,17 @@ export const timelineDataRef = useResetableRef<ITimelineData>(
   { shallow: true },
 );
 
+/**
+ * konva 那一套节点配置（text / divider / image / circle 各有各的 Config）。
+ *
+ * 这一处保留 any，是量出来的不是猜的：改成 `Record<string, unknown>` 之后，这两个文件里
+ * 读配置字段的地方全断 —— 13 条 vue-tsc 报错（`Property 'width' does not exist on type '{}'`、
+ * `The left-hand side of an arithmetic operation must be of type 'any, number...'`、
+ * `Type 'unknown' cannot be used as an index type`）。那些算式本来就在拿配置里的宽高做除法，
+ * 要收口就得给每个 helper 各写一份精确入参并补 `?? 0`，那是改运行时行为（NaN → 0），
+ * 而这一页是画在 canvas 上的、没法靠断言验观感。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type TKonvaConfig = Record<string, any>;
 export const text = (config: TKonvaConfig) => ({ x: 0, y: 0, fontSize: 24, fill: "#fff", ...config });
 export const divider = (config: TKonvaConfig) => ({ x: 0, y: 0, stroke: "#0000001f", strokeWidth: 2, ...config });

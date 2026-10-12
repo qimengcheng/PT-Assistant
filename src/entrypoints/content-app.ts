@@ -8,6 +8,6 @@
 import { mountApp } from "@/content-script/app/init.ts";
 
 export default defineUnlistedScript(() => {
-  const props = (globalThis as any).__PTD_CONTENT_PROPS__ ?? {};
+  const props = globalThis.__PTD_CONTENT_PROPS__ ?? {};
   mountApp(document, props);
 });

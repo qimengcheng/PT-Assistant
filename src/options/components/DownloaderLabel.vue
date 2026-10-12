@@ -40,7 +40,7 @@ const iconColor = computed(() => (downloader === "local" ? "#faad14" : "#9e9e9e"
     <div class="downloader_label">
       <div class="pa-0 downloader_icon">
         <img v-if="iconImage" class="downloader_avatar" :src="iconImage" alt="" />
-        <component v-else-if="IconComponent" :is="IconComponent" class="downloader_glyph" :style="{ color: iconColor }" />
+        <component :is="IconComponent" v-else-if="IconComponent" class="downloader_glyph" :style="{ color: iconColor }" />
       </div>
       <div class="downloader_info align-self-center">
         <span class="font-weight-bold">

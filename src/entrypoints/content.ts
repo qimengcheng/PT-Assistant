@@ -37,7 +37,7 @@ export default defineContentScript({
   async main() {
     // props 通过全局暂存传给 content-app：引导与 app 是两次独立的模块求值，
     // 无法直接传参；用 Symbol 之外的唯一键名避免与站点脚本冲突。
-    (globalThis as any).__PTD_CONTENT_PROPS__ = null;
+    globalThis.__PTD_CONTENT_PROPS__ = null;
 
     const configStore = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
 
@@ -78,7 +78,7 @@ export default defineContentScript({
 
 /** 按需加载 app（ES module，由 wxt.config.ts 的 ptd-content-app-esm 插件保证产物格式） */
 async function loadApp(props: Record<string, unknown>) {
-  (globalThis as any).__PTD_CONTENT_PROPS__ = props;
+  globalThis.__PTD_CONTENT_PROPS__ = props;
 
   const appUrl = chrome.runtime.getURL("content-app.js");
   console.debug("[PTD] loading app from", appUrl);

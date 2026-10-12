@@ -32,7 +32,14 @@ export default tseslint.config(
 
   js.configs.recommended,
   tseslint.configs.recommended,
-  pluginVue.configs["flat/recommended"],
+  // 预设里**后三条没有 `files`**（83 + 25 + 8 条规则），于是 vue 的模板规则会去跑 `.ts` / `.mjs`：
+  // 实测 `vue/one-component-per-file` 就是在 `scripts/check-content-antd-lite.mjs` 的
+  // `createApp({ render: () => null })` 上报出来的 —— 那条规则把「带 `render` 属性的对象字面量」
+  // 数成组件定义。这里把「有规则但没 files」的三条钉回 `.vue`；前两条一条只注册插件、
+  // 一条本来就限 `.vue`，原样留着（给插件注册那条加 files 会让 `.ts` 侧取不到 vue 插件，直接报错）。
+  ...pluginVue.configs["flat/recommended"].map((entry) =>
+    !entry.files && Object.keys(entry.rules ?? {}).length > 0 ? { ...entry, files: ["**/*.vue", "*.vue"] } : entry,
+  ),
 
   // —— 扩展内的代码：浏览器 + WebExtension 全局
   {
@@ -159,8 +166,13 @@ export default tseslint.config(
       "vue/require-default-prop": "off",
       "vue/require-prop-types": "off",
       "vue/multi-word-component-names": "off",
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/ban-ts-comment": "warn",
+      // 这两条在 v0.90.9 升成 error：我们自己那份（src / scripts / 根配置）已经逐文件收口到
+      // 0 条（any 221 → 0、@ts-ignore 10 → 0，剩下的全在 packages 那片中），所以不再有
+      // 「先让门禁落地」的理由留着 warn。
+      // 真要留一处 any（第三方 loose 类型、或跨上下文的动态消息名）就在上一行写行级
+      // disable 注释、并在它上面把实测依据讲清楚 —— TKonvaConfig 就是这样的先例。
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/ban-ts-comment": "error",
     },
   },
 
@@ -191,6 +203,10 @@ export default tseslint.config(
   {
     files: ["packages/**/*.{ts,vue}"],
     rules: {
+      // 上面两条刚升到 error，这一片必须按原样留在 warn —— 那 230 + 17 处是上游写法，
+      // 不改上游是本仓的硬口径。回涨由 scripts/check-eslint.mjs 的那份基线快照拦。
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/ban-ts-comment": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
       "@typescript-eslint/no-empty-object-type": "warn",
       "@typescript-eslint/no-non-null-asserted-optional-chain": "warn",

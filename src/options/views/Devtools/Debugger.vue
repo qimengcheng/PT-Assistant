@@ -32,12 +32,26 @@ setupRetryWhenCloudflareBlock(setupReplaceUnsafeHeader(axios));
 const { t } = useI18n();
 const { modal, message } = App.useApp();
 
+/**
+ * 调试页往 window 上挂的那几件，好让人在控制台里直接取用。
+ * 这一页藏在开发者模式后面（左侧导航标着「调试」那两项之一），不进普通用户的视野。
+ * 五项都写成可选：window 本来就没有这些键，必填会让下面那条断言判成「两个类型不重叠」。
+ */
+interface IDebugWindow {
+  axios?: typeof axios;
+  Sizzle?: typeof Sizzle;
+  _?: typeof estoolkit;
+  datefns?: typeof datefns;
+  sendMessage?: typeof sendMessage;
+}
+
 function enableLibrary() {
-  (window as any).axios = axios;
-  (window as any).Sizzle = Sizzle;
-  (window as any)._ = estoolkit;
-  (window as any).datefns = datefns;
-  (window as any).sendMessage = sendMessage;
+  const w = window as Window & IDebugWindow;
+  w.axios = axios;
+  w.Sizzle = Sizzle;
+  w._ = estoolkit;
+  w.datefns = datefns;
+  w.sendMessage = sendMessage;
   console.log("开发库已启用");
 }
 
@@ -112,7 +126,7 @@ async function getPiniaStore(storeName: string) {
   }
 }
 
-const log = async (v: any) => {
+const log = async (v: unknown) => {
   console.log(await v);
 };
 

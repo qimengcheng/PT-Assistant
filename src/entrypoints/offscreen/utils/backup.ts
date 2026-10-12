@@ -1,7 +1,7 @@
 import { intersection, isEqual, toMerged } from "es-toolkit";
 import { formatDate } from "date-fns";
 import PQueue from "p-queue";
-import { getBackupServer, type IBackupData, type IBackupFileInfo } from "@ptd/backupServer";
+import { getBackupServer, type IBackupConfig, type IBackupData, type IBackupFileInfo } from "@ptd/backupServer";
 import { backupDataToJSZipBlob, hasBackupRetentionToApply, pruneBackupFiles } from "@ptd/backupServer/utils.ts";
 import AbstractBackupServer from "@ptd/backupServer/AbstractBackupServer.ts";
 
@@ -74,7 +74,9 @@ export async function createBackupData(backupFields: TBackupFields[] = []): Prom
   return backupData;
 }
 
-export async function getBackupServerInstance(backupServerId: TBackupServerKey): Promise<AbstractBackupServer<any>> {
+export async function getBackupServerInstance(
+  backupServerId: TBackupServerKey,
+): Promise<AbstractBackupServer<IBackupConfig>> {
   logger({ msg: `Get backup server instance for ID: ${backupServerId}` });
   const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const backupServerConfig = metadataStore.backupServers[backupServerId];

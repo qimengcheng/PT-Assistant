@@ -4,7 +4,7 @@ interface IResetableRefOptions {
   shallow?: boolean;
 }
 
-export function useResetableRef<T = any>(initialValue: MaybeRefOrGetter<T>, options: IResetableRefOptions = {}) {
+export function useResetableRef<T = unknown>(initialValue: MaybeRefOrGetter<T>, options: IResetableRefOptions = {}) {
   const { shallow = false } = options;
   const originValue = toValue(initialValue);
 

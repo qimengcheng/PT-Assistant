@@ -1,6 +1,7 @@
 /// <reference types="chrome" />
-import { onMessage, sendMessage } from "@/messages.ts";
+import { onMessage, sendMessage, type ProtocolMap } from "@/messages.ts";
 import { whenOffscreenReady } from "./offscreen.ts";
+import { errorText } from "@/shared/errorText.ts";
 import type { BridgeState, BridgeStatus } from "@/shared/types.ts";
 
 /**
@@ -29,8 +30,13 @@ const FATAL_ERRORS = [
   "Access to the specified native messaging host is forbidden.",
 ];
 
-/** Methods the bridge will proxy to sendMessage(). Everything else is rejected. */
-const ALLOWED_METHODS = new Set([
+/**
+ * Methods the bridge will proxy to sendMessage(). Everything else is rejected.
+ *
+ * 键名写成 `keyof ProtocolMap`：拼错一个名字当场编译报错 —— 原先那是裸的字符串 Set，
+ * 拼错只表现为「这条方法在桥上一律 METHOD_NOT_ALLOWED」，界面上查不出原因。
+ */
+const ALLOWED_METHOD_NAMES: (keyof ProtocolMap)[] = [
   // Site config
   "getSiteList",
   "getSiteUserConfig",
@@ -63,7 +69,9 @@ const ALLOWED_METHODS = new Set([
   "updateKeepUploadTask",
   "deleteKeepUploadTask",
   "clearKeepUploadTasks",
-]);
+];
+
+const ALLOWED_METHODS = new Set<string>(ALLOWED_METHOD_NAMES);
 
 // ── Module-scoped state ──────────────────────────────────────────────
 
@@ -165,9 +173,9 @@ function connect() {
   try {
     currentPort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
     port = currentPort;
-  } catch (e: any) {
+  } catch (e) {
     state = "error";
-    lastError = e?.message ?? String(e);
+    lastError = errorText(e);
     console.debug("[PTD] Native messaging host not available:", lastError);
     return;
   }
@@ -188,9 +196,9 @@ function connect() {
           version: __EXT_VERSION__,
           capabilities: ["bridge-v1"],
         });
-      } catch (e: any) {
+      } catch (e) {
         state = "error";
-        lastError = e?.message ?? String(e);
+        lastError = errorText(e);
         console.debug("[PTD] Failed to send native hello message:", lastError);
         return;
       }
@@ -198,10 +206,10 @@ function connect() {
       state = "connected";
       reconnectAttempt = 0;
     })
-    .catch((e: any) => {
+    .catch((e) => {
       if (port !== currentPort) return;
       state = "error";
-      lastError = e?.message ?? String(e);
+      lastError = errorText(e);
       console.debug("[PTD] Failed to get or create native instance id:", lastError);
       try {
         currentPort.disconnect();
@@ -210,34 +218,40 @@ function connect() {
       }
     });
 
-  currentPort.onMessage.addListener(async (msg: any) => {
+  currentPort.onMessage.addListener(async (raw: unknown) => {
+    // 宿主递进来的每一条都按这个形状读；不合规的仍旧静丢掉（与原先一致，不回 error）
+    const msg = raw as { type?: unknown; id?: unknown; method?: unknown; params?: unknown } | undefined;
     if (msg?.type !== "request" || !msg.id || !msg.method) {
       return;
     }
 
     const { id, method, params } = msg;
 
-    if (!ALLOWED_METHODS.has(method)) {
+    if (typeof method !== "string" || !ALLOWED_METHODS.has(method)) {
       currentPort.postMessage({
         type: "response",
         id,
-        error: { code: "METHOD_NOT_ALLOWED", message: `Method '${method}' is not allowed` },
+        error: { code: "METHOD_NOT_ALLOWED", message: `Method '${String(method)}' is not allowed` },
       });
       return;
     }
 
     try {
       await whenOffscreenReady();
-      const result = await sendMessage(method as any, params);
+      // 名字上面已按白名单筛过；参数在这一层只能是「一个运行期才知道键名的转发」——
+      // ProtocolMap 每个键的 data 类型各不相同，TS 没法按变量键去索引它，
+      // 所以沿用仓库里既有的 `as never` 写法（见 storage.ts 的 setItem），
+      // 而不是原先那条把整次调用判成 any 的 `method as any`。
+      const result = await sendMessage(method as keyof ProtocolMap, params as never);
       if (port === currentPort) {
         currentPort.postMessage({ type: "response", id, result });
       }
-    } catch (e: any) {
+    } catch (e) {
       if (port === currentPort) {
         currentPort.postMessage({
           type: "response",
           id,
-          error: { code: "EXTENSION_ERROR", message: e?.message ?? String(e) },
+          error: { code: "EXTENSION_ERROR", message: errorText(e) },
         });
       }
     }

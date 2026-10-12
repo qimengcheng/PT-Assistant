@@ -21,7 +21,7 @@ const downloadLimit = ref<number | null>(null);
 function dialogEnter() {
   // 初始化为当前种子的限速（qBittorrent raw 中有 up_limit/dl_limit 字段，其他客户端留空）
   const first = torrents[0];
-  const raw = first?.raw as Record<string, any> | undefined;
+  const raw = first?.raw as Record<string, unknown> | undefined;
   // ⚠️ qBittorrent 的 up_limit/dl_limit 不是「一个数字」：官方文档写明 -1 = 不限速，
   // 0 的口径没有权威说法（本仓 qBittorrent.ts:764 那句注释也只讲了 -1）。
   // 旧写法只判 `typeof number`，实测两种都会预填成 0/-0（Math.round(-1/1024) 是 -0，
@@ -32,8 +32,10 @@ function dialogEnter() {
   // 那层意思，那个语义当场丢掉。
   // 现在只预填正数（= 真正的具体限速），其余留 null，回传时这个字段压根不发出去，
   // 策略由下载器自己保持。
-  uploadLimit.value = typeof raw?.up_limit === "number" && raw.up_limit > 0 ? Math.round(raw.up_limit / 1024) : null;
-  downloadLimit.value = typeof raw?.dl_limit === "number" && raw.dl_limit > 0 ? Math.round(raw.dl_limit / 1024) : null;
+  const upLimit = raw?.up_limit;
+  const dlLimit = raw?.dl_limit;
+  uploadLimit.value = typeof upLimit === "number" && upLimit > 0 ? Math.round(upLimit / 1024) : null;
+  downloadLimit.value = typeof dlLimit === "number" && dlLimit > 0 ? Math.round(dlLimit / 1024) : null;
 }
 
 const submitting = ref(false);

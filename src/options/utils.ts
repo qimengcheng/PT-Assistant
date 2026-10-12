@@ -12,8 +12,8 @@ import {
 } from "date-fns";
 import { i18n } from "@/options/plugins/i18n.ts";
 
-export function deepToRaw<T extends Record<string, any>>(sourceObj: T): T {
-  const objectIterator = (input: any): any => {
+export function deepToRaw<T>(sourceObj: T): T {
+  const objectIterator = (input: unknown): unknown => {
     if (Array.isArray(input)) {
       return input.map((item) => objectIterator(item));
     }
@@ -21,23 +21,31 @@ export function deepToRaw<T extends Record<string, any>>(sourceObj: T): T {
       return objectIterator(toRaw(input));
     }
     if (input && typeof input === "object") {
-      return Object.keys(input).reduce((acc, key) => {
-        acc[key as keyof typeof acc] = objectIterator(input[key]);
+      const source = input as Record<string, unknown>;
+      return Object.keys(source).reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = objectIterator(source[key]);
         return acc;
-      }, {} as T);
+      }, {});
     }
     return input;
   };
 
-  return objectIterator(sourceObj);
+  return objectIterator(sourceObj) as T;
 }
 
-export const formValidateRules: Record<string, (args?: any) => (v: any) => boolean | string> = {
+/**
+ * 表单校验规则：`(args) => (value) => true | 错误文案`。
+ *
+ * 值这一侧收成 unknown 是有原因的 —— 调用方传进来的就是界面原值（输入框可能给出
+ * number / null / undefined），而 `RegExp.test` 与 `!!` 本来做的就是同一套强制转换，
+ * 这里显式 String() 不改变判据。
+ */
+export const formValidateRules: Record<string, (args?: string) => (v: unknown) => boolean | string> = {
   require: (args: string = "Item is required") => {
-    return (v: any) => !!v || args;
+    return (v: unknown) => !!v || args;
   },
   url: (args: string = "Not url") => {
-    return (v: any) => /^(https?):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;[\]]+[-A-Za-z0-9+&@#/%=~_|]$/.test(v) || args;
+    return (v: unknown) => /^(https?):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;[\]]+[-A-Za-z0-9+&@#/%=~_|]$/.test(String(v)) || args;
   },
 };
 

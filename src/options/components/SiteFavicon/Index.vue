@@ -50,7 +50,7 @@ const binds = {
 </script>
 
 <template>
-  <img :height="size" :src="siteFavicon" :width="size" class="site-favicon" v-on="binds" alt="" />
+  <img :height="size" :src="siteFavicon" :width="size" class="site-favicon" alt="" v-on="binds" />
 </template>
 
 <style scoped lang="scss">

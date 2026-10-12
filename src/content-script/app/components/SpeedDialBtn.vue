@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useAttrs, useTemplateRef, type TransitionProps } from "vue";
+import { computed, useAttrs, useTemplateRef, type Component, type TransitionProps } from "vue";
 import { useElementHover } from "@vueuse/core";
 
 import { useConfigStore } from "@/options/stores/config.ts";
@@ -12,7 +12,7 @@ const {
 } = defineProps<{
   title: string;
   /** 图标组件（从 @antdv-next/icons 具名导入后传入） */
-  icon: any;
+  icon: Component;
   color?: string;
   transition?: TransitionProps;
 }>();

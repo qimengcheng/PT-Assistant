@@ -21,9 +21,19 @@ export interface IRangedField {
   ticks: number[];
 }
 
+/** 折出来之后能参与比较的那几型 */
+type TFilterValue = string | number | boolean;
+
+/**
+ * 一列怎么「折成可比较值」/「写回查询串」。
+ *
+ * 参数一律 `unknown` 而不是原先的 `any`：传进来的就是表格里那一格，什么类型都可能，
+ * 收窄由各格式自己做（`typeof value === "number"` 那几行本来就在那）。
+ * 原先标 `any` 的代价是编译器不再检查任何一处调用，包括把 `Date[]` 递给 `size` 这种。
+ */
 interface IValueFormat {
-  parse?: (value: any) => any;
-  build?: (value: any) => string;
+  parse?: (value: unknown) => TFilterValue;
+  build?: (value: unknown) => TFilterValue;
 }
 
 export const dateFilterFormat = [
@@ -38,27 +48,27 @@ export const dateFilterFormat = [
 
 const advanceFilterFormat: Record<TAdvanceFilterFormat, IValueFormat> = {
   date: {
-    parse: (value: string | number) => {
+    parse: (value: unknown) => {
       if (typeof value === "number") return value;
-      else return parseValidTimeString(value, dateFilterFormat) as number;
+      return parseValidTimeString(String(value), dateFilterFormat) as number;
     },
-    build: (value: string | number) => formatDate(value, "yyyyMMdd'T'HHmmss") as string,
+    build: (value: unknown) => formatDate(value as string | number, "yyyyMMdd'T'HHmmss") as string,
   },
   size: {
-    parse: (value: string | number) => {
+    parse: (value: unknown) => {
       if (typeof value === "number") return value;
-      else return parseSizeString(value);
+      return parseSizeString(String(value));
     },
-    build: (value: string | number) => filesize(value, { spacer: "" }) as string,
+    build: (value: unknown) => filesize(value as number, { spacer: "" }) as string,
   },
   // 对 number 全部转为字符串比较
   number: {
-    parse: (value: string | number) => value.toString(),
-    build: (value: string | number) => value.toString(),
+    parse: (value: unknown) => String(value),
+    build: (value: unknown) => String(value),
   },
   boolean: {
-    parse: (value: string) => (value ? "1" : "0"),
-    build: (value: boolean) => (value ? "1" : "0"),
+    parse: (value: unknown) => (value ? "1" : "0"),
+    build: (value: unknown) => (value ? "1" : "0"),
   },
 } as const;
 
@@ -147,7 +157,8 @@ function matchFilterValue(itemValue: string, rawFilterValue: unknown): boolean {
   return regex ? regex.test(itemValue) : itemValue === filterValue;
 }
 
-const getRaw = (x: any) => x;
+/** 没配格式的列：原样进、原样出（parse 与 build 共用这一份，所以返回类型取两者的交） */
+const getRaw = (x: unknown): TFilterValue => x as TFilterValue;
 function getValueFormat(key: string, format: TFormat = {}): Required<IValueFormat> {
   let valueFormatFn: IValueFormat = {};
 
@@ -204,7 +215,18 @@ export function setDateRangeByDatePicker(value: unknown[]): [number, number] {
   return [dateRange[0].getTime(), dateRange[dateRange.length - 1].getTime()];
 }
 
-type TRawItem = { [key: string]: any };
+/**
+ * 一行待筛的数据。刻意不写成 `Record<string, any>` —— 那个 `any` 会顺着 `get()` 流到每一处
+ * 比较上，等于整条判据都不过类型；也不能写成 `Record<string, unknown>`：`ITorrent` 这类
+ * **接口**没有隐式索引签名，传进来当场就是 TS2345（实测）。所以这里收成 `object`，
+ * 只在按列名取值那一步收窄一次（`get` 本来就是运行时按路径取值，类型只能到这里为止）。
+ */
+type TRawItem = object;
+
+/** 按列名（可以是 `a.b` 这种路径）从一行数据里取那一列 */
+function columnOf(item: TRawItem, keyword: string): unknown {
+  return get(item as Record<string, unknown>, keyword);
+}
 
 export function checkKeywordValue(
   filter: TFilter,
@@ -212,9 +234,8 @@ export function checkKeywordValue(
   keyword: string,
   format: TFormat = {},
   exclude = false,
-  // @ts-ignore
 ): boolean | undefined {
-  const itemValue = get(rawItem, keyword); // true    filter[keyword] = ['1']
+  const itemValue = columnOf(rawItem, keyword); // true    filter[keyword] = ['1']
   if (filter[keyword]) {
     // 如果原始数据中没有该 keyword 字段，则直接返回 false
     if (typeof itemValue == "undefined") {
@@ -223,7 +244,7 @@ export function checkKeywordValue(
 
     const valueFormat = getValueFormat(keyword as string, format);
     if (Array.isArray(itemValue)) {
-      const parsedValues = itemValue.map((v: any) => valueFormat.parse(v) as string);
+      const parsedValues = itemValue.map((v) => valueFormat.parse(v) as string);
       const filterVals = filter[keyword] as string[];
       // 如果是正向关键词则要求全部包含，如果是排除关键词则要求有任意一个包含
       return exclude
@@ -241,9 +262,8 @@ export function checkRangeValue(
   rawItem: TRawItem,
   keyword: string,
   format: TFormat = {},
-  // @ts-ignore
 ): boolean | undefined {
-  const itemValue = get(rawItem, keyword);
+  const itemValue = columnOf(rawItem, keyword);
   if (filter[keyword] && typeof itemValue !== "undefined") {
     const valueFormat = getValueFormat(keyword, format);
     const value = valueFormat.parse(itemValue) as number;
@@ -251,10 +271,9 @@ export function checkRangeValue(
     // `0 || -Infinity` 得到 -Infinity、`0 || Infinity` 得到 Infinity ——
     // 那个 0 边界等于永远表达不出来，滑块拖到 0 的条件恒不成立。
     // 这里只在 null/undefined（用户没填）时才取默认。
-    const rawFrom = (filter[keyword] as any).from;
-    const rawTo = (filter[keyword] as any).to;
-    const from = valueFormat.parse(rawFrom ?? -Infinity) as number;
-    const to = valueFormat.parse(rawTo ?? Infinity) as number;
+    const range = filter[keyword] as { from?: unknown; to?: unknown };
+    const from = valueFormat.parse(range.from ?? -Infinity) as number;
+    const to = valueFormat.parse(range.to ?? Infinity) as number;
 
     return value >= from && value <= to;
   }
@@ -274,7 +293,7 @@ interface TableCustomFilterOptions<ItemType> {
   autoUpdateFilter?: boolean; // 是否在 advanceFilterDictRef 变化时自动更新过滤器字符串（需要传入的为ref）
 }
 
-export function useTableCustomFilter<ItemType extends Record<string, any>>(
+export function useTableCustomFilter<ItemType extends object>(
   options: TableCustomFilterOptions<ItemType>,
 ) {
   const {
@@ -320,6 +339,7 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
    *   `${ranges}`: { range: [min, max], ticks: [x1, x2, x3, ...] }
    * }
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 见 380 行那条同样的理由
   const advanceItemPropsRef = ref<Record<string, any>>({});
 
   function buildAdvanceItemPropsFn() {
@@ -329,12 +349,14 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
       const valueFormat = getValueFormat(keyword, format);
 
       advanceItemPropsRef.value[keyword] = uniqBy(
-        flatten(unRefedItems.map((item) => item[keyword]).filter(Boolean)),
+        flatten(unRefedItems.map((item) => columnOf(item, keyword)).filter(Boolean)),
         (x) => valueFormat.parse(x),
       );
     });
     parseOptions.ranges?.forEach((keyword) => {
-      advanceItemPropsRef.value[keyword] = generateRangeField(unRefedItems.map((item) => item[keyword]));
+      advanceItemPropsRef.value[keyword] = generateRangeField(
+        unRefedItems.map((item) => columnOf(item, keyword) as number | undefined),
+      );
     });
   }
 
@@ -354,6 +376,18 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
    *   `${ranges}`: [number, number]
    * }
    */
+  /**
+   * ⚠️ 这两处（上面那条 `advanceItemPropsRef` 同样）留 `any` 是**量过之后的决定**，不是没改完：
+   * 四个筛选面板（`AdvanceFilterGenerateDialog` / `MyData` 那一格 / 搜索页 / 下载历史）在
+   * **模板里按列名直接点下去** —— `advanceFilterDictRef.status.required = [...]`、
+   * `advanceItemPropsRef.downloadAt.range[0]`。换成 `ITextValue | [number, number]` 这种联合，
+   * 模板里没有收窄的位置（Vue 模板表达式不能 `if (Array.isArray(x))`），就得把四个面板改成
+   * 函数取值 + 双向绑定改写；而 `Record<string, unknown>` 更直接 —— 现在这些点法当场全红。
+   * 上面两段注释已经把两本字典的真实结构写清了，所以这里丢的只是编译期检查，不是可读性。
+   * 要收这条，先给这两个 ref 做一对带列名的窄类型（`{ downloadAt: [number, number]; ... }`），
+   * 那需要每列在调用点声明自己的形状 —— 单开一次做，别混在 lint 收口里。
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const advanceFilterDictRef = ref<Record<string, any>>({});
 
   // 从 string 中构建 advanceFilterDictRef
@@ -368,12 +402,12 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
 
       const thisRequired = parsedFilter[key];
       if (Array.isArray(thisRequired) && thisRequired.length > 0) {
-        required = uniq(flattenDeep(thisRequired.map((v: any) => valueFormat.parse(unEscapeQueryValue(v)))));
+        required = uniq(flattenDeep(thisRequired.map((v) => valueFormat.parse(unEscapeQueryValue(v)))));
       }
 
       const thisExclude = parsedFilter.exclude?.[key];
       if (Array.isArray(thisExclude) && thisExclude.length > 0) {
-        exclude = uniq(flattenDeep(thisExclude.map((v: any) => valueFormat.parse(unEscapeQueryValue(v)))));
+        exclude = uniq(flattenDeep(thisExclude.map((v) => valueFormat.parse(unEscapeQueryValue(v)))));
       }
 
       advanceFilterDictRef.value[key] = { required, exclude };
@@ -395,7 +429,8 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
 
   function stringifyFilterDictFn() {
     const { keywords = [], ranges = [] } = parseOptions;
-    const filters: any = { exclude: {} };
+    /** 一份「要写回查询串」的中间结果：文本档按列名挂词组，排除词全在 `exclude` 那一节下 */
+    const filters: Record<string, unknown> & { exclude: Record<string, unknown> } = { exclude: {} };
 
     ["text", ...keywords].forEach((key) => {
       const valueFormat = getValueFormat(key, format);
@@ -411,7 +446,7 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
     ranges.forEach((key) => {
       const valueFormat = getValueFormat(key, format);
       const range = (advanceItemPropsRef.value[key] as unknown as IRangedField).range;
-      const value = (advanceFilterDictRef.value[key] as unknown as [number, number]).map(valueFormat.parse);
+      const value = (advanceFilterDictRef.value[key] as unknown as [number, number]).map(valueFormat.parse) as number[];
 
       // 同上：value 为 0（用户真把上界拖到 0）时不能被当成「没动过」而整条丢弃
       if ((value[0] !== -Infinity && value[0] !== undefined) || (value[1] !== Infinity && value[1] !== undefined)) {
@@ -504,7 +539,7 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
       let cachedTitleLower: string | undefined;
       const getTitle = () => {
         if (cachedTitle === undefined) {
-          cachedTitle = flattenDeep(titleFields.map((key) => get(rawItem, key)))
+          cachedTitle = flattenDeep(titleFields.map((key) => columnOf(rawItem, key)))
             .filter(Boolean)
             .join("|$|")
             .toString();
@@ -561,7 +596,12 @@ export function useTableCustomFilter<ItemType extends Record<string, any>>(
     };
   }
 
-  function tableFilterFn(value: any, query: string, item: any): boolean {
+  /**
+   * 表格那条路的过滤入口。前两参是 Vuetify 时代留下的位置占位（现在两个调用点分别传
+   * `item.id` 和 `undefined`，都不参与判据），真正吃的只有第三参的 `raw`。
+   * 原先三参全标 `any`，所以「把整行当第二参传进来」这类错位编译期看不见。
+   */
+  function tableFilterFn(_value: unknown, _query: string, item: { raw: unknown }): boolean {
     return createItemMatcherFn(tableParsedFilterRef.value)(item.raw as ItemType);
   }
 

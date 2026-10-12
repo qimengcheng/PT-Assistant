@@ -12,6 +12,7 @@ import {
   getBackupServerDefaultConfig,
   getBackupServerIcon,
   getBackupServerMetaData,
+  type IBackupConfig,
   type IBackupMetadata,
 } from "@ptd/backupServer";
 import { REPO_URL } from "~/helper.ts";
@@ -29,7 +30,7 @@ const storedBackupServerConfig = ref<IBackupServerMetadata>({} as IBackupServerM
 const isBackupServerConfigValid = ref<boolean>(false);
 
 const allBackupServerMetaData = computedAsync(async () => {
-  const clientMetaData: Record<string, IBackupMetadata<any> & { type: string }> = {};
+  const clientMetaData: Record<string, IBackupMetadata<IBackupConfig> & { type: string }> = {};
   for (const type of entityList) {
     clientMetaData[type] = { type, ...(await getBackupServerMetaData(type)) };
   }

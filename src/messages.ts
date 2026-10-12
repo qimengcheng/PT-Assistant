@@ -177,17 +177,22 @@ export interface ProtocolMap {
   getDownloaderMetaData(downloaderId: string): TorrentClientMetaData | undefined;
 
   // ===== 2.2.2 offscreen：客户端任务操作（MyClient 页面）=====
+  /**
+   * 种子在某台下载器里的主键。各家客户端用的形状不一样 —— qBittorrent / Transmission 是
+   * infoHash 字符串，Aria2 是数字 gid —— 所以它是 `string | number`，取自 `CTorrent["id"]`
+   * 而不是各写一份（原先这八个消息的 `id` 都标 `any`，等于把「传错主键」这件事从编译期挪到了运行时）。
+   */
   getClientTorrents(downloaderId: string): CTorrent[];
   getClientTorrentTrackers(data: { downloaderId: string; torrent: CTorrent }): string[];
-  deleteClientTorrent(data: { downloaderId: string; id: any; removeData?: boolean }): boolean;
-  pauseClientTorrent(data: { downloaderId: string; id: any }): boolean;
-  resumeClientTorrent(data: { downloaderId: string; id: any }): boolean;
-  recheckClientTorrent(data: { downloaderId: string; id: any }): boolean;
-  moveClientTorrentInQueue(data: { downloaderId: string; id: any; direction: TorrentQueueDirection }): boolean;
-  setClientTorrentSpeedLimit(data: { downloaderId: string; id: any; limits: TorrentSpeedLimit }): boolean;
-  setClientTorrentLabel(data: { downloaderId: string; id: any; label: string }): boolean;
+  deleteClientTorrent(data: { downloaderId: string; id: CTorrent["id"]; removeData?: boolean }): boolean;
+  pauseClientTorrent(data: { downloaderId: string; id: CTorrent["id"] }): boolean;
+  resumeClientTorrent(data: { downloaderId: string; id: CTorrent["id"] }): boolean;
+  recheckClientTorrent(data: { downloaderId: string; id: CTorrent["id"] }): boolean;
+  moveClientTorrentInQueue(data: { downloaderId: string; id: CTorrent["id"]; direction: TorrentQueueDirection }): boolean;
+  setClientTorrentSpeedLimit(data: { downloaderId: string; id: CTorrent["id"]; limits: TorrentSpeedLimit }): boolean;
+  setClientTorrentLabel(data: { downloaderId: string; id: CTorrent["id"]; label: string }): boolean;
   /** 把种子已在盘上的数据搬到别的目录（只有部分客户端支持，判据见 `src/shared/reseedPath.ts`） */
-  setClientTorrentLocation(data: { downloaderId: string; id: any; location: string }): boolean;
+  setClientTorrentLocation(data: { downloaderId: string; id: CTorrent["id"]; location: string }): boolean;
   /**
    * 该下载器的分类表（分类名 → 真正的落盘目录）。辅种那两处要用它把 `category:电影` 这种
    * 分类假路径翻成目录 —— 翻不出就是判不出，不许拿分类名当路径去比或去搬。
@@ -357,7 +362,13 @@ const messageMaps: Partial<ProtocolMap> = {};
 /**
  * 仅取协议中「值为函数」的键。ProtocolMap 去掉字符串索引签名后，
  * 泛型里的 PM[K] 不再被隐式约束为函数，需要用这个条件类型显式收窄。
+ *
+ * ⚠️ 这里的 `any` 是**量过才留下的**，不是懒得改：换成 `(...args: never[]) => unknown`
+ * 之后，`PM[K]` 在泛型还没代入时这条条件类型会落到 **false 分支** → `THandler` 变成 `never`，
+ * 于是下面 wrapper 里 `Parameters<THandler<PM, K>>[0]` 是 `never`，两处调用当场报
+ * TS2322 / TS2345（实测）。`any` 在参数位是双向兼容的，这条判据要的就是那个宽松度。
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type TMessageKey<PM> = {
   [K in keyof PM]: PM[K] extends (...args: any[]) => any ? K : never;
 }[keyof PM];
@@ -365,9 +376,10 @@ type TMessageKey<PM> = {
 /**
  * 取键 K 对应的处理器函数类型。必须逐点用条件类型——
  * 光靠 `K extends TMessageKey<PM>` 不会让泛型内部的 PM[K] 被收窄成函数
- * （TS 不会跨聚合条件类型传递约束）。
+ * （TS 不会跨聚合条件类型传递约束）。同上面那条：`any` 是实测换不掉的。
  */
 type THandler<PM, K extends keyof PM> = PM[K] extends (...args: any[]) => any ? PM[K] : never;
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /**
  * 为 sendMessage 和 onMessage 创建一个包装器（移植自 PT-depiler）：
@@ -389,7 +401,7 @@ function createMessageWrapper<PM extends ProtocolMap>(original: {
     type: K,
     handler: (message: { data: Parameters<THandler<PM, K>>[0] }) => void | Promise<ReturnType<THandler<PM, K>>>,
   ) => {
-    // @ts-expect-error
+    // @ts-expect-error 泛型 K 在这里证不出「写进 Partial<ProtocolMap> 的同一个键」，索引签名写入要绕一下
     messageMaps[type] = handler;
     original.onMessage(type, handler);
   };
@@ -398,7 +410,7 @@ function createMessageWrapper<PM extends ProtocolMap>(original: {
     type: K,
     data: Parameters<THandler<PM, K>>[0],
   ): Promise<ReturnType<THandler<PM, K>>> => {
-    // @ts-expect-error
+    // @ts-expect-error 同上：从 Partial<ProtocolMap> 读出来的那条不认得 K，收窄成交给下面用
     const localHandler = messageMaps[type] as THandler<PM, K> | undefined;
 
     // 本地短路优先：同一上下文内直接调用 handler，根本不存在跨进程序列化边界，

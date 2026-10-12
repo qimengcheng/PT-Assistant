@@ -191,9 +191,12 @@ export default defineConfig({
         // 匹配用 lib.fileName（= content-app），它与引导里
         // chrome.runtime.getURL("content-app.js") 的产物名一一对应；
         // lib.name 是从文件名推的驼峰形式（contentApp），对不上。
-        configResolved(config: any) {
-          if (config?.build?.lib?.fileName === "content-app") {
-            config.build.lib.formats = ["es"];
+        configResolved(config) {
+          // vite 的类型里 build.lib 是 `LibraryOptions | false`（false = 不是 lib 构建），
+          // 所以取 fileName / 写 formats 前要先判掉它。
+          const lib = config.build.lib;
+          if (lib && lib.fileName === "content-app") {
+            lib.formats = ["es"];
           }
         },
       },

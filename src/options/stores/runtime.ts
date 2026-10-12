@@ -101,7 +101,6 @@ export const useRuntimeStore = defineStore("runtime", {
     },
 
     showSnakebar(text: string, options: SnackbarMessageOptions = {}) {
-      // @ts-ignore
       this.uiGlobalSnakebar.push({ text, ...options });
     },
   },

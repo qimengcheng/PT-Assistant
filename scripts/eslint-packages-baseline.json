@@ -1,0 +1,20 @@
+{
+  "_comment": "packages/**（上游零修改平移件）的 ESLint warning 基线，按规则分别记条数。重录：node scripts/check-eslint.mjs --update-packages-baseline。判据在 check-eslint.mjs。",
+  "total": 407,
+  "rules": {
+    "@typescript-eslint/no-explicit-any": 230,
+    "@typescript-eslint/no-unused-vars": 60,
+    "@typescript-eslint/no-non-null-asserted-optional-chain": 30,
+    "prefer-const": 28,
+    "@typescript-eslint/ban-ts-comment": 17,
+    "no-useless-escape": 12,
+    "@typescript-eslint/no-unused-expressions": 9,
+    "no-useless-assignment": 5,
+    "@typescript-eslint/no-empty-object-type": 4,
+    "preserve-caught-error": 4,
+    "@typescript-eslint/no-unnecessary-type-constraint": 3,
+    "(无规则Id)": 2,
+    "no-irregular-whitespace": 2,
+    "no-extra-boolean-cast": 1
+  }
+}

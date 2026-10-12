@@ -1,8 +1,19 @@
 /**
  * 在 browser 环境中，我们有很多的 headers 是不能设置的，这里为 axios 提供一个方法来替换掉这些 headers
  */
-import type { AxiosInstance } from "axios";
+import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { sendMessage } from "@/messages.ts";
+
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /**
+     * 这条请求为绕过「不安全请求头」而建的那张 declarativeNetRequest 临时规则的 id。
+     * 响应（成功或失败）回来时按它把规则撤掉 —— 原先这一项靠 `(config as any)` 挂上去，
+     * 于是写错键名既不报错也没人撤规则（累积到上限后所有需要 unsafe header 的请求全失败）。
+     */
+    dummyHeaderRequestId?: number;
+  }
+}
 
 /**
  * 动态 session 规则的 ID 号段与自增计数器。
@@ -93,7 +104,7 @@ export function setupReplaceUnsafeHeader(axios: AxiosInstance): AxiosAllowUnsafe
         // 那条请求就会拿到错误的请求头（比如 M-Team 的 Origin 被换成别的站点的）。
         // 统一加 DNR_ID_BASE 前缀，与 webRequest.ts 的业务规则号段隔离。
         const dummyHeaderRequestId = nextDnrRuleId();
-        (config as any).dummyHeaderRequestId = dummyHeaderRequestId;
+        config.dummyHeaderRequestId = dummyHeaderRequestId;
 
         const requestUrl = axios.getUri({ baseURL: config.baseURL, url: config.url });
 
@@ -118,8 +129,9 @@ export function setupReplaceUnsafeHeader(axios: AxiosInstance): AxiosAllowUnsafe
     return config;
   });
 
-  async function removeDummyHeaderRequestId(config: any) {
-    const ruleId = config?.config?.dummyHeaderRequestId;
+  /** 成功响应与失败的 AxiosError 都带 `config`，这里只吃那一件 */
+  async function removeDummyHeaderRequestId(withConfig: { config?: InternalAxiosRequestConfig } | undefined) {
+    const ruleId = withConfig?.config?.dummyHeaderRequestId;
     if (ruleId === undefined || ruleId === null) {
       return;
     }

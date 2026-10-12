@@ -403,12 +403,19 @@ export const useMetadataStore = defineStore("metadata", {
     },
   },
   actions: {
-    async simplePatch<
-      Field extends TSimplePatchFieldKey,
-      Id extends keyof IMetadataPiniaStorageSchema[Field],
-      Key extends keyof IMetadataPiniaStorageSchema[Field][Id],
-      Value extends IMetadataPiniaStorageSchema[Field][Id][Key],
-    >(schemaKey: Field, id: Id, key: Key | string, value: Value | any) {
+    /**
+     * 按路径改一条 metadata 的某个字段，然后落盘。
+     *
+     * `key` 是**路径**而不只是一个键（调用方写过 `"feature.DefaultAutoStart"`），所以类型上
+     * 索引不到对应值的类型 —— 原先那四层泛型配一个 `value: Value | any` 等于什么都没判
+     * （`| any` 把整个联合折成 any）。这里只保留真正判得出的两层：存哪张表、表里哪个 id。
+     */
+    async simplePatch<Field extends TSimplePatchFieldKey, Id extends keyof IMetadataPiniaStorageSchema[Field]>(
+      schemaKey: Field,
+      id: Id,
+      key: string,
+      value: unknown,
+    ) {
       set(this[schemaKey][id], key, value);
       await this.$save();
     },

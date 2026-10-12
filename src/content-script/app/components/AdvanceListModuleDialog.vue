@@ -290,7 +290,7 @@ const rowSelection = computed(() => ({
 
         <a-button type="primary" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti()"><template #icon><CloudDownloadOutlined /></template><span>{{ t('contentScript.pushTo') }}</span></a-button>
 
-        <a-button type="primary" v-if="metadataStore.defaultDownloader?.id" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti(true)"><template #icon><DownloadOutlined /></template><span>{{ t('contentScript.pushToDefault') }}</span></a-button>
+        <a-button v-if="metadataStore.defaultDownloader?.id" type="primary" :disabled="!hasSelectedTorrent" @click="() => handleRemoteDownloadMulti(true)"><template #icon><DownloadOutlined /></template><span>{{ t('contentScript.pushToDefault') }}</span></a-button>
       </div>
     </template>
   </a-modal>

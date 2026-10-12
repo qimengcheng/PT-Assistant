@@ -28,7 +28,12 @@ import { type ITorrent } from "@ptd/site/types/torrent.ts";
 
 import { extStore } from "@/storage.ts";
 import { onMessage, sendMessage } from "@/messages.ts";
-import { type IDownloaderMetadata } from "@/shared/types/storages/metadata.ts";
+import {
+  type IDownloaderMetadata,
+  type IMetadataPiniaStorageSchema,
+  type ISearchSolutionMetadata,
+} from "@/shared/types/storages/metadata.ts";
+import { type IConfigPiniaStorageSchema } from "@/shared/types/storages/config.ts";
 import { openOptionsPage } from "./base.ts";
 
 const contextMenusId = "PT-Assistant-Context-Menus";
@@ -89,10 +94,19 @@ function parseMenuId(menuItemId: string | number): Record<string, string> | null
 /**
  * 菜单构建所需的两份存储 blob 只读一次并缓存在内存里，仅在 config / metadata 真正变化时失效。
  * 旧实现是在每次标签页激活时都重新读两份全量 blob。
+ *
+ * 类型只声明**菜单真吃的那几块**（不是整份 blob）：这两份存储是从老版本存档上来的，
+ * 任何一节都可能缺，所以全按 `Partial` 收 —— 原先标的是 `any`，等于把「读到 undefined 就崩」
+ * 留给运行时，也让下面十几处 `.filter((x: any))` 有了借口。
  */
 interface IMenuPlan {
-  config: any;
-  metadata: any;
+  config: Partial<Pick<IConfigPiniaStorageSchema, "contextMenus">>;
+  metadata: Partial<
+    Pick<
+      IMetadataPiniaStorageSchema,
+      "sites" | "solutions" | "downloaders" | "siteHostMap" | "siteNameMap"
+    >
+  >;
 }
 
 let planCache: IMenuPlan | null = null;
@@ -114,8 +128,9 @@ function addContextMenu(data: chrome.contextMenus.CreateProperties) {
   if (!data.id) {
     data.id = nanoid();
   }
-  // 外部经消息传入的 onclick 无法跨上下文序列化，这里显式丢弃以免误解
-  delete (data as any).onclick;
+  // 外部经消息传入的 onclick 无法跨上下文序列化，这里显式丢弃以免误解。
+  // chrome 的类型里没有这个属性（它本来就不该有），所以只在丢弃这一处把它声明出来。
+  delete (data as chrome.contextMenus.CreateProperties & { onclick?: unknown }).onclick;
   chrome.contextMenus?.create(data);
   return data.id;
 }
@@ -189,7 +204,7 @@ async function downloadLinkPush(
       savePath: folder!,
     } as CAddTorrentOptions,
   })
-    .then((result: any) => {
+    .then((result) => {
       notify(
         result?.downloadStatus === "failed"
           ? `推送「${downloader.name}」失败`
@@ -204,7 +219,7 @@ async function downloadLinkPush(
 interface ICreateSearchMenuOption {
   thisTabSiteId?: string;
   // chrome 类型将 contexts 定义为元组，与「默认值 + 动态展开覆盖」的模式天然冲突，此处放宽
-  extraCreateMenuProperties?: any;
+  extraCreateMenuProperties?: Partial<chrome.contextMenus.CreateProperties>;
 }
 
 async function createSearchMenu(scope: TSearchScope, baseMenuId: string, options: ICreateSearchMenuOption = {}) {
@@ -222,11 +237,9 @@ async function createSearchMenu(scope: TSearchScope, baseMenuId: string, options
   });
 
   // 特定搜索方案搜索
-  const solutions = Object.values(
-    (metadataStore.solutions ?? {}) as Record<string, { enabled: boolean; sort: number; id: string; name: string }>,
-  )
-    .filter((x: any) => !!x.enabled)
-    .sort((a: any, b: any) => b.sort - a.sort);
+  const solutions = Object.values(metadataStore.solutions ?? {})
+    .filter((x: ISearchSolutionMetadata) => !!x.enabled)
+    .sort((a, b) => b.sort - a.sort);
   if (solutions.length > 0) {
     const solutionSearchSubMenuId = addContextMenu({
       id: `${baseMenuId}${SEG}k`,
@@ -238,9 +251,9 @@ async function createSearchMenu(scope: TSearchScope, baseMenuId: string, options
 
     for (const solution of solutions) {
       addContextMenu({
-        id: `${solutionSearchSubMenuId}${SEG}${(solution as any).id}`,
+        id: `${solutionSearchSubMenuId}${SEG}${solution.id}`,
         parentId: solutionSearchSubMenuId,
-        title: (solution as any).name,
+        title: solution.name,
         contexts: ["selection"],
         ...extraCreateMenuProperties,
       });
@@ -249,12 +262,12 @@ async function createSearchMenu(scope: TSearchScope, baseMenuId: string, options
 
   // 特定站点搜索
   const sites = Object.entries(metadataStore.sites ?? {})
-    .map(([siteId, site]: [string, any]) => ({
+    .map(([siteId, site]) => ({
       id: siteId,
       ...site,
     }))
-    .filter((x: any) => !x.isOffline && !!x.allowSearch)
-    .sort((a: any, b: any) => (b.sortIndex ?? 0) - (a.sortIndex ?? 0));
+    .filter((x) => !x.isOffline && !!x.allowSearch)
+    .sort((a, b) => (b.sortIndex ?? 0) - (a.sortIndex ?? 0));
 
   if (sites.length > 0) {
     const siteSearchSubMenuId = addContextMenu({
@@ -298,7 +311,8 @@ async function populateContextMenus(tab: chrome.tabs.Tab) {
 
   const tabHost = getHostFromUrl(tab.url || "https://example.com");
   const thisTabSiteId = metadataStore?.siteHostMap?.[tabHost];
-  const thisTabSiteName = metadataStore?.siteNameMap?.[thisTabSiteId];
+  // 认不出站点时不去拿名字（原先 `siteNameMap[undefined]` 也是 undefined，但类型上说不通）
+  const thisTabSiteName = thisTabSiteId ? metadataStore?.siteNameMap?.[thisTabSiteId] : undefined;
 
   // 注：原先这里先 clearContextMenus()，改为在 commit 阶段按指纹决定是否重建
 
@@ -353,8 +367,8 @@ async function populateContextMenus(tab: chrome.tabs.Tab) {
   // 下载链接推送菜单（所有页面可用）
   if (configStore.contextMenus?.allowLinkDownloadPush ?? true) {
     const downloaders = Object.values(metadataStore.downloaders ?? {})
-      .filter((x: any) => !!x.enabled)
-      .sort((a: any, b: any) => (b.sortIndex ?? 100) - (a.sortIndex ?? 100));
+      .filter((x) => !!x.enabled)
+      .sort((a, b) => (b.sortIndex ?? 100) - (a.sortIndex ?? 100));
 
     if (downloaders.length > 0) {
       const baseLinkDownloadPushMenuId = addContextMenu({
@@ -380,7 +394,7 @@ async function populateContextMenus(tab: chrome.tabs.Tab) {
         "$torrent.category$",
       ];
 
-      for (const downloader of downloaders as IDownloaderMetadata[]) {
+      for (const downloader of downloaders) {
         const downloaderPushSubMenuId = addContextMenu({
           id: idOf("p", "d", downloader.id),
           parentId: baseLinkDownloadPushMenuId,
@@ -457,7 +471,9 @@ function searchTextForScope(scope: TSearchScope, info: chrome.contextMenus.OnCli
   return fallback;
 }
 
-function siteIdFromUrl(metadata: any, url?: string): string | undefined {
+type TMenuMetadata = IMenuPlan["metadata"];
+
+function siteIdFromUrl(metadata: TMenuMetadata, url?: string): string | undefined {
   if (!url) return undefined;
   try {
     return metadata?.siteHostMap?.[getHostFromUrl(url)];
@@ -467,7 +483,7 @@ function siteIdFromUrl(metadata: any, url?: string): string | undefined {
 }
 
 /** 由 url 解出当前标签页的站点上下文 */
-function resolveTabContext(metadata: any, url?: string) {
+function resolveTabContext(metadata: TMenuMetadata, url?: string) {
   const siteId = siteIdFromUrl(metadata, url);
   return { siteId, siteName: siteId ? metadata?.siteNameMap?.[siteId] : undefined };
 }
@@ -506,7 +522,7 @@ chrome.contextMenus?.onClicked.addListener(async (info, tab) => {
     }
     if (parsed.target === "download" && parsed.id) {
       const { metadata } = await loadPlan();
-      const downloader = (metadata?.downloaders?.[parsed.id] as IDownloaderMetadata | undefined) ?? undefined;
+      const downloader = metadata?.downloaders?.[parsed.id];
       if (!downloader) return;
 
       const ctx = resolveTabContext(metadata, info.pageUrl ?? tab?.url);
@@ -521,20 +537,24 @@ chrome.contextMenus?.onClicked.addListener(async (info, tab) => {
  * 菜单指纹：覆盖所有「会体现在菜单上的」输入。指纹没变就一次 IPC 都不发。
  * 旧实现没有这层判断——每次切标签页都无条件 removeAll + 全量 create。
  */
-function menuSignature(config: any, metadata: any, ctx: { siteId?: string; siteName?: string }): string {
-  const enabledSolutionIds = Object.values((metadata?.solutions ?? {}) as Record<string, any>)
-    .filter((x) => !!x.enabled)
+function menuSignature(
+  config: IMenuPlan["config"],
+  metadata: TMenuMetadata,
+  ctx: { siteId?: string; siteName?: string },
+): string {
+  const enabledSolutionIds = Object.values(metadata?.solutions ?? {})
+    .filter((x) => !!x?.enabled)
     .map((x) => `${x.id}=${x.name}`)
     .sort();
 
-  const searchableSiteIds = Object.entries((metadata?.sites ?? {}) as Record<string, any>)
+  const searchableSiteIds = Object.entries(metadata?.sites ?? {})
     .filter(([, s]) => !s.isOffline && !!s.allowSearch)
     // 站点名会直接出现在子菜单标题里，必须进指纹，否则改名后菜单不刷新
     .map(([id, s]) => `${id}=${metadata?.siteNameMap?.[id] ?? s?.merge?.name ?? id}`)
     .sort();
 
-  const pushDownloaders = Object.values((metadata?.downloaders ?? {}) as Record<string, any>)
-    .filter((x) => !!x.enabled)
+  const pushDownloaders = Object.values(metadata?.downloaders ?? {})
+    .filter((x) => !!x?.enabled)
     .map((x) => `${x.id}=${x.name}@${x.address}|${(x.suggestFolders ?? []).join(";")}`)
     .sort();
 

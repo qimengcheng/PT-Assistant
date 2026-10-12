@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef, type Component } from "vue";
+import { computed, ref, shallowRef, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { pickBy } from "es-toolkit";
 import { isEmpty } from "es-toolkit/compat";
@@ -10,11 +10,13 @@ import {
   ExclamationCircleOutlined,
   ImportOutlined,
   QuestionCircleOutlined,
+  SearchOutlined,
   ToolOutlined,
 } from "@antdv-next/icons";
 import { EResultParseStatus, type ISiteMetadata, type ISiteUserConfig, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";
+import { filterSitesByKeyword } from "@/shared/siteSearchFilter.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useResetableRef } from "@/options/directives/useResetableRef.ts";
@@ -49,11 +51,24 @@ const metadataStore = useMetadataStore();
 // 获取所有能添加的站点
 const canAddSites = shallowRef<Record<TSiteID, ISiteMetadata>>({});
 
-const realCanAutoAddSiteId = computed(() =>
-  Object.values(canAddSites.value)
-    .filter((x) => !x.userInputSettingMeta && x.type === "private")
-    .map((x) => x.id),
+/**
+ * 搜索过滤（用户 2026-10-12：「这个界面应该支持搜索过滤」）。
+ * 未添加的站点有几百张卡，原先只能一页一页翻 —— 想找「所有 NexusPHP 的站」或「海胆」都得靠肉眼。
+ * 判据在 `@/shared/siteSearchFilter.ts`（能直接跑断言），这里不另写一份字符串匹配。
+ */
+const keyword = ref("");
+
+const filteredSites = computed(() => filterSitesByKeyword(Object.values(canAddSites.value), keyword.value));
+
+/** 「全选 / 反选」吃的那一份：过滤生效时只选得着**过滤结果里**可自动添加的那些 */
+const selectableFilteredIds = computed(() =>
+  filteredSites.value.filter((x) => !x.userInputSettingMeta && x.type === "private").map((x) => x.id),
 );
+
+const isFiltering = computed(() => keyword.value.trim() !== "");
+
+/** 过滤前那一共多少（计数行右边那个「共 M」） */
+const siteTotal = computed(() => Object.keys(canAddSites.value).length);
 
 /**
  * 旧版返回 mdi-xxx 字符串图标，antdv-next 要求组件对象；
@@ -183,6 +198,7 @@ async function doAutoImport() {
 
 async function dialogEnter() {
   resetImportStatus(); // 重置状态
+  keyword.value = ""; // 上次筛的那一串不该留给下一次打开
   const allCanAddedSite = await getCanAddedSiteMetadata(); // 加载待添加站点
   canAddSites.value = pickBy(allCanAddedSite, (site) => site.isDead !== true) as Record<string, ISiteMetadata>;
 }
@@ -222,14 +238,34 @@ async function dialogEnter() {
       <template #action>
         <!-- 原先这里包了一层 a-space :size="4"，对多根组件不起作用（它只数得见一个孩子），
              缝现在由 CheckSwitchButton 自己给，那层壳留着只会多套一层 -->
-        <CheckSwitchButton v-model="importStatus.toWork" :all="realCanAutoAddSiteId" />
+        <CheckSwitchButton v-model="importStatus.toWork" :all="selectableFilteredIds" />
       </template>
     </a-alert>
 
+    <!-- 过滤那一行：输入框在工具条那一档就是默认档（32px），不写 size -->
+    <div class="site-filter mb-2">
+      <a-input
+        v-model:value="keyword"
+        allow-clear
+        :placeholder="t('SetSite.oneClickImportDialog.searchPlaceholder')"
+        style="width: 320px; max-width: 100%"
+      >
+        <template #prefix>
+          <SearchOutlined />
+        </template>
+      </a-input>
+      <span v-if="isFiltering" class="site-filter-count">
+        {{ t("SetSite.oneClickImportDialog.filterCount", { n: filteredSites.length, total: siteTotal }) }}
+      </span>
+    </div>
+
     <a-skeleton v-if="isEmpty(canAddSites)" active :paragraph="{ rows: 8 }" class="site-skeleton" />
+    <div v-else-if="filteredSites.length === 0" class="site-filter-empty">
+      {{ t("SetSite.oneClickImportDialog.filterEmpty", { keyword: keyword.trim() }) }}
+    </div>
     <a-checkbox-group v-else v-model:value="importStatus.toWork" class="site-grid">
       <a-row :gutter="8">
-        <a-col v-for="site in canAddSites" :key="site.id" :span="24" :sm="12" :md="8" class="site-col">
+        <a-col v-for="site in filteredSites" :key="site.id" :span="24" :sm="12" :md="8" class="site-col">
           <div class="site-card">
             <a-checkbox
               :value="site.id"
@@ -284,6 +320,25 @@ async function dialogEnter() {
 <style scoped lang="scss">
 .site-skeleton {
   padding: 12px;
+}
+
+/* 过滤那一行：输入框 + 计数，缝由 gap 给（全站口径：任何界面不许两个控件零间距贴边） */
+.site-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.site-filter-count {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.site-filter-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .site-grid {

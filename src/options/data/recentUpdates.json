@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-12 09:34:34",
-  "headSha": "048c29f",
+  "generatedAt": "2026-10-12 10:03:10",
+  "headSha": "9378c60",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.90.0",
+      "date": "2026-10-12 10:02:05",
+      "added": [
+        "「一键导入站点」现在可以搜索：按站点名称、别名、类型、标签或地址筛出没添加的那些，不用再一张张卡翻过去",
+        "筛选后「全选 / 反选」只作用于筛出来的站点，并显示「匹配 N / 共 M 个站点」；一条都没命中时会说明搜的是哪个词"
+      ],
+      "addedTotal": 2,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.89.1",
       "date": "2026-10-12 09:34:34",

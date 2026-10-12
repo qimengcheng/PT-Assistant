@@ -1550,6 +1550,9 @@
     "oneClickImportDialog": {
       "alert1": "此操作会尝试以默认配置导入你选择的站点，请确保该站点已在浏览器上登录过。导入过程不能中断，请耐心等待。",
       "alert2": "未添加的站点列表",
+      "searchPlaceholder": "搜索站点名称、别名、类型、标签或地址",
+      "filterCount": "匹配 {n} / 共 {total} 个站点",
+      "filterEmpty": "没有匹配「{keyword}」的站点",
       "importComplete": "一键导入完成，成功添加 {count} 个站点",
       "stats": "已选择 {count} 个站点，已添加 {success} 个站点，添加失败 {failed} 个站点。",
       "status": {

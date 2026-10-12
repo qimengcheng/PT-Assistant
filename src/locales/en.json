@@ -1550,6 +1550,9 @@
     "oneClickImportDialog": {
       "alert1": "This operation will attempt to import the sites you select with default configurations. Please ensure you have logged into these sites in your browser. The import process cannot be interrupted, please wait patiently.",
       "alert2": "List of unadded sites",
+      "searchPlaceholder": "Filter by site name, alias, schema, tag or address",
+      "filterCount": "{n} of {total} sites match",
+      "filterEmpty": "No site matches \"{keyword}\"",
       "importComplete": "One-click import complete, successfully added {count} sites",
       "stats": "Selected {count} sites, added {success} sites, failed to add {failed} sites.",
       "status": {

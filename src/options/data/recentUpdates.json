@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-12 17:58:20",
-  "headSha": "30c1f2b",
+  "generatedAt": "2026-10-12 18:19:10",
+  "headSha": "16cbb78",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.92.3",
+      "date": "2026-10-12 18:17:42",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「升级进度」展开后的当前值改成浮在等级表左外侧的一张卡，不再挤在要求值前面",
+        "等级要求与当前值里的分享率统一显示成两位小数，不再出现 6.68369301494062 这种原值"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.92.2",
       "date": "2026-10-12 17:56:25",

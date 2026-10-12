@@ -9,6 +9,7 @@ import {
 } from "@ptd/site";
 import { formatNumber, formatSize, formatDate, simplifyNumber } from "@/options/utils";
 import { useConfigStore } from "@/options/stores/config";
+import { formatRatioText } from "@/shared/ratioGuard.ts";
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
@@ -159,14 +160,20 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
     {{ formatSize(levelRequirement.totalTraffic) }};
   </template>
 
+  <!--
+    分享率走 `shared/ratioGuard.ts` 的 formatRatioText，不在这格自己写判据：站点报的是
+    浮点原值（实测见过 6.68369301494062），直接插值就是用户报的「当前值那一串里有个十几位
+    的小数」。这一份折的是 `0.85` / `∞` / `-` 三档，与「我的数据 → 分享率」那一列同一口径；
+    需求侧的整数 1 因此画成 1.00 —— 两处共用一份格式化，比让需求与现状两种写法更稳。
+  -->
   <template v-if="levelRequirement.ratio && !hideRatioInTable">
     <ColumnHeightOutlined class="level-require-icon level-require-icon--orange" :title="t('levelRequirement.ratio')" />
-    {{ levelRequirement.ratio }};
+    {{ formatRatioText(levelRequirement.ratio) }};
   </template>
 
   <template v-if="levelRequirement.trueRatio && !hideRatioInTable">
     <AimOutlined class="level-require-icon level-require-icon--orange" :title="t('levelRequirement.trueRatio')" />
-    {{ levelRequirement.trueRatio }};
+    {{ formatRatioText(levelRequirement.trueRatio) }};
   </template>
 
   <template v-if="levelRequirement.seeding">

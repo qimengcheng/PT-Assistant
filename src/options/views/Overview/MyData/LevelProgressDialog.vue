@@ -87,26 +87,36 @@ function dotItems(row: ILevelProgressRow) {
 }
 
 /**
- * 「下一级」那一行左边的当前值。只摆在那一级 —— 要回答的是「我离这一级还差什么」，
- * 每级都挂一串自己的数字会把表压成两列数字，反而看不出对照的是哪一行。
+ * 「当前值」那张悬浮卡，只挂在下一级那一行的**左边**（用户 2026-10-12 第二次指明：
+ * 「都说了放左边悬浮着，你放这里好难看啊」—— 上一版把它并排塞在需求值左侧，占了正文宽度）。
+ * 定位见下面 `.lp-current` 那条：绝对定位到 `.lp-detail-line` 的左外侧，所以它不吃表体宽度、
+ * 也不把那一行撑高。
+ *
  * 一项都对不上时整块不出（该级只要求入站时长，或这些字段站点压根没报数），不留一个空壳。
  */
 function currentValuesChip(row: ILevelProgressRow, level: ILevelRequirement) {
   const values = buildCurrentValues(row.userInfo, level);
   if (Object.keys(values).length === 0) return null;
   return h("div", { class: "lp-current" }, [
-    h("span", { class: "lp-current-label" }, t("MyData.levelProgress.currentValues")),
-    h(UserLevelsComponent, { userInfo: row.userInfo, levelRequirement: values, useJoinTimeAsRef: true }),
+    h("div", { class: "lp-current-label" }, t("MyData.levelProgress.currentValues")),
+    /**
+     * 这层 div 不能省：`UserLevelsComponent` → `UserLevelShowSpan` 是多根 fragment，
+     * 直接当 flex 子项会把「图标 / 值 / 分号」逐个提成 flex 项、各占一行。
+     */
+    h(
+      "div",
+      { class: "lp-current-values" },
+      h(UserLevelsComponent, { userInfo: row.userInfo, levelRequirement: values, useJoinTimeAsRef: true }),
+    ),
   ]);
 }
 
-/** 展开后的纵向阶梯：每级一行，等级名 + 该级要求（下一级那一行前面并上当前值）+ 特权说明 */
+/** 展开后的纵向阶梯：每级一行，等级名 + 该级要求（下一级那一行的左外侧浮一张当前值卡）+ 特权说明 */
 function detailItems(row: ILevelProgressRow) {
   return row.ladder.map((level) => ({
     title: level.name,
     content: h("div", { class: "lp-detail" }, [
       h("div", { class: "lp-detail-line" }, [
-        row.nextLevel?.id === level.id ? currentValuesChip(row, level) : null,
         /**
          * 必须再包一层 div：`UserLevelsComponent` 往下到 `UserLevelShowSpan` 是**多根 fragment**
          * （每档要求 = 图标 + 值 + 一枚字面量 `;`，全是平级的根节点）。fragment 直接当 flex 子项时，
@@ -115,6 +125,7 @@ function detailItems(row: ILevelProgressRow) {
          * 一排读下来和「我的数据」表格里那一格一致。
          */
         h("div", { class: "lp-detail-req" }, h(UserLevelsComponent, { userInfo: row.userInfo, levelRequirement: level, useJoinTimeAsRef: true })),
+        row.nextLevel?.id === level.id ? currentValuesChip(row, level) : null,
       ]),
       level.privilege ? h("div", { class: "lp-privilege" }, level.privilege) : null,
     ]),
@@ -418,26 +429,38 @@ function rankText(row: ILevelProgressRow): string {
   color: rgba(0, 0, 0, 0.45);
 }
 
-/* 下一级那一行：当前值摆在需求值左边。两串走的是同一个 UserLevelShowSpan，图标与单位一一对得上，
-   所以并排读就是逐字段对照；放不下时整行换行，而不是把其中一串压扁。 */
+/* 下一级那一行是这张卡的定位基准。它自己不再是 flex 行 —— 卡片走绝对定位到左外侧，
+   留在正常流里的只有需求值那一串。 */
 .lp-detail-ladder :deep(.lp-detail-line) {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
+  position: relative;
 }
 
-/* 淡蓝底 = 「这一串是你的数」，与等级浮层里「你当前所在那一级」的高亮同族 */
+/*
+ * 当前值卡：浮在等级表左外侧那条空档里（用户点名要的位置），垂直对齐到它所属那一行。
+ * `right: calc(100% + 12px)` 是「贴在这行的左外面」，不需要 JS 量行高 —— 行高会随
+ * 特权说明的有无变化，靠量再定位的那套一改就漂。
+ * 不透明底 + 描边 + 一点投影：它是盖在左栏上面的，没有底色的话字会叠字。
+ * `max-width` 由台架量出来：左栏 240 + 行间距 12 + 阶梯内衬 12 + 展开图标位 ≈ 300px 可用，
+ * 给到 220 既放得下「↓ 78.31 GiB; ↑ 6.68; ⚡ 4,939.00」这一串（超宽自动换行），
+ * 又不会顶到弹窗左内衬。
+ */
 .lp-detail-ladder :deep(.lp-current) {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: rgba(22, 119, 255, 0.06);
+  position: absolute;
+  top: 0;
+  right: calc(100% + 12px);
+  z-index: 1;
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 8px;
+  border: 1px solid var(--pt-color-border-light);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  line-height: 1.5;
 }
 
 .lp-detail-ladder :deep(.lp-current-label) {
+  margin-bottom: 2px;
   color: rgba(0, 0, 0, 0.45);
 }
 </style>

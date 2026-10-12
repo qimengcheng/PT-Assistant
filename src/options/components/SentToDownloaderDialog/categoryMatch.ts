@@ -44,7 +44,9 @@ export interface ICategorySource {
  * 三档匹配整个不跑 —— 界面上表现成「选了 8 条电影，保存路径却还是上次那个 category:剧集」。
  * 搜索结果表格里那列显示的「电影」是折类后的统一名，不是原值，两边对不上就是这么来的。
  *
- * 两种都不成立时返回全 null：**不取多数派**，这一版弹窗对整批种子用的是同一个 savePath。
+ * 两种都不成立（各站写法不同、折出来也不是同一类）时按**出现次数最多**的那一类算，
+ * 并列才返回 null —— 这一版弹窗对整批种子用的是同一个 savePath，所以「按多的那个算」
+ * 是他 2026-10-12 定的口径，不是漏判。
  */
 /**
  * 这一批里出现过的分类**原样叫法**（去首尾空白、去空、去重，保持首次出现顺序）。
@@ -55,6 +57,26 @@ export function batchCategoryRaws(items: readonly ICategorySource[]): string[] {
   return [...new Set(items.map((item) => String(item.category ?? "").trim()).filter(Boolean))];
 }
 
+/**
+ * 折过类的投票结果：`[类别, 条数]`。折不出来（`other`）的那几条不参与 —— 那是「未知」，
+ * 既不该被当成一个类别，也不该去否决别人。
+ * 折类按「每一条各自的站点覆盖表」算，所以逐条折再去数，不能只折 raws（那会丢掉 site 维度）。
+ */
+function kindVotes(
+  items: readonly ICategorySource[],
+  siteMapOf: (siteId: string) => Record<string, string> | undefined,
+): [TCategoryKind, number][] {
+  const counts = new Map<TCategoryKind, number>();
+  for (const item of items) {
+    const raw = String(item.category ?? "").trim();
+    if (!raw) continue;
+    const kind = categorizeCategory(raw, siteMapOf(item.site ?? ""));
+    if (kind === "other") continue;
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  return [...counts];
+}
+
 export function sharedCategory(
   items: readonly ICategorySource[],
   siteMapOf: (siteId: string) => Record<string, string> | undefined = () => undefined,
@@ -62,14 +84,18 @@ export function sharedCategory(
   const raws = batchCategoryRaws(items);
   if (raws.length === 0) return { raw: null, kind: null };
 
-  // 折类是按「每一条各自的站点覆盖表」算的，所以逐条折再去重，不能只折 raws（那会丢掉 site 维度）
-  const kinds = new Set<TCategoryKind>(
-    items
-      .filter((item) => String(item.category ?? "").trim() !== "")
-      .map((item) => categorizeCategory(String(item.category).trim(), siteMapOf(item.site ?? ""))),
-  );
-  const [only] = [...kinds];
-  const kind = kinds.size === 1 && only !== "other" ? only : null;
+  const votes = kindVotes(items, siteMapOf);
+  // 整批同类直接取；有分歧时按**出现次数最多**的那一类算（他 2026-10-12：
+  // 「像这种分类不一样的就按照多的那个算，这张截图上点辅种检测就应该把分类自动选中综艺」——
+  // 同一部内容在 4 个站被分别标成 3 综艺 + 1 电视剧，旧判据在此判成「没有共有分类」，整批不预选）。
+  // 只认「唯一最多」：2 + 2 并列时不猜，猜错等于把整批塞进一个谁都没说过的分类。
+  let kind: TCategoryKind | null = null;
+  if (votes.length === 1) {
+    kind = votes[0][0];
+  } else if (votes.length > 1) {
+    const [top, second] = [...votes].sort((a, b) => b[1] - a[1]);
+    if (top[1] !== second[1]) kind = top[0];
+  }
 
   return { raw: raws.length === 1 ? raws[0] : null, kind };
 }

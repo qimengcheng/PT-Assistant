@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-12 18:49:14",
-  "headSha": "71185dc",
+  "generatedAt": "2026-10-12 20:44:14",
+  "headSha": "6decf96",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.92.8",
+      "date": "2026-10-12 20:43:45",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「升级进度」展开后，左边那张「当前值」卡挪到了等级表外面，不再压住级数编号"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.92.4",
       "date": "2026-10-12 18:48:44",

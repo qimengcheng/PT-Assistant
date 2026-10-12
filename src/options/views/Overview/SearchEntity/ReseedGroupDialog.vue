@@ -96,7 +96,22 @@ const rows = computed<IRow[]>(() => {
 });
 
 const columns = computed<TableColumnsType<IRow>>(() => [
-  { title: t("SearchEntity.reseedGroups.colSize"), key: "size", width: 104, align: "end" },
+  {
+    title: t("SearchEntity.reseedGroups.colSize"),
+    key: "size",
+    width: 104,
+    align: "end",
+    /**
+     * 按大小排（用户 2026-10-12 提的）：这一屏默认按「最值得辅」排（站点数 → 条数 → 大小，
+     * 已在做种的那一档再整体提到最前），而他想换一档时读的是「哪一档装得下」——那是按体积问的。
+     * 必须给真正的 compare：只写 `sorter: true` 的话 antd 的 getSortFunction 会静默跳过，
+     * 箭头会动、数据不排（AGENTS §3.4）。
+     * 点排序之后「在做种优先」那个分区就被覆盖，这是他要的效果；「最多站点共有」那颗标记
+     * 按身份（`isBest`）跟着自己那一行走，不看界面第几行，所以不会留在错行上。
+     */
+    sorter: (a: IRow, b: IRow) => a.size - b.size,
+    sortDirections: ["descend", "ascend"],
+  },
   { title: t("SearchEntity.reseedGroups.colRows"), key: "rows", width: 76, align: "end" },
   // 84 = 表头三字实测 39 + 内衬 16×2 + 余量（这一列要容得下「数字 + 一颗 14px 图标」）
   { title: t("SearchEntity.reseedGroups.colSeeding"), key: "seeding", width: 84, align: "end" },

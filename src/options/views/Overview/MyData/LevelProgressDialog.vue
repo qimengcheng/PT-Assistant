@@ -91,7 +91,14 @@ function detailItems(row: ILevelProgressRow) {
   return row.ladder.map((level) => ({
     title: level.name,
     content: h("div", { class: "lp-detail" }, [
-      h(UserLevelsComponent, { userInfo: row.userInfo, levelRequirement: level, useJoinTimeAsRef: true }),
+      /**
+       * 必须再包一层 div：`UserLevelsComponent` 往下到 `UserLevelShowSpan` 是**多根 fragment**
+       * （每档要求 = 图标 + 值 + 一枚字面量 `;`，全是平级的根节点）。fragment 直接当 flex 子项时，
+       * 这些节点会被逐个提成 flex 项，而 `.lp-detail` 是 column → 图标、数值、分号各占一行
+       * （用户截图上那个「🕐 / 2W / ;」就是这么来的）。包成普通块级元素后它们回到行内流，
+       * 一排读下来和「我的数据」表格里那一格一致。
+       */
+      h("div", { class: "lp-detail-req" }, h(UserLevelsComponent, { userInfo: row.userInfo, levelRequirement: level, useJoinTimeAsRef: true })),
       level.privilege ? h("div", { class: "lp-privilege" }, level.privilege) : null,
     ]),
   }));
@@ -237,12 +244,16 @@ function rankText(row: ILevelProgressRow): string {
             <span class="lp-next-name">
               {{ t("MyData.levelProgress.nextLevel", { name: levelNameOf(row, row.currentIndex + 1) }) }}
             </span>
-            <UserNextLevelUnMet
-              :next-level-un-met="row.unmet"
-              :user-info="row.userInfo"
-              :show-next-level-name="false"
-              icon-class="mr-1"
-            />
+            <!-- 同 detailItems 里那层包裹一个道理：这一排是 flex（gap 4px），不包的话 fragment 的
+                 每个节点都成 flex 项，图标与数值之间、数值与 `;` 之间都会被拉开一道缝。 -->
+            <span class="lp-next-req">
+              <UserNextLevelUnMet
+                :next-level-un-met="row.unmet"
+                :user-info="row.userInfo"
+                :show-next-level-name="false"
+                icon-class="mr-1"
+              />
+            </span>
           </div>
 
           <div v-if="expandedSites.has(row.site)" class="lp-detail-ladder">

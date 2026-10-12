@@ -5,16 +5,31 @@
  * （同一批 .torrent 转发的），下载任意一条就能给其余各站辅种。用户要自己按大小列排序、
  * 扫一遍看哪一档重复最多、再逐条勾上 —— 这一步替他做掉。
  *
- * 判据是**字节数完全相同**，不是"差不多大"：
- *  - 同一份数据在不同站上大小报得一模一样（都是那串 bytes），这是辅种的前提；
- *  - 同一片内容的不同压制（56.72 GiB / 56.58 GiB）大小必然不同，而它们**不是**同一份数据，
- *    放一起辅种会被第 2 层指纹判成数据不符。所以这里宁可漏，不许近似。
+ * **分档看的是「大小那一列显示成什么」，不是原始字节相等**（v0.91.0 改的，之前按字节完全相同分，
+ * 把 YemaPT 整站排除了）。原因：各站报大小的**精度不一样**。
+ *  - NexusPHP 那一族是从页面上那串「17.18 GiB」反乘回字节的 ——
+ *    `packages/site/schemas/AbstractBittorrentSite.ts:663` 那条兜底对字符串一律走 `parseSizeString`，
+ *    于是 17.18 × 2³⁰ = 18446884536.32，一个**带小数**的字节数；
+ *  - 而报精确字节的站（走 openApi 的那类）同一份数据拿到的是另一个数，两边差几千字节 ——
+ *    实测 `formatSize` 对 18446884536.32 与 18446881536 印出来都是 17.18 GiB。
+ *    （YemaPT 具体落在哪一侧没在他的数据上验过，也不需要：两边只要不在同一个数上，
+ *    旧判据就把它们分开，而这条判据按显示值并回来。）
+ *  - 界面上那一格都印成 17.18 GiB，按字节比就永远凑不到一组，那一档只剩它一个站 ⇒ 被
+ *    「≥2 站才有辅种价值」那条丢掉，表现成「这个站怎么哪个组合里都没有」。
+ * 所以档按 `sizeKey` 给（默认仍是精确字节，UI 那侧传的是列表里同一个 `formatSize`）：
+ * **看到的大小一样，就算同一份**。这不是「差不多大」——同一片内容的不同压制差的是 0.2 GiB
+ * 量级（用户那一屏上六档：3.90 / 5.20 / 9.80 / 13.23 / 13.44 / 17.18 GiB），远在一档之外。
+ *
+ * 用**桶**而不是「两两相差小于容差」：后者不是等价关系（a≈b、b≈c 而 a≁c），
+ * 分组会随遍历顺序变，同一批数据两次打开可能给出不同的组。
  *
  * 站点数要**去重**：同一次搜索里一个站点可能经多个入口返回同一条（不同 key 的搜索入口、
  * 或结果被合并进来两次），不去重会把「1 个站发了 3 条」报成「3 个站都有」。
  *
  * 纯判据，不碰界面也不碰浏览器 API —— 行为断言直接 import 这个文件跑（见 .tmp-build 里的
  * best-reseed-test.mjs），同族先例 `src/shared/reseedRecommend.ts`。
+ * 也**不许**在这里 import `formatSize`：它住在 `src/options/utils.ts`，会把 filesize 与一堆
+ * options 依赖拖进来，这个文件的 Node 可 import 性就没了（同 `shared/levelProgress.ts` 那条约束）。
  *
  * 对外两个出口：{@link findBestReseedGroup} 给工具条那颗 chip（只要最值得的那一档），
  * {@link findAllReseedGroups} 给「更多」那一屏（把每一档都列出来让人挑 —— 最佳那档
@@ -53,7 +68,10 @@ export function isStatusKnown(status: unknown): boolean {
 }
 
 export interface IReseedGroup<T> {
-  /** 这一组的字节数 */
+  /**
+   * 这一档的字节数，取组内**最大**的那个值（不看遍历顺序，所以同一批数据两次算出来是同一个数）。
+   * 界面上那一格 `formatSize(size)` 印出来的就是这一档的档名 —— 组里每一条都印成同一个字。
+   */
   size: number;
   /** 组内结果，顺序沿用传进来的顺序（界面上就是列表顺序，不重排） */
   items: T[];
@@ -79,34 +97,49 @@ export function toSizeBytes(raw: unknown): number | null {
 }
 
 /**
+ * 不传 `sizeKey` 时的档名 = 精确字节。留着它只为让「按字节完全相同」这一档还能被断言直接跑到；
+ * **界面那侧必须传列表里同一个 `formatSize`** —— 不传就退回 v0.91.0 之前那个把 YemaPT 整站
+ * 排掉的形状（原因见文件头那段）。
+ */
+const exactBytesKey = (row: IReseedGroupRow) => String(toSizeBytes(row.size));
+
+/**
  * 所有可辅种的一档一档，按「最值得辅」从前往后排在第一位。
  *
  * 排序就是 {@link findBestReseedGroup} 原来那套并列判据（站点数 → 条数 → 大小），
  * 完全并列时保留输入顺序 —— 与旧版「先遇到者赢」一字不差，所以 `[0]` 恒等于旧版的最佳那档。
  * 界面上「更多」列的是这整个数组，chip 上写的是它的第 0 项。
  */
-export function findAllReseedGroups<T extends IReseedGroupRow>(rows: T[] | null | undefined): IReseedGroup<T>[] {
-  const bySize = new Map<number, T[]>();
+export function findAllReseedGroups<T extends IReseedGroupRow>(
+  rows: T[] | null | undefined,
+  sizeKey: (row: T) => string | null | undefined = exactBytesKey,
+): IReseedGroup<T>[] {
+  const byKey = new Map<string, T[]>();
   for (const row of rows ?? []) {
     if (!row || typeof row !== "object") continue;
-    const size = toSizeBytes(row.size);
-    if (size === null) continue;
-    const list = bySize.get(size);
+    // 大小拿不出来的（缺字段 / 0 / 带单位串 / NaN）不进任何一档，也不拿它去和别的凑一份
+    if (toSizeBytes(row.size) === null) continue;
+    const key = sizeKey(row);
+    if (!key) continue;
+    const list = byKey.get(key);
     if (list) list.push(row);
-    else bySize.set(size, [row]);
+    else byKey.set(key, [row]);
   }
 
   const groups: IReseedGroup<T>[] = [];
-  for (const [size, items] of bySize) {
+  for (const items of byKey.values()) {
     const sites = new Set<string>();
     let seedingCount = 0;
     let statusKnown = false;
+    let size = 0;
     for (const item of items) {
       const site = String(item.site ?? "");
       if (site) sites.add(site);
       if (isSeedingStatus(item.status)) seedingCount++;
       // 「报得出」要按整组求或：一条报得出、另一条缺字段，这一档仍然判得出有没有在做种
       if (isStatusKnown(item.status)) statusKnown = true;
+      const bytes = toSizeBytes(item.size) as number;
+      if (bytes > size) size = bytes;
     }
     // 只有一站收录的没有辅种价值（辅的是别的站），不进列表
     if (sites.size < 2) continue;
@@ -120,6 +153,9 @@ export function findAllReseedGroups<T extends IReseedGroupRow>(rows: T[] | null 
  * 找出被最多站点共有的一份；没有任何一档被 ≥2 个站点共有时返回 null（没得辅种，提示就不出）。
  * 并列时先比条数、再比大小（大的那份重下一次的代价更高，更值得辅）。
  */
-export function findBestReseedGroup<T extends IReseedGroupRow>(rows: T[] | null | undefined): IReseedGroup<T> | null {
-  return findAllReseedGroups(rows)[0] ?? null;
+export function findBestReseedGroup<T extends IReseedGroupRow>(
+  rows: T[] | null | undefined,
+  sizeKey?: (row: T) => string | null | undefined,
+): IReseedGroup<T> | null {
+  return findAllReseedGroups(rows, sizeKey)[0] ?? null;
 }

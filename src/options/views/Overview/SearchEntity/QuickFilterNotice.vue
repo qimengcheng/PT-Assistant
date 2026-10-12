@@ -57,11 +57,12 @@ const selectedTorrentsInfo = computed(() => {
 });
 
 /**
- * 这批结果里所有可辅种的一档一档（判据、以及为什么按「字节完全相同」算，都在
- * src/shared/bestReseed.ts）。排第一的就是那颗 chip。没有任何一档被 ≥2 站共有时是空数组，
- * chip 和「更多」都不出。
+ * 这批结果里所有可辅种的一档一档（判据、以及为什么按「大小那一列显示成什么」分档，都在
+ * src/shared/bestReseed.ts）。传进去的 `sizeKey` **就是列表里那一格用的同一个 `formatSize`**，
+ * 所以这条不变量是构造上成立的：两行的大小写得一样，就会被算进同一档。
+ * 排第一的就是那颗 chip。没有任何一档被 ≥2 站共有时是空数组，chip 和「更多」都不出。
  */
-const reseedGroups = computed(() => findAllReseedGroups(allTorrents));
+const reseedGroups = computed(() => findAllReseedGroups(allTorrents, (row) => String(formatSize(row.size ?? 0))));
 const bestGroup = computed(() => reseedGroups.value[0] ?? null);
 
 const showBestReseedDialog = ref(false);

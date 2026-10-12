@@ -26,7 +26,7 @@
 | 12 | 布局 | `.content` 必须 `min-width: 0`，`a-table` 必须给 `scroll.y` |
 | 13 | 本机环境 | `TEMP=$PWD/.tmp-build` 免重启绕过；⚠️ 杀软相关，不入库 |
 | 14 | 多会话协作 | 三层：会话隔离真身 + 固定联接 + 构建互斥锁 |
-| 15 | 存储 | 三条 RPC 已删，各上下文直连 `extStore`；互斥只在上下文内部 |
+| 15 | 存储 | 各上下文直连 `extStore` **只对 SW/options/content 成立**；offscreen 拿不到 `chrome.storage`（Chrome 硬限制），那一路走 SW 的三条代理消息（v0.5.19 改回来的，见该节的现状订正）。互斥只在各上下文内部 |
 | 16 | UI | 新增 `a-*` 用法后跑一次 `check-dead-props.mjs` |
 | 17 | UI | 列渲染只走插槽，没有 `customRender` |
 | 18 | UI / 包体 | 加标签先补 `antd-lite.ts` 清单，否则线上静默空白 |
@@ -35,7 +35,7 @@
 | 21 | 版本号 | amend 顺手改号会造死号；`--no-verify` 曾是唯一出路（现已不需要） |
 | 22 | 多会话协作 | `--amend` 前必须确认 HEAD 是你自己的那条，否则会改掉别人的提交 |
 | 23 | 发版 | 一次 push 攒多个版本号，只有最顶那版拿到 tag |
-| 24 | CI | 曾把 workflow 写成 `build.yml` / `release.yml`，实际只有 `ci.yml` |
+| 24 | CI | （已删：那节只记了一处文档笔误）真源只有一个 `ci.yml`，现状见 README |
 | 25 | service worker | 「导入即开库」的共享库接进 SW，只有跑产物才炸出来 |
 | 26 | store 水合 | 5 秒 debounce 掩盖竞态：症状没了，代价摊给所有人 |
 | 27 | 守卫边界 | 水合守卫首版把纯透传 getter 误报 |
@@ -101,13 +101,12 @@ git log --format=%s | grep "v0\.X\.Y\b"
 而状态文件标记「已完成」，后续 `install` 直接跳过，越修越乱。
 
 **当时的做法**：`pnpm-workspace.yaml` 写 `nodeLinker: hoisted`（npm 式扁平布局），并把它记成**长期状态**。
-那句话当时没有复现步骤，而同一次提交的「踩坑 1」对 rolldown 病因的诊断后来已被实测推翻（§1）——
-同一批记录，可信度要一起打折。
+那句话当时没有复现步骤。
 
 **2026-10-12 重测（pnpm 12.8.1 / Node 24，与 10-02 同版本）**：仓库外空目录只放 `package.json` +
 `pnpm-lock.yaml` 装一份 isolated，11.2s 退出 0；**逐个声明的直接依赖查到 `node_modules/<名>/package.json`
 读得开，46 个一个不缺**。判据必须是逐条查而不是数顶层条目 —— 后一种数法会把 scoped 目录算成一个，
-本机 46 个声明只摊出 39 个条目，拿它当「全在」会把结论建立在错判据上（我第一版探针就错在这儿）。
+本机 46 个声明只摊出 39 个条目，拿它当「全在」会把结论建立在错判据上。
 「半成品」那半没复现，所以 `hoisted` 撤了。
 
 **「状态文件标已完成、普通 `install` 不修」这半是真的**，2026-10-12 原样复现过一次：顶层缺两个链接，
@@ -396,7 +395,7 @@ SSR 环境下 `vite:css-post` 那张 `cssModulesCache` 没被填，任何 `?vue&
 
 **没做到的**：**像素层面没验**（首页那张卡片会不会把欢迎语挤成第三行、那一页的间距节奏），
 `updateAvailable` 那一支也没渲染到 —— SSR 不跑 `onMounted`，读不到缓存就永远停在 initial 态。
-浏览器台架那条路试过两次：以仓库根为 root 时 vite 的冷启动预打包要把整条 options 图
+浏览器台架那条路走不通：以仓库根为 root 时 vite 的冷启动预打包要把整条 options 图
 （antdv-next + `@ptd/site` 工具桶 + social/sizzle + downloader/backupServer 包）收一遍，
 在本机的隐藏页里始终不收敛，`#app` 一直是空的。所以这两处按「构建产物交给他肉眼验收」收尾。
 
@@ -405,6 +404,14 @@ SSR 环境下 `vite:css-post` 那张 `cssModulesCache` 没被填，任何 `?vue&
 ## 四、存储
 
 ### 15. 存储读写不再经 background 代理（2026-10-03）
+
+> ⚠️ **现状订正（2026-10-12 对着代码核过，本节下面那两段只对 content 成立）**：这一节记的是
+> 「三条 RPC 全删、各上下文都直连」那一版，**v0.5.19 已经改回来一半** —— offscreen 拿不到
+> `chrome.storage` 不是权限问题，是 Chrome 的硬限制：那个上下文里只有 `chrome.runtime`，连
+> `runtime.getManifest` 都不给，直连 wxt/storage 会抛 "You must add the 'storage' permission"。
+> 现在 `extStore` **按上下文自动二选一**：SW / options / content 直连，offscreen 走 SW 的
+> get / set / patch 三条代理消息（handler 在 `background/utils/base.ts`，分流在 `src/storage.ts`
+> 的 `createRemoteExtStore` + `hasDirectStorageAccess`）。互斥仍然只在各上下文内部 —— 这条没变。
 
 **做了什么**：`getExtStorage` / `setExtStorage` / `setExtStoragePath` 三条 RPC 与 background 侧的三个 handler 已删除，
 57 处调用点（offscreen 43、options 9、content 引导 2、site 包 adapter 3）改为直连 `extStore`。
@@ -549,10 +556,10 @@ NO_IMAGE 又是透明图，所以失败在界面上不可见：不是「裂图�
 
 **现在的做法**：**每个版本号单独 push**（AGENTS.md §2.4）。
 
-### 24. workflow 文件名曾被文档写错
+### 24. （已删 —— 原节只记了一处文档笔误）
 
-旧文档写的 `build.yml` / `release.yml` **两个文件都不存在**，v0.22.13 那轮文档订正漏掉了这处。
-真源只有一个：`.github/workflows/ci.yml`，三个 job 串起来 `verify → build → release`。
+编号不复用（AGENTS.md §2.4 和若干注释引用过它）。剩下的那半句事实属于现状，写在 README
+「工程化体系」里：workflow 真源只有 `.github/workflows/ci.yml` 一个文件，没有 `build.yml` / `release.yml`。
 
 ---
 
@@ -636,7 +643,8 @@ configStore 是同一条链上的另一个受害者：不等它，用户设的�
 **冷接入口径**（要改这里的人先看这段，别直接加严）：**只有 error 判失败**。首轮量到 713 条问题、
 其中 129 条 error；把 error 全修完之后是 **0 error / 638 warning**，warning 里
 `@typescript-eslint/no-explicit-any` 一条就占 424 —— 把它们当失败，等于让「装 linter」这条提交先去
-改 424 处与功能无关的东西。`packages/**`（上游零修改平移件）在配置里把报出来的 error 逐条降成 warn，
+改 424 处与功能无关的东西。`packages/**`（上游平移件 —— **不是「零修改」**，实测 96 个文件有内容差异，
+但也不是我方写的、不做批量改写）在配置里把报出来的 error 逐条降成 warn，
 理由也写在配置注释里。
 
 **三条实测，每条都会让「看起来接管了」变成静默失效**：
@@ -647,7 +655,7 @@ configStore 是同一条链上的另一个受害者：不等它，用户设的�
    选择器倒是正常报出来，所以不是没解析）。结论：模板侧必须换插件自己的
    `vue/no-restricted-static-attribute`（静态 `ok-type="danger"`）+ `vue/no-restricted-v-bind`
    （动态 `:ok-type` / `:okType` / `v-bind:ok-type` 三种都覆盖，实测各打中一次且正确写法零命中）。
-   这原话是「防线 ⑪ 整条换成 esquery」—— 那句话是错的，换成两条规则才叫接管。
+   所以**防线 ⑪ 不能整条换成 esquery** —— 换成上面这两条插件规则才叫接管。
 2. **`--fix` 会顺手改上游、还会铺一遍观感重排**。第一次 `eslint . --fix` 改了 46 个文件，其中
    `packages/**` 5 个（上游件，已 `git checkout` 还原），另有 20 多个视图文件被 `vue/attributes-order`
    重排属性 —— 那类改动与功能无关，却会把热点文件的 blame 打散。两条出路：`--fix` 的范围写死在
@@ -738,7 +746,8 @@ v0.20.0 整站接入 i18n 时，`check-locale-keys.mjs` 扫出 `ExportUserInfoDi
 - content script（引导 + 懒加载 app，站点浮窗/推送）（v0.13.1）
 - 站点图标资源目录平移（`public/icons/site`，`__RESOURCE_SITE_ICONS__`）（v0.13.1）
 - 我的数据三件套：概览表格 + echarts 统计页 + konva 时间线页（v0.13.1）
-- 面向用户文案全站接入 i18n（v0.20.0，默认语言静态注册 + 切换语言动态 import）
+- 面向用户文案全站接入 i18n（v0.20.0，两份语言包都预注册 —— CSP 下 vue-i18n 11 无法运行时编译，
+  **没有「切换语言时动态 import」这条路**；省体积的是 content 侧 `i18n-lite.ts` 只装 6 个顶层命名空间，现状见 README）
 - CI 流水线 + 4 条静态防线 + 版本号守卫 + 自动发版（v0.20.1 ~ v0.22.2）
 - 防线 ⑤：挂载钩子里命令式读异步水合 store 的守卫，并修掉它扫出的 5 处真问题（v0.22.19）
 - 种子指纹自检挂进 CI（v0.22.25）

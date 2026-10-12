@@ -53,7 +53,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 机制 | 位置 | 作用 |
 |---|---|---|
 | 提交消息守卫 | `.githooks/commit-msg` → `check-version.mjs --message-file` | 查标题里的 `vX.Y.Z` 与暂存的 `package.json` 一致，并按标题类型词**定档**（`feat` 必须进次版本，其余进修订号）；`[agent名]-[模型名]` 前缀是 AGENTS.md §1.1 的约定，没有任何脚本强制它 |
-| 版本号进位 | `scripts/check-version.mjs` | `pre-commit` 拦跳号（两档都放行，因为它这时拿不到提交消息）、`prepare-commit-msg` 拦没展开的 `@next`、`commit-msg` 钉档位、CI 用 `--committed` 兜底（clone 出的仓库没有本地 hook，`--no-verify` 也能绕过）。规则见 AGENTS.md §1.2，成因见 PLAYBOOK §30 |
+| 版本号进位 | `scripts/check-version.mjs` | `pre-commit` 拦跳号（两档都放行，因为它这时拿不到提交消息）、`prepare-commit-msg` 拦没展开的 `@next`、`commit-msg` 钉档位、CI 用 `--range $before..$after` **逐条查这次 push 区间的每一条**（v0.93.4 起；拿不到区间——force push 的全 0 基线、dispatch——自己退成 `--committed` 只查 HEAD）。为什么事后还要逐条查：clone 出的仓库可能没启用本地 hook，`--no-verify` 也能绕过，而这两种情况下只查 tip 会放过中段那几条。规则见 AGENTS.md §1.2，成因见 PLAYBOOK §30 |
 | 提交时自动算号 | `scripts/versioned-commit.mjs` → `check-version.mjs --resolve` | `git commit` 的包装：首行写 `@next` 就按类型词算出号、写 `package.json` 并只暂存这一个路径，再把展开后的消息交给 git。**没做成纯 hook** 是实测出来的（git 2.45.1）：`pre-commit` 改索引进得了提交对象，但那时看不到这次的消息；`prepare-commit-msg` 看得到消息，改的索引却进不去（tree 用更早读进内存的那份快照）——算号两半分别只有前后两个阶段拿得到，所以放在调 git 之前 |
 | 防线 ① | `scripts/check-antd-tags.mjs` | 全仓扫描写错的 `a-*` 标签（antdv-next 没有的组件写错不报错，只是静默丢内容） |
 | 防线 ② | `scripts/check-content-antd-lite.mjs` | content 侧 antd 按需注册的覆盖度比对 |
@@ -69,7 +69,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 防线 ⑫ | `scripts/check-notification-ids.mjs` | 系统通知：`create` 必须带 id、监听器必须按 id 前缀认领。`chrome.notifications.onClicked` 是全局事件、不按 id 分发，所以一个不看 `notificationId` 的监听器会把别处的通知接走（点「辅种完成」跳去 GitHub 下载页就是这么来的；AGENTS.md §3.4 表第 12 行） |
 | 防线 ⑬ | `scripts/check-eslint.mjs` + `scripts/eslint-packages-baseline.json` | ESLint 10（`eslint.config.mjs` = `@eslint/js` + `typescript-eslint` + `eslint-plugin-vue`）。判据分三档，分界线是**这份代码谁写的**：① error 一律 FAIL（全仓）；② 我方（`src` / `scripts` / 根配置）**连 warning 都不许留** —— v0.90.9 把 `no-explicit-any`（我方那份 221 条 → 0）与 `ban-ts-comment`（10 → 0）逐文件收口后升成 error，其余观感类也清干了；③ `packages/**` 是从上游平移过来的那一片（**不是「零修改」**，实测差异见上面「架构决策」的站点定义行；这一档真正的理由是「不是我方写的，不做批量改写」），那一块按基线快照**逐规则**只拦回涨（现记 407 条 / 14 条规则；按规则记而不记总数，是因为清掉一条 `prefer-const` 会腾出总数额度，就会放过一条新进的 `any`）。要留一处 `any` 得写行级 disable 并把实测依据讲清楚（先例：`TKonvaConfig` —— 改成 `unknown` 会断 13 条 vue-tsc）。它同时是 PLAYBOOK §9「禁原生 confirm/alert/prompt」、§11「别 import dayjs」、站内信正文「禁 v-html」、AGENTS §3.4「确认框那颗键」这四处**第一次真有的守卫**。自检：`src` / `packages` / `scripts` 任一块一个文件都没扫到就 FAIL —— 配置写歪时「一条 error 都没有」是假 PASS；基线文件读不到同样 FAIL（缺它等于第 ③ 档没门禁） |
 | 防线 ⑭ | `scripts/check-vitest.mjs` + `vitest.config.ts` + `tests/` | 跑 Vitest 的行为断言（v0.92.7 接入）。`vitest.config.ts` 的别名与 `wxt.config.ts` **逐条同构** —— 判据文件里写的是仓库真名（`@/…`、`@ptd/…`），测试不许为了跑得起来改成相对路径，那等于测另一份代码。四条「报干净 ≠ 真跑到了」的判据里最容易中的一项：**报告里的测试文件数要等于磁盘上 `tests` 里 `.test.ts` 的个数**（`include` 写歪时报的是「0 个文件、0 条失败」，那是最像 PASS 的假 PASS —— 已拿改坏的 include 实测反证过）；被 skip / todo 的用例也算 FAIL。当下搬进来 4 个文件 / 80 条（重下延时调度、日志总闸、升级进度排序、站点解析安全取值），`.tmp-build` 里其余一次性断言脚本仍在迁移路上（清单见文末待办） |
-| 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `build` job 也挂着它 |
+| 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开、`--range` 逐条查那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `verify` job 也挂着它（v0.93.4 起从 `build` 挪过去：它只用 node + git，自己 `git init` 临时仓库，装不装依赖与它无关，放前面早一分钟出结论） |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
 | 检查更新 | `src/shared/updateCheck.ts` + `src/entrypoints/background/utils/updateCheck.ts` | 只有 service worker 每天问一次仓库的 `releases/latest`（一条公开接口，不带账号与 cookie），结果写 `chrome.storage.local` 的 `updateCheck`；界面（基础设置 → 检查更新、首页那张卡片）只读缓存、手动检查经 `checkForUpdate` 消息交回 SW。为什么不走 `chrome.runtime.requestUpdateCheck()`、限速与「同一版本只提醒一次」的判据见 PLAYBOOK §35 |
@@ -168,7 +168,8 @@ node scripts/versioned-commit.mjs -m "[agent名]-[模型名] @next feat: 描述"
 > `pnpm version:next` / `version:check` 背后是 `scripts/check-version.mjs`，
 > **它同时是 `.githooks/` 的三个钩子**（`pre-commit` 只判相邻档、`prepare-commit-msg` 拒收没展开的
 > `@next`、`commit-msg` 按类型词钉档位）。
-> clone 出的仓库没有本地 hook，需 `git config core.hooksPath .githooks` 手动启用；
+> clone 出的仓库靠 `package.json` 的 `prepare`（`git config core.hooksPath .githooks || true`）在
+> `pnpm install` 时自动启用本地 hook（v0.93.4 起；之前是每个新克隆要手动跑一次，漏了就没有任何本地防线）；
 > CI 侧的 `verify` job 是兜底，两者互不替代。
 
 交付验收流程：本仓库常有**多个 agent 会话并行改同一棵工作树**，`wxt` 每次构建又会先清空输出目录，

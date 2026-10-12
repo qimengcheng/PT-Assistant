@@ -457,8 +457,13 @@ if (has("--message-file")) {
 
 // ---------------------------------------------------------------------------
 // --staged：pre-commit 阶段，HEAD 还是上一条提交
+//
+// 不点名 --range 时它也会命中这个默认分支（这里原本写的是「没给其它模式就当 --staged」），
+// 而 --range 是事后模式，此时暂存区属于**下一个人的工作**（CI 里是空的）—— 那会把别人的
+// 未提交 package.json 当成本次要提交的号，报一句谁都对不上的错。
 // ---------------------------------------------------------------------------
-const checkStaged = has("--staged") || (!has("--committed") && !has("--message-file"));
+const checkStaged =
+  has("--staged") || (!has("--committed") && !has("--message-file") && !has("--range"));
 
 if (checkStaged) {
   const stagedVersion = versionFrom("");
@@ -520,33 +525,156 @@ if (checkStaged) {
 }
 
 // ---------------------------------------------------------------------------
-// --committed：CI / 事后自检，校验 HEAD 这一条
+// 事后校验：--committed 查 HEAD 这一条，--range 查一个区间里的每一条
 // ---------------------------------------------------------------------------
 const checkCommitted = has("--committed") || (has("--message-file") && has("--staged"));
 
-if (checkCommitted && !checkStaged) {
-  const subject = (git("log", "-1", "--format=%s") ?? "").trim();
+/**
+ * 校验**一条已落库的提交**：三处一致 + 进位档位配类型词。
+ *
+ * --committed（只查 HEAD）与 --range（查 push 区间每一条）共用这一份判据。分开写两遍迟早会漂开，
+ * 漂开的代价是「区间说合规、tip 说不合规」这种没人能解释的组合 —— 与 versioned-commit.mjs
+ * 不复写占位符正则是同一个理由。
+ *
+ * 基线取这条提交自己的父提交（`<sha>^`），于是 feat 归零作废的那些修订号不会被当成缺口
+ * （AGENTS.md §1.2：看的是相邻两条之间有没有跳法，不是号段连不连续）。
+ * label 只用于把「是哪一条」说清；传 "HEAD" 时打印与拆出这函数之前逐字一致。
+ */
+function committedProblem(sha, label) {
+  const subject = (git("log", "-1", "--format=%s", sha) ?? "").trim();
   const inMsg = parseMsgVersion(subject);
-  const pkgVersion = versionFrom("HEAD");
-  const { max } = maxCommittedVersion("HEAD~1");
+  const pkgVersion = versionFrom(sha);
+  const { max } = maxCommittedVersion(`${sha}^`);
 
-  if (!inMsg) fail(`HEAD 提交消息里没有版本号：${subject.slice(0, 60)}`);
-  else if (!pkgVersion) fail("HEAD 的 package.json 里读不到 version");
-  else if (pkgVersion !== fmt(inMsg).slice(1)) {
-    fail(`HEAD 三处不一致：package.json=${pkgVersion}，提交消息=${fmt(inMsg)}`);
-  } else if (max && cmp(inMsg, expectedBump(max, parseMsgType(subject))) !== 0) {
-    fail(
-      `HEAD 版本号进位不对：其父提交最大是 ${fmt(max)}，HEAD 是 ${fmt(inMsg)}，` +
-        `类型词「${parseMsgType(subject) || "未识别，按修订号"}」应当是 ${fmt(expectedBump(max, parseMsgType(subject)))}` +
-        `（feat 进次版本，其余进修订号）`,
-    );
-  } else {
-    ok(`HEAD 版本号 ${fmt(inMsg)} 进位正确且三处一致`);
+  if (!inMsg) return { problem: `${label} 提交消息里没有版本号：${subject.slice(0, 60)}`, ver: null };
+  if (!pkgVersion) return { problem: `${label} 的 package.json 里读不到 version`, ver: null };
+  if (pkgVersion !== fmt(inMsg).slice(1)) {
+    return {
+      problem: `${label} 三处不一致：package.json=${pkgVersion}，提交消息=${fmt(inMsg)}`,
+      ver: fmt(inMsg),
+    };
   }
+  const type = parseMsgType(subject);
+  if (max && cmp(inMsg, expectedBump(max, type)) !== 0) {
+    return {
+      problem:
+        `${label} 版本号进位不对：其父提交最大是 ${fmt(max)}，${label} 是 ${fmt(inMsg)}，` +
+        `类型词「${type || "未识别，按修订号"}」应当是 ${fmt(expectedBump(max, type))}` +
+        `（feat 进次版本，其余进修订号）`,
+      ver: fmt(inMsg),
+    };
+  }
+  return { problem: null, ver: fmt(inMsg) };
+}
+
+if (checkCommitted && !checkStaged) {
+  const { problem, ver } = committedProblem("HEAD", "HEAD");
+  if (problem) fail(problem);
+  else ok(`HEAD 版本号 ${ver} 进位正确且三处一致`);
+}
+
+// ---------------------------------------------------------------------------
+// --range <base..head>：把这一次 push 区间里的每一条提交都过一遍同一条判据。
+//
+// 为什么需要它：--committed 只查 tip，而「绕过本地钩子」的真实形态恰恰是连提好几条
+// （--no-verify，或 clone 后没启用 core.hooksPath）—— 中段那些错档 / 跳号 / 三处不一致
+// 过去一条都看不见。AGENTS.md §1.2 末尾和 check-version-test.sh 末尾那两条断言记录的
+// 正是这个结构性盲区（「缺口进了历史中段，CI 也看不见」），这里把它关上。
+// 多会话并发也从这里得利：两个 agent 从同一基线算出同一个号，先 push 的赢，后者 rebase
+// 之后自己那条号已经过期，而 rebase 不触发任何钩子 —— 区间检查至少给出一句点名到哪条的报错。
+//
+// 拿不到区间（force push 的全 0 基线、浅克隆里没有那个对象）时报错退出 2，不自动作弊：
+// 「区间解析不出来」和「区间里没提交」是两件事，后者才是合法的没事可查。
+// 由调用方（CI 那一步）先确认两端对象在不在，再决定退回 --committed。
+// ---------------------------------------------------------------------------
+
+/**
+ * --range 从哪一版开始逐条校验，更早的不查。
+ *
+ * 这不是「放宽」，是「不追溯」，依据是把整段历史实测跑了一遍：13 条按今天的档位判据不合规，
+ * **全部**在 v0.23.0 之前（8 条早期用中文/无类型词起头却进了次版本，5 条写了 feat 却进修订号，
+ * 都早于档位判据开始逐条拦人的时候），v0.23.0 起到 HEAD 一条都没有。
+ *
+ * 为什么不改成「把那 13 条补齐」再取消 floor：本仓库做过 0.5.x → 0.2x 的整段重编号，还会再改写；
+ * 整段重写时 push 区间会把旧提交当新提交重发一遍，没有 floor 就会让一次毫不相干的维护操作
+ * 红在「祖上犯错」上，而 verify 一红 build/release 全跳过，tag 也打不出来。
+ * floor 用**版本号**不用 sha：重编号会换 sha，不会让号段整体挪位。
+ * 跳过的条数照旧出声 —— 一声不吭地少查就是假 PASS（AGENTS.md §3.4 那几条守卫反复栽过的形状）。
+ *
+ * `--since <版本>` 覆盖这个默认值（check-version-test.sh 的临时仓库用的是 0.5.x，
+ * 照默认值整个 floor 会把要测的那条一起放过 —— 那种「测试永远碰不到判据」的守卫等于没有）。
+ */
+const DEFAULT_RANGE_FLOOR = [0, 23, 0];
+
+if (has("--range")) {
+  const spec = val("--range");
+  if (!spec || !spec.includes("..")) {
+    console.error(`--range 需要一个 git 区间参数，例如 --range "$BEFORE..$AFTER"（收到：${String(spec)}）`);
+    process.exit(2);
+  }
+  let floor = DEFAULT_RANGE_FLOOR;
+  if (has("--since")) {
+    const parsed = parseVer(val("--since") ?? "");
+    if (!parsed) {
+      console.error(`--since 要的是一个三段式版本号（收到：${String(val("--since"))}）`);
+      process.exit(2);
+    }
+    floor = parsed;
+  }
+  const list = git("rev-list", "--reverse", "--no-merges", spec);
+  if (list === null) {
+    console.error(
+      `--range「${spec}」取不出提交列表 —— 区间有一端不在本地对象库里。\n` +
+        `    浅克隆（fetch-depth 不是 0）和 force push 留下的全 0 基线都会这样；这一步不该由脚本来猜，\n` +
+        `    调用方确认对象在不在之后再决定是 --range 还是 --committed。`,
+    );
+    process.exit(2);
+  }
+  const shas = list.split("\n").filter(Boolean);
+  const bad = [];
+  let skipped = 0;
+  let i = 0;
+  for (const sha of shas) {
+    i += 1;
+    const short = (git("rev-parse", "--short", sha) ?? sha.slice(0, 7)).trim();
+    const { problem, ver } = committedProblem(sha, `提交 ${short}`);
+    // 首行连版本号都取不到时无从判 floor，照旧报 —— 「没有版本号的 commit 不允许存在」是 §1.2 的硬规则。
+    if (problem && ver && cmp(parseVer(ver), floor) < 0) {
+      skipped += 1;
+      continue;
+    }
+    if (problem) bad.push(`${problem}\n    （区间 ${spec} 的第 ${i}/${shas.length} 条）`);
+  }
+  if (skipped) {
+    console.log(
+      `  · 跳过 ${skipped} 条早于 ${fmt(floor)} 的提交（不追溯，判据与依据见 DEFAULT_RANGE_FLOOR 的注释）`,
+    );
+  }
+  if (shas.length === 0) {
+    ok(`区间 ${spec} 里没有提交，无需校验`);
+  } else if (bad.length === 0) {
+    ok(`区间 ${spec} 的 ${shas.length - skipped} 条提交逐条合规（每条都对着自己的父提交进位）`);
+  } else {
+    for (const p of bad) fail(p);
+  }
+}
+
+if (has("--since") && !has("--range")) {
+  console.error(
+    `--since 只是 --range 的下限参数，单独传它谁也不读 —— 直接报错，不静默忽略（那样调用方会以为自己收紧过判据）。`,
+  );
+  process.exit(2);
 }
 
 if (errors.length > 0) {
   console.error(`\n版本号检查未通过（${errors.length} 项）。`);
-  console.error("这条提交会被拦住。若确认判断有误，先改 package.json / 提交消息，或用 --no-verify 临时绕过（不建议）。");
+  // 事后模式（CI 的 --committed / --range）里那句「用 --no-verify 绕过」把人往错方向带：
+  // 提交早已落库，钩子根本不在场。当场模式（pre-commit / commit-msg）拦的才是「这一次提交」。
+  console.error(
+    has("--committed") || has("--range")
+      ? "这几条已经落库。要改号就重写那一条（AGENTS.md §1.6：amend 不许改号，跳号中段是盲区）；" +
+        "确认是判据本身错了，就改 scripts/check-version.mjs 并跑 sh scripts/check-version-test.sh 证明没改坏。"
+      : "这条提交会被拦住。若确认判断有误，先改 package.json / 提交消息，或用 --no-verify 临时绕过（不建议）。",
+  );
   process.exit(1);
 }

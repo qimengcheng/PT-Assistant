@@ -46,6 +46,12 @@ ta() { # --amend HEAD：<用例> <期望> <消息> <版本号>
 ci() { # 事后校验 HEAD：<期望> <说明>
   out=$(node scripts/check-version.mjs --committed 2>&1); report $? "$1" "$2" "$out"
 }
+# rg：<期望> <说明> <区间> —— CI 的 push 区间逐条校验（--range），参数顺序照 ci()。
+# 必须带 --since 0.0.0：默认下限是 v0.23.0（本仓库不追溯更早的历史，理由写在脚本里那段注释），
+# 而这里的临时仓库用的是 0.5.x，照默认值整个 floor 会把要测的那条一并放过。
+rg() {
+  out=$(node scripts/check-version.mjs --range "$3" --since 0.0.0 2>&1); report $? "$1" "$2" "$out"
+}
 nx() { # --next：<期望输出> <附加参数> <说明>
   got=$(node scripts/check-version.mjs --next $2)
   [ "$got" = "$1" ] && { n=$((n+1)); pass=$((pass+1)); echo "  ok   $n $3 = $got"; } \
@@ -186,6 +192,8 @@ printf '{"name":"x","version":"0.5.0"}\n' > package.json; echo a > f.txt
 git add -A >/dev/null 2>&1; out=$(git commit -q -m "[A]-[M] v0.5.0 one" 2>&1); report $? PASS "铺垫：首条 v0.5.0" "$out"
 printf '{"name":"x","version":"0.5.1"}\n' > package.json; echo b >> f.txt
 git add -A >/dev/null 2>&1; out=$(git commit -q -m "[A]-[M] v0.5.1 two" 2>&1); report $? PASS "铺垫：推进到 v0.5.1" "$out"
+# 合规历史先过一遍 --range：下面那条 FAIL 只有在这条 PASS 的前提下才说明是「历史坏」而不是「判据坏」。
+rg PASS "区间逐条查：合规的历史放行" "$(git rev-list --max-parents=0 HEAD)..HEAD"
 # 把 v0.5.1 那条 amend 成 v0.5.2 —— pre-commit 只看「staged 是否等于 HEAD 的号」，
 # 这里不相等，走普通分支，candidates = max(历史)+1 = 0.5.2，于是放过；0.5.1 从此成为死号。
 printf '{"name":"x","version":"0.5.2"}\n' > package.json; echo c >> f.txt
@@ -193,9 +201,16 @@ git add -A >/dev/null 2>&1; out=$(git commit -q --amend -m "[A]-[M] v0.5.2 amend
 out=$(node scripts/check-version.mjs --committed 2>&1); report $? FAIL "缺口在 tip 时，CI 认得出" "$out"
 printf '{"name":"x","version":"0.5.3"}\n' > package.json; echo d >> f.txt
 git add -A >/dev/null 2>&1; out=$(git commit -q -m "[A]-[M] v0.5.3 three" 2>&1); report $? PASS "再进一条把缺口顶成中段" "$out"
-out=$(node scripts/check-version.mjs --committed 2>&1); report $? PASS "缺口进了历史中段，CI 也看不见" "$out"
+out=$(node scripts/check-version.mjs --committed 2>&1); report $? PASS "缺口进了历史中段，--committed 就看不见了" "$out"
+# 同一个区间交给逐条校验：那条 amend 出来的 0.5.2 站在自己父提交（0.5.0）前面就该是 0.5.1，
+# 于是被点名 —— CI 的 push 区间检查关的就是上面那个盲区（本地三条钩子仍拦不住，见 AGENTS.md §1.6）。
+rg FAIL "中段缺口由 --range 认得出（同一条表达式上面还是 PASS）" "$(git rev-list --max-parents=0 HEAD)..HEAD"
+# 区间有一端取不出来时必须出声报错（exit 非 0），不能报成「没问题」：浅克隆、force push 的全 0 基线都会这样。
+rg FAIL "区间一端不在对象库里时报错，不静默放行" "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef..HEAD"
 echo "    实际历史：$(git log --reverse --format='%s' | sed 's/\[[^]]*\]-\[[^]]*\] //' | tr '\n' ' ')"
-echo "    ← 0.5.1 再没有任何提交用过。--committed 只校验 HEAD 一条，所以中段缺口是结构性的盲区。"
+echo "    ← 0.5.1 再没有任何提交用过。--committed 只校验 HEAD 一条，所以中段缺口对它结构性看不见；"
+echo "      本地三条钩子当场也拦不住（那一刻的索引状态与一次正常提交无法区分）。"
+echo "      现在 CI 的 --range 逐条查 push 区间，这个缺口只要经过一次 push 就会被点名。"
 cd "$REPO"
 
 echo "--- 最终历史（自上而下）---"

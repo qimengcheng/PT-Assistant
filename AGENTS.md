@@ -122,7 +122,8 @@ node scripts/versioned-commit.mjs -m "[agent名]-[模型名] @next feat(搜索�
 amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位 / `@next` 真落库且自动暂存 /
 包名里的 `@next` 不触发 / amend 配 `@next` 拒收」。
 **改 `check-version.mjs` 的判据必须先跑它** —— 这条守卫自己连续两次误拦 / 漏放，就是它没人守造成的。
-现在 CI 的 `build` job 也挂着它（§2.4），但**主防线仍在本地**：CI 只在 push 时跑，本地忘了跑就等于把判据改了没验。
+现在 CI 的 `verify` job 也挂着它（§2.4，v0.93.4 起从 `build` 挪过来 —— 它只用 node + git，装不装依赖与它无关），
+但**主防线仍在本地**：CI 只在 push 时跑，本地忘了跑就等于把判据改了没验。
 
 三个钩子的判据都有**结构性够不着的地方**，写提交前得知道：
 
@@ -138,9 +139,12 @@ amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位 / `@nex
   （再补一条实测：`prepare-commit-msg` 的第二个参数能认出 `-c/-C`、裸 `--amend` 开编辑器、merge
   这三类，**唯独 `--amend -m` 与普通提交一模一样**（都是 `message`），所以「amend」在钩子这条路上
   仍然只能猜；包装命令不吃这个参数，它直接读自己的 argv。）
-- `--amend` 时**顺手改号**会把被改那条的号变成死号，两个钩子和 CI 都拦不住：那一刻
+- `--amend` 时**顺手改号**会把被改那条的号变成死号，两个钩子当场都拦不住：那一刻
   暂存号 == HEAD 的号 + 1，与一次完全正常的提交无法区分。等下一条提交压上去，缺口就进了
-  历史中段，而 `--committed` 只校验 HEAD 一条，中段缺口是盲区（实测见 PLAYBOOK §21）。
+  历史中段，而 `--committed` 只校验 HEAD 一条（实测见 PLAYBOOK §21）。
+  **这条盲区自 v0.93.4 起由 CI 的 `--range` 关上**：verify job 对这次 push 区间里的**每一条**
+  逐条跑同一条判据（基线取各条自己的父提交），所以缺口只要经过一次 push 就会被点名到 sha。
+  它不改变本地的结论 —— 钩子当场仍然拦不住，而重写已推送的历史远比当场改麻烦。
   → **amend 只改消息和内容，不改版本号**，见 §1.6。
   钩子拦不住的原因是 git 不把 `--amend` 告诉它们，但**包装命令看得见自己的 argv**：
   `versioned-commit.mjs --amend` 配 `@next` 会在写文件之前就当场拒收，这条终于有了前置防线。
@@ -149,15 +153,21 @@ amend 放行 / 跳号拦住 / 首行模型名带三段式数字不抢位 / `@nex
 - 首行的锚定规则是「模型名右方括号之后第一个 `vX.Y.Z`」，所以 `[OpenCode]-[Space Bunny Alpha 1.0.0] v0.22.16 …`
   这种模型名自带三段式数字的写法不会抢位（§1.1 要求逐字照抄模型名，撞上是迟早的事）。
 
-**每个新克隆必须启用一次**（仓库级配置，不入库，所以不在 git 里）：
+**新克隆不用再手动启用**（v0.93.4 起）：`package.json` 的 `prepare` 会在 `pnpm install` 时
+自动跑 `git config core.hooksPath .githooks`。这条是仓库级配置、不入库，所以只能靠装依赖那一刻补上。
+末尾的 `|| true` 不是偷懒：在没有 `.git` 的副本里（解包源码做审查时会这样）`git config` 会失败，
+而 `prepare` 失败会让整个 `pnpm install` 非零退出 —— 一颗便利性的糖不该反过来让装依赖失败。
+
+手动那条仍然有效，任何时候想确认状态就查（它也是 `prepare` 没跑成时的退路）：
 
 ```bash
-git config core.hooksPath .githooks
+git config core.hooksPath .githooks   # 设
+git config --local core.hooksPath     # 读，空就是没设上
 ```
 
 为什么不能只靠 CI：CI 只在 push 时触发。本地连提 5 次它一次都不跑，等 push 时历史
-已经定型，只能事后告诉你「曾经跳过某个版本」，那时重写 5 条提交远比当场改麻烦。
-CI 里那份（`check-version.mjs --committed`）是兜底，因为 clone 出来的仓库没有本地
+已经定型，那时重写 5 条提交远比当场改麻烦。
+CI 里那份（`check-version.mjs --range`，见下）是兜底，因为 clone 出来的仓库可能没启用本地
 hook，且 `--no-verify` 能绕过。
 
 ```bash
@@ -260,9 +270,10 @@ git commit --amend -m '<合并后的完整消息>'
    git log --oneline origin/master..HEAD   # 再看它没推出去
    ```
 2. **amend 只改消息和内容，绝不改版本号。** 把 HEAD 从 N 改成 N+1 会让 N 变成没有任何提交
-   用过的死号，而那一刻的暂存状态与一次正常提交无法区分，`pre-commit` / `commit-msg` / CI
-   三条都拦不住（CI 的 `--committed` 只校验 HEAD 一条，等下一条提交压上去，缺口进了历史中段
-   就彻底看不见）。要换号就是新开一条提交，不是 amend。
+   用过的死号，而那一刻的暂存状态与一次正常提交无法区分，`pre-commit` / `commit-msg` 两条当场拦不住
+   （CI 的 `--committed` 也只校验 HEAD 一条，等下一条提交压上去，缺口进了历史中段它就看不见 ——
+   v0.93.4 起 verify job 改用 `--range` 逐条查 push 区间，这个缺口要等**下一次 push** 才被点名，
+   仍然不是当场拦住）。要换号就是新开一条提交，不是 amend。
    走 §1.2 的包装命令时这条有事前防线：`versioned-commit.mjs --amend` 看到首行是 `@next`
    会在动 package.json **之前**就拒收（包装脚本读得到自己的 argv，钩子读不到）。
    **合进上一条时（§1.6 的用法）也不许换档**：把 `fix` 改写成 `feat` 让消息看着更贴切是可以的，
@@ -390,13 +401,17 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 **只有一个 workflow：`.github/workflows/ci.yml`**，三个 job 串起来 `verify → build → release`。
 （没有 `build.yml` / `release.yml` 这两个文件 —— 这是一条长期成立的事实，不是「曾写错」；PLAYBOOK §24 那节已删，编号留着不复用。）
 
-- `verify`：只查**提交标题**那三条硬规则（`[agent名]-[模型名]` 前缀、含 `vX.Y.Z`、与 `package.json` 一致），
-  不装依赖也不跑守卫（只 checkout，用 runner 自带的 node 读一下 version）—— 别把它当静态检查那一段。
+- `verify`：查**提交标题**那三条硬规则（`[agent名]-[模型名]` 前缀、含 `vX.Y.Z`、与 `package.json` 一致），
+  再查**这次 push 区间里的每一条提交**（`check-version.mjs --range $before..$after`，v0.93.4 起；
+  判不出区间时自己退 `--committed` 只查 HEAD），最后跑 `sh scripts/check-version-test.sh` ——
+  版本号守卫自己的回归测试（同 v0.93.4 从 `build` 挪来：它只用 node + git，自己 `git init` 临时仓库）。
+  这条线要 `fetch-depth: 0` 的全历史 checkout，浅克隆里 `rev-list` 取不出区间（脚本会 exit 2 出声，不静默放行）。
+  它仍然不是静态检查那一段 —— 不装依赖。
 - `build`：`pnpm compile` → **一条 `node scripts/check-all.mjs`**（全部守卫，清单从 `scripts/` 现取，
   与本地 `pnpm check:all` 同一个入口，见 §3.4）
-  → `check-version.mjs --committed` → `check-version-test.sh`（版本号守卫自己的断言，
-  它不在 `check-all` 的聚合里，所以单独挂一步）→ `wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
+  → `wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
   `PT-Assistant-<version>-{chrome,firefox,sources}.zip` 三个包，外加 `smoke-background.mjs`。
+  **版本号那条线不在这里了**（在 verify，且 verify 红时 build 因 `needs` + `success()` 根本不会跑）。
 - `release`：`ncipollo/release-action` 按 `package.json` 的 version 打 `v<version>` tag 并挂上
   三个产物，随后是 Publish to Chrome Web Store / Publish to Firefox Add-ons 两步。
 

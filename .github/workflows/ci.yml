@@ -39,7 +39,11 @@ jobs:
       early: ${{ steps.stage.outputs.early }}
       version: ${{ steps.meta.outputs.version }}
     steps:
+      # fetch-depth: 0 是下面那条 push 区间逐条校验的前提：默认的浅克隆只有 tip 一个对象，
+      # `git rev-list $before..$after` 直接取不出提交列表（脚本为此专门 exit 2，不静默放行）。
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Detect stage
         id: stage
@@ -83,6 +87,54 @@ jobs:
             echo "::error::提交标题里的版本号与 package.json 不一致（package.json 是 v${PKG_VERSION}）"
             exit 1
           fi
+
+      # 版本号守卫的**兜底 + 区间逐条校验**（主防线是本地 .githooks 的三条钩子）。
+      #
+      # 原来这里只查 tip：--committed 只看 HEAD 一条，而「绕过本地钩子」的真实形态恰恰是
+      # 连提好几条（--no-verify、或 clone 后没跑过 git config core.hooksPath —— 现在 prepare
+      # 会自动配好，但配好之前的老 clone 仍然没有钩子）。那几条里中段的错档 / 跳号 / 三处不一致
+      # 过去一条都看不见，等 push 完历史已定型（AGENTS.md §1.2 末尾、check-version-test.sh 末尾
+      # 那两条断言记录的就是这个盲区）。多会话并发也从这里得利：两个会话从同一基线算出同一个号，
+      # 先 push 的赢，后者 rebase 之后自己那条号已过期，而 rebase 不触发任何钩子。
+      #
+      # 拿不到区间就退回只查 HEAD，而不是当没事：force push 的 before 是全 0、workflow_dispatch
+      # 根本没有 before/after、浅克隆里没有那个对象 —— 三种都是「这一趟查不了区间」。
+      # --range 自己在这种情况下 exit 2 出声（它不猜），退不退由这里判。
+      - name: Check every commit in the pushed range
+        if: steps.stage.outputs.early == 'false'
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            BASE="$BASE_SHA"; TIP="$HEAD_SHA"
+          else
+            BASE="$BEFORE"; TIP="$AFTER"
+          fi
+          # 全 0 的 BASE 是 GitHub 表示「这边以前什么都没有」的写法，对象库里查不到，直接走退路
+          if [ -n "$BASE" ] && [ -n "$TIP" ] \
+             && git cat-file -e "${BASE}^{commit}" 2>/dev/null \
+             && git cat-file -e "${TIP}^{commit}" 2>/dev/null; then
+            node scripts/check-version.mjs --range "${BASE}..${TIP}"
+          else
+            echo "::notice::拿不到本次推送的区间（基线是全 0 / force push / ${EVENT} 没有 before-after 两端），退回只校验 HEAD 一条"
+            node scripts/check-version.mjs --committed
+          fi
+
+      # 版本号守卫自己的回归测试：在临时仓库里装真 hook 跑断言（条数看脚本自己末尾的输出）。
+      # 它不在 pnpm check:all 的聚合里 —— 那个只收 scripts/check-*.mjs，且刻意排除
+      # check-version.mjs（它读暂存区的版本号，结果取决于此刻暂存了什么）。
+      # 原来挂在 build job，理由写的是「同属版本号这条线，且那时 node/git 都就位了」；
+      # 但这个脚本实测只用 node + git（它自己 git init 临时仓库、自己设 core.hooksPath），
+      # 依赖装没装对它没有影响，而 --range 的断言也归它管 —— 判据和它的回归测试留在同一个 job。
+      # 为什么值得占 CI 一分钟：这条守卫的判据已经错过两次「误拦 / 漏放」，而它自己没人守。
+      - name: Version guard self-test (real hooks in throwaway repos)
+        if: steps.stage.outputs.early == 'false'
+        run: sh scripts/check-version-test.sh
 
   build:
     # 两个条件都要显式写：
@@ -130,22 +182,14 @@ jobs:
       - name: Guards (check-*.mjs, list collected from scripts/)
         run: node scripts/check-all.mjs
 
-      # 版本号守卫的**兜底**（主防线是本地 .githooks 里的 pre-commit / commit-msg：
-      # CI 只在 push 时触发，本地连提 5 次它一次都不跑，等历史定型就晚了）。
-      # 这里检查 HEAD 这一条：「提交消息版本号 == package.json」，且进位档位配标题类型词
-      # （feat 进次版本、其余进修订号 —— 规则见 AGENTS.md §1.2，成因见 PLAYBOOK §30）。
-      # CI 只校验这次 push 的 tip 那一条，所以它抓不到历史中段的错档，主防线仍在本地钩子。
-      # clone 出来的仓库没有本地 hook，且 --no-verify 能绕过，所以 CI 必须再挂一份。
-      - name: Check version number and its bump level
-        run: node scripts/check-version.mjs --committed
-
-      # 版本号守卫自己的回归测试：在临时仓库里装真 hook 跑断言（条数看脚本自己末尾的输出）。
-      # 它不在 pnpm check:all 的聚合里 —— 那个只收 scripts/check-*.mjs，且刻意排除
-      # check-version.mjs（它读暂存区的版本号，结果取决于此刻暂存了什么）。
-      # 挂在这里而不是 verify 的理由与上面那条一致：同属「版本号」这条线，且这时 node/git 都已就位。
-      # 为什么值得占 CI 一分钟：这条守卫的判据已经错过两次「误拦 / 漏放」，而它自己没人守。
-      - name: Version guard self-test (real hooks in throwaway repos)
-        run: sh scripts/check-version-test.sh
+      # 版本号那条线（--committed / --range + 守卫自己的回归测试）整条挪进 verify job 了，
+      # 这里不再重复挂一份：
+      #   · verify 的区间校验把 HEAD 也包含在内（`--range base..tip` 的终点就是 tip），
+      #     拿不到区间时它自己退到 --committed —— 在这里再查一遍是同一个判据跑两次；
+      #   · build 有 `needs: verify` + `success()`，verify 红在这里根本跑不到；
+      #   · check-version-test.sh 实测只用 node + git（自己 git init 临时仓库），
+      #     装不装依赖与它无关，放在 verify 出结论快一分钟。
+      # 规则本身没动：feat 进次版本、其余进修订号，见 AGENTS.md §1.2，成因见 PLAYBOOK §30。
 
       # 首页「最近更新」那份快照的判据自检：往内存里注入十来种畸形（裁掉一条、时间只剩日期、
       # 时间对不上提交、顺序倒了、totals 小于条数…），逐条确认脚本真会 FAIL、原样必须 PASS。

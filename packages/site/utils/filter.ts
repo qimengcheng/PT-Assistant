@@ -6,10 +6,13 @@ import { socialParseUrlMap } from "@ptd/social/index.ts";
 
 export function tryToNumber(value: any): number {
   if (typeof value === "string") {
-    value = value.replace(/[, ]/gi, ""); // 统一处理 `1,024` `1 024` 之类的情况
-    if (/^-?\d+$/.test(value)) {
-      // 尽可能的将返回值转成数字类型
-      value = isNaN(parseInt(value)) ? 0 : parseInt(value);
+    // 只对「去掉千分位/空格之后就是个整数」的值改写；否则原样返回。
+    // 原来无条件先 replace 再判，于是**所有**非数字字符串都被顺手删掉了空格和逗号：
+    // 分类 "TV Series(电视剧)" 会变成 "TVSeries(电视剧)"（海胆实测），
+    // 由 url/link 兜出来的 id 里若含逗号也会被吃掉。那不是这个函数的职责。
+    const cleaned = value.replace(/[, ]/gi, ""); // 统一处理 `1,024` `1 024` 之类的情况
+    if (/^-?\d+$/.test(cleaned)) {
+      return isNaN(parseInt(cleaned)) ? 0 : parseInt(cleaned);
     }
   }
   return value;

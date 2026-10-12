@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-11 23:40:24",
-  "headSha": "6260b55",
+  "generatedAt": "2026-10-12 08:34:52",
+  "headSha": "e797f72",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.87.2",
+      "date": "2026-10-12 08:34:31",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "海胆的搜索结果里，「分类」那一列不再显示成种子标题，改显示站点自己在组头标的分类（如 TV Series(电视剧)）",
+        "分类名里的空格不再被解析层吃掉：站点写「TV Series(电视剧)」，界面与悬停提示里不会再出现被粘成「TVSeries(电视剧)」的写法"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.87.1",
       "date": "2026-10-11 23:39:31",

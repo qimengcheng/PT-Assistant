@@ -91,6 +91,23 @@ export const siteMetadata: ISiteMetadata = {
       subTitle: {
         selector: [".torrent_name_col a[href*='details.php']"],
       },
+      /**
+       * 分类图标在**组头**那一格（`.group > .name_col > .img_blurry > a[href="?cat=402"] > img`，
+       * `title`/`alt` 就是「TV Series(电视剧)」这种和上面 category 选项里逐字一致的写法），
+       * 而 rows 是 `.torrent_wrap`：组头是它的兄弟分支，行内的任何选择器都走不到那里。
+       * 于是继承 NexusPHP 的那份（行内 `a:first` → 其中的 `img:first`）只会命中种子名那条链接，
+       * 它没有 img，就退回 `textContent` —— 界面上「分类」列画的其实是种子标题（台架实测）。
+       * 和 `title` 一样从行元素上溯到 `.group_content`，再取组头那颗图标；
+       * 图标没写 title/alt 时留空，不替站点编一个它没报的「Other」。
+       */
+      category: {
+        selector: ":self",
+        elementProcess: (element: HTMLElement) => {
+          const group = findParentByClass(element, "group_content");
+          const icon = group.querySelector<HTMLImageElement>("a[href*='cat='] img, .name_col img");
+          return (icon?.title || icon?.alt || "").trim();
+        },
+      },
       time: {
         selector: [".time_col span[title]"],
         attr: "title",

@@ -23,12 +23,12 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 构建内核 | Vite 6（rollup） | **Vite 8（rolldown 内核）**，靠 `import type` + `verbatimModuleSyntax` 过 missing-export 硬错误（§1） |
 | UI | Vue 3 + **Vuetify 4**（主 chunk ~444KB） | Vue 3 + **antdv-next**（Ant Design Vue 3，CSS-in-JS） |
 | service worker | — | **module SW**：`defineBackground({ type: "module" })` 是硬要求，改回 classic 即启动即崩（§6，规则见 AGENTS.md §3.2） |
-| 消息层 | @webext-core/messaging + 自建 wrapper（269 行协议） | 同款 wrapper（精简协议，随功能平移扩充） |
-| 扩展存储 | @webext-core/storage（经 background 代理读写） | **wxt/storage**（官方推荐，键名/格式不变，见 src/storage.ts），**各上下文直连 `extStore`**，不经 background 代理（决策与边界见 §15） |
+| 消息层 | @webext-core/messaging + 自建 wrapper（269 行协议） | 同一套 wrapper（同一条「本地 handler 优先命中、数据进通道前深拷贝挡 DataCloneError」），协议表随功能平移扩充 —— 现 445 行 / 上游 269 行 |
+| 扩展存储 | @webext-core/storage（经 background 代理读写） | **wxt/storage**（官方推荐，键名/格式不变，见 `src/storage.ts`）。`extStore` 按上下文二选一：SW / options / content **直连**，**offscreen 直连不了** —— Chrome 硬限制：offscreen 文档只有 `chrome.runtime`（连 `getManifest` 都不给），所以那一路自动改走 SW 的 get/set/patch 三条代理消息，调用方无感知。（§15 记的是「三条 RPC 全删、处处直连」那一版，v0.5.19 已改回这个形状） |
 | 图表/画布 | echarts(vue-echarts) + konva(vue-konva 全局注册) | 同款库，**vue-konva 按需局部导入**（konva 随路由 chunk 懒加载，不进 options 主包）；echarts 模块化注册 + 页面级懒加载 |
-| 站点定义 | 340 个 definition，import.meta.glob 按需加载 | **原样平移，零修改**（packages/site） |
-| Buffer polyfill | 全局注入（background 464KB） | 不注入 |
-| i18n | vue-i18n 双语言全量注册（~118KB） | vue-i18n 双语言全量注册（默认语言静态 import，切换语言动态 import） |
+| 站点定义 | 340 个 definition，import.meta.glob 按需加载 | 同样 340 个、目录结构与文件划分未改，但**不是「零修改」**：与上游逐文件对过，**96 个文件有内容差异**（site 62 / downloader 12 / backupServer 9 / mediaServer 6 / social 7）+ 本仓新增 2 个文件（`site/types/message.ts`、`site/utils/safeParse.ts`）；另有 236 个只是行尾 CRLF 不同。差异的三类来路：rolldown 那 335 处 `import type`（§1）、类型收口、以及若干解析/接口修正（`beyondhd` 的字段名、uTorrent/Aria2 的 progress 口径） |
+| Node 内建模块 | 全局注入 Buffer polyfill（background 464KB） | **不挂全局**，改成三条 `resolve.alias`（`wxt.config.ts`）把 `buffer` / `path` / `crypto` 三个模块名指到 `src/extends/browser*.ts` 的最小实现。非这样做不可：打包器默认给的是 `exports = {}` 的空 stub，`Buffer.from(...)` / `path.join(...)` 当场抛，而那个 stub 文件还落在扩展根目录、名字以 `_` 开头 —— Chrome 直接拒载整个扩展 |
+| i18n | vue-i18n 双语言全量注册（~118KB） | 同为双语言**全量预注册**，但按上下文分档：options 那份 `main.ts` 把 `en.json` / `zh_CN.json` **两份都静态 import**（CSP 环境里 vue-i18n 11 无法运行时编译模板，取不到就整页不显示，所以必须预注册）；省体积的是 content 侧 —— `src/content-script/i18n-lite.ts` 只注册实际用到的 6 个顶层命名空间，靠 JSON 具名导入 + tree-shake 把约 84% 的语言包挡在 content chunk 外。**没有「切换语言时动态 import」这条路** |
 | 测试 | 无 | 类型检查 + CI 守卫（静态扫描 + 行为断言，条数见「工程化体系」）+ 产物 smoke test + ESLint（10，扁平配置，只有 error 与「我方 warning」判失败）；Vitest 尚未引入 |
 
 > **UI 栈是 antdv-next**，走 CSS-in-JS **运行时注入样式**，
@@ -67,7 +67,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 防线 ⑩（行为断言） | `scripts/check-category-map.mjs` | 搜索结果「分类」的折类判据：同一内容的各种写法必须折到同一类、顺序敏感的几对不许互撞（纪录片/电视剧、动漫/电影、软件/游戏、综艺/电视剧）、站点覆盖优先于规则，以及 `common.categoryKind.*` 这批**动态拼出来的** i18n 键两侧都在（防线 ③ 看不见这种键） |
 | ~~防线 ⑪~~ | ~~`scripts/check-confirm-danger.mjs`~~ **v0.90.5 撤下** | 确认框那颗键走了 legacy 的 `okType: "danger"` —— 出来是红描边而非实心红，class 里照样带 `.ant-btn-dangerous`（AGENTS.md §3.4）。脚本删了，判据由防线 ⑬ 接手：脚本侧 `no-restricted-syntax` 选 `Property[key.name='okType']`，模板侧 `vue/no-restricted-static-attribute` + `vue/no-restricted-v-bind`（`:ok-type` / `:okType` / `v-bind:ok-type`）。**不能整条换成 esquery** 的原因：核心 `no-restricted-syntax` 看不见 Vue 模板 AST（实测三条模板 selector 全零命中），见 PLAYBOOK §36 |
 | 防线 ⑫ | `scripts/check-notification-ids.mjs` | 系统通知：`create` 必须带 id、监听器必须按 id 前缀认领。`chrome.notifications.onClicked` 是全局事件、不按 id 分发，所以一个不看 `notificationId` 的监听器会把别处的通知接走（点「辅种完成」跳去 GitHub 下载页就是这么来的；AGENTS.md §3.4 表第 12 行） |
-| 防线 ⑬ | `scripts/check-eslint.mjs` + `scripts/eslint-packages-baseline.json` | ESLint 10（`eslint.config.mjs` = `@eslint/js` + `typescript-eslint` + `eslint-plugin-vue`）。判据分三档，分界线是**这份代码谁写的**：① error 一律 FAIL（全仓）；② 我方（`src` / `scripts` / 根配置）**连 warning 都不许留** —— v0.90.9 把 `no-explicit-any`（我方那份 221 条 → 0）与 `ban-ts-comment`（10 → 0）逐文件收口后升成 error，其余观感类也清干了；③ `packages/**` 是上游零修改平移件，那一块按基线快照**逐规则**只拦回涨（现记 407 条 / 14 条规则；按规则记而不记总数，是因为清掉一条 `prefer-const` 会腾出总数额度，就会放过一条新进的 `any`）。要留一处 `any` 得写行级 disable 并把实测依据讲清楚（先例：`TKonvaConfig` —— 改成 `unknown` 会断 13 条 vue-tsc）。它同时是 PLAYBOOK §9「禁原生 confirm/alert/prompt」、§11「别 import dayjs」、站内信正文「禁 v-html」、AGENTS §3.4「确认框那颗键」这四处**第一次真有的守卫**。自检：`src` / `packages` / `scripts` 任一块一个文件都没扫到就 FAIL —— 配置写歪时「一条 error 都没有」是假 PASS；基线文件读不到同样 FAIL（缺它等于第 ③ 档没门禁） |
+| 防线 ⑬ | `scripts/check-eslint.mjs` + `scripts/eslint-packages-baseline.json` | ESLint 10（`eslint.config.mjs` = `@eslint/js` + `typescript-eslint` + `eslint-plugin-vue`）。判据分三档，分界线是**这份代码谁写的**：① error 一律 FAIL（全仓）；② 我方（`src` / `scripts` / 根配置）**连 warning 都不许留** —— v0.90.9 把 `no-explicit-any`（我方那份 221 条 → 0）与 `ban-ts-comment`（10 → 0）逐文件收口后升成 error，其余观感类也清干了；③ `packages/**` 是从上游平移过来的那一片（**不是「零修改」**，实测差异见上面「架构决策」的站点定义行；这一档真正的理由是「不是我方写的，不做批量改写」），那一块按基线快照**逐规则**只拦回涨（现记 407 条 / 14 条规则；按规则记而不记总数，是因为清掉一条 `prefer-const` 会腾出总数额度，就会放过一条新进的 `any`）。要留一处 `any` 得写行级 disable 并把实测依据讲清楚（先例：`TKonvaConfig` —— 改成 `unknown` 会断 13 条 vue-tsc）。它同时是 PLAYBOOK §9「禁原生 confirm/alert/prompt」、§11「别 import dayjs」、站内信正文「禁 v-html」、AGENTS §3.4「确认框那颗键」这四处**第一次真有的守卫**。自检：`src` / `packages` / `scripts` 任一块一个文件都没扫到就 FAIL —— 配置写歪时「一条 error 都没有」是假 PASS；基线文件读不到同样 FAIL（缺它等于第 ③ 档没门禁） |
 | 版本号守卫自检 | `scripts/check-version-test.sh` | 在临时仓库里装真 hook 跑断言，验守卫自己的判定边界（含 `@next` 自动展开那几条；条数看脚本末尾输出，别往这里抄）。改 `check-version.mjs` 前必跑，CI 的 `build` job 也挂着它 |
 | SW smoke test | `scripts/smoke-background.mjs` | 真的 import 一次构建产物，挡 classic SW 内联 sizzle 导致启动即崩那类问题 |
 | 自动发版 | `release` job + `scripts/gen-release-notes.mjs` | push 到 master 或手动触发时打 tag + 出 Release（`skipIfReleaseExists`） |
@@ -88,13 +88,14 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 ```
 PT-assistant-wxt/
 ├── packages/
-│   ├── site/          ← 自 PT-depiler 原样平移（340 定义 + schemas + types + utils）
+│   ├── site/          ← 自 PT-depiler 平移（340 定义 + schemas + types + utils；内容改过 62 个文件，见「架构决策」的站点定义行）
 │   ├── social/        ← 同上（bangumi/douban/imdb/anidb）
 │   ├── downloader/    ← 下载器协议适配（qBittorrent/Transmission/aria2/Deluge…）
 │   ├── mediaServer/   ← EMBY/Jellyfin/Plex/fnOS 适配
 │   └── backupServer/  ← WebDAV/S3/B2 远程备份适配
 ├── public/
-│   ├── icons/site/         ← 站点 favicon 资源（249 个，__RESOURCE_SITE_ICONS__）
+│   ├── icons/site/         ← 站点 favicon 资源（249 个文件，编译期注入成 __RESOURCE_SITE_ICONS__；
+│   │                         按 `<站点id>.png|ico|svg` 命中的定义是 242 / 340，剩下 98 个走 offscreen 现抓，见 §31）
 │   ├── icons/downloader/   ← 8 个下载器图标，文件名 == packages/downloader/entity 的类型名
 │   ├── icons/backupServer/ ← 8 个备份服务器图标（同上，靠 getBackupServerIcon 拼路径）
 │   ├── icons/mediaServer/  ← 4 个媒体服务器图标
@@ -110,18 +111,22 @@ PT-assistant-wxt/
 │   │   └── options/       # 设置页（侧边栏 + 全部功能视图）
 │   ├── options/           # 设置页内部：views/ stores/ components/ plugins/ directives/ services/
 │   ├── content-script/    # content 浮窗 UI + antd-lite.ts（按需注册，见防线 ②）
-│   ├── extends/           # axios 拦截器（unsafe header + Cloudflare 重试）、pinia webext 持久化
+│   ├── extends/           # axios 拦截器（unsafe header + Cloudflare 重试）、pinia webext 持久化、
+│   │                      #   Node 内建三件的浏览器替身（browserBuffer / browserPath / browserNodeCrypto，
+│   │                      #   由 wxt.config.ts 的 alias 顶上，见「架构决策」那行）
 │   ├── locales/           # zh_CN / en 双语言 JSON
 │   ├── shared/types/      # 存储与领域类型
 │   ├── messages.ts        # 消息协议（@webext-core/messaging）
 │   ├── storage.ts         # 扩展存储（wxt/storage defineItem 适配层）
-│   └── helper.ts          # 全局助手（原样平移）
+│   └── helper.ts          # 全局助手（平移自上游，但 REPO_NAME / REPO_URL / REPO_API 已改成本仓库 ——
+│                          #   About、特别感谢、站点/下载器/备份设置的「源码」入口都读它，
+│                          #   从上游重新同步时**不要**把这三个常量盖回去）
 ├── dist-<会话>-<版本>/   # 各会话构建的真身目录（PTD_SESSION + package.json 版本号驱动，见「命令」）
 ├── dist-verify/          # 唯一验收加载路径：构建成功后换指到上面的 chrome-mv3（目录联接）
 └── wxt.config.ts
 ```
 
-## 别名约定（与 PT-depiler 一致，保证包零修改平移）
+## 别名约定（与 PT-depiler 一致，包能整目录平移过来不用改 import 路径）
 
 - `~/*` → `src/*`
 - `@/*` → `src/*`
@@ -171,9 +176,11 @@ node scripts/versioned-commit.mjs -m "[agent名]-[模型名] @next feat: 描述"
 
 ## Roadmap（待办）
 
-- [ ] `reDownloadTorrent` 延时调度（站点最小重下载间隔，job-scheduler 已就位）
 - [ ] Vitest（ESLint 已于 v0.90.5 接入，判据见「工程化体系」的防线 ⑬）
 - [ ] axios → ofetch 迁移评估（新代码先行）
 - [ ] 模板清理完成后删掉 `src/entrypoints/options/vuetify-compat.css`（见「架构决策」的兼容层说明）
+      —— **前置条件 v0.92.4 实测过：还没到。** 那 74 个复刻类里 67 个仍有调用点（`flex-wrap` 21 处、
+      `ml-1` 19 处、`text-no-wrap` 16 处…），只有 `ml-4` `pl-1` `ga-3`~`ga-6` `table-stripe` 七个是死的。
+      现在删这个文件 = 全站版式塌一片。
 
 已完成的部分不在这里列（那是历史）：轨迹见 `PLAYBOOK.md` 附录，逐项细节见 `git log` 与 GitHub Releases。

@@ -24,6 +24,7 @@ import {
   othersAlreadySent,
   othersStillPending,
   planAutoReseed,
+  pruneUnlandedOthers,
   reseedItemKey,
   sendReseedBatch,
 } from "@/options/views/Overview/KeepUploadTask/autoReseed.ts";
@@ -199,6 +200,9 @@ function worthWriting(task: IKeepUploadTask, next: IKeepUploadTask["autoState"])
     "baseSendFails",
     "othersSentAt",
     "othersSent",
+    // 「没落地就放开重发」的次数。漏在这一条里的话它进不了存储 —— 每轮都读到 0，
+    // 那个封顶就永远够不着，变成每 5 分钟重发一次没完（基准那边同一个道理，见上面注释）。
+    "othersResent",
     "completedAt",
     "stage",
     "notifiedWrong",
@@ -333,8 +337,16 @@ async function autoReseedTick() {
         const allOthers = task.baseLocal ? task.items : task.items.slice(1);
         const others = allOthers.map((item) => probe(item.hash));
         const untracked = allOthers.filter((i) => String(i.hash ?? "").trim() === "").length;
+        /**
+         * 先把「记为已发出、这一轮却查不到、且已超过 5 分钟」的那几条从发送记录里摘掉，
+         * 再算还有几条要发。判据与基准那条对称（见 `pruneUnlandedOthers`）—— 不摘的话，
+         * 一次「add 成功但没落地」会让这一条永远挂着「下载器中未找到」，而后台每轮都读到
+         * 「这条发过了」。摘完的这份 `stateForPlan` 会一路带下去，所以 `next` 里写的就是它。
+         */
+        const pruned = pruneUnlandedOthers({ state: task.autoState ?? {}, items: allOthers, statuses: others, now: Date.now() });
+        const stateForPlan: IKeepUploadTask["autoState"] = { ...(task.autoState ?? {}), othersSent: pruned.sent, othersResent: pruned.resent };
         /** 其中还没成功发出去的那几条（逐条记，不再拿「整批发过一次」当闸） */
-        const othersToSend = othersStillPending(task.autoState ?? {}, allOthers);
+        const othersToSend = othersStillPending(stateForPlan, allOthers);
 
         /**
          * 基准那份数据**此刻**到底在不在任务目录里。
@@ -365,7 +377,7 @@ async function autoReseedTick() {
           others,
           untracked,
           pathMismatch: !!baseMismatch,
-          state: task.autoState ?? {},
+          state: stateForPlan,
           now: Date.now(),
         });
 
@@ -424,7 +436,9 @@ async function autoReseedTick() {
 
         if (tick.sendOthers && !tick.sendBase) {
           const at = Date.now();
-          const sent: Record<string, number> = { ...othersAlreadySent(task.autoState ?? {}, allOthers) };
+          // 吃摘过一遍的那份，不是原始 `task.autoState`：否则刚摘掉的那几条会被旧记录又填回
+          // 「已发出」，这一轮发成功了下一轮又算成没发过 —— 自愈变成每轮重发。
+          const sent: Record<string, number> = { ...othersAlreadySent(stateForPlan, allOthers) };
           const { sentKeys, failed } = await sendReseedBatch({
             items: othersToSend,
             keyOf: reseedItemKey,
@@ -589,10 +603,11 @@ function runAutoReseedTick(): Promise<void> {
   return job;
 }
 
-// 建完任务那一侧催的（判据仍只有 `autoReseedTick` 这一份，这里只是把触发时刻提前）
-onMessage("runAutoReseedTick", () => {
-  void runAutoReseedTick();
-});
+// 建完任务那一侧、以及辅种任务页「回查做种状态」/「移到任务目录」之后催的
+// （判据仍只有 `autoReseedTick` 这一份，这里只是把触发时刻提前）。
+// ⚠️ 回包**等这一轮真的跑完**（原先是 `void`，立刻回包）：调用点拿它当「已经推进过了」的证据，
+// 回得太早的话，它随后拉回来的还是上一轮的状态，界面表现为「我点了回查，什么都没发生」。
+onMessage("runAutoReseedTick", () => runAutoReseedTick());
 
 // noinspection JSIgnoredPromiseFromCall
 jobs.scheduleJob({

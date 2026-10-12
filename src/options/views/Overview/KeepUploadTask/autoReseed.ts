@@ -317,6 +317,50 @@ export function othersStillPending<T extends { hash?: string; title?: string }>(
   return items.filter((item) => sent[reseedItemKey(item)] === undefined);
 }
 
+/**
+ * 把「记为已发出、这一轮却在下载器里查不到」的那几条从发送记录里摘掉，于是它们重新算作待发送。
+ *
+ * 为什么基准有这一条而辅种那几条原本没有（`planAutoReseed` 第 2 档 vs 第 4 档）：基准那次
+ * `downloadTorrent` 回的是「已交给下载器」，不等于真进了列表（.torrent 没下下来、add 被客户端
+ * 拒掉都会安静地什么都不留）。那同样的事在**每一条**上都成立 —— 少这一道自愈，界面上就是
+ * 「下载器中未找到」挂到天荒地老，而后台每一轮都读到的还是「这条发过了」。
+ * （用户 2026-10-12 那条就是这个形状：目录不一致时挑了「移到新目录」，移动已经落地，
+ * 那一条却始终没再发出去。）
+ *
+ * 三条边界：
+ * - **5 分钟**门槛同基准（`AUTO_RESEED_BASE_RESEND_MS`）：刚发出去那条还在 qBittorrent 的
+ *   15 秒列表缓存闸后面，不看这一条就会把「正在进列表」抢着重发一遍；
+ * - **封顶 3 次**：同基准的理由。他在下载器里手动删掉了这一条，不该每 5 分钟跟他对着干一次；
+ * - 只认 `notFound`。`pending`（正在下 / 正在校验）和 `seeding` 说明它确实在那儿，
+ *   连不上下载器时 `statuses` 是 `undefined` —— 那种「我这轮没看着」不能当成「它不在了」。
+ */
+export function pruneUnlandedOthers(params: {
+  state: IKeepUploadTaskAutoState;
+  items: readonly { hash?: string; title?: string }[];
+  /** 与 `items` 同下标的这一轮结论（调用方那份 `others`）；没查到的传 undefined */
+  statuses: readonly (IReseedItemStatus | undefined)[];
+  now: number;
+}): { sent: Record<string, number>; resent: Record<string, number>; dropped: string[] } {
+  const { state, items, statuses, now } = params;
+  const sent = { ...othersAlreadySent(state, items) };
+  const resent: Record<string, number> = { ...state.othersResent };
+  const dropped: string[] = [];
+
+  items.forEach((item, i) => {
+    const key = reseedItemKey(item);
+    const at = sent[key];
+    if (at === undefined) return;
+    if (statuses[i]?.verdict !== "notFound") return;
+    if (now - at < AUTO_RESEED_BASE_RESEND_MS) return;
+    if ((resent[key] ?? 0) >= AUTO_RESEED_BASE_SEND_FAIL_MAX) return;
+    resent[key] = (resent[key] ?? 0) + 1;
+    delete sent[key];
+    dropped.push(key);
+  });
+
+  return { sent, resent, dropped };
+}
+
 export interface IReseedBatchFailure {
   key: string;
   title: string;

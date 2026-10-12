@@ -106,6 +106,12 @@ export interface IKeepUploadTaskAutoState {
    * 界面上永远是「下载器中未找到」（他 2026-10-10 那一条 yemapt 就是这个形状）。
    */
   othersSent?: Record<string, number>;
+  /**
+   * 每条因为「记为已发出、5 分钟后下载器里还查不到」被放开重发的次数。
+   * 键同 `othersSent`。封顶同基准（`AUTO_RESEED_BASE_SEND_FAIL_MAX`）—— 到顶就留着
+   * 「下载器中未找到」，不再每 5 分钟跟一次：那种情况多半是他自己在下载器里删了这条。
+   */
+  othersResent?: Record<string, number>;
   /** 上一次后台跑这一条的时刻（只为排查，判据不看它） */
   lastRunAt?: number;
   /**

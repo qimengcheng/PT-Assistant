@@ -311,6 +311,9 @@ async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
     task.baseLocal!.moveToTaskPath = true;
     await sendMessage("updateKeepUploadTask", task).catch(() => {});
     runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveSent"), { color: "success" });
+    // 搬完就该接着发。催一轮而不是等定时器：数据没挪动时那一轮仍然判得出「还是不一致」，
+    // 不会替用户把闸放开；真落地了就在这一次把还没发的那几条推下去。
+    await advanceAutoReseed();
   } catch (e) {
     runtimeStore.showSnakebar(
       t("KeepUploadTask.pathMismatch.moveFailed", { reason: e instanceof Error ? e.message : String(e) }),
@@ -370,6 +373,25 @@ async function refreshTasksFromStorage() {
   } catch {
     // 静默：这一轮没拿到就下一轮再拿，用户随时能手动刷新
   }
+}
+
+/**
+ * 催后台立刻跑一轮自动辅种，跑完再把这张表拉回来。
+ *
+ * 为什么要有这一条（用户 2026-10-12：「手动回查状态后应该立即做应该做的事，比如这时候就该发送辅种」）：
+ * 回查那一圈只**读**状态、写结论、暂停判坏的几条，发送/发基准那些动作全在后台每分钟那一轮里。
+ * 于是用户点完回查，界面报出「下载器中未找到」，扩展却站在原地不动 —— 最长再等一分钟。
+ * 判据本身仍只有后台那一份 tick（同「辅种检测」建任务那条路），这里只是把它的**触发时刻**提前。
+ *
+ * 等回包是必要的：那条消息现在跑完才回，所以这一刻存储里已是新值，拉回来的不是上一轮的状态。
+ */
+async function advanceAutoReseed() {
+  try {
+    await sendMessage("runAutoReseedTick", undefined);
+  } catch {
+    // 催不动就算了：后台的定时器还在，下一分钟照常自己跑，不该因为催失败打断用户这次回查
+  }
+  await refreshTasksFromStorage();
 }
 
 // 统一走公共实现（原先这里是本仓库第一份手写副本，现已抽到 components/useConfirmDanger.ts）
@@ -763,6 +785,8 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
     for (const task of touched) {
       await sendMessage("updateKeepUploadTask", task);
     }
+    // 查完当场把「该做的」做掉（发基准 / 发还没发出去的那几条），不等下一分钟
+    await advanceAutoReseed();
   } finally {
     rechecking.value = false;
   }

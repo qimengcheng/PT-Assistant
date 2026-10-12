@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-12 20:44:14",
-  "headSha": "6decf96",
+  "generatedAt": "2026-10-12 20:53:47",
+  "headSha": "11d6cdb",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.93.0",
+      "date": "2026-10-12 20:53:38",
+      "added": [
+        "「可选的辅种组合」那张表的「条数」列也可以点表头排序，按「这一档装了几条种子」挑一档时不必只看体积"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.92.8",
       "date": "2026-10-12 20:43:45",

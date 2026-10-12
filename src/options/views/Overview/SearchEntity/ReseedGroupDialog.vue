@@ -112,7 +112,19 @@ const columns = computed<TableColumnsType<IRow>>(() => [
     sorter: (a: IRow, b: IRow) => a.size - b.size,
     sortDirections: ["descend", "ascend"],
   },
-  { title: t("SearchEntity.reseedGroups.colRows"), key: "rows", width: 76, align: "end" },
+  {
+    title: t("SearchEntity.reseedGroups.colRows"),
+    key: "rows",
+    width: 76,
+    align: "end",
+    /**
+     * 条数也要能按（用户 2026-10-12 提的）：默认那串是「站点数 → 条数 → 大小」，而一档里条数多
+     * 意味着这一份内容被更多站重复收录、纯辅的条数也就多 —— 他要按这一维挑。
+     * 同「大小」那一列：必须给真正的 compare，只写 `sorter: true` 箭头会动、数据不排（AGENTS §3.4）。
+     */
+    sorter: (a: IRow, b: IRow) => a.rowCount - b.rowCount,
+    sortDirections: ["descend", "ascend"],
+  },
   // 84 = 表头三字实测 39 + 内衬 16×2 + 余量（这一列要容得下「数字 + 一颗 14px 图标」）
   { title: t("SearchEntity.reseedGroups.colSeeding"), key: "seeding", width: 84, align: "end" },
   { title: t("SearchEntity.reseedGroups.colSites"), key: "sites", width: 200 },

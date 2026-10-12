@@ -147,14 +147,14 @@ function scheduleReconnect() {
   if (reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
     state = "error";
     lastError = `Gave up after ${MAX_RECONNECT_ATTEMPTS} reconnect attempts`;
-    console.debug("[PTD] Native bridge exceeded max reconnect attempts, giving up.");
+    console.debug("[PT-Assistant] Native bridge exceeded max reconnect attempts, giving up.");
     return;
   }
 
   const delay = Math.min(RECONNECT_BASE_MS * 2 ** reconnectAttempt, RECONNECT_MAX_MS);
   state = "retrying";
   console.debug(
-    `[PTD] Native bridge reconnecting in ${delay}ms (attempt ${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})...`,
+    `[PT-Assistant] Native bridge reconnecting in ${delay}ms (attempt ${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})...`,
   );
   reconnectTimer = setTimeout(connect, delay);
 }
@@ -176,7 +176,7 @@ function connect() {
   } catch (e) {
     state = "error";
     lastError = errorText(e);
-    console.debug("[PTD] Native messaging host not available:", lastError);
+    console.debug("[PT-Assistant] Native messaging host not available:", lastError);
     return;
   }
 
@@ -199,7 +199,7 @@ function connect() {
       } catch (e) {
         state = "error";
         lastError = errorText(e);
-        console.debug("[PTD] Failed to send native hello message:", lastError);
+        console.debug("[PT-Assistant] Failed to send native hello message:", lastError);
         return;
       }
 
@@ -210,7 +210,7 @@ function connect() {
       if (port !== currentPort) return;
       state = "error";
       lastError = errorText(e);
-      console.debug("[PTD] Failed to get or create native instance id:", lastError);
+      console.debug("[PT-Assistant] Failed to get or create native instance id:", lastError);
       try {
         currentPort.disconnect();
       } catch {
@@ -271,13 +271,13 @@ function connect() {
     }
 
     if (err) {
-      console.debug("[PTD] Native messaging disconnected:", errMsg);
+      console.debug("[PT-Assistant] Native messaging disconnected:", errMsg);
     }
 
     if (FATAL_ERRORS.some((e) => errMsg.includes(e))) {
       state = "error";
       lastError = errMsg;
-      console.debug("[PTD] Native host not available, CLI bridge disabled.");
+      console.debug("[PT-Assistant] Native host not available, CLI bridge disabled.");
       return;
     }
 

@@ -134,7 +134,7 @@ async function handleLocalDownloadMulti() {
         await sendMessage("downloadTorrent", { torrent, downloaderId: "local" });
         okCount++;
       } catch (e) {
-        console.error("[PTD] download torrent failed", torrent.title, e);
+        console.error("[PT-Assistant] download torrent failed", torrent.title, e);
       }
     }
 

@@ -101,7 +101,7 @@ async function waitForOffscreenReady(): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, READY_POLL_INTERVAL_MS));
   }
-  throw new Error("[PTD] offscreen document did not become ready in time", { cause: lastErr });
+  throw new Error("[PT-Assistant] offscreen document did not become ready in time", { cause: lastErr });
 }
 
 /**
@@ -116,7 +116,7 @@ export function setupOffscreenDocumentSafe(retries = 3): void {
         await setupOffscreenDocument();
         return;
       } catch (e) {
-        console.error(`[PTD] setupOffscreenDocument failed (${attempt + 1}/${retries + 1})`, e);
+        console.error(`[PT-Assistant] setupOffscreenDocument failed (${attempt + 1}/${retries + 1})`, e);
         if (attempt === retries) {
           return;
         }

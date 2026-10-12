@@ -2,6 +2,7 @@
 import type { ISiteMetadata, TSite } from "@ptd/site"; // type-only：构建时擦除，不会把 @ptd/site 的 eager 链（utils → social → sizzle）带进 SW
 
 import { onMessage } from "@/messages.ts";
+import { installConsoleLogGate } from "@/shared/consoleLog.ts";
 import { setupOffscreenDocumentSafe } from "./utils/offscreen.ts";
 // cookies 相关 handler（含 setCookie 的字段白名单与 checkAndExtendCookies）统一在本模块注册
 import "./utils/cookies.ts";
@@ -49,6 +50,10 @@ export default defineBackground({
   // 2. module 模式下站点定义保持为独立懒加载 chunk，只有真正用到某站点时才加载。
   type: "module",
   main() {
+    // 控制台日志总闸（默认关）。放在 main() 第一句：SW 里其余模块的 import 期日志
+    // 只有极少数，而那些正是排查「SW 起没起来」要看的，不在这次收口的范围里。
+    installConsoleLogGate();
+
     // ===== offscreen 文档（站点解析/搜索/下载等服务宿主，具备 DOM）=====
     setupOffscreenDocumentSafe();
 
@@ -82,7 +87,7 @@ export default defineBackground({
 
     // ===== 安装/升级时修复历史版本写入的坏数据（字符串型 ratio/seeding/joinTime 等）=====
     browser.runtime.onInstalled.addListener(() => {
-      console.debug("[PTD] Installed!");
+      console.debug("[PT-Assistant] Installed!");
       void fixAllStoredUserInfo();
     });
 

@@ -54,7 +54,7 @@ function injectSfcStyles(document: Document, shadowRoot: ShadowRoot) {
       el.textContent = css;
       shadowRoot.appendChild(el);
     })
-    .catch((e) => console.error("[PTD] 注入 content-app.css 失败，content 侧组件样式将全部丢失", SFC_CSS_PATH, e));
+    .catch((e) => console.error("[PT-Assistant] 注入 content-app.css 失败，content 侧组件样式将全部丢失", SFC_CSS_PATH, e));
 }
 
 
@@ -130,7 +130,7 @@ export function mountApp(document: Document, data: Record<string, unknown> = {})
   let disposed = false;
   const mutationObserver = new MutationObserver(() => {
     if (!disposed && !document.body.contains(contentRoot)) {
-      console.debug("[PTD] Content root removed from body, remounting app...");
+      console.debug("[PT-Assistant] Content root removed from body, remounting app...");
       dispose();
       mountApp(document, data);
     }

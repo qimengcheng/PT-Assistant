@@ -29,7 +29,7 @@ async function confirmDelete() {
     const failed = results.filter((r) => r.status === "rejected");
     if (failed.length > 0) {
       console.error(
-        "[PTD] delete partially failed",
+        "[PT-Assistant] delete partially failed",
         failed.map((r) => (r as PromiseRejectedResult).reason),
       );
       message.error(t("common.dialog.deleteFailed", [failed.length]));

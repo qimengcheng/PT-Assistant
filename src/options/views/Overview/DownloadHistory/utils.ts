@@ -77,7 +77,7 @@ function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
       }
     } catch (e) {
       // 抛错时必须清理定时器并放弃轮询，否则会变成每 1s 一次的死循环 unhandledRejection
-      console.error(`[PTD] watch download history failed: ${downloadHistoryId}`, e);
+      console.error(`[PT-Assistant] watch download history failed: ${downloadHistoryId}`, e);
       delete watchingMap[downloadHistoryId];
     }
   }, 1e3) as unknown as number;

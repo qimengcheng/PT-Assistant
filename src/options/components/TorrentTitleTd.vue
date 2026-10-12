@@ -69,7 +69,7 @@ function loadSocialInformation(site: TSupportSocialSite) {
       })
       .catch((e) => {
         // 必须兜底：失败时 { loading: true } 永不清除，popover 里会一直显示 Loading....
-        console.error("[PTD] load social information failed", site, e);
+        console.error("[PT-Assistant] load social information failed", site, e);
         socialInformation[site] = { error: true } as ISocialInformationData;
       });
   }

@@ -58,7 +58,7 @@ async function fillFaviconAsync(siteId: TSiteID, placeholder: IExtendSiteMetadat
     placeholder.faviconSrc = siteFaviconUrl;
   } catch (e) {
     // 保留占位图，不影响表格首屏
-    console.error(`[PTD] 站点图标获取失败（保留占位图）: ${siteId}`, e);
+    console.error(`[PT-Assistant] 站点图标获取失败（保留占位图）: ${siteId}`, e);
   }
 }
 
@@ -101,7 +101,7 @@ export async function loadAllAddedSiteMetadata(sites?: string[]): Promise<TOptio
         // 不 await：图标异步回填，不阻塞表格首屏
         void fillFaviconAsync(siteId, entry);
       } catch (e) {
-        console.error(`[PTD] loadAllAddedSiteMetadata 失败: ${siteId}`, e);
+        console.error(`[PT-Assistant] loadAllAddedSiteMetadata 失败: ${siteId}`, e);
       }
     }),
   );

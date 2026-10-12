@@ -1067,6 +1067,7 @@
       "enableTableMultiSort": "允许多列排序",
       "groupDeveloper": "开发者选项",
       "developerMode": "显示开发者菜单（站点定义 / 调试信息）",
+      "consoleLog": "在浏览器控制台输出运行日志（报错不受此项影响）",
       "groupContentScript": "站点页面助手（content script）",
       "enableContentScript": "启用站点页面助手",
       "socialSiteSearchBy": "社交站点搜索方式",

@@ -7,12 +7,18 @@ import { piniaInstance } from "@/options/plugins/pinia.ts";
 import { routerInstance } from "@/options/plugins/router.ts";
 import { i18nInstance, mergeLocaleMessages } from "@/options/plugins/i18n.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
+import { installConsoleLogGate } from "@/shared/consoleLog.ts";
 
 // options 页面注册全量语言包（消息与 i18n 单例解耦，见 plugins/i18n.ts）
 import en from "~/locales/en.json";
 import zh_CN from "~/locales/zh_CN.json";
 mergeLocaleMessages("en", en);
 mergeLocaleMessages("zh_CN", zh_CN);
+
+// 控制台日志总闸：必须早于第一个 store 实例化 —— pinia 持久化插件那句
+// `Restoring state for key: config from storage: local` 就是在 store 创建时打的，
+// 晚一步装就等于漏掉用户截图里最吵的那一条。
+installConsoleLogGate();
 
 import "./style.css";
 import "./vuetify-compat.css";

@@ -26,6 +26,7 @@ import { getHostFromUrl } from "@ptd/site/utils/html.ts";
 import { sendMessage } from "@/messages.ts";
 import type { IConfigPiniaStorageSchema } from "@/shared/types/storages/config.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types/storages/metadata.ts";
+import { installConsoleLogGate } from "@/shared/consoleLog.ts";
 import { extStore } from "@/storage.ts";
 
 export default defineContentScript({
@@ -35,6 +36,10 @@ export default defineContentScript({
   allFrames: false,
 
   async main() {
+    // 控制台日志总闸。引导与 content-app 是同一个 realm（后者由这里动态 import 进来），
+    // 所以装上这一道就把两边打出的日志一起管住了。
+    installConsoleLogGate();
+
     // props 通过全局暂存传给 content-app：引导与 app 是两次独立的模块求值，
     // 无法直接传参；用 Symbol 之外的唯一键名避免与站点脚本冲突。
     globalThis.__PTD_CONTENT_PROPS__ = null;
@@ -50,7 +55,7 @@ export default defineContentScript({
     if (configStore?.contentScript?.enabledAtSocialSite ?? true) {
       const socialSite = await sendMessage("matchSocialPage", window.location.href).catch(() => undefined);
       if (socialSite) {
-        console.debug(`[PTD] Social site detected: ${socialSite}, loading app...`);
+        console.debug(`[PT-Assistant] Social site detected: ${socialSite}, loading app...`);
         await loadApp({ socialSite });
         return;
       }
@@ -67,11 +72,11 @@ export default defineContentScript({
       configStore?.contentScript?.allowExceptionSites === true &&
       metadataStore.sites[siteId]?.allowContentScript === false
     ) {
-      console.debug(`[PTD] Content script is disabled for site: ${siteId}`);
+      console.debug(`[PT-Assistant] Content script is disabled for site: ${siteId}`);
       return;
     }
 
-    console.debug(`[PTD] host found for site: ${siteId}, loading app...`);
+    console.debug(`[PT-Assistant] host found for site: ${siteId}, loading app...`);
     await loadApp({ siteId });
   },
 });
@@ -81,10 +86,10 @@ async function loadApp(props: Record<string, unknown>) {
   globalThis.__PTD_CONTENT_PROPS__ = props;
 
   const appUrl = chrome.runtime.getURL("content-app.js");
-  console.debug("[PTD] loading app from", appUrl);
+  console.debug("[PT-Assistant] loading app from", appUrl);
 
   // @vite-ignore：必须是运行时 URL，否则构建期会把这个动态 import 静态打进引导
   await import(/* @vite-ignore */ appUrl);
 
-  console.debug("[PTD] app module loaded");
+  console.debug("[PT-Assistant] app module loaded");
 }

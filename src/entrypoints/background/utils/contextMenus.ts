@@ -181,7 +181,7 @@ async function downloadLinkPush(
         torrent.site = metadataStore.siteHostMap[host];
       }
     } catch (error) {
-      console.warn("[PTD] Failed to get metadata store for site detection:", error);
+      console.warn("[PT-Assistant] Failed to get metadata store for site detection:", error);
     }
   }
 
@@ -318,7 +318,7 @@ async function populateContextMenus(tab: chrome.tabs.Tab) {
 
   // 配置中禁用右键菜单则不初始化
   if (configStore?.contextMenus?.enabled === false) {
-    console.debug("[PTD] Context menus are disabled, skipping initialization.");
+    console.debug("[PT-Assistant] Context menus are disabled, skipping initialization.");
     return;
   }
 
@@ -586,7 +586,7 @@ async function rebuildMenus(tab: chrome.tabs.Tab) {
   try {
     await chrome.contextMenus?.removeAll();
   } catch (error) {
-    console.warn("[PTD] removeAll failed:", error);
+    console.warn("[PT-Assistant] removeAll failed:", error);
   }
 
   await populateContextMenus(tab);

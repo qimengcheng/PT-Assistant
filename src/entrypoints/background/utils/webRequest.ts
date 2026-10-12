@@ -58,6 +58,6 @@ export async function cleanupStaleDNRSessionRules(): Promise<void> {
       void sendMessage("logger", { msg: `Cleaned ${stale.length} stale DNR session rules` });
     }
   } catch (e) {
-    console.warn("[PTD] cleanup stale DNR session rules failed", e);
+    console.warn("[PT-Assistant] cleanup stale DNR session rules failed", e);
   }
 }

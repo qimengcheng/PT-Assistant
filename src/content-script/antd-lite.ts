@@ -95,12 +95,12 @@ function registerDevResolverGuard(app: VueApp) {
   app.config.warnHandler = (msg, instance, trace) => {
     if (import.meta.env.DEV && msg.includes("Failed to resolve component")) {
       console.error(
-        `[PTD][content] ${msg}\n这是 src/content-script/antd-lite.ts 的按需清单缺项，补上对应组件即可。`,
+        `[PT-Assistant][content] ${msg}\n这是 src/content-script/antd-lite.ts 的按需清单缺项，补上对应组件即可。`,
       );
       return;
     }
     if (upstream) upstream(msg, instance, trace);
-    else console.warn(`[PTD][content] ${msg}${trace ? `\n${trace}` : ""}`);
+    else console.warn(`[PT-Assistant][content] ${msg}${trace ? `\n${trace}` : ""}`);
   };
 }
 

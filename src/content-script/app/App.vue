@@ -108,7 +108,7 @@ configStore.$onReady(() => {
  * 点子按钮不自动收起，对应上游的 :close-on-content-click="false"。
  */
 function toggleSpeedDial() {
-  updatePageType(ptdData).catch((e) => console.error("[PTD] updatePageType failed", e));
+  updatePageType(ptdData).catch((e) => console.error("[PT-Assistant] updatePageType failed", e));
   openSpeedDial.value = !openSpeedDial.value;
 }
 
@@ -236,7 +236,7 @@ function onDrop(event: DragEvent) {
     try {
       torrents = JSON.parse(dataTransfer.getData(CUSTOM_DRAG_MIME));
     } catch (error) {
-      console.warn("[PTD] Failed to parse dropped data as JSON:", error);
+      console.warn("[PT-Assistant] Failed to parse dropped data as JSON:", error);
     }
   } else {
     // 尝试从其他类型中提取链接
@@ -249,11 +249,11 @@ function onDrop(event: DragEvent) {
     }
   }
   if (torrents.length > 0) {
-    console.debug("[PTD] Dropped data:", torrents);
+    console.debug("[PT-Assistant] Dropped data:", torrents);
     remoteDownloadDialogData.torrents = torrents;
     remoteDownloadDialogData.show = true;
   } else {
-    console.warn("[PTD] No valid torrent data found in the dropped content.");
+    console.warn("[PT-Assistant] No valid torrent data found in the dropped content.");
   }
   isDragging.value = false; // 重置拖拽状态
 }

@@ -84,7 +84,7 @@ function reDownload(reDownloadType: TReDownloadType) {
       const failed = results.filter((r) => r.status === "rejected");
       if (failed.length > 0) {
         console.error(
-          "[PTD] re-download partially failed",
+          "[PT-Assistant] re-download partially failed",
           failed.map((r) => (r as PromiseRejectedResult).reason),
         );
         // ⚠️ 这条键的占位符是命名的 `{n}`，所以参数必须给对象：

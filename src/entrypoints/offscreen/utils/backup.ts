@@ -301,7 +301,7 @@ export async function restoreBackupData(
     cookieFailedCount = cookieFailed.length;
     if (cookieFailedCount > 0) {
       console.error(
-        `[PTD] restore cookies partially failed: ${cookieFailedCount}/${cookieResults.length}`,
+        `[PT-Assistant] restore cookies partially failed: ${cookieFailedCount}/${cookieResults.length}`,
         cookieFailed.slice(0, 5).map((r) => (r as PromiseRejectedResult).reason),
       );
     }

@@ -81,9 +81,9 @@ export async function fixAllStoredUserInfo(): Promise<void> {
     // 只有当有变化时才更新存储
     if (hasChanges) {
       await replaceArchive(fixedUserInfoData);
-      console.debug("[PTD] Fixed corrupted user info data");
+      console.debug("[PT-Assistant] Fixed corrupted user info data");
     }
   } catch (error) {
-    console.error("[PTD] Error fixing user info data:", error);
+    console.error("[PT-Assistant] Error fixing user info data:", error);
   }
 }

@@ -102,7 +102,7 @@ function loadLogger() {
         loadFailureNotified = true;
         message.error(t("Logger.loadFailed"));
       }
-      console.error("[PTD] load logger failed", e);
+      console.error("[PT-Assistant] load logger failed", e);
     })
     .finally(() => {
       isLoadingLogger.value = false;

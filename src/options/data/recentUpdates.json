@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-12 17:41:30",
-  "headSha": "58c2c1e",
+  "generatedAt": "2026-10-12 17:58:20",
+  "headSha": "30c1f2b",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.92.2",
+      "date": "2026-10-12 17:56:25",
+      "added": [
+        "设置 → 高级与诊断 新增「在浏览器控制台输出运行日志」，默认关闭；打开后所有日志前缀统一为 [PT-Assistant]，报错不受此项影响"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.92.1",
       "date": "2026-10-12 17:36:26",

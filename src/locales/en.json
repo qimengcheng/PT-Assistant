@@ -1067,6 +1067,7 @@
       "enableTableMultiSort": "Allow multi-column sorting",
       "groupDeveloper": "Developer",
       "developerMode": "Show developer menus (Site Definitions / Debugger)",
+      "consoleLog": "Print runtime logs to the browser console (errors are always shown)",
       "groupContentScript": "Site page helper (content script)",
       "enableContentScript": "Enable the site page helper",
       "socialSiteSearchBy": "Search method on social sites",

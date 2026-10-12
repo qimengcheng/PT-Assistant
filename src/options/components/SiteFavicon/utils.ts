@@ -73,7 +73,7 @@ async function readFaviconFromIdb(siteId: TSiteID): Promise<string | null> {
     return cached && cached !== NO_IMAGE ? cached : null;
   } catch (e) {
     // 读缓存失败不该影响主流程，降级去问 offscreen
-    console.error(`[PTD] 读 favicon 缓存失败: ${siteId}`, e);
+    console.error(`[PT-Assistant] 读 favicon 缓存失败: ${siteId}`, e);
     return null;
   }
 }
@@ -117,7 +117,7 @@ export async function getSiteFavicon(siteId: TSiteID, flush: boolean = false): P
       return favicon;
     })
     .catch((e) => {
-      console.error(`[PTD] getSiteFavicon(${siteId}) 失败`, e);
+      console.error(`[PT-Assistant] getSiteFavicon(${siteId}) 失败`, e);
       faviconCache.value[siteId] = NO_IMAGE;
       return NO_IMAGE;
     })
@@ -148,7 +148,7 @@ export async function flushSiteFavicon(siteIds: TSiteID[]): Promise<void> {
     delete faviconCache.value[siteId];
     await db.delete("favicon", siteId).catch((e) => {
       // 条目本来不存在时 IndexedDB 也会抛，不该因此中断整批刷新
-      console.error(`[PTD] 清除 favicon 缓存失败: ${siteId}`, e);
+      console.error(`[PT-Assistant] 清除 favicon 缓存失败: ${siteId}`, e);
     });
   }
 
@@ -168,6 +168,6 @@ export async function clearFaviconCaches(): Promise<void> {
     // 内存那份已经清了；库里清不掉（比如 IndexedDB 临时不可用）时不能把异常
     // 抛给调用方 —— 调试页那颗「清空图标缓存」会变成一个 unhandled rejection，
     // 用户看到的是按钮没反应而不是「有一半清了」。
-    console.error("[PTD] 清空 favicon 缓存失败", e);
+    console.error("[PT-Assistant] 清空 favicon 缓存失败", e);
   }
 }

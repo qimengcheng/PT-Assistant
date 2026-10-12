@@ -69,7 +69,7 @@ function handleLocalDownloadMulti() {
       for (const torrent of torrents) {
         // 单个种子失败不应中断整批，也不该留下 unhandledRejection
         sendMessage("downloadTorrent", { torrent, downloaderId: "local" }).catch((e) =>
-          console.error("[PTD] download torrent failed", torrent.title, e),
+          console.error("[PT-Assistant] download torrent failed", torrent.title, e),
         );
       }
 
@@ -77,7 +77,7 @@ function handleLocalDownloadMulti() {
     })
     .catch((e) => {
       // parseListPage 失败时必须有兜底，否则只剩 .finally 复位、错误被彻底吞掉
-      console.error("[PTD] parse list page failed", e);
+      console.error("[PT-Assistant] parse list page failed", e);
       runtimeStore.showSnakebar(t("contentScript.noTorrentParsed"), { color: "error" });
     })
     .finally(() => {
@@ -107,7 +107,7 @@ function handleLinkCopyMulti() {
       }
     })
     .catch((e) => {
-      console.error("[PTD] parse list page failed", e);
+      console.error("[PT-Assistant] parse list page failed", e);
       runtimeStore.showSnakebar(t("contentScript.copyLinkFailed"), { color: "error" });
     })
     .finally(() => {
@@ -127,7 +127,7 @@ function handleRemoteDownloadMulti(isDefaultSend = false) {
       }
     })
     .catch((e) => {
-      console.error("[PTD] parse list page failed", e);
+      console.error("[PT-Assistant] parse list page failed", e);
       runtimeStore.showSnakebar(t("contentScript.noTorrentParsed"), { color: "error" });
     });
 }
@@ -146,7 +146,7 @@ function handleAdvanceListModule() {
       }
     })
     .catch((e) => {
-      console.error("[PTD] parse list page failed", e);
+      console.error("[PT-Assistant] parse list page failed", e);
       runtimeStore.showSnakebar(t("contentScript.parsePageFailed"), { color: "error" });
     });
 }
@@ -157,7 +157,7 @@ async function handleSearch() {
     const { keywords } = await parseListPage();
     doKeywordSearch(keywords);
   } catch (e) {
-    console.error("[PTD] parse list page failed", e);
+    console.error("[PT-Assistant] parse list page failed", e);
     runtimeStore.showSnakebar(t("contentScript.parsePageFailed"), { color: "error" });
   }
 }

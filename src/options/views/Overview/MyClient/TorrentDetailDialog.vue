@@ -302,7 +302,7 @@ async function copyMagnet() {
     await navigator.clipboard.writeText(magnetLink(torrent));
     useRuntimeStore().showSnakebar(t("MyClient.detail.copyMagnetSuccess"), { color: "success" });
   } catch (e) {
-    console.error("[PTD] copy magnet link failed", torrent.infoHash, e);
+    console.error("[PT-Assistant] copy magnet link failed", torrent.infoHash, e);
     useRuntimeStore().showSnakebar(t("MyClient.detail.copyFailed"), { color: "error" });
   }
 }

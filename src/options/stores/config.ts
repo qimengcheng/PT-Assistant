@@ -185,6 +185,8 @@ export const useConfigStore = defineStore("config", {
     enableTableMultiSort: false,
 
     developerMode: false,
+    // 控制台日志总闸，默认关（判据与「为什么拦在 console 那一层」见 src/shared/consoleLog.ts）
+    consoleLog: false,
 
     contextMenus: {
       enabled: true,

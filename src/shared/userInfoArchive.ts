@@ -45,12 +45,12 @@ export function ensureMigrated(): Promise<void> {
 
     if (moved > 0) {
       await extStore.setItem("userInfo", {});
-      console.debug(`[PTD] userInfo 按天存档已迁入 IndexedDB user_info，共 ${moved} 条`);
+      console.debug(`[PT-Assistant] userInfo 按天存档已迁入 IndexedDB user_info，共 ${moved} 条`);
     }
   })().catch((e) => {
     // 迁移失败不能永久缓存失败态：置空让下次访问重试，否则本次会话所有存档读写全废
     migration = null;
-    console.error("[PTD] userInfo 存档迁移失败，将在下次访问时重试", e);
+    console.error("[PT-Assistant] userInfo 存档迁移失败，将在下次访问时重试", e);
     throw e;
   });
 

@@ -45,6 +45,19 @@ export interface IConfigPiniaStorageSchema {
   // 新键拿的就是这里的默认值 false。
   developerMode: boolean;
 
+  /**
+   * 是否把运行日志打进浏览器控制台，默认关（用户 2026-10-12 要求）。
+   *
+   * 闸门在 `src/shared/consoleLog.ts`：它包住的是一等公民 `console.log/info/debug/warn` 四档，
+   * **不含 `console.error`**（报错是「真坏了」唯一的现场信号）。判据放在 console 那一层而不是
+   * 逐个调用点，是因为噪声里有一条来自 pinia 持久化插件、还有 7 处来自上游 `packages/**`，
+   * 那两类都不是「改我们自己代码」能盖住的。
+   *
+   * 与「运行日志」那一页无关：那页读的是 offscreen 内存里的环形缓冲
+   * （`entrypoints/offscreen/utils/logger.ts` 的 `ring`，经 `getLogger` 消息取），不走 console。
+   */
+  consoleLog: boolean;
+
   // 用于存储 v-data-table 表格的展示
   tableBehavior: Record<UiTableBehaviorKey, UiTableBehaviorItem>;
 

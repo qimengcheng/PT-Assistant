@@ -3,6 +3,7 @@
  */
 
 import { onMessage } from "@/messages.ts";
+import { mergeTaskPreservingAutoState } from "@/shared/keepUploadTaskSave.ts";
 import type { IKeepUploadTask, TKeepUploadTaskKey, TKeepUploadTaskStorageSchema } from "@/shared/types.ts";
 import { extStore } from "@/storage.ts";
 
@@ -46,11 +47,17 @@ onMessage("createKeepUploadTask", async ({ data: task }) => {
 
 /**
  * 更新辅种任务
+ *
+ * ⚠️ 整条写回时**保住存储里那份 `autoState`**：那些「这件事提醒过没有」的标记归后台独占，
+ * 而界面手里的是上一次刷新的快照（那一页 60 秒刷一次）。用户点一下「把数据移到任务目录」
+ * 就把后台刚写的标记抹掉，下一轮读到 `undefined` → 同一件事又提醒一次（重复的
+ * 「辅种已停止发送」就是这么来的，`othersSent` 被抹掉还会把已发出去的那几条再发一次）。
+ * 判据与理由在 `@/shared/keepUploadTaskSave.ts`。
  */
 export async function updateKeepUploadTask(task: IKeepUploadTask): Promise<void> {
   const tasks = ((await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema) || {};
   if (tasks[task.id]) {
-    tasks[task.id] = task;
+    tasks[task.id] = mergeTaskPreservingAutoState(tasks[task.id], task);
     await extStore.setItem(STORAGE_KEY, tasks);
   }
 }

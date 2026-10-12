@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-12 10:44:14",
-  "headSha": "5e62d85",
+  "generatedAt": "2026-10-12 12:56:50",
+  "headSha": "1bf5ac5",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.90.6",
+      "date": "2026-10-12 12:56:28",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "辅种任务的提醒不再重复：同一件事（例如「基准数据所在目录与任务目录不一致」）只提醒一次，处理过之后不会再来一条同样的通知",
+        "已经推进下载器的辅种任务不会被重新算成「还没发」，同一批种子不会因此被第二次发送"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.90.3",
       "date": "2026-10-12 10:44:04",

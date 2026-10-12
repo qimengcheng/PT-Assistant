@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-12 08:47:14",
-  "headSha": "e136984",
+  "generatedAt": "2026-10-12 08:59:58",
+  "headSha": "68e6763",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.87.5",
+      "date": "2026-10-12 08:59:48",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "辅种进展通知弹出的同时，辅种任务列表立刻重读一次，不再等那一分钟的定时刷新：原来右上角已经提示「全部条目均已正常做种」，列表里那几条还停在上一轮的「下载器中未找到」"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.87.4",
       "date": "2026-10-12 08:47:05",

@@ -27,6 +27,7 @@ import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
 import { detectBasePathMismatch, isCategorySavePath, type IClientCategory } from "@/shared/reseedPath.ts";
+import { watchReseedNotice } from "@/shared/reseedPresence.ts";
 import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
 import {
   judgeReseedTorrent,
@@ -323,6 +324,8 @@ async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
 /** 页面开着时跟着后台那一分钟的节奏取一次任务，见 `refreshTasksFromStorage` */
 const AUTO_REFRESH_MS = 60_000;
 let autoRefreshTimer: number | undefined;
+/** 后台进展通知的订阅句柄（卸载时取消） */
+let stopNoticeWatch: (() => void) | undefined;
 
 async function loadTasks() {
   loading.value = true;
@@ -339,6 +342,16 @@ async function loadTasks() {
 onMounted(() => {
   loadTasks();
   autoRefreshTimer = window.setInterval(refreshTasksFromStorage, AUTO_REFRESH_MS);
+  /**
+   * 后台每弹出一批进展，就顺手把这张表拉一次 —— 不等那个 60 秒的轮询。
+   * 用户 2026-10-12 报的形状就是这一处：右上角已经弹出「全部条目均已正常做种」，
+   * 列表里那几条还停在上一轮的「下载器中未找到」，最长要再等一分钟才对得上。
+   * 通知与写回在同一次后台遍历里发生（`persistVerify` 在前、通知 flush 在后），所以这一刻
+   * 存储里已经是新值，这一趟拉回来就是最终状态，不是又读到一份旧的。
+   */
+  stopNoticeWatch = watchReseedNotice(() => {
+    void refreshTasksFromStorage();
+  });
 });
 
 /**
@@ -594,6 +607,7 @@ onUnmounted(() => {
   autoRecheckTimers.forEach((id) => window.clearTimeout(id));
   autoRecheckTimers.clear();
   if (autoRefreshTimer !== undefined) window.clearInterval(autoRefreshTimer);
+  stopNoticeWatch?.();
 });
 
 function scheduleAutoRecheck(taskId: string) {

@@ -313,6 +313,7 @@
     "label": {
       "batchBtn": "批量设置标签",
       "emptyLabel": "标签不能为空",
+      "existing": "已有的标签",
       "input": "标签",
       "success": "已设置 {count} 个种子的标签",
       "title": "设置标签（{count} 个种子）"

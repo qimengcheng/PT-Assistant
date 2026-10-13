@@ -118,6 +118,31 @@ const totalDlSpeed = computed(() => allTorrents.value.reduce((acc, t) => acc + (
 // ── computed ───────────────────────────────────────────────────────────────
 const allTorrents = computed(() => Object.values(torrents.value).flat());
 
+/**
+ * 「设置标签」弹窗里那一排可以点的已有标签（用户 2026-10-13 要求把它摆出来，别只留一个空输入框）。
+ * 两路并起来，都限定在**这批选中种子所在的那几台下载器**上：
+ * ① 这些种子上真在用的 label（客户端里有什么，这里就有什么）；
+ * ② 那几台在下载器设置里配好的候选 `suggestTags`（与辅种检测那颗标签框同源）。
+ * 排序按「在用的条数」从多到少、同数按字面 —— 常用的排最前，点得到而不用翻。
+ */
+const existingLabels = computed<string[]>(() => {
+  const clients = new Set(tableSelected.value.map((t) => t.clientId));
+  if (clients.size === 0) return [];
+  const used = new Map<string, number>();
+  for (const t of allTorrents.value) {
+    if (!clients.has(t.clientId)) continue;
+    const label = (t.label ?? "").trim();
+    if (label) used.set(label, (used.get(label) ?? 0) + 1);
+  }
+  for (const id of clients) {
+    for (const tag of metadataStore.downloaders[id]?.suggestTags ?? []) {
+      const label = tag.trim();
+      if (label && !used.has(label)) used.set(label, 0);
+    }
+  }
+  return [...used.keys()].sort((a, b) => (used.get(b) ?? 0) - (used.get(a) ?? 0) || a.localeCompare(b));
+});
+
 const filteredTorrents = computed(() => {
   const active = activeDownloaderIds.value;
   let base = active.flatMap((id) => torrents.value[id] ?? []);
@@ -813,7 +838,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
 
   <SpeedLimitDialog v-model="showSpeedLimitDialog" :torrents="tableSelected" />
 
-  <LabelDialog v-model="showLabelDialog" :torrents="tableSelected" />
+  <LabelDialog v-model="showLabelDialog" :torrents="tableSelected" :suggest-labels="existingLabels" />
 
   <RecheckConfirmDialog
     v-model="showRecheckDialog"

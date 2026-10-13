@@ -313,6 +313,7 @@
     "label": {
       "batchBtn": "Set Label",
       "emptyLabel": "Label cannot be empty",
+      "existing": "Existing labels",
       "input": "Label",
       "success": "Labeled {count} torrent(s)",
       "title": "Set Label ({count} torrent(s))"

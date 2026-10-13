@@ -311,6 +311,11 @@ export default class Flood extends AbstractBittorrentClient {
         downloadSpeed: rawTorrent.downRate,
         totalUploaded: rawTorrent.upTotal,
         totalDownloaded: rawTorrent.downTotal,
+        seeds: rawTorrent.seedsConnected,
+        peers: rawTorrent.peersConnected,
+        eta: rawTorrent.eta,
+        // Flood 给的是 URI 数组，取第一个非空的当「当前 tracker」
+        tracker: rawTorrent.trackerURIs?.find((uri) => !!uri),
         raw: rawTorrent,
         clientId: this.config.id,
       } as CTorrent<TorrentProperties>;

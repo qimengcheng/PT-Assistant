@@ -362,15 +362,21 @@
     "table": {
       "addedAt": "添加时间",
       "client": "下载器",
+      "completedAt": "完成时间",
       "dlSpeed": "下载速度",
+      "eta": "剩余时间",
+      "label": "标签",
       "name": "种子名称",
+      "peers": "下载数",
       "progress": "进度",
       "ratio": "分享率",
       "savePath": "保存路径",
+      "seeds": "做种数",
       "size": "大小",
       "status": "状态",
       "totalDownloaded": "总下载量",
       "totalUploaded": "总上传量",
+      "tracker": "Tracker",
       "upSpeed": "上传速度"
     }
   },

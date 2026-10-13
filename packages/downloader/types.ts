@@ -166,6 +166,29 @@ export interface CTorrent<RAW = any> {
    */
   totalDownloaded: number;
 
+  /**
+   * 以下都是**可选**的展示用字段：各家客户端不是都能报，报不出的留 undefined，
+   * 界面按「-」显示 —— 不许拿 0 冒充「没有」，也不许在界面里再去读 raw 的各家键名。
+   * 键名对照（都取自各驱动自己已声明的类型，不是猜的）：
+   * seeds = qBittorrent num_seeds / Transmission peersSendingToUs / Deluge num_seeds /
+   *         Flood seedsConnected / ruTorrent seeds_actual / uTorrent SEEDS_CONNECTED
+   * peers = num_leechs / peersGettingFromUs / num_peers / peersConnected / peers_actual / PEERS_CONNECTED
+   * eta = eta（qBittorrent、Deluge、Flood、uTorrent）/ ruTorrent remaining
+   * completedDate = qBittorrent completion_on / Transmission doneDate / uTorrent DATE_COMPLETED
+   * tracker = qBittorrent tracker / Transmission trackers[].announce / Deluge tracker_host /
+   *           Flood trackerURIs[0] / ruTorrent tracker_focus
+   */
+  /** 已连上的做种者数量 */
+  seeds?: number;
+  /** 已连上的下载者（对）数量 */
+  peers?: number;
+  /** 预计剩余时间，秒；-1 / 负数表示「算不出」（不在下载、速度为 0 那种） */
+  eta?: number;
+  /** 下载完成时间，unix 秒 */
+  completedDate?: number;
+  /** 当前 tracker 的地址或主机名 */
+  tracker?: string;
+
   raw: RAW;
   clientId: string;
 }

@@ -385,6 +385,12 @@ export default class UTorrent extends AbstractBittorrentClient<TorrentClientConf
         downloadSpeed: torrent[9],
         totalUploaded: torrent[6],
         totalDownloaded: torrent[5],
+        // 元组位序见 `type TorrentData`：10=ETA / 12=PEERS_CONNECTED / 14=SEEDS_CONNECTED /
+        // 24=DATE_COMPLETED
+        seeds: torrent[14],
+        peers: torrent[12],
+        eta: torrent[10],
+        completedDate: torrent[24],
         raw: torrent,
         clientId: this.config.id,
       } as CTorrent;

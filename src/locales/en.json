@@ -362,15 +362,21 @@
     "table": {
       "addedAt": "Added At",
       "client": "Client",
+      "completedAt": "Completed At",
       "dlSpeed": "Download Speed",
+      "eta": "Remaining Time",
+      "label": "Label",
       "name": "Torrent Name",
+      "peers": "Peers",
       "progress": "Progress",
       "ratio": "Ratio",
       "savePath": "Save Path",
+      "seeds": "Seeds",
       "size": "Size",
       "status": "Status",
       "totalDownloaded": "Total Download",
       "totalUploaded": "Total Upload",
+      "tracker": "Tracker",
       "upSpeed": "Upload Speed"
     }
   },

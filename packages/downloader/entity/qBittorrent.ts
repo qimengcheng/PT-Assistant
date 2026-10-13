@@ -664,6 +664,11 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
         downloadSpeed: torrent.dlspeed,
         totalUploaded: torrent.uploaded,
         totalDownloaded: torrent.downloaded,
+        seeds: torrent.num_seeds,
+        peers: torrent.num_leechs,
+        eta: torrent.eta,
+        completedDate: torrent.completion_on,
+        tracker: torrent.tracker,
         raw: torrent,
         clientId: this.config.id,
       } as QbittorrentTorrent;

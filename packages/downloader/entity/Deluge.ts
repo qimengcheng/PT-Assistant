@@ -289,6 +289,14 @@ interface DelugeRawTorrent {
   total_uploaded: number;
   total_done: number;
   trackers?: Array<{ url: string; tier: number }>;
+  /** 已连上的做种数 */
+  num_seeds: number;
+  /** 已连上的下载对数 */
+  num_peers: number;
+  /** 预计剩余秒数；不在下载时为 -1 */
+  eta: number;
+  /** 当前 tracker 的主机名 */
+  tracker_host: string;
 }
 
 interface DelugeTorrentFilterRules extends CTorrentFilterRules {
@@ -315,6 +323,11 @@ export default class Deluge extends AbstractBittorrentClient {
     "state",
     "total_size",
     "trackers",
+    // 列表页的「做种数 / 下载数 / 剩余时间 / Tracker」四列吃这四个
+    "num_seeds",
+    "num_peers",
+    "eta",
+    "tracker_host",
   ];
 
   constructor(options: Partial<DownloaderBaseConfig>) {
@@ -485,6 +498,10 @@ export default class Deluge extends AbstractBittorrentClient {
         // label 明明在 torrentRequestField 里请求了，却没映射进 CTorrent ——
         // 于是 getClientLabels 永远返回空，标签列整列没有内容
         label: torrent.label ?? "",
+        seeds: torrent.num_seeds,
+        peers: torrent.num_peers,
+        eta: torrent.eta,
+        tracker: torrent.tracker_host,
         raw: torrent,
         clientId: this.config.id,
       } as CTorrent<DelugeRawTorrent>;

@@ -58,6 +58,7 @@ import {
   toPercent,
   useClientRefresh,
 } from "./utils.ts";
+import { countText, etaText } from "./columnText.ts";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -220,13 +221,19 @@ const fullTableHeader = computed(
       { title: t("MyClient.table.size"), key: "totalSize", align: "end", width: 110 },
       { title: t("MyClient.table.progress"), key: "progress", align: "end", width: 90 },
       { title: t("MyClient.table.status"), key: "state", align: "center", width: 110 },
+      { title: t("MyClient.table.seeds"), key: "seeds", align: "end", width: 76 },
+      { title: t("MyClient.table.peers"), key: "peers", align: "end", width: 76 },
       { title: t("MyClient.table.upSpeed"), key: "uploadSpeed", align: "end", width: 100 },
       { title: t("MyClient.table.dlSpeed"), key: "downloadSpeed", align: "end", width: 100 },
       { title: t("MyClient.table.totalUploaded"), key: "totalUploaded", align: "end", width: 100 },
       { title: t("MyClient.table.totalDownloaded"), key: "totalDownloaded", align: "end", width: 100 },
       { title: t("MyClient.table.ratio"), key: "ratio", align: "end", width: 80 },
+      { title: t("MyClient.table.eta"), key: "eta", align: "end", width: 110 },
+      { title: t("MyClient.table.label"), key: "label", align: "start", width: 120 },
+      { title: t("MyClient.table.tracker"), key: "tracker", align: "start", width: 180 },
       { title: t("MyClient.table.savePath"), key: "savePath", align: "start" },
       { title: t("MyClient.table.addedAt"), key: "dateAdded", align: "center", width: 160 },
+      { title: t("MyClient.table.completedAt"), key: "completedDate", align: "center", width: 160 },
       {
         title: t("common.action"),
         key: "action",
@@ -732,6 +739,38 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
         <!-- date added -->
         <template v-else-if="column.key === 'dateAdded'">
           <span class="text-no-wrap text-body-small">{{ formatDate(record.dateAdded * 1000) }}</span>
+        </template>
+
+        <!-- 完成时间：没下完的种子里这一格是空的（各家回 0 或干脆没这个字段） -->
+        <template v-else-if="column.key === 'completedDate'">
+          <span class="text-no-wrap text-body-small">
+            {{ record.completedDate ? formatDate(record.completedDate * 1000) : "-" }}
+          </span>
+        </template>
+
+        <!-- 做种数 / 下载数：0 是真值（没人做种、没人下载），只有「这家压根没报」才空 -->
+        <template v-else-if="column.key === 'seeds'">
+          <span class="text-no-wrap">{{ countText(record.seeds) }}</span>
+        </template>
+
+        <template v-else-if="column.key === 'peers'">
+          <span class="text-no-wrap">{{ countText(record.peers) }}</span>
+        </template>
+
+        <!-- 剩余时间 -->
+        <template v-else-if="column.key === 'eta'">
+          <span class="text-no-wrap text-body-small">{{ etaText(record.eta, configStore.lang === "zh_CN") }}</span>
+        </template>
+
+        <!-- 标签：与「设置标签」那格写回去的是同一个字段（qBittorrent 存成分类、
+             Transmission 存成 labels[0]、Flood 存成 tags[0]，各家语义不同但都是那一个值） -->
+        <template v-else-if="column.key === 'label'">
+          <span class="text-body-small text-no-wrap">{{ record.label || "-" }}</span>
+        </template>
+
+        <!-- Tracker -->
+        <template v-else-if="column.key === 'tracker'">
+          <span class="text-body-small text-no-wrap">{{ record.tracker || "-" }}</span>
         </template>
 
         <!-- actions -->

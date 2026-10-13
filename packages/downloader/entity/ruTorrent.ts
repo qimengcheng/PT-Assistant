@@ -436,6 +436,12 @@ export default class RuTorrent extends AbstractBittorrentClient<TorrentClientCon
         downloadSpeed: iv(rawTorrent[12]),
         totalUploaded: iv(rawTorrent[9]),
         totalDownloaded: iv(rawTorrent[8]),
+        // 元组位序见 `type torrentData` 的逐位注释（15=peers_actual / 18=seeds_actual /
+        // 19=remaining / 27=tracker_focus），各家字段名不同但都归进 CTorrent 那四个可选键。
+        seeds: iv(rawTorrent[18]),
+        peers: iv(rawTorrent[15]),
+        eta: iv(rawTorrent[19]),
+        tracker: safeDecodeURIComponent(rawTorrent[27]),
         raw: rawTorrent,
         clientId: this.config.id,
       } as CTorrent<torrentData>;

@@ -114,6 +114,15 @@ interface rawTorrent {
     sitename: string;
     tier: number;
   }>;
+
+  /** 已连上、正在给我们上传的对数（Transmission 语义里的 seeders） */
+  peersSendingToUs: number;
+  /** 已连上、正在从我们这里下载的对数 */
+  peersGettingFromUs: number;
+  /** 预计剩余秒数；不在下载时为 -1 */
+  eta: number;
+  /** 下载完成时间，unix 秒；未完成为 0 */
+  doneDate: number;
 }
 
 interface TransmissionBaseResponse<T = any> {
@@ -336,6 +345,11 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
     "leftUntilDone",
     "labels",
     "trackers",
+    // 列表页的「做种数 / 下载数 / 剩余时间 / 完成时间」四列吃这四个
+    "peersSendingToUs",
+    "peersGettingFromUs",
+    "eta",
+    "doneDate",
     // 上传/下载速度与总量
     "rateDownload",
     "rateUpload",
@@ -560,6 +574,12 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
         downloadSpeed: torrent.rateDownload,
         totalUploaded: torrent.uploadedEver,
         totalDownloaded: torrent.downloadedEver,
+        seeds: torrent.peersSendingToUs,
+        peers: torrent.peersGettingFromUs,
+        eta: torrent.eta,
+        completedDate: torrent.doneDate,
+        // trackers 里第一个 announce 常常是空串（本地节点发现占的那格），所以取第一个非空的
+        tracker: torrent.trackers?.find((item) => item.announce)?.announce,
         raw: torrent,
         clientId: this.config.id,
       } as CTorrent<rawTorrent>;

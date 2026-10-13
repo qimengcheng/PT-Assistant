@@ -24,7 +24,8 @@ import {
 
 import { sendMessage } from "@/messages.ts";
 import { showReseedNoticeCard } from "@/options/reseedNoticeCard.ts";
-import { startPresenceHeartbeat, watchReseedNotice } from "@/shared/reseedPresence.ts";
+import LevelUpCelebration from "@/options/components/LevelUpCelebration.vue";
+import { startPresenceHeartbeat, watchReseedNotice, watchLevelUpGreeting, type ILevelUpGreeting } from "@/shared/reseedPresence.ts";
 import { antdLocaleMap } from "@/options/plugins/antd.ts";
 import { i18nInstance } from "@/options/plugins/i18n.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
@@ -68,9 +69,21 @@ const stopPresence = startPresenceHeartbeat();
 const stopReseedNoticeWatch = watchReseedNotice((batch) => {
   for (const group of batch.groups) showReseedNoticeCard(group, configStore.lang);
 });
+/**
+ * 站点等级提升的祝贺（判据与措辞在 src/shared/levelUp.ts，怎么放烟花在 components/LevelUpCelebration.vue）。
+ * offscreen 那侧攒好一批写进 session 存储，这里只接过来交给组件 —— 人不在页面里时那条路
+ * 走的是系统通知，这里收不到（不是丢了）。
+ * 组件关掉时把那份清空：这一批已经放完了，留着它只是让下一场烟花起之前屏幕上还挂着一批旧名字。
+ */
+const levelUpGreeting = ref<ILevelUpGreeting | null>(null);
+const stopLevelUpWatch = watchLevelUpGreeting((greeting) => {
+  levelUpGreeting.value = greeting;
+});
+
 onUnmounted(() => {
   stopPresence();
   stopReseedNoticeWatch();
+  stopLevelUpWatch();
 });
 
 const navItems = computed(() => {
@@ -301,6 +314,10 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
           </a-layout-content>
         </a-layout>
       </a-layout>
+
+      <!-- 挂在 a-app 之内、整棵布局之外：它要的是全屏覆盖层，但不该跟着路由切换被换掉。
+           留在 a-app 里面才吃得到 ConfigProvider 的 token 与 antdLocale。 -->
+      <LevelUpCelebration :greeting="levelUpGreeting" :lang="configStore.lang" @close="levelUpGreeting = null" />
     </a-app>
   </a-config-provider>
 </template>

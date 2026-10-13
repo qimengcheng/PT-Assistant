@@ -37,6 +37,8 @@ import type { IBackupData, IBackupFileInfo } from "@ptd/backupServer";
 import type { IExtensionStorageSchema, TExtensionStorageKey } from "@/storage.ts";
 
 import type { IFilesFingerprint, IPieceSample, ILocalFingerprintIndex } from "@/shared/fingerprint/index.ts";
+// type-only：站点等级祝贺那条消息的载荷（判据与措辞都住在这一份文件里）
+import type { ILevelUpItem } from "@/shared/levelUp.ts";
 import type {
   IDownloaderMetadata,
   IDownloadTorrentOption,
@@ -136,6 +138,18 @@ export interface ProtocolMap {
    * 上一轮的状态，界面表现仍旧是「我点了回查，什么都没发生」。
    */
   runAutoReseedTick(): void;
+
+  // ===== 1.5 站点等级提升的祝贺（background）=====
+  /**
+   * offscreen 取完用户信息、判出「这一站升了一级」之后报上来，由后台攒批并选通道投递
+   * （人在插件页面 → 界面放烟花；不在 → 系统通知）。判据在 `@/shared/levelUp.ts`，
+   * 攒批与投递在 `background/utils/levelUpNotice.ts`。
+   *
+   * 为什么要绕这一道而不是 offscreen 自己投：offscreen 里只有 `chrome.runtime` 的消息子集，
+   * 没有 `chrome.storage`，也没有 `chrome.notifications`（见 `src/storage.ts:57-59`）——
+   * 在那儿投是**静默什么都不发生**。不等回包：祝贺不该拖住这次取数。
+   */
+  notifyLevelUp(item: ILevelUpItem): void;
 
   // ===== 2. offscreen：站点基础 ( utils/site ) =====
   getSiteList(): Array<{ id: string; name: string; url: string; offline: boolean }>;

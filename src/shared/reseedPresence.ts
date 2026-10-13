@@ -1,8 +1,10 @@
 /**
- * 「用户此刻在不在插件页面」这一件事，以及后台 → 界面那条辅种进展的投递通道。
+ * 「用户此刻在不在插件页面」这一件事，以及**后台 → 界面**那两条投递通道
+ * （辅种进展卡片、站点等级提升的祝贺）。
  *
- * 两个键都放 **session** 存储：它们说的是「此刻」，落盘反而有害 —— 存到 local 的话，
- * 下次开浏览器会读到一条上次关机前留下的陈旧真值（明明没人看页面却按「在页面里」处理）。
+ * 几个键都放 **session** 存储：它们说的是「此刻」，落盘反而有害 —— 存到 local 的话，
+ * 下次开浏览器会读到一条上次关机前留下的陈旧真值（明明没人看页面却按「在页面里」处理，
+ * 而那张祝贺卡会在几天后突然放一场烟花）。
  * session 不落盘、浏览器重启即清，正合这个语义。
  *
  * 为什么不用 `chrome.runtime.getContexts()`：它能告「有没有一个活的 options 页面」，
@@ -12,6 +14,7 @@
 import { storage } from "wxt/utils/storage";
 
 import type { IReseedNoticeBatch } from "./reseedNotice.ts";
+import type { ILevelUpItem } from "./levelUp.ts";
 
 /** 界面每 10 秒报一次「我还可见」 */
 export const PRESENCE_PING_MS = 10_000;
@@ -45,6 +48,26 @@ export async function pushReseedNotice(batch: IReseedNoticeBatch): Promise<void>
 export function watchReseedNotice(cb: (batch: IReseedNoticeBatch) => void): () => void {
   return noticeItem.watch((value) => {
     if (value) cb(value);
+  });
+}
+
+/** 一次祝贺：`at` 同 `reseedNotice` 的理由一样 —— 连续两批内容可能一字不差，没时刻就不回调 */
+export interface ILevelUpGreeting {
+  at: number;
+  items: ILevelUpItem[];
+}
+
+const greetingItem = storage.defineItem<ILevelUpGreeting | null>("session:levelUpGreeting", { fallback: null });
+
+/** 取数那侧（offscreen 的用户信息刷新）写：人在页面时把这一批交给界面放烟花 */
+export async function pushLevelUpGreeting(greeting: ILevelUpGreeting): Promise<void> {
+  await greetingItem.setValue(greeting);
+}
+
+/** 界面订阅：只在变化时回调，所以页面开着时不会把上次那场重放一遍 */
+export function watchLevelUpGreeting(cb: (greeting: ILevelUpGreeting) => void): () => void {
+  return greetingItem.watch((value) => {
+    if (value && value.items.length > 0) cb(value);
   });
 }
 

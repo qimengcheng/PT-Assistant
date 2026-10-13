@@ -13,11 +13,37 @@ import type {
 import { logger } from "./logger.ts";
 import { getSiteInstance } from "./site.ts";
 import { extStore } from "@/storage.ts";
+import { detectLevelUp } from "@/shared/levelUp.ts";
 import {
   deleteArchiveEntries,
   putArchiveEntry,
   readSiteArchive,
 } from "@/shared/userInfoArchive.ts";
+
+/**
+ * 判一次等级，升了就把这一条报给 SW，由那边攒成一场烟花投递。
+ *
+ * 为什么判完**不**在本上下文直接投出去：offscreen 里只有 `chrome.runtime` 的消息子集，
+ * 没有 `chrome.storage`（这条官方限制记在 `src/storage.ts:57-59`，本仓库的 extStore 因此在
+ * 这里改走 SW 代理）。所以那边既写不了 session 存储那条通道、也没有 `chrome.notifications` ——
+ * 拿 `?.` 一调就是**静默什么都不发生**，正是这条链上最坏的那种坏法。
+ * 攒批 + 选通道 + 投递都在 `background/utils/levelUpNotice.ts`（那儿是辅种进展通知一直在走的路）。
+ *
+ * 只在**这次真取到了用户信息**（`status === success`）时才判：解析失败那份的 `levelId` 是旧的或空的，
+ * 拿它比会把「我这轮没看着」说成「升了级」。判据本身在 `@/shared/levelUp.ts`（那份能直接跑用例）。
+ */
+function reportLevelUp(prevLevelId: IUserInfo["levelId"], fresh: IUserInfo, siteName: string): void {
+  if (fresh.status !== EResultParseStatus.success) return;
+  if (!detectLevelUp(prevLevelId, fresh.levelId)) return;
+  logger({ msg: `level up detected for ${siteIdOf(fresh)}: ${prevLevelId} → ${fresh.levelId}` });
+  // fire-and-forget：祝贺不该把这次取数的回包卡住；SW 没收到的话就是这一场不放
+  void sendMessage("notifyLevelUp", { siteName, levelName: fresh.levelName }).catch(() => {});
+}
+
+/** 站点内部 id 只进日志，不进界面（§3.5） */
+function siteIdOf(userInfo: IUserInfo): string {
+  return String(userInfo.site ?? "");
+}
 
 const flushQueue = new PQueue({ concurrency: 1 }); // 默认设置为 1，避免并发搜索
 const setSiteLastUserInfoQueue = new PQueue({ concurrency: 1 }); // 专门用于 setSiteLastUserInfo 的队列
@@ -90,6 +116,13 @@ export async function getSiteUserInfoResult(siteId: string) {
         )) as IConfigPiniaStorageSchema;
         let lastUserInfo =
           metadataStoreRaw?.lastUserInfo?.[siteId as string] ?? {};
+        /**
+         * 上一次存着的等级 —— 这是「有没有升」的比较基准。
+         *
+         * ⚠️ 必须在下面那道 `alwaysPickLastUserInfo` 闸**之前**取：那道闸管的是「这次取数要不要拿旧数据
+         * 当底稿」，与「跟什么比」是两件事。闸先把它清成 `{}`，那个档一关就永远报不出升级。
+         */
+        const prevLevelId = metadataStoreRaw?.lastUserInfo?.[siteId as string]?.levelId;
         if (
           !(configStoreRaw.userInfo.alwaysPickLastUserInfo ?? true) ||
           (lastUserInfo as IUserInfo).status !== EResultParseStatus.success
@@ -125,6 +158,7 @@ export async function getSiteUserInfoResult(siteId: string) {
         }
 
         await setSiteLastUserInfo(userInfo);
+        if (userInfo) reportLevelUp(prevLevelId, userInfo, site.metadata.name);
         return userInfo!;
       },
       { signal: controller.signal },

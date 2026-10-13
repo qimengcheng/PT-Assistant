@@ -21,6 +21,8 @@ import "./utils/updateCheck.ts";
 // 自动辅种：每 1 分钟替开了开关的辅种任务走完「发基准 → 等下完 → 发辅种 → 盯做种」那条链
 // （判据在 views/KeepUploadTask/autoReseed.ts，那份能直接跑 Node 断言；这里只做取数、发送、暂停、通知）
 import "./utils/autoReseed.ts";
+// 站点等级提升的祝贺：offscreen 判出来报上来，这里攒成一场再选通道（界面放烟花 / 系统通知）
+import "./utils/levelUpNotice.ts";
 // 原生通信桥（可选权限 nativeMessaging）：本机 ptd CLI ↔ 扩展，未授权时自动休眠
 import "./utils/nativeMessaging.ts";
 import { fixAllStoredUserInfo } from "./utils/fixer.ts";

@@ -2,17 +2,13 @@
 import { computed, ref, useTemplateRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { isUndefined } from "es-toolkit/compat";
 // 注意：antdv-next 根入口把这几个类型做了别名再导出（ColumnType -> TableColumnType 等）
 import type { TableColumnsType } from "antdv-next";
 import {
   AlertOutlined,
-  ArrowDownOutlined,
-  ArrowUpOutlined,
   BarChartOutlined,
   CalendarOutlined,
   ColumnWidthOutlined,
-  DollarOutlined,
   ExclamationCircleOutlined,
   ExportOutlined,
   FilterOutlined,
@@ -22,9 +18,7 @@ import {
   SettingOutlined,
   StopOutlined,
   SyncOutlined,
-  ThunderboltOutlined,
   TrophyOutlined,
-  UnorderedListOutlined,
 } from "@antdv-next/icons";
 import { EResultParseStatus, type TSiteID } from "@ptd/site";
 
@@ -34,21 +28,17 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { buildSortOrderMap, toTableColumns } from "@/options/components/tableSorters.ts";
-import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
+import { formatDate } from "@/options/utils.ts";
 import { RATIO_DANGER_CEIL, ratioTier } from "@/shared/ratioGuard.ts";
 
-import SiteName from "@/options/components/SiteName.vue";
-import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
-import ResultParseStatus from "@/options/components/ResultParseStatus.vue";
-import UserLevelRequirementsTd from "./UserLevelRequirementsTd.vue";
 import HistoryDataViewDialog from "./HistoryDataViewDialog.vue";
 import SiteMessagesDialog from "./SiteMessagesDialog.vue";
 import AllSiteMessagesDialog from "./AllSiteMessagesDialog.vue";
-import BonusFormatSpan from "./BonusFormatSpan.vue";
 import ExportUserInfoDialog from "./ExportUserInfoDialog.vue";
 import LevelProgressDialog from "./LevelProgressDialog.vue";
+// 表格每一格的渲染：主表与上面两块单列表共用它，所以「列一样」才是真的列一样。
+import UserInfoCell from "./UserInfoCell.vue";
 
-import { bonusFullText, formatRatio } from "./utils/format.ts";
 import {
   tableData,
   isTableLoading,
@@ -177,6 +167,19 @@ const tableColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
 );
 
 /**
+ * 主表上方两块单列表（异常 / 低分享率）用的列：**就是主表那一份 tableHeader**，
+ * 同一批列、同一顺序、同一标题与对齐（用户 2026-10-13：「单列出来的站点，表头的列要和下面的一样」）。
+ * 原先两块各自手写 5 列，与主表的列名、顺序、宽度全不一样，同一个站在两块里像两张表的数据。
+ *
+ * 唯一去掉的是排序：这两块没有 @change 接，把带 sorter 的那份直接递过去会留下
+ * 「箭头点了没反应」的死控件（AGENTS 记的那一族：sorter 无 compare / 无回调时数据不排）。
+ * 低分享率那块自己按分享率升序排（最欠的排前面，见 lowRatioTableData），排序交给 JS，不让 antd 插手。
+ */
+const blockColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
+  toTableColumns<IUserInfoItem>(tableHeader.value.map((header) => ({ ...header, sortable: false }))),
+);
+
+/**
  * 「异常」的口径 = 筛选面板那颗「最后更新状态异常」用的同一批状态，两处共用这一个常量。
  * 不含 waiting/working（那是正在刷）、也不含 noResults/passParse（不是读取失败）。
  */
@@ -194,18 +197,14 @@ const ABNORMAL_STATUSES: EResultParseStatus[] = [
  * 走 tableData 而不是 filteredTableData：这是一份「哪些站这次没读到」的健康清单，
  * 不该被搜索框筛掉 —— 他搜某个站的时候，别的站坏了这件事不应该因此消失。
  * 一条都没有时整块不渲染（含标题），留一张空表在那儿是新的噪音。
+ *
+ * 列与主表同一份（blockColumns），所以这一块不再有自己那颗「状态」列：读取失败时
+ * 「更新时间」那一格本来就画成状态标签（UserInfoCell 的 updateAt 分支，主表一直是这个画法），
+ * 信息没丢，位置与主表一致。
  */
 const abnormalTableData = computed(() =>
   tableData.value.filter((row) => ABNORMAL_STATUSES.includes(row.status as EResultParseStatus)),
 );
-
-const abnormalColumns = computed<TableColumnsType<IUserInfoItem>>(() => [
-  { title: t("common.site"), key: "site" },
-  { title: t("common.username"), key: "name" },
-  { title: t("MyData.index.siteStatus"), key: "status" },
-  { title: t("MyData.table.updateAt"), key: "updateAt" },
-  { title: t("common.action"), key: "action", align: "center", width: 72 },
-]);
 
 /**
  * 分享率低于 1 的站点再单独一张表（用户 2026-10-13）。它们要的不是「重新登录」而是「去补上传」，
@@ -227,14 +226,6 @@ const lowRatioTableData = computed(() =>
     .filter((row) => ratioTier(row.ratio) === "danger")
     .sort((a, b) => Number(a.ratio) - Number(b.ratio)),
 );
-
-const lowRatioColumns = computed<TableColumnsType<IUserInfoItem>>(() => [
-  { title: t("common.site"), key: "site" },
-  { title: t("common.username"), key: "name" },
-  { title: t("levelRequirement.ratio"), key: "ratio", align: "end" },
-  { title: t("MyData.table.levelName"), key: "levelName" },
-  { title: t("MyData.table.updateAt"), key: "updateAt" },
-]);
 
 const tableNonBooleanControlKey = [
   "joinTimeFormat",
@@ -276,22 +267,6 @@ const {
   },
 });
 
-/** v-badge 的 model-value/content 到 a-badge 的 count/dot 的映射 */
-function unreadBadge(record: IUserInfoItem) {
-  /**
-   * 只显站点自己报的那个数，**不减本地已读**。v0.31.0 拿记账去减，于是徽章和站点横幅
-   * 长期对不上（站点横幅「你有2条新短讯」、徽章 1，刷新也不回来）：记账只增不减，
-   * 而读信那条 GET 本身就会把站点侧标成已读（LuckPT 真页：读前横幅 8、读后 7），
-   * 减一次等于把同一条扣两遍。记账现在只管列表里那行的置灰，见 utils/siteMessageRead.ts。
-   */
-  const messageCount = record.messageCount ?? 0;
-  if (!configStore.myDataTableControl.showUnreadMessage || messageCount <= 0) {
-    return { count: 0, dot: false };
-  }
-  // 超过 10 条时原实现只显示一个小圆点（content 传 undefined）
-  return messageCount > 10 ? { count: 0, dot: true } : { count: messageCount, dot: false };
-}
-
 const showMessageDialog = ref<boolean>(false);
 const messageDialogSiteId = ref<TSiteID | null>(null);
 /**
@@ -302,17 +277,13 @@ const messageDialogSiteId = ref<TSiteID | null>(null);
 const messageDialogUnread = ref<number>(0);
 
 /**
- * 红数字/圆点是「读站内信」的入口，图标本体仍然是「刷新该站数据」。
- * 两者都落在 a-badge 这一层（a-badge 把 click 挂到根 span 上），所以按事件目标分流：
- * 命中的是徽标指示物才开弹窗，否则什么都不做，让 SiteFavicon 自己的 click 去刷新。
+ * 格子里那颗红数字/圆点被点中时由 UserInfoCell 递上来。「按事件目标分流」那条判据住在格子里
+ * （只有它知道点的是 a-badge 的哪一层：指示物开弹窗，图标本体留给 SiteFavicon 自己的 click 去刷新），
+ * 这里只负责开弹窗。
  */
-function onBadgeClick(event: MouseEvent, record: IUserInfoItem) {
-  const target = event.target as HTMLElement | null;
-  if (!target?.closest(".ant-badge-count, .ant-badge-dot")) {
-    return;
-  }
-  messageDialogSiteId.value = record.site;
-  messageDialogUnread.value = record.messageCount ?? 0;
+function openMessagesDialog(payload: { site: TSiteID; unread: number }) {
+  messageDialogSiteId.value = payload.site;
+  messageDialogUnread.value = payload.unread;
   showMessageDialog.value = true;
 }
 
@@ -451,28 +422,6 @@ function viewStatistic() {
       sites: tableSelected.value,
     },
   });
-}
-
-/**
- * 「积分」那一格的**一个**合并浮层：每行是「那颗图标的含义 + 不带简化的完整数字」。
- *
- * 原先这一格里挂着四个原生 title —— 两颗图标各说自己是什么（积分 / 做种积分）、
- * 两个数字各给一份完整值（数字被简化成 1.42M 时 hover 才看得到 1,419,552.50）。
- * 一次 hover 只能读到其中一个，要看全得在格子里挪四下鼠标。合成一个浮层后一次读完。
- *
- * 第二行的出现条件与格子里那条 v-if 完全一致 —— 两处必须判得一样，否则浮层里会多出
- * 一行格子里根本没有的东西。
- */
-function bonusRevealLines(record: { bonus?: number | string; seedingBonus?: number | string }) {
-  const lines = [{ label: t("levelRequirement.bonus"), value: bonusFullText(record.bonus) }];
-  if (
-    configStore.myDataTableControl.showSeedingBonus &&
-    record.seedingBonus !== "" &&
-    !isUndefined(record.seedingBonus)
-  ) {
-    lines.push({ label: t("levelRequirement.seedingBonus"), value: bonusFullText(record.seedingBonus) });
-  }
-  return lines;
 }
 
 const showExportDialog = ref(false);
@@ -652,46 +601,20 @@ const showLevelProgressDialog = ref(false);
       <a-table
         bordered
         size="small"
-        :columns="abnormalColumns"
+        :columns="blockColumns"
         :data-source="abnormalTableData"
         :row-key="(r: any) => r.site"
         :pagination="false"
+        :scroll="{ x: 'max-content' }"
+        class="table-header-no-wrap"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'site'">
-            <a-flex align="center" gap="small">
-              <SiteFavicon :site-id="record.site" :size="18" />
-              <SiteName :site-id="record.site" />
-            </a-flex>
-          </template>
-
-          <template v-else-if="column.key === 'name'">
-            <span :title="record.id as string" class="text-no-wrap">
-              {{ configStore.myDataTableControl.showUserName ? (record.name ?? "-") : "******" }}
-            </span>
-          </template>
-
-          <template v-else-if="column.key === 'status'">
-            <ResultParseStatus :status="record.status" />
-          </template>
-
-          <template v-else-if="column.key === 'updateAt'">
-            <span class="text-no-wrap">{{ record.updateAt ? formatDate(record.updateAt) : "-" }}</span>
-          </template>
-
-          <template v-else-if="column.key === 'action'">
-            <a-tooltip :title="t('MyData.table.action.flushData')">
-              <a-button
-                type="text"
-                size="small"
-                :disabled="runtimeStore.userInfo.flushPlan[record.site]"
-                :loading="runtimeStore.userInfo.flushPlan[record.site]"
-                @click="flushSiteLastUserInfo([record.site])"
-              >
-                <template #icon><SyncOutlined /></template>
-              </a-button>
-            </a-tooltip>
-          </template>
+          <UserInfoCell
+            :column="column"
+            :record="record"
+            @view-messages="openMessagesDialog"
+            @view-history="viewHistoryData"
+          />
         </template>
       </a-table>
     </div>
@@ -709,36 +632,20 @@ const showLevelProgressDialog = ref(false);
       <a-table
         bordered
         size="small"
-        :columns="lowRatioColumns"
+        :columns="blockColumns"
         :data-source="lowRatioTableData"
         :row-key="(r: any) => r.site"
         :pagination="false"
+        :scroll="{ x: 'max-content' }"
+        class="table-header-no-wrap"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'site'">
-            <a-flex align="center" gap="small">
-              <SiteFavicon :site-id="record.site" :size="18" />
-              <SiteName :site-id="record.site" />
-            </a-flex>
-          </template>
-
-          <template v-else-if="column.key === 'name'">
-            <span :title="record.id as string" class="text-no-wrap">
-              {{ configStore.myDataTableControl.showUserName ? (record.name ?? "-") : "******" }}
-            </span>
-          </template>
-
-          <template v-else-if="column.key === 'ratio'">
-            <span class="text-no-wrap">{{ formatRatio(record) }}</span>
-          </template>
-
-          <template v-else-if="column.key === 'levelName'">
-            <span class="text-no-wrap">{{ record.levelName ?? "-" }}</span>
-          </template>
-
-          <template v-else-if="column.key === 'updateAt'">
-            <span class="text-no-wrap">{{ record.updateAt ? formatDate(record.updateAt) : "-" }}</span>
-          </template>
+          <UserInfoCell
+            :column="column"
+            :record="record"
+            @view-messages="openMessagesDialog"
+            @view-history="viewHistoryData"
+          />
         </template>
       </a-table>
     </div>
@@ -756,278 +663,15 @@ const showLevelProgressDialog = ref(false);
       size="small"
       @change="handleTableChange"
     >
-      <!-- 站点信息 -->
+      <!-- 每一格的渲染住在 UserInfoCell：主表与上面两块单列表共用同一份 —— 「表头列一样」
+           才不会退化成「列名一样、格子里各画一套」（等级列一边是组件、一边是裸文本就是这样）。 -->
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'siteUserConfig.sortIndex'">
-          <div class="site-cell">
-            <a-badge
-              class="site-unread-badge"
-              :count="unreadBadge(record).count"
-              :dot="unreadBadge(record).dot"
-              color="#f44336"
-              :title="t('MyData.messages.badgeTip')"
-              @click="onBadgeClick($event, record)"
-            >
-              <div class="favicon-hover-wrapper favicon-hover-bg">
-                <SiteFavicon
-                  :site-id="record.site"
-                  :size="configStore.myDataTableControl.showSiteName ? 18 : 24"
-                  @click="() => flushSiteLastUserInfo([record.site])"
-                />
-              </div>
-            </a-badge>
-
-            <SiteName v-if="configStore.myDataTableControl.showSiteName" :site-id="record.site" />
-          </div>
-        </template>
-
-        <!-- 用户名，用户ID -->
-        <template v-else-if="column.key === 'name'">
-          <span :title="record.id as string" class="text-no-wrap">
-            {{ configStore.myDataTableControl.showUserName ? (record.name ?? "-") : "******" }}
-          </span>
-        </template>
-
-        <!-- 等级信息，升级信息 -->
-        <template v-else-if="column.key === 'levelName'">
-          <UserLevelRequirementsTd :user-info="record" />
-        </template>
-
-        <!-- 上传、下载 -->
-        <template v-else-if="column.key === 'uploaded'">
-          <div class="d-flex flex-column align-end">
-            <div class="d-flex justify-end flex-nowrap">
-              <span class="text-no-wrap">
-                {{ typeof record.uploaded !== "undefined" ? formatSize(record.uploaded) : "-" }}
-              </span>
-              <ArrowUpOutlined class="cell-icon cell-icon--green" />
-            </div>
-            <div class="d-flex justify-end flex-nowrap">
-              <span class="text-no-wrap">
-                {{ typeof record.downloaded !== "undefined" ? formatSize(record.downloaded) : "-" }}
-              </span>
-              <ArrowDownOutlined class="cell-icon cell-icon--red" />
-            </div>
-          </div>
-        </template>
-
-        <!-- 真实上传、下载 -->
-        <template v-else-if="column.key === 'trueUploaded'">
-          <div class="d-flex flex-column align-end">
-            <div class="d-flex justify-end flex-nowrap">
-              <span class="text-no-wrap">
-                {{ typeof record.trueUploaded !== "undefined" ? formatSize(record.trueUploaded) : "-" }}
-              </span>
-              <ArrowUpOutlined class="cell-icon cell-icon--green" />
-            </div>
-            <div class="d-flex justify-end flex-nowrap">
-              <span class="text-no-wrap">
-                {{ typeof record.trueDownloaded !== "undefined" ? formatSize(record.trueDownloaded) : "-" }}
-              </span>
-              <ArrowDownOutlined class="cell-icon cell-icon--red" />
-            </div>
-          </div>
-        </template>
-
-        <!-- 分享率 -->
-        <template v-else-if="column.key === 'ratio'">
-          <span class="text-no-wrap">{{ formatRatio(record) }}</span>
-        </template>
-
-        <!-- 真实分享率 -->
-        <template v-else-if="column.key === 'trueRatio'">
-          <span class="text-no-wrap">{{ formatRatio(record, "trueRatio") }}</span>
-        </template>
-
-        <!-- 发布数 -->
-        <template v-else-if="column.key === 'uploads'">
-          <span class="text-no-wrap">{{ record.uploads ?? "-" }}</span>
-        </template>
-
-        <!-- 做种数， H&R 情况  -->
-        <template v-else-if="column.key === 'seeding'">
-          <div class="d-flex flex-column align-end">
-            <div class="d-flex align-center justify-end flex-nowrap">
-              <span class="text-no-wrap">{{ record.seeding ?? "-" }}</span>
-            </div>
-            <div v-if="configStore.myDataTableControl.showHnR" class="d-flex align-center justify-end flex-nowrap">
-              <span
-                v-if="typeof record.hnrPreWarning !== 'undefined' && record.hnrPreWarning > 0"
-                class="d-inline-flex align-center ml-2"
-              >
-                <AlertOutlined class="cell-icon cell-icon--yellow" :title="t('levelRequirement.hnrPreWarning')" />
-                <span class="text-no-wrap">
-                  {{ record.hnrPreWarning }}
-                </span>
-              </span>
-              <span
-                v-if="typeof record.hnrUnsatisfied !== 'undefined' && record.hnrUnsatisfied > 0"
-                class="d-inline-flex align-center ml-1"
-              >
-                <ExclamationCircleOutlined
-                  class="cell-icon cell-icon--red"
-                  :title="t('levelRequirement.hnrUnsatisfied')"
-                />
-                <span class="text-no-wrap">
-                  {{ record.hnrUnsatisfied }}
-                </span>
-              </span>
-            </div>
-          </div>
-        </template>
-
-        <!-- 做种量 -->
-        <template v-else-if="column.key === 'seedingSize'">
-          <span class="text-no-wrap">
-            {{ typeof record.seedingSize !== "undefined" ? formatSize(record.seedingSize) : "-" }}
-          </span>
-        </template>
-
-        <!-- 魔力/积分：整格只挂**一个**浮层（原先这一格里有四个原生 title，判据见 bonusRevealLines）。
-             两颗图标不再自己带提示，含义写在浮层那一行的标签上。 -->
-        <template v-else-if="column.key === 'bonus'">
-          <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
-            <template #content>
-              <div class="bonus-reveal">
-                <div v-for="line in bonusRevealLines(record)" :key="line.label" class="bonus-reveal-line">
-                  <span class="bonus-reveal-label">{{ line.label }}</span>
-                  <span class="bonus-reveal-value">{{ line.value }}</span>
-                </div>
-              </div>
-            </template>
-            <div class="d-flex flex-column align-end">
-              <div class="bonus-line d-flex align-center justify-end flex-nowrap">
-                <BonusFormatSpan :num="record.bonus" :reveal="false" />
-                <DollarOutlined class="cell-icon cell-icon--green" />
-              </div>
-              <div
-                v-if="
-                  configStore.myDataTableControl.showSeedingBonus &&
-                  record.seedingBonus !== '' &&
-                  !isUndefined(record.seedingBonus)
-                "
-                class="bonus-line d-flex align-center justify-end flex-nowrap"
-              >
-                <BonusFormatSpan :num="record.seedingBonus" :reveal="false" />
-                <ThunderboltOutlined class="cell-icon cell-icon--green" />
-              </div>
-            </div>
-          </a-popover>
-        </template>
-
-        <template v-else-if="column.key === 'bonusPerHour'">
-          <BonusFormatSpan :num="record.bonusPerHour" />
-        </template>
-
-        <template v-else-if="column.key === 'invites'">
-          <span class="text-no-wrap">{{ typeof record.invites !== "undefined" ? record.invites : "-" }}</span>
-        </template>
-
-        <!-- 入站时间：格子里可以选「显示成多久以前」，完整时间原先挂原生 title，改成浮层 -->
-        <template v-else-if="column.key === 'joinTime'">
-          <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
-            <template #content>
-              <div class="reveal-lines">
-                <div>{{ record.joinTime ? (formatDate(record.joinTime) as string) : "-" }}</div>
-              </div>
-            </template>
-            <span class="text-no-wrap">
-              {{
-                typeof record.joinTime !== "undefined"
-                  ? configStore.myDataTableControl.joinTimeFormat === "aliveWeek"
-                    ? formatTimeAgo(record.joinTime, { weekOnly: true })
-                    : configStore.myDataTableControl.joinTimeFormat === "alive"
-                      ? formatTimeAgo(record.joinTime)
-                      : formatDate(record.joinTime, "yyyy-MM-dd")
-                  : "-"
-              }}
-            </span>
-          </a-popover>
-        </template>
-
-        <!-- 最近访问：这一格里原先有两个原生 title（完整时间 + 那颗「N 天未访问」的说明），
-             合成一个浮层：第一行完整时间，第二行那句说明（只在图标出现时才有）。 -->
-        <template v-else-if="column.key === 'lastAccessAt'">
-          <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
-            <template #content>
-              <div class="reveal-lines">
-                <div>{{ record.lastAccessAt ? (formatDate(record.lastAccessAt) as string) : "-" }}</div>
-                <div v-if="record.lastAccessDuration >= 5" class="reveal-note">
-                  {{ t("MyData.table.lastAccessDurationNote", [record.lastAccessDuration]) }}
-                </div>
-              </div>
-            </template>
-            <span class="text-no-wrap">
-              <template v-if="typeof record.lastAccessAt !== 'undefined'">
-                {{ formatDate(record.lastAccessAt) }}
-                <AlertOutlined
-                  v-if="record.lastAccessDuration >= 5"
-                  class="cell-icon"
-                  :style="{ color: record.lastAccessDuration >= 15 ? '#f44336' : '#ffc107' }"
-                />
-              </template>
-              <template v-else>-</template>
-            </span>
-          </a-popover>
-        </template>
-
-        <!-- 更新时间 -->
-        <template v-else-if="column.key === 'updateAt'">
-          <template v-if="record.status === EResultParseStatus.success">
-            <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
-              <template #content>
-                <div class="reveal-lines">
-                  <div>{{ record.updateAt ? (formatDate(record.updateAt) as string) : "-" }}</div>
-                </div>
-              </template>
-              <span class="text-wrap">
-                {{
-                  record.updateAt
-                    ? configStore.myDataTableControl.updateAtFormatAsAlive
-                      ? formatTimeAgo(record.updateAt)
-                      : formatDate(record.updateAt)
-                    : "-"
-                }}
-              </span>
-            </a-popover>
-          </template>
-          <template v-else>
-            <a-tag>
-              <ResultParseStatus :status="record.status" />
-            </a-tag>
-          </template>
-        </template>
-
-        <!-- 操作 -->
-        <template v-else-if="column.key === 'action'">
-          <!-- 两个按钮的图标都必须走 #icon 插槽（与 SetSite、SearchEntity/ActionTd 同一写法）：
-               挂在默认插槽时 antd 的 loading 图标是**插在按钮前面**的，还带一段 width 0→N 的
-               过渡动画（button/DefaultLoadingIcon.js 的 existIcon 分支）—— 按钮变宽就把整张表
-               的列宽重排一遍；挂进 #icon 后 loading 是原地替换同一个 .ant-btn-icon，宽度不动。
-               顺带统一尺寸：默认插槽的图标不算 icon-only，内衬比 #icon 那档宽 4px。 -->
-          <div class="table-action">
-            <a-tooltip :title="t('MyData.table.action.viewHistoryData')">
-              <a-button
-                type="text"
-                size="small"
-                @click="viewHistoryData(record.site)"
-              >
-                <template #icon><UnorderedListOutlined /></template>
-              </a-button>
-            </a-tooltip>
-            <a-tooltip :title="t('MyData.table.action.flushData')">
-              <a-button
-                type="text"
-                size="small"
-                :disabled="runtimeStore.userInfo.flushPlan[record.site]"
-                :loading="runtimeStore.userInfo.flushPlan[record.site]"
-                @click="flushSiteLastUserInfo([record.site])"
-              >
-                <template #icon><SyncOutlined /></template>
-              </a-button>
-            </a-tooltip>
-          </div>
-        </template>
+        <UserInfoCell
+          :column="column"
+          :record="record"
+          @view-messages="openMessagesDialog"
+          @view-history="viewHistoryData"
+        />
       </template>
     </a-table>
     </div>
@@ -1094,9 +738,6 @@ const showLevelProgressDialog = ref(false);
 .cell-icon {
   font-size: 14px; /* 原 <v-icon size="small"> */
 }
-.cell-icon--green {
-  color: #388e3c; /* Vuetify green-darken-4 */
-}
 .cell-icon--red {
   color: #c62828; /* Vuetify red-darken-4 */
 }
@@ -1104,87 +745,6 @@ const showLevelProgressDialog = ref(false);
   color: #f9a825; /* Vuetify yellow-darken-4 */
 }
 
-.favicon-hover-wrapper {
-  cursor: pointer;
-}
-
-/* 站点列：图标在左、站名在右（原来是上下两行，行高被堆成 63.8px）。
-   缝 8px：含悬停圆底那 4px 内衬，实测墨迹间距 12px。 */
-.site-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/**
- * 红数字/圆点是读站内信的入口，得看着能点（图标本体是刷新，另有 cursor）。
- *
- * 徽标只包图标那一块 —— 它标的是「这个站有几封未读」，锚点该是图标。原先包住「图标 + 站名」
- * 整块，那颗就落在站名最后一个字母的角上（台架实测中心在图标右沿外 79.3px、离图标墨迹 0 重叠），
- * 看着是浮在文字上方，而不是挂在站点上。
- *
- * inset-inline-end 从 0 收到 8px（正好等于图标到站名的那道缝）：antd 把指示物的中心放在被包
- * 元素的右外角，最宽的那档（`messageCount === 10` 的两位数胶囊，实测宽 26.8px）不收就会越过
- * 站名盒左沿 5.4px、压住第一个字；收 8px 之后一位数离站名 6.5px、两位数 2.6px、圆点 13.5px，
- * 三档都不碰文字，代价是胶囊盖住图标墨迹右上角约 23%（两位数 30%）。
- *
- * 只挪 inset-inline-end、不改 transform：入场动画的 keyframes 写死了 translate(50%, -50%)，
- * 改了 transform 会在动画结束时被 keyframes 顶回原位再跳一下。
- */
-.site-unread-badge {
-  :deep(.ant-badge-count),
-  :deep(.ant-badge-dot) {
-    cursor: pointer;
-    inset-inline-end: 8px;
-  }
-}
-
-.favicon-hover-bg {
-  border-radius: 50%;
-  transition: background 0.2s;
-  display: inline-flex;
-  padding: 4px;
-}
-
-.favicon-hover-bg:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-/**
- * 「积分」那一格的合并浮层：标签在左、完整数字在右，一行一项。
- * tabular-nums 是必须的：两行位数不同（1,419,552.50 / 970,509.70），比例数字下右沿对不齐。
- */
-.bonus-reveal {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 220px;
-}
-
-.bonus-reveal-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.bonus-reveal-label {
-  opacity: 0.75;
-}
-
-.bonus-reveal-value {
-  font-variant-numeric: tabular-nums;
-}
-
-/** 日期那一族的浮层：第一行完整时间，第二行（可选）那句「N 天未访问」 */
-.reveal-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 480px;
-}
-
-.reveal-note {
-  opacity: 0.75;
-}
+/* 格子里那一批规则（站点格 / 未读徽章 / 悬停圆底 / 浮层）跟着模板一起搬进了 UserInfoCell ——
+   scoped 样式选不到子组件渲染出来的元素，留在这里等于没写。这里只剩标题那两颗图标用的三条。 */
 </style>

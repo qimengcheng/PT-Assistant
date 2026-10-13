@@ -672,7 +672,15 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
         <!-- name column -->
         <template v-else-if="column.key === 'name'">
           <div>
-            <span class="font-weight-medium">{{ record.name }}</span>
+            <!-- 名称只给一行，剩下的交给 popover（用户 2026-10-13：长标题折行把行高撑得很高，不好看）。
+                 这一页每页条数是 useAutoFitPageSize 按实测行高算的，标题多折一行就少一整条。
+                 全文揭示走 a-popover 而不是原生 title，规格与搜索页的 TorrentTitleTd.vue 同一条。 -->
+            <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+              <template #content>
+                <div class="reveal-text">{{ record.name }}</div>
+              </template>
+              <div class="torrent-name font-weight-medium text-truncate">{{ record.name }}</div>
+            </a-popover>
             <!-- 分类（qBittorrent 的 category / 各家的主标签）与全部标签一起摆出来：
                  原先只有 record.label 一个值，用户 2026-10-13 指着这行说「只显示了分类，
                  要把标签也显示出来」。判据在 columnText.ts 的 labelChips（去重 + 丢空）。 -->
@@ -915,6 +923,25 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   width: 14px;
   height: 14px;
   margin-right: 4px;
+}
+
+/**
+ * 名称那一行的宽度上限。这张表是 auto 布局（没有 scroll.y、没有固定列），td 的宽度跟着内容走，
+ * 所以截断**必须给一个绝对宽度**才成立 —— 只挂 `.text-truncate` 不给上限，它会一直撑下去、
+ * 永远不截（`.text-truncate` 是 overflow: hidden + ellipsis + nowrap，见 vuetify-compat.css）。
+ * 420 是一档布局预算：这一列再宽就要开始吃别的列的可视区，全文本来就不指望在这一格里读完
+ * （popover 给）。要更宽或更窄改这一个数。
+ */
+.torrent-name {
+  max-width: 420px;
+}
+
+/* popover 里的全文：与搜索页 TorrentTitleTd.vue 同一条规格（480 上限 + 换行铺开 +
+   overflow-wrap:anywhere 处理种子标题里那种无空格长串）。 */
+.reveal-text {
+  max-width: 480px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /**

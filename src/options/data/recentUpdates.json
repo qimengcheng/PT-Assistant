@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-13 13:19:17",
-  "headSha": "14a0c39",
+  "generatedAt": "2026-10-13 13:32:50",
+  "headSha": "189364e",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.96.1",
+      "date": "2026-10-13 13:47:03",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「数据备份」那张备份服务器列表去掉了格线：整张表的外框和每格之间的竖线都不再画，只留行与行之间的横线，所以行还是分得开的。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.96.0",
       "date": "2026-10-13 13:32:50",

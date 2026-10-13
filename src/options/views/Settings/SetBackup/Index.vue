@@ -172,8 +172,11 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
     </a-flex>
 
     <div class="page-panel">
+    <!-- 全站口径是「列表页的 a-table 一律带 bordered」（AGENTS.md §3.4，用户 2026-10-06 定的），
+         这一张是他 2026-10-13 点名要去的例外 —— 别顺手补回来。台架量的实际差别：去掉的是
+         「整张表的外框 + 每格之间的竖线」（th 8/8、td 24/24 条竖线归零、container 外框归零），
+         行与行之间的横线照旧（24/24 还在），所以行仍然分得开。 -->
     <a-table
-      bordered
       :columns="fullTableHeader"
       :data-source="filteredBackupServers"
       :row-key="(record: IBackupServerMetadata) => record.id"

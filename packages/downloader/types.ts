@@ -507,6 +507,21 @@ export abstract class AbstractBittorrentClient<T extends DownloaderBaseConfig = 
   }
 
   /**
+   * 新建一个分类（名字 + 它的落盘目录），默认不支持，由各客户端 override。
+   *
+   * 辅种要它：保存路径那一格能写 `category:电影`，可候选里只有下载器**已经有**的分类，
+   * 想用一个新分类就得先离开这个界面、去下载器里建好再回来。qBittorrent 虽然会在添加种子
+   * 那一刻顺手建出不存在的分类，但那样建出来的**没有目录**，而辅种是跳过校验去挂盘上现成的
+   * 数据 —— 落进下载器的默认目录就等于挂一条永远 0% 的死种。所以这里要的是「带着目录建」。
+   *
+   * 返回 false 表示这台客户端没有分类概念（界面据此说明「这台建不了」，而不是静默什么都不做）；
+   * 请求本身失败（没连上、被拒）走抛错，调用方分得清这两种，提示措辞也不一样。
+   */
+  public async createClientCategory(_name: string, _savePath: string): Promise<boolean> {
+    return false;
+  }
+
+  /**
    * ─────────────────────────────────────────────
    * 文件级 / peers / tracker 管理（追加扩展，默认不支持）
    * 各客户端按能力矩阵 override，feature 枚举（FileList/FilePriority/PeerList/TrackerList/TrackerManage）同步声明

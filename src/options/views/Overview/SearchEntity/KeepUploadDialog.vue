@@ -5,6 +5,7 @@ import { type TableColumnsType } from "antdv-next";
 import {
   CheckOutlined,
   CloseOutlined,
+  FolderAddOutlined,
   PlusOutlined,
   QuestionCircleOutlined,
   SaveOutlined,
@@ -41,7 +42,7 @@ import {
   type TReseedRecommendKind,
 } from "@/shared/reseedRecommend.ts";
 import { detectBasePathMismatch, isCategorySavePath, type IClientCategory } from "@/shared/reseedPath.ts";
-import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
+import { invalidateCategoryTable, loadCategoryTable } from "@/options/utils/categoryPaths.ts";
 import { isFreeTorrent } from "@/shared/torrentFree.ts";
 import type { TRatioImpact } from "@/shared/ratioGuard.ts";
 import type { TCategoryKind } from "@/shared/category.ts";
@@ -53,7 +54,12 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
 import SiteRatioPopover from "@/options/components/SiteRatioPopover.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
-import { folderCategoryKind, resolveCategoryFolder } from "@/options/components/SentToDownloaderDialog/categoryMatch.ts";
+import {
+  CATEGORY_FOLDER_PREFIX,
+  folderCategoryKind,
+  resolveCategoryFolder,
+  supportsCategoryFolders,
+} from "@/options/components/SentToDownloaderDialog/categoryMatch.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 const showDialog = defineModel<boolean>();
@@ -152,6 +158,90 @@ const downloaderOptions = computed(() =>
 /** a-auto-complete 的 options 走的是 SelectProps.options，形如 { value, label } */
 const savePathOptions = computed(() => suggestedSavePaths.value.map((x) => ({ value: x, label: x })));
 const labelOptions = computed(() => suggestedLabels.value.map((x) => ({ value: x, label: x })));
+
+/**
+ * 「增加分类」这颗按钮的可见性。只有 qBittorrent 认 `category:` 前缀（判据在
+ * `categoryMatch.ts` 的 `supportsCategoryFolders`，与「发送到下载器」共用同一份），
+ * 别的下载器会把整串当成路径 —— 给它们立一个「建分类」的入口是骗人。
+ */
+const canCreateCategory = computed(() =>
+  supportsCategoryFolders(metadataStore.downloaders[selectedDownloaderId.value]?.type),
+);
+
+const showCategoryDialog = ref(false);
+const newCategoryName = ref("");
+const newCategoryPath = ref("");
+const categorySaving = ref(false);
+
+/**
+ * 「该分类的目录」那一栏的候选：只列这台下载器记住的**普通路径**。
+ * `category:` 那些不是目录 —— qBittorrent 的分类目录只能是一个真实路径，把前缀串填进去等于
+ * 绕回原处（而且它会被当成一个叫 `category:xxx` 的真目录名建出来）。
+ */
+const plainPathOptions = computed(() =>
+  suggestedSavePaths.value.filter((x) => !isCategorySavePath(x)).map((x) => ({ value: x, label: x })),
+);
+
+/**
+ * 打开时把目录替他填成「最可能对的那一个」：这一栏此刻写的是普通路径就用它，否则用基准那条
+ * 在下载器里的实际目录。理由不是省事 —— 辅种走的是跳过校验挂盘上现成的数据，新分类的目录
+ * 指不到数据所在处的话，挂上去就是一条永远 0% 的死种。
+ */
+function openCategoryDialog() {
+  newCategoryName.value = "";
+  const typed = savePath.value.trim();
+  newCategoryPath.value =
+    typed !== "" && !isCategorySavePath(typed) ? typed : (chosenLocalBase.value?.entry.savePath ?? "");
+  showCategoryDialog.value = true;
+}
+
+/**
+ * 建一条分类。三件事按顺序做，少一件界面上就是假状态：
+ *  1. 真去下载器建（不建的话这一串只是个名字，qBittorrent 会在添加种子那一刻顺手建出
+ *     **没有目录**的分类，正好落进上面说的那个坑）；
+ *  2. 丢掉那份页面级分类表缓存 —— 「基准在不在任务目录」的判定拿它翻 `category:新名字`，
+ *     不清就会在刚建完的分类上挂一条「判不出/目录不一致」；
+ *  3. 记进这台下载器的建议目录并选中它（与「发送到下载器」里删推荐路径同一份写法）。
+ */
+async function submitCategoryDialog() {
+  const name = newCategoryName.value.trim();
+  if (name === "") {
+    runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.categoryNameRequired"), { color: "warning" });
+    return;
+  }
+  const downloader = metadataStore.downloaders[selectedDownloaderId.value];
+  if (!downloader) return;
+
+  categorySaving.value = true;
+  try {
+    const created = await sendMessage("createTorrentCategory", {
+      downloaderId: downloader.id,
+      name,
+      savePath: newCategoryPath.value.trim(),
+    });
+    // false 只表示这台客户端没有分类概念（基类默认实现）；连不上、被拒都是抛错，走下面那支
+    if (!created) {
+      runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.categoryUnsupported"), { color: "error" });
+      return;
+    }
+    invalidateCategoryTable(downloader.id);
+    const folder = `${CATEGORY_FOLDER_PREFIX}${name}`;
+    const remembered = downloader.suggestFolders ?? [];
+    if (!remembered.includes(folder)) {
+      await metadataStore.addDownloader({ ...downloader, suggestFolders: [...remembered, folder] });
+    }
+    savePath.value = folder;
+    showCategoryDialog.value = false;
+    runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.categoryCreated", { name }), { color: "success" });
+  } catch (e) {
+    runtimeStore.showSnakebar(
+      t("SearchEntity.KeepUploadDialog.categoryFailed", { msg: e instanceof Error ? e.message : String(e) }),
+      { color: "error" },
+    );
+  } finally {
+    categorySaving.value = false;
+  }
+}
 
 /** 站点自己的分类覆盖表（ISiteUserConfig.categoryMap），与「发送到下载器」读同一份 */
 const siteCategoryMaps = computed(() => {
@@ -1315,6 +1405,32 @@ async function createKeepUploadTask() {
          ZIndexProvider，内层拿到 1200。它自己仍是 portal 到 body，不会被本弹窗的滚动容器裁掉。 -->
     <KeepUploadUsageDialog v-model="showUsageDialog" />
 
+    <!-- 「增加分类」的那张表单，同样挂在本弹窗默认插槽里（上一条注释的那条理由对它一样成立）。
+         它必须真去下载器建一条带目录的分类，不能只把 `category:新名字` 填进保存路径就完事：
+         qBittorrent 是在添加种子那一刻顺手建出缺失的分类，那条建出来**没有目录**，而辅种走的是
+         跳过校验、直接挂盘上现成的数据 —— 目录对不上就是一条永远 0% 的死种。 -->
+    <a-modal
+      v-model:open="showCategoryDialog"
+      :title="t('SearchEntity.KeepUploadDialog.addCategory')"
+      :width="480"
+      :ok-text="t('common.dialog.ok')"
+      :cancel-text="t('common.dialog.cancel')"
+      :confirm-loading="categorySaving"
+      @ok="submitCategoryDialog"
+    >
+      <a-form layout="vertical">
+        <a-form-item :label="t('SearchEntity.KeepUploadDialog.categoryName')">
+          <a-input v-model:value="newCategoryName" />
+        </a-form-item>
+        <a-form-item
+          :label="t('SearchEntity.KeepUploadDialog.categoryPath')"
+          :extra="t('SearchEntity.KeepUploadDialog.categoryPathHint')"
+        >
+          <a-auto-complete v-model:value="newCategoryPath" :options="plainPathOptions" style="width: 100%" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
     <!-- 本地指纹索引：决定「哪些条目本地已经有了」，是辅种前的最后一道保守检查 -->
     <div class="d-flex align-center ga-2 mb-2">
       <span class="text-body-small text-grey">{{ localIndexText }}</span>
@@ -1622,6 +1738,14 @@ async function createKeepUploadTask() {
             style="flex: 1 1 300px; min-width: 220px"
             :popup-match-select-width="false"
           />
+          <!-- 候选只列下载器**已经有**的分类，想用一个新的原先得离开这个界面去建、再回来重开
+               （用户 2026-10-13 要求在这里加一颗）。只在认 `category:` 前缀的那台下载器上出现。 -->
+          <a-tooltip v-if="canCreateCategory" :title="t('SearchEntity.KeepUploadDialog.addCategoryHint')">
+            <a-button :loading="categorySaving" @click="openCategoryDialog">
+              <template #icon><FolderAddOutlined /></template>
+              {{ t("SearchEntity.KeepUploadDialog.addCategory") }}
+            </a-button>
+          </a-tooltip>
           <a-auto-complete
             v-model:value="torrentLabel"
             :options="labelOptions"

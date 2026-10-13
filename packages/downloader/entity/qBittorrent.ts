@@ -712,6 +712,21 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
     return categories;
   }
 
+  /**
+   * 建一个带目录的分类。`/torrents/createCategory` 成功时回空 body，失败是非 2xx
+   * （`request` 会抛），所以「没抛」就是建好了 —— 不去看 body 里有没有 "Ok."。
+   *
+   * 目录留空时**不传** savePath：那是「用下载器的默认目录」，与「不指定」同义；
+   * 传空串会被 qBittorrent 当成一个真目录名，建出一条落不了东西的分类。
+   */
+  public override async createClientCategory(name: string, savePath: string): Promise<boolean> {
+    const data = new FormData();
+    data.append("category", name);
+    if (savePath) data.append("savePath", savePath);
+    await this.request("/torrents/createCategory", { method: "post", data });
+    return true;
+  }
+
   public override async getClientPaths(): Promise<string[]> {
     const savePaths: string[] = await super.getClientPaths();
     const categories = await this.getClientCategories();

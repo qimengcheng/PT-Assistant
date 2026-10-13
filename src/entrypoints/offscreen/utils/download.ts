@@ -311,6 +311,18 @@ onMessage("getClientTorrentCategories", async ({ data: downloaderId }) => {
   }
 });
 
+/**
+ * 新建分类。这里**不**像上面那条一样把失败吞成 null/false：那是一条只读判据，拿不到就按
+ * 「判不出」走；而这是用户点了一下要看到结果的动作 —— 没连上、被下载器拒掉都必须把原因带回去，
+ * 否则界面只能说「没建成」，用户只能自己去下载器里猜。
+ * 回 false 只表示这台客户端没有分类概念（基类默认实现），那是一句能说的实话。
+ */
+onMessage("createTorrentCategory", async ({ data: { downloaderId, name, savePath } }) => {
+  const downloaderInstance = await getDownloaderInstance(downloaderId);
+  if (!downloaderInstance) throw new Error("downloader-unavailable");
+  return await downloaderInstance.createClientCategory(name, savePath);
+});
+
 function buildDownloadHistory(downloadOption: IDownloadTorrentOption): ITorrentDownloadMetadata {
   const { torrent = {}, downloaderId = "local" } = downloadOption;
   return {

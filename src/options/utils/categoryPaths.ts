@@ -41,3 +41,20 @@ export async function loadCategoryTable(downloaderId?: string | null): Promise<T
   }
   return pending;
 }
+
+/**
+ * 丢掉这台下载器的分类表缓存。
+ *
+ * 新建分类之后必须调：那份缓存的注释写了「只在本次页面存活期内有效」，不清的话
+ * 「基准那份在不在任务目录」的判定还拿旧表去翻 `category:新名字`，翻不出就判成「判不出」，
+ * 而用户刚建完就选它 —— 界面上表现为「我明明建好了，它还说目录不一致」。
+ */
+export function invalidateCategoryTable(downloaderId?: string | null): void {
+  if (!downloaderId) {
+    cache.clear();
+    inflight.clear();
+    return;
+  }
+  cache.delete(downloaderId);
+  inflight.delete(downloaderId);
+}

@@ -200,6 +200,13 @@ export interface ProtocolMap {
    */
   getClientTorrentCategories(downloaderId: string): Record<string, { name: string; savePath: string }> | null;
 
+  /**
+   * 在该下载器上新建一个分类（名字 + 落盘目录）。辅种检测那一栏的「增加分类」用它 ——
+   * 那一格选的是 `category:xxx`，而候选只列下载器已有的分类。
+   * false = 这台客户端没有分类概念（基类默认实现）；请求失败走抛错，两种说法界面分开给。
+   */
+  createTorrentCategory(data: { downloaderId: string; name: string; savePath: string }): boolean;
+
   // ===== 2.2.3 offscreen：文件级 / peers / tracker 管理 =====
   getClientTorrentFiles(data: { downloaderId: string; torrent: CTorrent }): CTorrentFile[];
   setClientTorrentFilePriority(data: {

@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-12 22:00:29",
-  "headSha": "84bf247",
+  "generatedAt": "2026-10-13 10:00:48",
+  "headSha": "1316ddb",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.94.0",
+      "date": "2026-10-13 10:00:48",
+      "added": [
+        "「辅种检测」的保存路径旁边多了一颗「增加分类」：填上名字和它的目录就能直接在 qBittorrent 里建出这个分类，建完自动选中、并记进这台下载器的候选目录 —— 以前要用一个新分类，得先离开这个界面去下载器里建好再回来"
+      ],
+      "addedTotal": 1,
+      "improved": [],
+      "improvedTotal": 0
+    },
     {
       "version": "0.93.3",
       "date": "2026-10-12 22:00:20",

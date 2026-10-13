@@ -220,7 +220,12 @@ async function checkConnect() {
 </script>
 
 <template>
-  <a-card class="mb-5">
+  <!-- 用户 2026-10-13 要的「这个不要 border」指的是这一块（弹窗里的表单），不是弹窗后面那张列表：
+       a-card 默认带 0.8px #f0f0f0 的边框 + 8px 圆角，套在弹窗里像给表单又画了一层表框。
+       ⚠️ `:bordered="false"` 与 `variant="borderless"` 实测等价（台架 .tmp-build/bench-tcell：
+       两者都把 border 归 0，但都会换上 antd 那三层 box-shadow `rgba(0,0,0,.05) 0 1px 2px` 等）——
+       所以光去掉边框会留一层阴影，得连它一起清掉，见下面 `.editor-card`。 -->
+  <a-card :bordered="false" class="editor-card mb-5">
     <a-form v-if="clientConfig" ref="formRef" :model="clientConfig" layout="vertical" class="editor-form">
       <div class="section-label my-2">{{ t("common.basicInfo") }}</div>
       <a-row :gutter="[16, 8]">
@@ -460,6 +465,16 @@ async function checkConnect() {
 </template>
 
 <style scoped lang="scss">
+/**
+ * borderless 档的 a-card 会把边框换成 antd 那三层 box-shadow（台架 .tmp-build/bench-tcell 实测），
+ * 弹窗里看着还是一层框，所以连阴影一起清掉。
+ * Card 的渲染是单个 `div` 且 `mergeProps(restAttrs)`，class 与本组件的 scope id 都落在这个根上 ——
+ * 和上面那条 `:deep(.ant-card-body)` 生效靠的是同一件事。特异度 0,2,0 压过 cssinjs 的 `.ant-card`（0,1,0）。
+ */
+.editor-card {
+  box-shadow: none;
+}
+
 /* 卡片本身只是分组容器，去掉默认内边距，保持与原先 v-container.pa-0 一致的紧凑排版 */
 :deep(.ant-card-body) {
   padding: 0;

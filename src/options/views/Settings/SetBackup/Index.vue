@@ -172,11 +172,12 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
     </a-flex>
 
     <div class="page-panel">
-    <!-- 全站口径是「列表页的 a-table 一律带 bordered」（AGENTS.md §3.4，用户 2026-10-06 定的），
-         这一张是他 2026-10-13 点名要去的例外 —— 别顺手补回来。台架量的实际差别：去掉的是
-         「整张表的外框 + 每格之间的竖线」（th 8/8、td 24/24 条竖线归零、container 外框归零），
-         行与行之间的横线照旧（24/24 还在），所以行仍然分得开。 -->
+    <!-- 全站口径是「列表页的 a-table 一律带 bordered」（AGENTS.md §3.4，用户 2026-10-06 定的）。
+         v0.96.1 曾把这张的 bordered 删掉，那是**删错了对象**：用户 2026-10-13 那张截图点的是
+         「添加备份服务器」弹窗（`Editor.vue`，里面是 a-form + 5 处 a-divider，压根没有 a-table），
+         不是弹窗后面这张列表。这里按他 2026-10-13 的「把不该删的删回去」恢复。 -->
     <a-table
+      bordered
       :columns="fullTableHeader"
       :data-source="filteredBackupServers"
       :row-key="(record: IBackupServerMetadata) => record.id"

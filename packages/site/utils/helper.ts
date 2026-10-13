@@ -71,7 +71,7 @@ export function hasNonLatinCharacters(query: string): boolean {
   } catch (error) {
     // Fallback: if Unicode Script Extensions are not supported or any error occurs,
     // default to false (treat as Latin) to ensure search functionality continues
-    console.warn("Character detection failed, defaulting to Latin-only detection:", error);
+    console.warn("字符集检测失败，退回按纯拉丁字符检测：", error);
     return false;
   }
 }

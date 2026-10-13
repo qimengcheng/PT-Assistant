@@ -114,7 +114,7 @@ async function buildHostSiteMap(): Promise<Map<string, TSiteID>> {
         const siteMetadata = await getDefinedSiteMetadata(siteId);
         urls.push(...(siteMetadata.urls ?? []), ...(siteMetadata.legacyUrls ?? []));
       } catch (e) {
-        logger({ msg: `buildHostSiteMap: failed to load metadata of ${siteId}`, level: "warn", data: String(e) });
+        logger({ msg: `构建域名到站点的映射：读取 ${siteId} 的站点定义失败`, level: "warn", data: String(e) });
       }
     }
 
@@ -188,7 +188,7 @@ export async function getLocalFingerprintIndex(
   if (!options.refresh) {
     const cached = (await (await ptdIndexDb()).get("local_fingerprint", downloaderId)) ?? undefined;
     if (cached && Date.now() - cached.updatedAt < INDEX_TTL) {
-      logger({ msg: `getLocalFingerprintIndex: hit cache for ${downloaderId}`, data: cached.updatedAt });
+      logger({ msg: `本地指纹索引：命中 ${downloaderId} 的缓存`, data: cached.updatedAt });
       return cached;
     }
   }
@@ -209,7 +209,7 @@ async function buildLocalFingerprintIndex(
 ): Promise<ILocalFingerprintIndex | null> {
   const downloader = await getDownloaderInstance(downloaderId);
   if (!downloader) {
-    logger({ msg: `getLocalFingerprintIndex: downloader ${downloaderId} not found`, level: "warn" });
+    logger({ msg: `本地指纹索引：找不到下载器 ${downloaderId}`, level: "warn" });
     return null;
   }
 
@@ -268,7 +268,7 @@ async function buildLocalFingerprintIndex(
           }
         } catch (e) {
           unresolved++;
-          logger({ msg: `getTorrentFileList failed for ${torrent.infoHash}`, level: "warn", data: String(e) });
+          logger({ msg: `获取种子文件清单失败：${torrent.infoHash}`, level: "warn", data: String(e) });
         }
 
         return entry;
@@ -287,7 +287,7 @@ async function buildLocalFingerprintIndex(
   };
 
   logger({
-    msg: `getLocalFingerprintIndex: built for ${downloaderId} in ${Date.now() - startedAt}ms`,
+    msg: `本地指纹索引：为 ${downloaderId} 建好，用时 ${Date.now() - startedAt} 毫秒`,
     data: { totalTorrents: index.totalTorrents, unresolved: index.unresolved },
   });
 

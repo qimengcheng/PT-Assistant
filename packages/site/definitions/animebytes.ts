@@ -635,7 +635,7 @@ export default class AnimeBytes extends Gazelle {
             ext_anidb: group.Links?.AniDB ? parse(group.Links.AniDB) : null,
           });
         } catch (e) {
-          console.debug(`[PTD] site '${this.name}' parseWholeTorrentFromRow Error:`, e, torrent);
+          console.debug(`[PTD] site '${this.name}' 解析整行种子信息出错：`, e, torrent);
         }
       }
     }

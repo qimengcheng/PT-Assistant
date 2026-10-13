@@ -46,7 +46,7 @@ watch(
     try {
       siteName.value = await metadataStore.getSiteName(id);
     } catch (e) {
-      console.error("[PT-Assistant] load site name failed", id, e);
+      console.error("[PT-Assistant] 读取站点名称失败", id, e);
       siteName.value = "";
     }
   },
@@ -130,7 +130,7 @@ async function deleteSiteUserInfo(date: string[]) {
     siteHistoryData.value = await loadSiteHistoryData(siteId!);
     tableSelected.value = [];
   } catch (e) {
-    console.error("[MyData] remove site user info failed", e);
+    console.error("[MyData] 删除站点用户信息失败", e);
     runtimeStore.showSnakebar(t("MyData.HistoryDataView.deleteError"), { color: "error" });
   }
 }

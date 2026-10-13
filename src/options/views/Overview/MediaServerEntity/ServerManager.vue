@@ -159,7 +159,7 @@ async function saveConfig() {
       }
     }
     message.error(t("SetMediaServer.index.saveFailed"));
-    console.error("[SetMediaServer] save failed, rolled back", e);
+    console.error("[SetMediaServer] 保存失败，已回滚", e);
   }
 }
 
@@ -184,7 +184,7 @@ function confirmDelete(row: IMediaServerMetadata) {
           metadataStore.mediaServers[row.id] = removed;
         }
         message.error(t("SetMediaServer.index.saveFailed"));
-        console.error("[SetMediaServer] delete failed, rolled back", e);
+        console.error("[SetMediaServer] 删除失败，已回滚", e);
         throw e;
       }
     },
@@ -224,7 +224,7 @@ async function toggleEnabled(row: IMediaServerMetadata, enabled: boolean) {
   } catch (e) {
     row.enabled = previous;
     message.error(t("SetMediaServer.index.saveFailed"));
-    console.error("[SetMediaServer] toggle enabled failed, rolled back", e);
+    console.error("[SetMediaServer] 切换启用状态失败，已回滚", e);
   }
 }
 

@@ -47,7 +47,7 @@ async function refreshStatus() {
   try {
     status.value = await sendMessage("nativeBridgeGetStatus", undefined);
   } catch (e) {
-    console.debug("[PT-Assistant] Failed to get bridge status:", e);
+    console.debug("[PT-Assistant] 获取桥接状态失败：", e);
   }
 }
 
@@ -62,7 +62,7 @@ async function grantPermission() {
       console.debug("[PT-Assistant]", t("SetNativeBridge.permission.grantFailed"));
     }
   } catch (e) {
-    console.debug("[PT-Assistant] Permission request error:", e);
+    console.debug("[PT-Assistant] 申请权限时报错：", e);
   } finally {
     permissionLoading.value = false;
   }
@@ -74,7 +74,7 @@ async function revokePermission() {
     await chrome.permissions.remove({ permissions: ["nativeMessaging"] });
     await refreshStatus();
   } catch (e) {
-    console.debug("[PT-Assistant] Permission revoke error:", e);
+    console.debug("[PT-Assistant] 撤销权限时报错：", e);
   } finally {
     permissionLoading.value = false;
   }
@@ -85,7 +85,7 @@ async function toggleEnabled(newValue: boolean) {
   try {
     status.value = await sendMessage("nativeBridgeSetEnabled", newValue);
   } catch (e) {
-    console.debug("[PT-Assistant] Failed to set enabled:", e);
+    console.debug("[PT-Assistant] 设置启用状态失败：", e);
   } finally {
     loading.value = false;
   }
@@ -138,7 +138,7 @@ async function testConnection() {
       await waitForSettledState(token);
     }
   } catch (e) {
-    console.debug("[PT-Assistant] Reconnect failed:", e);
+    console.debug("[PT-Assistant] 重连失败：", e);
   } finally {
     // 迟到的 finally 不许把**新一轮**的 loading 关掉（卸载那一路也无所谓，ref 已经没人看了）
     if (token === pollingToken) testLoading.value = false;

@@ -183,7 +183,7 @@ export default class Plex extends AbstractMediaServer<IPlexConfig> {
       }
       return objectUrl;
     } catch (e) {
-      console.warn(`[plex] load poster failed: ${item.thumb}`, e);
+      console.warn(`[plex] 读取海报失败：${item.thumb}`, e);
       return "";
     }
   }

@@ -790,12 +790,12 @@ export default class AvistazNetwork extends PrivateSite {
       Number.isFinite(storedAuthExpiry) &&
       storedAuthExpiry > currentTime
     ) {
-      console.debug("Found valid token in runtimeSettings. Returning existing token.");
+      console.debug("在运行时设置里找到有效令牌，直接复用。");
       return storedAuthToken.trim();
     }
 
     // 2. 如果过期或不存在，发起新的授权请求
-    console.debug("Token expired or not found. Requesting new token...");
+    console.debug("令牌已过期或没找到，正在申请新令牌…");
     try {
       const { data: apiAuth } = await this.request<AvzNetAuthResp>({
         url: "/api/v1/jackett/auth",
@@ -812,15 +812,15 @@ export default class AvistazNetwork extends PrivateSite {
         await this.storeRuntimeSettings("authToken", authToken);
         await this.storeRuntimeSettings("authExpiry", newAuthExpiry);
 
-        console.debug("Successfully obtained and stored new token.");
+        console.debug("已取到新令牌并存下。");
         return authToken;
       } else if (isAuthFailResp(apiAuth)) {
         // 检查 message 属性是否存在且为字符串
         const message = apiAuth.message.trim() || "Authorization failed";
-        console.error(`Failed to get new token: ${message}`);
+        console.error(`申请新令牌失败：${message}`);
         throw new Error(`AvistaZ authorization failed: ${message}`);
       } else {
-        console.error("Failed to get new token: Unexpected response format or missing required properties.");
+        console.error("申请新令牌失败：返回结构不符合预期或缺少必要字段。");
         throw new Error("AvistaZ authorization failed: Unexpected response format or missing required properties.");
       }
     } catch (error) {

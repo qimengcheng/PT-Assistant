@@ -432,10 +432,10 @@ export default class Deluge extends AbstractBittorrentClient {
             await this.request("label.set_torrent", [torrentHash, options.label]);
           } catch (e) {
             // 标签设不上不影响种子本身已经加进去，只记日志
-            console.error(`[Deluge] set label failed for ${torrentHash}`, e);
+            console.error(`[Deluge] 设置标签失败：${torrentHash}`, e);
           }
         } else {
-          console.error(`[Deluge] unexpected add result shape, cannot set label:`, result);
+          console.error(`[Deluge] 添加返回的结构不符合预期，无法设置标签：`, result);
         }
       }
 
@@ -445,7 +445,7 @@ export default class Deluge extends AbstractBittorrentClient {
     } catch (e) {
       // 静默 catch 会让「添加失败」既没有消息也没有日志 —— 用户只看到没加上，
       // 界面上也没有任何说明。至少记一条，并把原因带进 addResult。
-      console.error(`[Deluge] add torrent failed via ${method}`, e);
+      console.error(`[Deluge] 通过 ${method} 添加种子失败`, e);
       addResult.success = false;
       addResult.message = e instanceof Error ? e.message : String(e);
     }

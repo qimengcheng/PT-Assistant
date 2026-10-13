@@ -37,7 +37,7 @@ async function doReBuild() {
     // 原先三步都没有 try/catch：任一步抛错，弹窗既不关也没有提示，
     // 用户只看到「点了没反应」，无法判断到底有没有生效。
     message.error(t("SetSite.ReBuildMapDialog.failed"));
-    console.error("[SetSite] rebuild map failed", e);
+    console.error("[SetSite] 重建映射失败", e);
   } finally {
     rebuilding.value = false;
   }

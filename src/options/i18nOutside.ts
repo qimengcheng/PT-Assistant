@@ -29,7 +29,7 @@ export function tOutside(key: string, named?: Record<string, unknown>): string {
   } catch (e) {
     // 键不存在时 vue-i18n 会把键路径本身返回（不是抛异常）；这里 catch 只兜
     // 「实例还没挂载消息」这类早期路径，那种情况同样退回键，便于发现漏注册。
-    console.warn(`[i18nOutside] translate failed for "${key}"`, e);
+    console.warn(`[i18nOutside] 翻译 "${key}" 失败`, e);
     return key;
   }
 }

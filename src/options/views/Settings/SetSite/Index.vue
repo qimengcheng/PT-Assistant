@@ -367,7 +367,7 @@ async function refreshSiteFavicon(siteId: TSiteID | TSiteID[]) {
     runtimeStore.showSnakebar(t("SetSite.index.flushFaviconFinish"), { color: "success" });
   } catch (e) {
     // 旧实现只有 finally：刷新失败时用户只看到按钮停转，没有任何失败提示
-    console.error("[SetSite] flush site favicon failed", e);
+    console.error("[SetSite] 刷新站点图标失败", e);
     runtimeStore.showSnakebar(t("SetSite.index.flushFaviconFailed"), { color: "error" });
   } finally {
     isFaviconFlushing.value = false;

@@ -714,7 +714,7 @@ async function loadLocalIndex(refresh = false) {
     // 索引是异步到的，补算一遍本地比对结论
     refreshLocalDecisions();
   } catch (e) {
-    console.error("[PT-Assistant] load local fingerprint index failed", e);
+    console.error("[PT-Assistant] 读取本地指纹索引失败", e);
     localIndex.value = null;
     indexSupported.value = false;
   } finally {

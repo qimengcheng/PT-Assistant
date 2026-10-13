@@ -37,7 +37,7 @@ async function doLocalExport() {
     }
   } catch (e) {
     message.error(t("SetBackup.LocalExportConfirmDialog.exportFailed"));
-    console.error("[SetBackup] local export failed", e);
+    console.error("[SetBackup] 导出到本地失败", e);
   } finally {
     exporting.value = false;
   }

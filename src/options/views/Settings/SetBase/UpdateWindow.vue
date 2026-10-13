@@ -86,7 +86,7 @@ async function checkNow() {
   try {
     state.value = await sendMessage("checkForUpdate", undefined);
   } catch (e) {
-    console.debug("[PT-Assistant] Manual update check failed:", e);
+    console.debug("[PT-Assistant] 手动检查更新失败：", e);
     await refresh();
   } finally {
     isChecking.value = false;
@@ -99,7 +99,7 @@ function showDownloadedPackage() {
   try {
     browser.downloads?.show?.(state.value.downloadId);
   } catch (e) {
-    console.debug("[PT-Assistant] downloads.show failed:", e);
+    console.debug("[PT-Assistant] 打开下载页失败：", e);
   }
 }
 

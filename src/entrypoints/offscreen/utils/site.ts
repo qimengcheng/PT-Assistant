@@ -49,7 +49,7 @@ export async function getSiteUserConfig(siteId: TSiteID, flush = false) {
     storedSiteUserConfig.merge ??= {};
   }
 
-  logger({ msg: `getSiteUserConfig for ${siteId}`, data: storedSiteUserConfig });
+  logger({ msg: `读取站点用户配置：${siteId}`, data: storedSiteUserConfig });
   return storedSiteUserConfig;
 }
 
@@ -83,7 +83,7 @@ export async function getSiteInstance<TYPE extends "private" | "public">(
     storedSiteUserConfig = await getSiteUserConfig(siteId);
   }
 
-  logger({ msg: `getSiteInstance for ${siteId}`, data: storedSiteUserConfig });
+  logger({ msg: `获取站点实例：${siteId}`, data: storedSiteUserConfig });
   return await createSiteInstance<TYPE>(siteId, storedSiteUserConfig);
 }
 
@@ -127,14 +127,14 @@ export async function getSiteFavicon(site: TSiteID | getFaviconMetadata, flush: 
       if (siteFavicon && siteFavicon !== NO_IMAGE) {
         await (await ptdIndexDb()).put("favicon", siteFavicon, siteId);
       } else {
-        logger({ msg: `getSiteFavicon for ${siteId} 未取到图标，不写缓存（下次仍会重试）`, level: "warn" });
+        logger({ msg: `读取站点图标：${siteId} 未取到图标，不写缓存（下次仍会重试）`, level: "warn" });
       }
     }
   }
 
   if (!siteFavicon) {
     siteFavicon = NO_IMAGE;
-    logger({ msg: `getSiteFavicon for ${siteId} failed, use default NO_IMAGE.`, level: "warn" });
+    logger({ msg: `读取站点图标失败：${siteId}，改用默认占位图 NO_IMAGE`, level: "warn" });
   }
 
   return siteFavicon;
@@ -143,7 +143,7 @@ export async function getSiteFavicon(site: TSiteID | getFaviconMetadata, flush: 
 onMessage("getSiteFavicon", async ({ data: { site, flush } }) => (await getSiteFavicon(site, flush))!);
 
 export async function clearSiteFaviconCache() {
-  logger({ msg: `clearSiteFaviconCache` });
+  logger({ msg: `已清空站点图标缓存` });
   return await (await ptdIndexDb()).clear("favicon");
 }
 

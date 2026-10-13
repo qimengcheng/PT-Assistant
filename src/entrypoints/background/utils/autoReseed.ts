@@ -135,7 +135,7 @@ function createReseedNotifier(lang: string | undefined) {
         }
       } catch (e) {
         void sendMessage("logger", {
-          msg: `Auto-reseed: 进展通知改走系统通知栏 (${e instanceof Error ? e.message : e})`,
+          msg: `自动辅种：界面卡片那条路没走通，进展通知改走系统通知栏 (${e instanceof Error ? e.message : e})`,
         });
       }
       for (const group of groups) {
@@ -504,7 +504,7 @@ async function autoReseedTick() {
           try {
             await sendOne(task, task.items[0], downloader, siteNameOf(metadata, task.items[0].site));
             next.baseSentAt = Date.now();
-            void sendMessage("logger", { msg: `Auto-reseed: base torrent sent for [${task.title}]` });
+            void sendMessage("logger", { msg: `自动辅种：已发送基准种子 [${task.title}]` });
             // ②「基准已交给下载器，开始下全量」。一条任务只报一次；那次发送没落地被放开重发时，
             // 判据会把标记清掉，于是重发成功会再报一次 —— 那是又一次真的进展，不是重复轰炸。
             if (next.notifiedBaseStarted === undefined) {
@@ -514,7 +514,7 @@ async function autoReseedTick() {
           } catch (e) {
             next.baseSendFails = (next.baseSendFails ?? 0) + 1;
             void sendMessage("logger", {
-              msg: `Auto-reseed: sending base failed for [${task.title}] (${e instanceof Error ? e.message : e})`,
+              msg: `自动辅种：基准种子发送失败 [${task.title}] (${e instanceof Error ? e.message : e})`,
             });
           }
           acted = true;
@@ -547,7 +547,7 @@ async function autoReseedTick() {
             },
             onFailure: (f) => {
               void sendMessage("logger", {
-                msg: `Auto-reseed: reseed torrent failed for [${task.title}] → ${f.title} (${f.message})`,
+                msg: `自动辅种：辅种条目发送失败 [${task.title}] → ${f.title}（${f.message}）`,
               });
             },
           });
@@ -559,7 +559,7 @@ async function autoReseedTick() {
           if (sentKeys.length > 0) {
             void sendMessage("logger", {
               msg:
-                `Auto-reseed: ${sentKeys.length} reseed torrent(s) sent for [${task.title}]` +
+                `自动辅种：已为 [${task.title}] 发出 ${sentKeys.length} 条辅种种子` +
                 (failed.length > 0 ? `（另有 ${failed.length} 条失败，下一轮只重试这几条）` : ""),
             });
             // ③「基准下完了，那几条已推给下载器」。只报第一次成功 —— 后面那些重试轮次再报一遍，
@@ -607,7 +607,7 @@ async function autoReseedTick() {
           });
           void sendMessage("logger", {
             msg:
-              `Auto-reseed: [${task.title}] 的辅种暂停发送 —— 基准那份在 ${baseMismatch.basePath}，` +
+              `自动辅种：[${task.title}] 的辅种暂停发送 —— 基准那份在 ${baseMismatch.basePath}，` +
               `任务目录是 ${baseMismatch.taskPath}`,
           });
         } else if (task.autoState?.notifiedPathMismatch !== undefined && next.notifiedPathMismatch === undefined) {
@@ -637,7 +637,7 @@ async function autoReseedTick() {
             if (await sendMessage("pauseClientTorrent", { downloaderId, id: one.id })) paused++;
           } catch {
             // 暂停失败只记日志：下一轮还会看到它 wrong，还会再试一次
-            void sendMessage("logger", { msg: `Auto-reseed: pause failed for [${task.title}] ${one.label}` });
+            void sendMessage("logger", { msg: `自动辅种：暂停失败 [${task.title}] ${one.label}` });
           }
         }
         if (paused > 0) acted = true;
@@ -652,7 +652,7 @@ async function autoReseedTick() {
             title,
             message,
           });
-          void sendMessage("logger", { msg: `Auto-reseed: ${count} torrent(s) not seeding for [${task.title}], paused` });
+          void sendMessage("logger", { msg: `自动辅种：[${task.title}] 有 ${count} 条没有在做种，已暂停该任务` });
         }
 
         /**
@@ -670,7 +670,7 @@ async function autoReseedTick() {
         }
       } catch (e) {
         void sendMessage("logger", {
-          msg: `Auto-reseed: task [${task.title}] 这一轮没走完 (${e instanceof Error ? e.message : e})`,
+          msg: `自动辅种：任务 [${task.title}] 这一轮没走完 (${e instanceof Error ? e.message : e})`,
         });
       }
     }
@@ -710,7 +710,7 @@ function runAutoReseedTick(): Promise<void> {
           await autoReseedTick();
         } catch (e) {
           // 一轮失败不影响补跑，也不让定时器就此哑掉（下一分钟照常再来）
-          void sendMessage("logger", { msg: `Auto-reseed: tick failed (${e instanceof Error ? e.message : e})` });
+          void sendMessage("logger", { msg: `自动辅种：这一轮执行失败 (${e instanceof Error ? e.message : e})` });
         }
       } while (again);
     } finally {

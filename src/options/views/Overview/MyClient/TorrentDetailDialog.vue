@@ -186,7 +186,7 @@ async function updateFilePriority(file: CTorrentFile, priority: TorrentFilePrior
     // 原先这里是空 catch + 「静默失败」注释：优先级下拉点了没反应，
     // 用户既不知道成没成，也无法分辨是自己没选对还是下载器拒绝了。
     useRuntimeStore().showSnakebar(t("MyClient.detail.updateFilePriorityFailure"), { color: "error" });
-    console.error("[MyClient] set file priority failed", e);
+    console.error("[MyClient] 设置文件优先级失败", e);
   }
 }
 
@@ -237,7 +237,7 @@ async function addTracker() {
   } catch (e) {
     // 原先空 catch：加完 Tracker 界面上什么变化都没有，用户只能再点一次
     useRuntimeStore().showSnakebar(t("MyClient.detail.addTrackerFailure"), { color: "error" });
-    console.error("[MyClient] add tracker failed", e);
+    console.error("[MyClient] 添加 Tracker 失败", e);
   }
 }
 
@@ -261,7 +261,7 @@ async function removeTracker(tracker: CTorrentTracker) {
   } catch (e) {
     // 原先空 catch：Tracker 删不掉 / 删错了都看不出来
     useRuntimeStore().showSnakebar(t("MyClient.detail.removeTrackerFailure"), { color: "error" });
-    console.error("[MyClient] remove tracker failed", e);
+    console.error("[MyClient] 移除 Tracker 失败", e);
   }
 }
 
@@ -302,7 +302,7 @@ async function copyMagnet() {
     await navigator.clipboard.writeText(magnetLink(torrent));
     useRuntimeStore().showSnakebar(t("MyClient.detail.copyMagnetSuccess"), { color: "success" });
   } catch (e) {
-    console.error("[PT-Assistant] copy magnet link failed", torrent.infoHash, e);
+    console.error("[PT-Assistant] 复制磁力链接失败", torrent.infoHash, e);
     useRuntimeStore().showSnakebar(t("MyClient.detail.copyFailed"), { color: "error" });
   }
 }

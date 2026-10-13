@@ -63,7 +63,7 @@ export async function getSocialInformation(
     if (stored && (stored.title !== "" || stored.poster !== "")) {
       await setSocialInformation(site, sid, stored);
     }
-    logger({ msg: `getSocialInformation for ${site} with sid: ${sid}`, data: stored });
+    logger({ msg: `获取社交信息：${site}，条目号 ${sid}`, data: stored });
   }
 
   return stored as ISocialInformation;

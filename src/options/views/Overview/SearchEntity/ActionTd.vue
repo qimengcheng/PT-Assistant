@@ -41,7 +41,7 @@ async function getTorrentDownloadLinks() {
 
   for (const torrent of torrentItems) {
     const downloadUrl = await sendMessage("getTorrentDownloadLink", torrent);
-    sendMessage("logger", { msg: `torrent ${torrent} download link: ${downloadUrl}` }).catch();
+    sendMessage("logger", { msg: `种子 ${torrent} 的下载链接：${downloadUrl}` }).catch();
     downloadUrls.push({ torrent, downloadUrl });
   }
 

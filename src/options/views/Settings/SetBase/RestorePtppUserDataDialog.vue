@@ -236,7 +236,7 @@ async function doImportInternal() {
       configStore.userInfo.autoReflush.enabled = autoReflushStatus;
       await configStore.$save();
     } catch (e) {
-      console.error("[RestorePtppUserDataDialog] restore auto-refresh failed", e);
+      console.error("[RestorePtppUserDataDialog] 恢复自动刷新设置失败", e);
     }
   }
 }

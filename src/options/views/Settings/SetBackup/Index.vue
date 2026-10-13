@@ -95,7 +95,7 @@ async function doBackup(backupServerId: TBackupServerKey | symbol) {
   try {
     await runBackup(backupServerId);
   } catch (e) {
-    console.error("[SetBackup] doBackup failed", backupServerId, e);
+    console.error("[SetBackup] 执行备份失败", backupServerId, e);
     runtimeStore.showSnakebar(t("SetBackup.snackbar.failure"), { color: "error" });
   } finally {
     doBackupStatus.value[backupServerId] = false;

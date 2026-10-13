@@ -320,13 +320,13 @@ export default class BroadcastTheNet extends Gazelle {
       const pageUrl = response.request?.responseURL || document.URL || "";
 
       if (!pageUrl.includes("series.php")) {
-        console.warn(`[BroadcastTheNet] IMDB search for ${imdbId} did not redirect to series.php, no results found`);
+        console.warn(`[BroadcastTheNet] 按 ${imdbId} 查 IMDB 没有跳转到 series.php，没找到结果`);
         return null;
       }
 
       return { document, pageUrl };
     } catch (error) {
-      console.warn(`[BroadcastTheNet] IMDB search failed for IMDB ID: ${imdbId}. Error:`, error);
+      console.warn(`[BroadcastTheNet] 按 IMDB 编号 ${imdbId} 查询失败，原因：`, error);
       return null;
     }
   }

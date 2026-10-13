@@ -22,7 +22,7 @@ export async function restore<T>(key: string, options: restoreOptions<T> = {}): 
   const rawInit: T = unref(initialValue)!;
 
   try {
-    console.debug("Restoring state for key:", key, "from storage:", storage);
+    console.debug("正在恢复该键的存储状态：", key, "from storage:", storage);
     const { [key]: fromStorage } = await chrome.storage[storage].get(key);
     if (fromStorage) {
       return fromStorage as T;
@@ -166,7 +166,7 @@ export function piniaWebExtPersistencePlugin(context: PiniaPluginContext) {
       // 不能裸吞：持久化失败（配额超限/序列化循环引用）必须留下线索。
       // 更关键的是这里绝不能让异常逃出去 —— 原写法把 re-add 放在 try 内，
       // 一旦 persistent 抛错，onChanged 监听就永久丢失，该 store 的跨 tab 同步彻底死掉。
-      console.error(`[pinia] persist "${key}" failed`, error);
+      console.error(`[pinia] 持久化 "${key}" 失败`, error);
     } finally {
       // 无论成功失败都恢复监听
       chrome.storage.onChanged.addListener(onChanged);

@@ -49,7 +49,7 @@ const remoteDownloadDialogData = inject<IRemoteDownloadDialogData>("remoteDownlo
 function runWithDetailPage(doWork: (torrent: NonNullable<Awaited<ReturnType<typeof parseDetailPage>>>) => Promise<void> | void) {
   return () => {
     parseDetailPage().then(doWork).catch((e) => {
-      console.error("[PT-Assistant] detail page action failed", e);
+      console.error("[PT-Assistant] 详情页操作失败", e);
       runtimeStore.showSnakebar(t("contentScript.cannotParseDetailLink"), { color: "error" });
     });
   };

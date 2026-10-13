@@ -47,7 +47,7 @@ watch(
     try {
       siteName.value = await metadataStore.getSiteName(id);
     } catch (e) {
-      console.error("[PT-Assistant] load site name failed", id, e);
+      console.error("[PT-Assistant] 读取站点名称失败", id, e);
       siteName.value = "";
     }
   },

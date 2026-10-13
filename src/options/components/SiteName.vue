@@ -43,7 +43,7 @@ if (tagIs === "a") {
     try {
       href.value = await metadataStore.getSiteUrl(siteId);
     } catch (e) {
-      console.error("[PT-Assistant] load site url failed", siteId, e);
+      console.error("[PT-Assistant] 读取站点地址失败", siteId, e);
       href.value = "#";
     }
   };
@@ -65,7 +65,7 @@ function updateSiteName(siteId: TSiteID) {
       .then((name) => {
         siteName.value = name;
       })
-      .catch((e) => console.error("[PT-Assistant] load site name failed", siteId, e));
+      .catch((e) => console.error("[PT-Assistant] 读取站点名称失败", siteId, e));
   }
 }
 

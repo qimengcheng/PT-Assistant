@@ -17,7 +17,7 @@ onMessage("getSiteSearchResult", async ({ data: { siteId, keyword = "", searchEn
   const configStorage = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
 
   logger({
-    msg: `getSiteSearchResult For site: ${siteId} with keyword: ${keyword}`,
+    msg: `获取站点搜索结果：${siteId}，关键词 ${keyword}`,
     data: { siteId, keyword, searchEntry },
   });
   const site = await getSiteInstance<"public">(siteId);
@@ -62,7 +62,7 @@ onMessage("getSiteSearchResult", async ({ data: { siteId, keyword = "", searchEn
 
 onMessage("getMediaServerSearchResult", async ({ data: { mediaServerId, keywords = "", options = {} } }) => {
   logger({
-    msg: `getMediaServerSearchResult For mediaServer: ${mediaServerId} with: ${keywords}`,
+    msg: `获取媒体服务器搜索结果：${mediaServerId}，关键词 ${keywords}`,
     data: { mediaServerId, keywords, options },
   });
   const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
@@ -83,7 +83,7 @@ onMessage("getSearchResultSnapshotData", async ({ data: snapshotId }) => {
 onMessage("saveSearchResultSnapshotData", async ({ data: { snapshotId, data } }) => {
   const snapshotData = await getSnapshotData();
   snapshotData[snapshotId] = data;
-  logger({ msg: `A new SearchResult Snapshot will be add at: ${snapshotId}`, data });
+  logger({ msg: `即将新增一条搜索结果快照：${snapshotId}`, data });
   await extStore.setItem("searchResultSnapshot", snapshotData);
 });
 
@@ -91,5 +91,5 @@ onMessage("removeSearchResultSnapshotData", async ({ data: snapshotId }) => {
   const snapshotData = await getSnapshotData();
   delete snapshotData[snapshotId];
   await extStore.setItem("searchResultSnapshot", snapshotData);
-  logger({ msg: `SearchResult Snapshot ${snapshotId} is removed.` });
+  logger({ msg: `搜索结果快照 ${snapshotId} 已移除` });
 });

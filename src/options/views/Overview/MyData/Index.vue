@@ -388,7 +388,7 @@ async function multiOpen() {
         w.location.href = siteUrl;
       } catch (e) {
         // 用户提前把占位标签页关掉了：退回直接开，让 Chrome 自己处理
-        console.error("[MyData] assign location failed, fallback to window.open", siteId, e);
+        console.error("[MyData] 指定下载位置失败，回落到 window.open", siteId, e);
         window.open(siteUrl, "_blank", "noopener noreferrer");
       }
       // 占位窗口是我们自己开的、带着 opener，原来那串 "noopener noreferrer" 在这条路上

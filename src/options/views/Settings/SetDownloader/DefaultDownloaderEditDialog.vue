@@ -79,7 +79,7 @@ async function saveDefaultDownloader() {
     showDialog.value = false;
   } catch (e) {
     message.error(t("SetDownloader.index.defaultDownloaderSaveFailed"));
-    console.error("[SetDownloader] save default downloader failed", e);
+    console.error("[SetDownloader] 保存默认下载器失败", e);
   } finally {
     saving.value = false;
   }

@@ -512,7 +512,7 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
           });
         } catch (e) {
           // 限速设不上不影响种子已经加进去，但要说出来而不是静默
-          console.error("[Transmission] set upload speed limit failed", e);
+          console.error("[Transmission] 设置上传限速失败", e);
         }
       }
 
@@ -522,7 +522,7 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
       }
     } catch (e) {
       // 抛错时 addResult.message 还空着，调用方只看到「失败」而不知道原因
-      console.error("[Transmission] add torrent failed", e);
+      console.error("[Transmission] 添加种子失败", e);
       addResult.message = e instanceof Error ? e.message : String(e);
     }
 

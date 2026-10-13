@@ -18,7 +18,7 @@ import { getSiteInstance } from "./site.ts";
 import { logger } from "./logger.ts";
 
 function failNote(scene: string, error: unknown) {
-  logger({ msg: `${scene} failed: ${error instanceof Error ? error.message : String(error)}` });
+  logger({ msg: `${scene}失败：${error instanceof Error ? error.message : String(error)}` });
 }
 
 /**
@@ -37,7 +37,7 @@ onMessage("getSiteMessages", async ({ data: siteId }): Promise<ISiteMessagesResu
     }
     return { supported: true, status: EResultParseStatus.success, messages: await site.getMessages() };
   } catch (error) {
-    failNote(`getSiteMessages for ${siteId}`, error);
+    failNote(`读取站内信列表（${siteId}）`, error);
     return { supported: true, status: EResultParseStatus.parseError, messages: [], ...noteOf(error) };
   }
 });
@@ -57,7 +57,7 @@ onMessage("getSiteMessageContent", async ({ data }): Promise<ISiteMessageContent
       ...(content === undefined ? noteOf(new Error("站点未返回正文")) : {}),
     };
   } catch (error) {
-    failNote(`getSiteMessageContent for ${data.siteId}/${data.messageId}`, error);
+    failNote(`读取站内信正文（${data.siteId}/${data.messageId}）`, error);
     return { supported: true, status: EResultParseStatus.parseError, ...noteOf(error) };
   }
 });
@@ -70,7 +70,7 @@ onMessage("deleteSiteMessages", async ({ data }): Promise<ISiteMessageActionResu
     }
     return await site.deleteMessages(data.messageIds);
   } catch (error) {
-    failNote(`deleteSiteMessages for ${data.siteId}`, error);
+    failNote(`批量删除站内信（${data.siteId}）`, error);
     return { supported: true, status: EResultParseStatus.unknownError, handled: 0, ...noteOf(error) };
   }
 });

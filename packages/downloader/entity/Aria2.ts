@@ -401,13 +401,13 @@ export default class Aria2 extends AbstractBittorrentClient {
           ]);
         } catch (e) {
           // 限速设不上不影响种子已经加进去，但要说出来而不是静默
-          console.error(`[Aria2] set upload speed limit failed for ${gid}`, e);
+          console.error(`[Aria2] 设置上传限速失败：${gid}`, e);
         }
       }
 
       addResult.success = true;
     } catch (e) {
-      console.error(`[Aria2] add torrent failed via ${method}`, e);
+      console.error(`[Aria2] 通过 ${method} 添加种子失败`, e);
       addResult.message = e instanceof Error ? e.message : String(e);
     }
 

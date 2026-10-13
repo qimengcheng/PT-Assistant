@@ -23,7 +23,7 @@ onMessage("updateDNRSessionRules", async ({ data: { rule, extOnly = true } }) =>
   }
 
   void sendMessage("logger", {
-    msg: `Update DNR session rules ${rule.id} for url: ${rule.condition?.urlFilter}`,
+    msg: `更新 DNR 会话规则 ${rule.id}，地址：${rule.condition?.urlFilter}`,
     data: rule,
   });
 
@@ -34,7 +34,7 @@ onMessage("updateDNRSessionRules", async ({ data: { rule, extOnly = true } }) =>
 });
 
 onMessage("removeDNRSessionRuleById", async ({ data: ruleId }) => {
-  void sendMessage("logger", { msg: `Remove DNR session rule by ID: ${ruleId}` });
+  void sendMessage("logger", { msg: `按 id 移除 DNR 会话规则：${ruleId}` });
   return await chrome.declarativeNetRequest.updateSessionRules({
     removeRuleIds: [ruleId],
   });
@@ -55,9 +55,9 @@ export async function cleanupStaleDNRSessionRules(): Promise<void> {
     const stale = rules.map((rule) => rule.id).filter((id) => id >= DNR_ID_BASE);
     if (stale.length > 0) {
       await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: stale });
-      void sendMessage("logger", { msg: `Cleaned ${stale.length} stale DNR session rules` });
+      void sendMessage("logger", { msg: `清理了 ${stale.length} 条过期 DNR 会话规则` });
     }
   } catch (e) {
-    console.warn("[PT-Assistant] cleanup stale DNR session rules failed", e);
+    console.warn("[PT-Assistant] 清理过期 DNR 会话规则失败", e);
   }
 }

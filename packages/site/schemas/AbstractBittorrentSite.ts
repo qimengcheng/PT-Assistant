@@ -99,7 +99,7 @@ export default class BittorrentSite {
     if (import.meta.env.DEV) {
       // debug 档：每个站点初始化都会走到这里，340 个站点一次加载就是 340 行，
       // 用 log 档会把控制台刷满（且整份 metadata 里含站点配置）。
-      console.debug(`[Site] ${this.name} Initialized with Metadata: `, this.metadata);
+      console.debug(`[Site] ${this.name} 已按元数据初始化：`, this.metadata);
     }
   }
 
@@ -618,7 +618,7 @@ export default class BittorrentSite {
       try {
         torrents.push((await this.parseWholeTorrentFromRow({}, tr, searchConfig!)) as ITorrent);
       } catch (e) {
-        console.error(`[PTD] site '${this.name}' parseWholeTorrentFromRow Error:`, e, tr);
+        console.error(`[PTD] site '${this.name}' 解析整行种子信息出错：`, e, tr);
         throw e;
       }
     }
@@ -777,7 +777,7 @@ export default class BittorrentSite {
         requestConfig: { url: parsedListPageUrl },
       });
     } catch (e) {
-      console.error(`[PTD] site '${this.name}' transformListPage Error:`, e);
+      console.error(`[PTD] site '${this.name}' 解析列表页出错：`, e);
     }
 
     return retData;

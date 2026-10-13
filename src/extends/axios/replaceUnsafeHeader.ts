@@ -64,7 +64,7 @@ export function setupReplaceUnsafeHeader(axios: AxiosInstance): AxiosAllowUnsafe
   const axiosAllowUnsafeHeaderInstance = axios as AxiosAllowUnsafeHeaderInstance;
 
   if (axiosAllowUnsafeHeaderInstance.allowUnsafeHeader) {
-    console.debug("setupReplaceUnsafeHeader() should be called only once");
+    console.debug("setupReplaceUnsafeHeader() 只应调用一次");
     return axiosAllowUnsafeHeaderInstance;
   }
   axiosAllowUnsafeHeaderInstance.allowUnsafeHeader = true;
@@ -140,7 +140,7 @@ export function setupReplaceUnsafeHeader(axios: AxiosInstance): AxiosAllowUnsafe
     } catch (e) {
       // 不能静默：规则删不掉会一直驻留在 declarativeNetRequest 里，
       // 累积到上限后 updateSessionRules 直接抛错，该扩展之后所有需要 unsafe header 的请求全部失败。
-      console.warn("[DNR] failed to remove session rule", ruleId, e);
+      console.warn("[DNR] 移除会话规则失败", ruleId, e);
     }
   }
 

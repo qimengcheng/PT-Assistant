@@ -35,7 +35,7 @@ import {
 function reportLevelUp(prevLevelId: IUserInfo["levelId"], fresh: IUserInfo, siteName: string): void {
   if (fresh.status !== EResultParseStatus.success) return;
   if (!detectLevelUp(prevLevelId, fresh.levelId)) return;
-  logger({ msg: `level up detected for ${siteIdOf(fresh)}: ${prevLevelId} → ${fresh.levelId}` });
+  logger({ msg: `检测到等级提升：${siteIdOf(fresh)} 从 ${prevLevelId} 升到 ${fresh.levelId}` });
   // fire-and-forget：祝贺不该把这次取数的回包卡住；SW 没收到的话就是这一场不放
   void sendMessage("notifyLevelUp", { siteName, levelName: fresh.levelName }).catch(() => {});
 }
@@ -57,7 +57,7 @@ flushQueue.on("active", async () => {
   if (flushQueue.concurrency != queueConcurrency) {
     flushQueue.concurrency = queueConcurrency;
     logger({
-      msg: `The concurrency of the user information refresh queue has been updated to ${flushQueue.concurrency}`,
+      msg: `用户信息刷新队列的并发数已改为 ${flushQueue.concurrency}`,
     });
   }
 });
@@ -91,7 +91,7 @@ export async function getSiteUserInfoResult(siteId: string) {
     return (await flushQueue.add(
       async () => {
         flushQueueAbortControllers.delete(controller);
-        logger({ msg: `getSiteUserInfoResult for ${siteId}` });
+        logger({ msg: `获取站点用户信息：${siteId}` });
 
         // 获取站点实例和配置信息
         const site = await getSiteInstance<"private">(siteId);
@@ -102,7 +102,7 @@ export async function getSiteUserInfoResult(siteId: string) {
         } catch (error) {
           // 静默处理错误，不影响用户信息获取流程
           logger({
-            msg: `Failed to extend cookies for site ${siteId}`,
+            msg: `延长站点 ${siteId} 的 Cookie 失败`,
             level: "debug",
           });
         }
@@ -175,7 +175,7 @@ onMessage(
 
 export async function setSiteLastUserInfo(userData: IUserInfo) {
   return setSiteLastUserInfoQueue.add(async () => {
-    logger({ msg: `setSiteLastUserInfo for ${userData.site}`, data: userData });
+    logger({ msg: `保存站点最近一次用户信息：${userData.site}`, data: userData });
     const site = userData.site;
 
     // 存储用户信息到 metadata 中（ pinia/webExtPersistence 会自动同步该部分信息 ）

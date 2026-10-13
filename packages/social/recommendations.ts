@@ -375,7 +375,7 @@ async function fetchRecommendationSource(source: ISocialRecommendationSource): P
   });
 
   if (!parserEntry) {
-    console.warn(`No social recommendation parser found for ${source.url}`);
+    console.warn(`没有找到 ${source.url} 对应的社交推荐解析器`);
     return [];
   }
 

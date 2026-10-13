@@ -191,7 +191,7 @@ export async function fetchInformation(
         ),
       );
     } catch (e) {
-      console.warn("[douban] ld+json parse failed, fall back to DOM only", e);
+      console.warn("[douban] ld+json 解析失败，改为只读 DOM", e);
     }
 
     resDict.title = pageParser$1(data).titles.join(" / ");

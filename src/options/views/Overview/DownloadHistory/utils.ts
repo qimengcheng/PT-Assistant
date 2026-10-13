@@ -77,7 +77,7 @@ function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
       }
     } catch (e) {
       // 抛错时必须清理定时器并放弃轮询，否则会变成每 1s 一次的死循环 unhandledRejection
-      console.error(`[PT-Assistant] watch download history failed: ${downloadHistoryId}`, e);
+      console.error(`[PT-Assistant] 监听下载历史失败：${downloadHistoryId}`, e);
       delete watchingMap[downloadHistoryId];
     }
   }, 1e3) as unknown as number;
@@ -130,7 +130,7 @@ async function loadDownloadHistory() {
     downloadHistory.value = historyMap;
     tableCustomFilter.buildAdvanceItemPropsFn();
   } catch (e) {
-    console.error("[DownloadHistory] load download history failed", e);
+    console.error("[DownloadHistory] 读取下载历史失败", e);
     useRuntimeStore().showSnakebar(i18nLoadErrorText(), { color: "error" });
   } finally {
     isLoadingHistory.value = false;

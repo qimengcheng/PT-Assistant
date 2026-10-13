@@ -19,7 +19,7 @@ export async function getCanAddedSiteMetadata() {
         canAddedSiteMetadata[siteId] = await metadataStore.getSiteMetadata(siteId);
       } catch (e) {
         // 同 makeMissingMetadata 的注释：定义分片缺失不该让整个下拉空掉
-        console.error(`[SetSite] load site metadata failed: ${siteId}`, e);
+        console.error(`[SetSite] 读取站点定义元数据失败：${siteId}`, e);
         canAddedSiteMetadata[siteId] = makeMissingMetadata(siteId);
       }
     }),
@@ -80,7 +80,7 @@ export const allAddedSiteInfo = computedAsync<ISiteTableItem[]>(async () => {
       });
     } catch (e) {
       // 一个站点缺定义不该让整张表 reject（computedAsync 一失败就全空）
-      console.error(`[SetSite] load site metadata failed: ${siteId}`, e);
+      console.error(`[SetSite] 读取站点定义元数据失败：${siteId}`, e);
       sitesReturn.push({
         id: siteId,
         metadata: makeMissingMetadata(siteId as TSiteID),

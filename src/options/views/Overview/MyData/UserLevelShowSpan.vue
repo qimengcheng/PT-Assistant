@@ -79,7 +79,7 @@ function formatDuration(duration: number | isoDuration) {
       return duration.substring(1);
     }
   } catch (e) {
-    console.error("Error formatting duration:", duration, e);
+    console.error("格式化时长时报错：", duration, e);
     return "";
   }
 }
@@ -108,7 +108,7 @@ function formatIntervalDate(duration: number | isoDuration): string {
       return typeof result === "string" ? result : "";
     }
   } catch (e) {
-    console.error("Error formatting interval date:", duration, e);
+    console.error("格式化区间日期时报错：", duration, e);
     return "";
   }
 }

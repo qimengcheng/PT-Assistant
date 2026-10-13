@@ -78,7 +78,7 @@ export function isSearchGenerationAlive(generation: number): boolean {
 function syncSearchQueueConcurrency() {
   if (searchQueue.concurrency != configStore.searchEntity.queueConcurrency) {
     searchQueue.concurrency = configStore.searchEntity.queueConcurrency;
-    console.debug("Search queue concurrency changed to: ", searchQueue.concurrency);
+    console.debug("搜索队列并发数已改为：", searchQueue.concurrency);
   }
 }
 
@@ -265,7 +265,7 @@ export async function doSearchEntity(
       // 站点不可达 / 解析崩溃 / 扩展重载都会让 getSiteSearchResult 抛错，原先无人接手的
       // rejection 会让该方案的 status 永远停在 working、endAt/costTime 不写、
       // 排队计数不降（按钮一直显示「排队中」），甚至 idle 事件不触发导致 isSearching 卡在 true。
-      console.error(`[SearchEntity] search failed: ${solutionKey}`, e);
+      console.error(`[SearchEntity] 搜索失败：${solutionKey}`, e);
 
       // 世代已过期 = 这轮搜索已被取消/替换，别把「失败」写到新一轮的方案上
       if (!isSearchGenerationAlive(generation)) return;
@@ -294,7 +294,7 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
       advanceFilterDictRef.value.site = { required: [], exclude: [] };
       updateTableFilterValueFn();
     } catch (e) {
-      console.error("Failed to reset table filter site field: ", e);
+      console.error("重置表格筛选的站点字段失败：", e);
     }
   }
 
@@ -344,7 +344,7 @@ export async function doSearch(search: string, plan?: string, flush: boolean = t
   } catch (e) {
     // getSearchSolution / 队列投递抛错时原先一路冒泡到路由 watcher，变成 unhandled rejection：
     // isSearching 可能卡在 true（表格一直转圈），用户也看不到任何提示。
-    console.error("[SearchEntity] doSearch failed", e);
+    console.error("[SearchEntity] 执行搜索失败", e);
     runtimeStore.search.isSearching = false;
     // 原因必须进提示：这句以前只说「请重试」，而配置类错误重试一万次也不会好，
     // 用户唯一的办法是开 F12 找那条 console。

@@ -130,7 +130,7 @@ export function mountApp(document: Document, data: Record<string, unknown> = {})
   let disposed = false;
   const mutationObserver = new MutationObserver(() => {
     if (!disposed && !document.body.contains(contentRoot)) {
-      console.debug("[PT-Assistant] Content root removed from body, remounting app...");
+      console.debug("[PT-Assistant] 内容根节点被从页面移除，正在重新挂载…");
       dispose();
       mountApp(document, data);
     }

@@ -102,7 +102,7 @@ function loadLogger() {
         loadFailureNotified = true;
         message.error(t("Logger.loadFailed"));
       }
-      console.error("[PT-Assistant] load logger failed", e);
+      console.error("[PT-Assistant] 读取运行日志失败", e);
     })
     .finally(() => {
       isLoadingLogger.value = false;

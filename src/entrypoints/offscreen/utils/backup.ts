@@ -68,7 +68,7 @@ export async function createBackupData(backupFields: TBackupFields[] = []): Prom
   };
 
   logger({
-    msg: `A Backup data created at ${formatDate(backupData.manifest.time!, "yyyy-MM-dd HH:mm:ss")}`,
+    msg: `已生成备份数据，时间 ${formatDate(backupData.manifest.time!, "yyyy-MM-dd HH:mm:ss")}`,
     data: Object.keys(backupData),
   });
   return backupData;
@@ -77,7 +77,7 @@ export async function createBackupData(backupFields: TBackupFields[] = []): Prom
 export async function getBackupServerInstance(
   backupServerId: TBackupServerKey,
 ): Promise<AbstractBackupServer<IBackupConfig>> {
-  logger({ msg: `Get backup server instance for ID: ${backupServerId}` });
+  logger({ msg: `获取备份服务器实例：${backupServerId}` });
   const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema;
   const backupServerConfig = metadataStore.backupServers[backupServerId];
   return await getBackupServer(backupServerConfig);
@@ -120,14 +120,14 @@ export async function applyBackupRetention(
       }
     } catch (e) {
       logger({
-        msg: `Failed to delete expired backup [${file.filename}] of [${backupServerId}]: ${e instanceof Error ? e.message : String(e)}`,
+        msg: `删除过期备份失败：[${backupServerId}] 的 [${file.filename}]：${e instanceof Error ? e.message : String(e)}`,
       });
     }
   }
 
   if (actuallyDeletedFiles.length > 0) {
     logger({
-      msg: `Retention policy removed ${actuallyDeletedFiles.length} of ${backupFiles.length} backup(s) of [${backupServerId}]`,
+      msg: `按保留策略删除了 [${backupServerId}] 的 ${backupFiles.length} 份备份中的 ${actuallyDeletedFiles.length} 份`,
       data: { deleted: actuallyDeletedFiles.map((item) => item.filename) },
     });
   }
@@ -149,7 +149,7 @@ export async function exportBackupData(
   const configStore = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
   const encryptionKey = configStore?.backup?.encryptionKey ?? "";
 
-  logger({ msg: `Exporting backup data to ${backupServerId}`, data: { backupFields, backupFilename } });
+  logger({ msg: `正在导出备份数据到 ${backupServerId}`, data: { backupFields, backupFilename } });
   if (backupServerId === "local") {
     const jsZipBlob = await backupDataToJSZipBlob(backupData, encryptionKey);
     const blobUrl = URL.createObjectURL(jsZipBlob);
@@ -177,7 +177,7 @@ export async function exportBackupData(
       // 备份成功后，按照保留策略清理历史备份
       await applyBackupRetention(backupServerId, backupFilename).catch((e) => {
         logger({
-          msg: `Failed to apply the backup retention policy of [${backupServerId}]: ${e instanceof Error ? e.message : String(e)}`,
+          msg: `执行 [${backupServerId}] 的备份保留策略失败：${e instanceof Error ? e.message : String(e)}`,
         });
       });
     }

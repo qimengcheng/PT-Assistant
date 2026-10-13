@@ -120,7 +120,7 @@ export async function setCookie(cookie: chrome.cookies.SetDetails, force: boolea
     }
   } catch {
     sendMessage("logger", {
-      msg: `Failed to set cookie ${cookie.name} for url ${cookie.url ?? new_cookie.url ?? ""}`,
+      msg: `设置 Cookie ${cookie.name} 失败，地址 ${cookie.url ?? new_cookie.url ?? ""}`,
       level: "error",
     }).catch(() => {});
   }
@@ -204,7 +204,7 @@ export async function checkAndExtendCookies({ url, siteId }: { url: string; site
         }
       } catch (error) {
         // 静默处理单个cookie的错误，继续处理其他cookies
-        sendMessage("logger", { msg: `Failed to extend cookie ${cookie.name} for url ${url}`, level: "debug" }).catch();
+        sendMessage("logger", { msg: `延长 Cookie ${cookie.name} 的有效期失败，地址 ${url}`, level: "debug" }).catch();
       }
     }
 
@@ -216,7 +216,7 @@ export async function checkAndExtendCookies({ url, siteId }: { url: string; site
     }
   } catch (error) {
     // 静默处理整体错误，不影响调用方
-    sendMessage("logger", { msg: `Failed to check and extend cookies for url ${url}`, level: "debug" }).catch();
+    sendMessage("logger", { msg: `检查并延长该地址的 Cookie 失败：${url}`, level: "debug" }).catch();
   }
 }
 

@@ -116,7 +116,7 @@ export function setupOffscreenDocumentSafe(retries = 3): void {
         await setupOffscreenDocument();
         return;
       } catch (e) {
-        console.error(`[PT-Assistant] setupOffscreenDocument failed (${attempt + 1}/${retries + 1})`, e);
+        console.error(`[PT-Assistant] 创建 offscreen 文档失败（第 ${attempt + 1}/${retries + 1} 次）`, e);
         if (attempt === retries) {
           return;
         }

@@ -668,7 +668,7 @@ export default class Gazelle extends GazelleBase {
         )) as ITorrent;
         torrents.push(torrent);
       } catch (e) {
-        console.debug(`[PTD] site '${this.name}' parseWholeTorrentFromRow Error:`, e, groupTorrentEl);
+        console.debug(`[PTD] site '${this.name}' 解析整行种子信息出错：`, e, groupTorrentEl);
       }
     }
 
@@ -696,7 +696,7 @@ export default class Gazelle extends GazelleBase {
       const torrent = (await this.parseWholeTorrentFromRow({ link }, torrentEl, searchConfig)) as ITorrent;
       return torrent;
     } catch (e) {
-      console.debug(`[PTD] site '${this.name}' parseWholeTorrentFromRow Error:`, e, torrentEl);
+      console.debug(`[PTD] site '${this.name}' 解析整行种子信息出错：`, e, torrentEl);
     }
     return null;
   }

@@ -55,7 +55,7 @@ async function flush(): Promise<void> {
     }
   } catch (e) {
     void sendMessage("logger", {
-      msg: `Level up: 祝贺改走系统通知栏 (${e instanceof Error ? e.message : e})`,
+      msg: `等级提升：界面卡片那条路没走通，祝贺改走系统通知栏 (${e instanceof Error ? e.message : e})`,
     });
   }
   // 同一个 id：下一批再 create 是替换，不在通知栏堆一排

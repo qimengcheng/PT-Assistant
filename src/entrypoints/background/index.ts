@@ -89,7 +89,7 @@ export default defineBackground({
 
     // ===== 安装/升级时修复历史版本写入的坏数据（字符串型 ratio/seeding/joinTime 等）=====
     browser.runtime.onInstalled.addListener(() => {
-      console.debug("[PT-Assistant] Installed!");
+      console.debug("[PT-Assistant] 已安装！");
       void fixAllStoredUserInfo();
     });
 

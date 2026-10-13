@@ -59,7 +59,7 @@ async function editClientConfig() {
     showDialog.value = false;
   } catch (e) {
     message.error(t("SetDownloader.edit.saveFailed"));
-    console.error("[SetDownloader] edit save failed", e);
+    console.error("[SetDownloader] 保存编辑内容失败", e);
   } finally {
     saving.value = false;
   }

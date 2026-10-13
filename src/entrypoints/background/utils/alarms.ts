@@ -63,7 +63,7 @@ function autoFlushUserInfo(retryIndex: number = 0) {
         (curDate.getHours() === afterHour && curDate.getMinutes() < afterMinute)
       ) {
         void sendMessage("logger", {
-          msg: `Auto-refreshing user information paused since current time is before the allowed refresh time.`,
+          msg: `自动刷新用户信息本轮跳过：当前时间还没到设定的刷新时间点`,
         });
         return;
       }
@@ -116,7 +116,7 @@ function autoFlushUserInfo(retryIndex: number = 0) {
     }
 
     void sendMessage("logger", {
-      msg: `Auto-refreshing user information at ${curDateFormat}${retryIndex > 0 ? `(Retry #${retryIndex})` : ""}`,
+      msg: `于 ${curDateFormat} 自动刷新用户信息${retryIndex > 0 ? `（第 ${retryIndex} 次重试）` : ""}`,
     });
 
     let processedSiteCount = 0;
@@ -139,7 +139,7 @@ function autoFlushUserInfo(retryIndex: number = 0) {
     }
 
     void sendMessage("logger", {
-      msg: `Auto-refreshing user information finished, ${processedSiteCount} sites processed, ${failFlushSites.length} failed.`,
+      msg: `自动刷新用户信息结束：处理 ${processedSiteCount} 个站点，失败 ${failFlushSites.length} 个`,
       data: { failFlushSites },
     });
 
@@ -153,7 +153,7 @@ function autoFlushUserInfo(retryIndex: number = 0) {
     // 如果本次有失败的刷新操作，则设置重试
     if (failFlushSites.length > 0 && retryIndex < retryMax) {
       void sendMessage("logger", {
-        msg: `Retrying auto-refresh for ${failFlushSites.length} failed sites in ${retryInterval} minutes (Retry #${retryIndex + 1})`,
+        msg: `${retryInterval} 分钟后重试这 ${failFlushSites.length} 个失败的站点（第 ${retryIndex + 1} 次重试）`,
       });
       await jobs.scheduleJob({
         id: EJobType.FlushUserInfo + "-Retry-" + retryIndex,
@@ -199,7 +199,7 @@ function autoBackup() {
 
       if (now - lastBackup >= intervalMs) {
         void sendMessage("logger", {
-          msg: `Auto-backup triggered for [${serverConfig.name}] (interval: ${serverConfig.backupInterval}h)`,
+          msg: `已触发自动备份：服务器 [${serverConfig.name}]（间隔 ${serverConfig.backupInterval} 小时）`,
         });
 
         try {
@@ -211,13 +211,13 @@ function autoBackup() {
 
           if (!ok) {
             void sendMessage("logger", {
-              msg: `Auto-backup failed for [${serverConfig.name}] (returned false)`,
+              msg: `自动备份失败：服务器 [${serverConfig.name}]（返回 false）`,
             });
           }
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : String(e);
           void sendMessage("logger", {
-            msg: `Auto-backup failed for [${serverConfig.name}]: ${errMsg}`,
+            msg: `自动备份失败：服务器 [${serverConfig.name}]：${errMsg}`,
           });
         }
       }

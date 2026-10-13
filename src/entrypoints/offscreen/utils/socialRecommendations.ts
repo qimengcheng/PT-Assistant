@@ -84,7 +84,7 @@ async function getSocialInformationSafely(item: ISocialRecommendationItem) {
       requireSummary: !item.summary,
     });
   } catch (error) {
-    console.warn("Failed to enrich social recommendation", item, error);
+    console.warn("补全社交推荐信息失败", item, error);
     return undefined;
   }
 }
@@ -125,7 +125,7 @@ async function fetchPosterDataUrl(
         return poster;
       }
     } catch (error) {
-      console.warn("Failed to fetch recommendation poster", candidate, error);
+      console.warn("获取推荐海报失败", candidate, error);
     }
   }
 
@@ -204,7 +204,7 @@ onMessage("getSocialRecommendations", async ({ data }) => {
 
   if (options.enrichment === "none") {
     logger({
-      msg: "getSocialRecommendations",
+      msg: "获取社交推荐",
       data: {
         count: result.items.length,
         flush: options.flush ?? false,
@@ -219,7 +219,7 @@ onMessage("getSocialRecommendations", async ({ data }) => {
   const items = await enrichRecommendations(result.items, enrichment);
 
   logger({
-    msg: "getSocialRecommendations",
+    msg: "获取社交推荐",
     data: {
       count: items.length,
       flush: options.flush ?? false,
@@ -235,7 +235,7 @@ onMessage("getSocialRecommendationItem", async ({ data }) => {
   const item = await enrichRecommendation(data.item, enrichment);
 
   logger({
-    msg: "getSocialRecommendationItem",
+    msg: "获取单条社交推荐",
     data: {
       item: getRecommendationItemKey(item),
       enrichment,

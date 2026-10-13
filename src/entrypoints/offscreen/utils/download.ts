@@ -306,7 +306,7 @@ onMessage("getClientTorrentCategories", async ({ data: downloaderId }) => {
   try {
     return await downloaderInstance.getClientCategories();
   } catch (e) {
-    console.error("[offscreen] getClientCategories failed:", e);
+    console.error("[offscreen] 获取下载器分类失败：", e);
     return null;
   }
 });
@@ -359,7 +359,7 @@ async function downloadTorrent(downloadOption: IDownloadTorrentOption) {
     const downloadHistory = buildDownloadHistory(downloadOption);
     downloadOption.downloadId = downloadId = await setDownloadHistory(downloadHistory);
   }
-  logger({ msg: `generate download torrent task #${downloadOption.downloadId}`, data: downloadOption });
+  logger({ msg: `生成种子下载任务 #${downloadOption.downloadId}`, data: downloadOption });
   // 这一次「pending」是要写进下载历史的（有副作用），但它的返回值没人读 ——
   // 下面进 try 之后马上被 "downloading" 覆盖，所以只调用、不接返回值。
   await setDownloadStatus(downloadId!, "pending");
@@ -383,7 +383,7 @@ async function downloadTorrent(downloadOption: IDownloadTorrentOption) {
         siteInstance.downloadInterval * 1000 - (new Date().getTime() - (lastSiteDownloadAt.get(torrent.site) ?? 0));
 
       if (leftInterval > 0) {
-        logger({ msg: `Site ${torrent.site} download interval not reached, waiting...` });
+        logger({ msg: `站点 ${torrent.site} 的下载间隔未到，等待中…` });
         sendMessage("reDownloadTorrent", { ...downloadOption, downloadId, leftInterval }).catch();
         return {
           downloadId,
@@ -440,7 +440,7 @@ async function downloadTorrent(downloadOption: IDownloadTorrentOption) {
   if (errorMessage) {
     // 将失败原因写入下载历史，方便在下载历史页面定位问题（见 issue #1430）
     await patchDownloadHistory(downloadId, { errorMessage }).catch(() => {
-      logger({ msg: `Failed to persist errorMessage for download task #${downloadId}` });
+      logger({ msg: `下载任务 #${downloadId} 的错误信息没能存下` });
     });
   }
   return { downloadId, downloadStatus, errorMessage } as IDownloadTorrentResult;
@@ -467,7 +467,7 @@ async function downloadTorrentToLocalFile(
   // 如果设置为 web 方法，且没有 headers 的情况，直接使用 window.open 方法
   if (localDownloadMethod === "web") {
     if (downloadMethod.toUpperCase() === "GET" && isEmpty(downloadHeaders)) {
-      logger({ msg: `Download torrent file with web method: ${downloadUri}` });
+      logger({ msg: `用 web 方式下载种子文件：${downloadUri}` });
       // ⚠️ 这一段跑在 offscreen 的**隐藏文档**里，弹窗基本必被拦，window.open 返回 null。
       // 原先不看返回值就标 completed —— 用户那边什么都没下，下载历史却是「已完成」。
       // 拿不到窗口就回落 extension（走 chrome.downloads），别假装成功。
@@ -475,7 +475,7 @@ async function downloadTorrentToLocalFile(
       if (opened) {
         return { downloadStatus: await setDownloadStatus(downloadId, "completed"), errorMessage };
       }
-      logger({ msg: "window.open was blocked in offscreen document, falling back to extension method" });
+      logger({ msg: "弹窗被 offscreen 文档拦下，回落到 extension 方式" });
       localDownloadMethod = "extension";
     } else {
       localDownloadMethod = "extension"; // 如果是不能直接使用 window.open 方法的情况，直接使用 extension 方法
@@ -501,7 +501,7 @@ async function downloadTorrentToLocalFile(
         downloadOptions.headers = Object.entries(downloadHeaders).map(([name, value]) => ({ name, value }));
       }
 
-      logger({ msg: `Download torrent file with browser method: ${downloadUri}`, data: downloadOptions });
+      logger({ msg: `用浏览器方式下载种子文件：${downloadUri}`, data: downloadOptions });
       await sendMessage("downloadFile", downloadOptions);
       return { downloadStatus: await setDownloadStatus(downloadId, "completed"), errorMessage };
     } catch (e) {
@@ -514,7 +514,7 @@ async function downloadTorrentToLocalFile(
   // 如果设置为 extension，其次考虑使用 getRemoteTorrentFile 转为 Blob 再调用 chrome.downloads
   if (localDownloadMethod === "extension") {
     try {
-      logger({ msg: `Download torrent file with extension method: ${downloadUri}`, data: downloadRequestConfig });
+      logger({ msg: `用 extension 方式下载种子文件：${downloadUri}`, data: downloadRequestConfig });
 
       const torrentInstance = await getRemoteTorrentFile(downloadRequestConfig);
       const torrentUrl = URL.createObjectURL(torrentInstance.metadata.blob());
@@ -557,19 +557,19 @@ async function downloadTorrentToRemote(
     // 这一条是给日志用的袋子：addTorrentResult 拿到之后还会再塞进来一项，所以按袋子声明
     const loggerData: Record<string, unknown> = { torrent, downloaderId, downloadRequestConfig, addTorrentOptions };
     try {
-      logger({ msg: "downloadTorrentToDownloader", data: loggerData });
+      logger({ msg: "把种子交给下载器", data: loggerData });
       const addTorrentResult = await downloaderInstance.addTorrent(downloadRequestConfig.url!, addTorrentOptions);
       loggerData.addTorrentResult = addTorrentResult;
       if (addTorrentResult?.success === true) {
-        logger({ msg: "Successfully added torrent to downloader", data: loggerData });
+        logger({ msg: "已成功把种子加入下载器", data: loggerData });
         downloadStatus = "completed";
       } else {
-        logger({ msg: "Failed to add torrent to downloader", data: loggerData });
+        logger({ msg: "把种子加入下载器失败", data: loggerData });
         errorMessage = getErrorMessage(addTorrentResult?.message || "Downloader rejected the torrent");
       }
       patchDownloadHistory(downloadId, { addTorrentResult }).catch(); // 存储添加种子结果，方便后续调试
     } catch (e) {
-      logger({ msg: "Error adding torrent to downloader", data: loggerData });
+      logger({ msg: "把种子加入下载器时报错", data: loggerData });
       errorMessage = getErrorMessage(e);
     }
   } else {

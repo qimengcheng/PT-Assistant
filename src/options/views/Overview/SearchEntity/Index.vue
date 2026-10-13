@@ -300,12 +300,12 @@ const tableItems = computed(() => {
       try {
         return tableFilterFn(null, tableFilterRef.value, { raw: item });
       } catch (e) {
-        console.warn("[SearchEntity] row filter error, show row anyway:", (e as Error)?.message, item?.uniqueId);
+        console.warn("[SearchEntity] 单行过滤出错，该行照旧显示：", (e as Error)?.message, item?.uniqueId);
         return true;
       }
     });
   } catch (e) {
-    console.warn("[SearchEntity] tableItems fallback to unfiltered list:", e);
+    console.warn("[SearchEntity] 表格数据回落到未过滤的列表：", e);
     return items;
   }
 });
@@ -551,7 +551,7 @@ function applySnapshot(snapshotId: string) {
         // ⚠️ 提示里不带 snapshotId —— 那是 nanoid() 生成的存储键（metadata.ts:542），
         // 上屏就是内部标识进 UI；出处只进控制台。
         message.error(t("SearchEntity.index.snapshotLoadFailed"));
-        console.error(`[SearchEntity] snapshot not found: ${snapshotId}`);
+        console.error(`[SearchEntity] 找不到快照：${snapshotId}`);
         return;
       }
       runtimeStore.search = { ...data, snapshot: snapshotId };
@@ -562,7 +562,7 @@ function applySnapshot(snapshotId: string) {
     })
     .catch((e) => {
       message.error(t("SearchEntity.index.snapshotLoadFailed"));
-      console.error(`[SearchEntity] load snapshot failed: ${snapshotId}`, e);
+      console.error(`[SearchEntity] 读取快照失败：${snapshotId}`, e);
     });
 }
 

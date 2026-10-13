@@ -55,7 +55,7 @@ export default defineContentScript({
     if (configStore?.contentScript?.enabledAtSocialSite ?? true) {
       const socialSite = await sendMessage("matchSocialPage", window.location.href).catch(() => undefined);
       if (socialSite) {
-        console.debug(`[PT-Assistant] Social site detected: ${socialSite}, loading app...`);
+        console.debug(`[PT-Assistant] 识别到社交站点：${socialSite}，正在加载界面…`);
         await loadApp({ socialSite });
         return;
       }
@@ -72,11 +72,11 @@ export default defineContentScript({
       configStore?.contentScript?.allowExceptionSites === true &&
       metadataStore.sites[siteId]?.allowContentScript === false
     ) {
-      console.debug(`[PT-Assistant] Content script is disabled for site: ${siteId}`);
+      console.debug(`[PT-Assistant] 该站点已关闭内容脚本：${siteId}`);
       return;
     }
 
-    console.debug(`[PT-Assistant] host found for site: ${siteId}, loading app...`);
+    console.debug(`[PT-Assistant] 命中站点 ${siteId}，正在加载界面…`);
     await loadApp({ siteId });
   },
 });
@@ -86,10 +86,10 @@ async function loadApp(props: Record<string, unknown>) {
   globalThis.__PTD_CONTENT_PROPS__ = props;
 
   const appUrl = chrome.runtime.getURL("content-app.js");
-  console.debug("[PT-Assistant] loading app from", appUrl);
+  console.debug("[PT-Assistant] 正在从该地址加载界面：", appUrl);
 
   // @vite-ignore：必须是运行时 URL，否则构建期会把这个动态 import 静态打进引导
   await import(/* @vite-ignore */ appUrl);
 
-  console.debug("[PT-Assistant] app module loaded");
+  console.debug("[PT-Assistant] 界面模块已加载");
 }

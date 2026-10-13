@@ -229,7 +229,7 @@ function resetFnWrapper(resetFn: resetItem["resetFn"]) {
         message.success(t("Debugger.resetSuccess"));
       } catch (e) {
         message.error(t("Debugger.resetFailed"));
-        console.error("[Debugger] reset failed", e);
+        console.error("[Debugger] 重置失败", e);
         // 不 rethrow：rethrow 会让确认框卡在 loading 不消失
       } finally {
         resetting.value = false;

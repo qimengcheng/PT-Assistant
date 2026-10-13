@@ -94,7 +94,7 @@ const globalExistingIds = new Set<string>();
 function syncSearchQueueConcurrency() {
   if (searchQueue.concurrency != configStore.mediaServerEntity.queueConcurrency) {
     searchQueue.concurrency = configStore.mediaServerEntity.queueConcurrency;
-    void sendMessage("logger", { msg: `Search queue concurrency changed to: ${searchQueue.concurrency}` });
+    void sendMessage("logger", { msg: `搜索队列并发数已改为 ${searchQueue.concurrency}` });
   }
 }
 
@@ -196,7 +196,7 @@ export async function doSearch(option: { searchKey?: string; loadMore?: boolean 
         // 队列任务必须兜底 catch：服务器不可达 / 扩展重载都会让
         // getMediaServerSearchResult 抛错，而这里原先无人接手 ——
         // rejection 会让该服务器的状态永远停在上一轮的值、界面一直转圈。
-        console.error(`[MediaServerEntity] search failed: ${mediaServerId}`, e);
+        console.error(`[MediaServerEntity] 搜索失败：${mediaServerId}`, e);
       });
   }
 }

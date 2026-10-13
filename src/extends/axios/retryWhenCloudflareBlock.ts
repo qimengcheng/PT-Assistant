@@ -51,7 +51,7 @@ export function isCloudflareBlocked(response: AxiosResponse): boolean {
       }
     }
   } catch (e) {
-    console.error("[CFBlockCheck] An error occurred while checking CF block status:", e);
+    console.error("[CFBlockCheck] 检查 Cloudflare 拦截状态时报错：", e);
   }
 
   return false;
@@ -75,7 +75,7 @@ export function setupRetryWhenCloudflareBlock(axios: AxiosInstance): AxiosRetryW
   const axiosRetryWhenCloudflareBlockInstance = axios as AxiosRetryWhenCloudflareBlockInstance;
 
   if (axiosRetryWhenCloudflareBlockInstance.defaults.retryWhenCloudflare) {
-    console.debug("setupRetryWhenCloudflareBlock() should be called only once");
+    console.debug("setupRetryWhenCloudflareBlock() 只应调用一次");
     return axiosRetryWhenCloudflareBlockInstance;
   }
   axiosRetryWhenCloudflareBlockInstance.defaults.retryWhenCloudflare = true;

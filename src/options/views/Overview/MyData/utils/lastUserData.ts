@@ -165,7 +165,7 @@ export async function cancelFlushSiteLastUserInfo() {
     await sendMessage("cancelUserInfoQueue", undefined);
   } catch (e) {
     // 本地计划已经作废，SW 侧取消失败不能让「已取消」提示也丢掉
-    console.error("cancelUserInfoQueue failed", e);
+    console.error("取消用户信息队列失败", e);
   }
 
   // 队列取消不是错误（原先用了 color: error，红色报错条说「已取消」纯属吓人），走 info 档。

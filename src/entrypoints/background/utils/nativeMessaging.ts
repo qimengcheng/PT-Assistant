@@ -147,7 +147,7 @@ function scheduleReconnect() {
   if (reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
     state = "error";
     lastError = `Gave up after ${MAX_RECONNECT_ATTEMPTS} reconnect attempts`;
-    console.debug("[PT-Assistant] Native bridge exceeded max reconnect attempts, giving up.");
+    console.debug("[PT-Assistant] 本地桥接重连次数已达上限，放弃。");
     return;
   }
 
@@ -176,7 +176,7 @@ function connect() {
   } catch (e) {
     state = "error";
     lastError = errorText(e);
-    console.debug("[PT-Assistant] Native messaging host not available:", lastError);
+    console.debug("[PT-Assistant] 本地消息主机不可用：", lastError);
     return;
   }
 
@@ -199,7 +199,7 @@ function connect() {
       } catch (e) {
         state = "error";
         lastError = errorText(e);
-        console.debug("[PT-Assistant] Failed to send native hello message:", lastError);
+        console.debug("[PT-Assistant] 向本地主机发送握手消息失败：", lastError);
         return;
       }
 
@@ -210,7 +210,7 @@ function connect() {
       if (port !== currentPort) return;
       state = "error";
       lastError = errorText(e);
-      console.debug("[PT-Assistant] Failed to get or create native instance id:", lastError);
+      console.debug("[PT-Assistant] 获取或创建本地实例标识失败：", lastError);
       try {
         currentPort.disconnect();
       } catch {
@@ -271,13 +271,13 @@ function connect() {
     }
 
     if (err) {
-      console.debug("[PT-Assistant] Native messaging disconnected:", errMsg);
+      console.debug("[PT-Assistant] 本地消息连接已断开：", errMsg);
     }
 
     if (FATAL_ERRORS.some((e) => errMsg.includes(e))) {
       state = "error";
       lastError = errMsg;
-      console.debug("[PT-Assistant] Native host not available, CLI bridge disabled.");
+      console.debug("[PT-Assistant] 本地主机不可用，命令行桥接已停用。");
       return;
     }
 

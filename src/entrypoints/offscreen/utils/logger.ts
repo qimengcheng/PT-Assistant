@@ -39,7 +39,7 @@ function scheduleFlush() {
     try {
       loggerStorage.value = [...ring];
     } catch (e) {
-      console.error("[PT-Assistant] logger flush failed:", e);
+      console.error("[PT-Assistant] 日志落盘失败：", e);
     }
   }, 500);
 }
@@ -57,7 +57,7 @@ export function logger(data: ILoggerItem) {
     scheduleFlush();
   } catch (e) {
     // 日志记录失败不应影响主流程（如传入不可序列化数据、sessionStorage 写入异常等）
-    console.error("[PT-Assistant] logger failed:", e);
+    console.error("[PT-Assistant] 日志写入失败：", e);
   }
 }
 

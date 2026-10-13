@@ -41,7 +41,7 @@ watch(
     try {
       siteMetaCategory.value = await getSiteMetaCategory(siteId);
     } catch (e) {
-      console.error("[SolutionDetail] get site category failed", siteId, e);
+      console.error("[SolutionDetail] 获取站点分类失败", siteId, e);
       siteMetaCategory.value = [];
     }
   },

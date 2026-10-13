@@ -52,7 +52,7 @@ async function editClientConfig() {
     showDialog.value = false;
   } catch (e) {
     message.error(t("SetBackup.edit.saveFailed"));
-    console.error("[SetBackup] edit save failed", e);
+    console.error("[SetBackup] 保存编辑内容失败", e);
   } finally {
     saving.value = false;
   }

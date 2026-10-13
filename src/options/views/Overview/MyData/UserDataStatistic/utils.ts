@@ -79,7 +79,7 @@ export async function loadFullData(): Promise<IUserDataStatistic> {
 
   // 如果没有有效的站点数据，返回空结果
   if (allDates.length === 0) {
-    console.debug("[PT-Assistant] No valid site data found after filtering");
+    console.debug("[PT-Assistant] 过滤之后没有可用的站点数据");
     return {
       dailyUserInfo: {},
       siteDateRange: {},
@@ -103,7 +103,7 @@ export async function loadFullData(): Promise<IUserDataStatistic> {
   console.debug(
     `[PT-Assistant] Filtered out ${Object.keys(rawData).length - Object.keys(filteredRawData).length} deleted sites`,
   );
-  console.debug("[PT-Assistant] Found UserDataStatistic used date ranges:", datesInRange);
+  console.debug("[PT-Assistant] 统计用到的日期区间：", datesInRange);
 
   for (const [siteId, perSiteUserInfoHistory] of Object.entries(filteredRawData)) {
     const thisSiteDateRange = Object.keys(perSiteUserInfoHistory);
@@ -143,7 +143,7 @@ export async function loadFullData(): Promise<IUserDataStatistic> {
       }
     }
 
-    console.debug(`[PT-Assistant] UserDataStatistic for ${siteId} loaded, date range: ${thisSiteDateRangeInInterval}`);
+    console.debug(`[PT-Assistant] 已载入 ${siteId} 的统计数据，日期区间：${thisSiteDateRangeInInterval}`);
   }
 
   return { dailyUserInfo, siteDateRange, incrementalData };

@@ -102,7 +102,7 @@ async function autoDownloadIfNeeded(state: IUpdateCheckState, autoDownloadOn: bo
 
   await writeUpdateState(next);
   void sendMessage("logger", {
-    msg: `Update check: auto-download v${next.latestVersion} ${next.downloadState} (${next.downloadError || "ok"})`,
+    msg: `检查更新：自动下载 v${next.latestVersion} ${next.downloadState}（${next.downloadError || "正常"}）`,
   });
   return next;
 }
@@ -123,7 +123,7 @@ chrome.downloads?.onChanged.addListener((delta) => {
       await writeUpdateState({ ...state, downloadState: "failed", downloadError: delta.error?.current ?? "" });
     }
   })().catch((e) => {
-    void sendMessage("logger", { msg: `Update check: 下载状态回写失败 (${e instanceof Error ? e.message : e})` });
+    void sendMessage("logger", { msg: `检查更新：下载状态回写失败 (${e instanceof Error ? e.message : e})` });
   });
 });
 
@@ -176,14 +176,14 @@ async function autoCheck() {
   const next = await runUpdateCheck();
   if (next.errorCode) {
     void sendMessage("logger", {
-      msg: `Update check failed (${next.errorCode}${next.httpStatus ? `, HTTP ${next.httpStatus}` : ""})`,
+      msg: `检查更新失败（${next.errorCode}${next.httpStatus ? `，HTTP ${next.httpStatus}` : ""}）`,
     });
     return;
   }
 
   const status = deriveUpdateStatus(next, currentVersion());
   void sendMessage("logger", {
-    msg: `Update check finished: latest v${next.latestVersion}, current v${currentVersion()} (${status})`,
+    msg: `检查更新完成：最新 v${next.latestVersion}，当前 v${currentVersion()}（${status}）`,
   });
 
   if (status === "updateAvailable") {

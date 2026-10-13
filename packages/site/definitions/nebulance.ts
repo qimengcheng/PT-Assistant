@@ -400,7 +400,7 @@ export default class Nebulance extends Gazelle {
         )) as ITorrent;
         torrents.push(torrent);
       } catch (e) {
-        console.debug(`[PTD] site '${this.name}' parseWholeTorrentFromRow Error:`, e, tr);
+        console.debug(`[PTD] site '${this.name}' 解析整行种子信息出错：`, e, tr);
       }
     }
 

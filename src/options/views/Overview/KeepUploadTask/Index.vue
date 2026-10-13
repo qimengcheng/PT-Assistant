@@ -346,7 +346,7 @@ async function loadTasks() {
     // 列表一到位就把「上次点过移到任务目录、界面还挂着不一致」的那几条过一遍（见那处的注释）
     void refreshPendingBaseMoves();
   } catch (e) {
-    console.error("Failed to load keep upload tasks:", e);
+    console.error("读取辅种任务列表失败：", e);
     tasks.value = [];
   } finally {
     loading.value = false;
@@ -485,7 +485,7 @@ async function deleteTasksByIds(ids: TKeepUploadTaskKey[]): Promise<number> {
       await sendMessage("deleteKeepUploadTask", id);
       removed.push(id);
     } catch (e) {
-      console.error("Failed to delete keep upload task:", id, e);
+      console.error("删除辅种任务失败：", id, e);
     }
   }
   tasks.value = tasks.value.filter((item) => !removed.includes(item.id));
@@ -623,7 +623,7 @@ async function sendTorrentsToDownloader(
       return true;
     }
 
-    console.error(`[KeepUploadTask] send partially failed: ${JSON.stringify(failedItems)}`);
+    console.error(`[KeepUploadTask] 这一批有失败条目：${JSON.stringify(failedItems)}`);
     runtimeStore.showSnakebar(
       t("KeepUploadTask.sendPartiallyFailed", {
         succeeded: succeededCount,
@@ -668,7 +668,7 @@ async function setAsBaseTorrent(task: IKeepUploadTask, itemIndex: number) {
     task.items.splice(0, 1);
     task.items.splice(itemIndex, 0, item);
     runtimeStore.showSnakebar(t("KeepUploadTask.setBaseError"), { color: "error" });
-    console.error("[KeepUploadTask] set base torrent failed, order reverted", e);
+    console.error("[KeepUploadTask] 换基准失败，顺序已回退", e);
   }
 }
 

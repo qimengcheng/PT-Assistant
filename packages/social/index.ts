@@ -90,7 +90,7 @@ export async function getSocialSiteInformation(
       }
       // 端点不可用是常态（站点没上 PtGen、网络抖动），记 debug 即可不该刷 error
       if (result.status === "rejected") {
-        console.debug("[social] PtGen endpoint failed", site, result.reason);
+        console.debug("[social] PtGen 接口调用失败", site, result.reason);
       }
     }
   }

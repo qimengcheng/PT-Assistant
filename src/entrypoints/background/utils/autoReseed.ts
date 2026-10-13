@@ -20,6 +20,7 @@ import { onMessage, sendMessage } from "@/messages.ts";
 import type { IKeepUploadTask, IKeepUploadTaskItem, IMetadataPiniaStorageSchema } from "@/shared/types.ts";
 
 import {
+  AUTO_RESEED_BASE_RESEND_MS,
   buildReseedAddTorrentOptions,
   othersAlreadySent,
   othersStillPending,
@@ -53,7 +54,8 @@ const JOB_ID = "autoReseed";
 const TICK_MS = 60 * 1000;
 
 /**
- * 任务卡在「基准正往任务目录搬」时的那几趟快查。
+ * 两种情况要用的那几趟快查：任务卡在「基准正往任务目录搬」，以及**刚把辅种那几条发出去、
+ * 下载器列表里还没露面**。
  *
  * 为什么要有这一串（用户 2026-10-12：「添加完了之后应该马上就回查啊…过几秒就得查一下啊，
  * 查到移动完了就赶紧推种子啊，不要一开始就等 1 分钟」）：新旧目录在同一个盘符时 qBittorrent 只是
@@ -61,35 +63,39 @@ const TICK_MS = 60 * 1000;
  * 页面里那套盯梢（`KeepUploadTask/Index.vue` 的 `watchBaseMoveLanded`）是页内定时器，
  * 从搜索页建完任务就没人起它 —— 那种情况下唯一会再查的就是这一串。
  *
+ * 发送那一半是他 2026-10-13 报的同一种形状：建完任务确实当场就发了（`createKeepUploadTask`
+ * 末尾催的那一轮），但一批是**串行**发的，而新挂上的那几条要等下一轮才写进 `verify` ——
+ * 没有这一串的话，界面上「已推送」最迟要等满一分钟才翻过来（实测 46 秒）。
+ *
  * 6 → 15 → 30 → 60 秒四趟，之后交回每分钟那一轮（它本来就在，不算放弃）。
  * 第一趟给 6 秒是贴着用户那句「过几秒」，代价要说清：下载器那份列表自己有 15 秒缓存闸
  * （`qBittorrent.ts` 的 `getSyncData`），所以 6 秒那一趟大概率拿回同一份快照 —— 它查的是内存里
  * 那份缓存，不打网络，白跑一趟不贵，但别指望它落地；真正可能落地的是 15 秒那一趟。
  */
-const MOVE_RECHECK_DELAYS_MS = [6_000, 15_000, 30_000, 60_000];
-let moveRecheckStep = 0;
-let moveRecheckTimer: ReturnType<typeof setTimeout> | undefined;
+const QUICK_RECHECK_DELAYS_MS = [6_000, 15_000, 30_000, 60_000];
+let quickRecheckStep = 0;
+let quickRecheckTimer: ReturnType<typeof setTimeout> | undefined;
 
 /**
- * 每一轮末尾交回来一次：这一轮还看见有任务在搬就排下一趟，一趟都没看见就把阶梯归零
- * （下一次再搬仍从 6 秒起，而不是接着上一次的 60 秒）。
+ * 每一轮末尾交回来一次：这一轮还看见有任务在搬、**或者有刚发出去还没在下载器列表里露面的那几条**，
+ * 就排下一趟；一趟都没看见就把阶梯归零（下一次再搬/再发仍从 6 秒起，而不是接着上一次的 60 秒）。
  */
-function scheduleMoveRecheck(pending: boolean): void {
-  if (moveRecheckTimer !== undefined) {
-    clearTimeout(moveRecheckTimer);
-    moveRecheckTimer = undefined;
+function scheduleQuickRecheck(pending: boolean): void {
+  if (quickRecheckTimer !== undefined) {
+    clearTimeout(quickRecheckTimer);
+    quickRecheckTimer = undefined;
   }
   if (!pending) {
-    moveRecheckStep = 0;
+    quickRecheckStep = 0;
     return;
   }
-  if (moveRecheckStep >= MOVE_RECHECK_DELAYS_MS.length) return;
-  const delay = MOVE_RECHECK_DELAYS_MS[moveRecheckStep];
-  moveRecheckStep += 1;
+  if (quickRecheckStep >= QUICK_RECHECK_DELAYS_MS.length) return;
+  const delay = QUICK_RECHECK_DELAYS_MS[quickRecheckStep];
+  quickRecheckStep += 1;
   // 这几趟都在 30 秒以内，用 setTimeout 就够：SW 空闲 30 秒才会被收走，而每一轮本身就把
   // 这个时钟拨回去了。超过那一档的（最后那趟 60 秒）落空也不要紧 —— 每分钟的定时器是兜底。
-  moveRecheckTimer = setTimeout(() => {
-    moveRecheckTimer = undefined;
+  quickRecheckTimer = setTimeout(() => {
+    quickRecheckTimer = undefined;
     void runAutoReseedTick();
   }, delay);
 }
@@ -323,7 +329,7 @@ async function autoReseedTick() {
    */
   const tasks = all ?? [];
   if (tasks.length === 0) {
-    scheduleMoveRecheck(false);
+    scheduleQuickRecheck(false);
     return;
   }
 
@@ -331,8 +337,8 @@ async function autoReseedTick() {
   const config = await extStore.getItem("config");
   /** 这一轮的进展：任务循环里只登记，函数末尾一次性投递（合并 + 选通道都在那儿） */
   const notices = createReseedNotifier(config?.lang);
-  /** 这一轮有没有看见任务还卡在「基准正往任务目录搬」—— 决定末尾要不要提前起下一轮 */
-  let movePending = false;
+  /** 这一轮有没有看见任务还卡在「基准正往任务目录搬」或「刚发出去还没露面」—— 决定末尾要不要提前起下一轮 */
+  let quickRecheckPending = false;
 
   // 同一台下载器只拉一次列表，多个任务共用那份（qBittorrent 那边 15 秒才刷一次，多拉没意义）
   const byDownloader = new Map<string, IKeepUploadTask[]>();
@@ -405,8 +411,8 @@ async function autoReseedTick() {
          */
         if (torrents) await persistBaseLocalPath(task, torrents, categories);
         // 路径没落地时 `moveToTaskPath` 仍挂着（`refreshBaseLocalPaths` 只在**确定**一致时才清它）——
-        // 这一轮就没法往下推，别等下一分钟的定时器，见 `scheduleMoveRecheck`。
-        if (task.baseLocal?.moveToTaskPath) movePending = true;
+        // 这一轮就没法往下推，别等下一分钟的定时器，见 `scheduleQuickRecheck`。
+        if (task.baseLocal?.moveToTaskPath) quickRecheckPending = true;
 
         // 没开自动辅种的到这儿就结束：**只看不动手** —— 不发种子、不暂停、不弹通知。
         // 「查」和「动他的种子」是两件事，用户关的是后者，不是前者。
@@ -527,6 +533,17 @@ async function autoReseedTick() {
             titleOf: (item) => `${siteNameOf(metadata, item.site)} / ${item.title}`,
             send: async (item) => {
               await sendOne(task, item, downloader, siteNameOf(metadata, item.site));
+              /**
+               * 一条一写，不等整批跑完：一批八条是串行发的（每条要回站点取 .torrent 再 add），
+               * 而界面上那一列吃的是 `verify`。全等末尾落库的话，这一段里用户读到的是「一条都没推」
+               * （他 2026-10-13 报的那一幕）。写「待确认」是实话 —— 它刚交给下载器，这一轮的列表还没算它。
+               * 已经在列表里做种的那些不降级回待确认（重发那一档会走到这里）。
+               */
+              const key = String(item.hash ?? "").toLowerCase();
+              if (key !== "" && statuses[key]?.verdict !== "seeding") {
+                statuses[key] = { verdict: "pending", rawState: "" };
+                await persistVerify(task, statuses, reachable);
+              }
             },
             onFailure: (f) => {
               void sendMessage("logger", {
@@ -553,6 +570,26 @@ async function autoReseedTick() {
             }
           }
           acted = true;
+        }
+
+        /**
+         * 这一轮末尾要不要提前再查一趟：有没有「已记为发出、这一轮在下载器列表里却还看不见」的那几条
+         * （基准那条同理）。
+         *
+         * 发出去 ≠ 看得见：一批是串行发的（每条要回站点取 .torrent 再 add），而 qBittorrent 那份
+         * 列表自己有 15 秒缓存闸。不排这一趟，界面上「已推送」最迟要等满下一次定时才翻过来
+         * （他 2026-10-13 报的那一幕，实测 46 秒）。
+         *
+         * 窗口沿用放开重发那一条的 5 分钟（`pruneUnlandedOthers`）：过了那一档这条会被摘掉重发，
+         * 快查再排下去没意义，交给每分钟的定时器兜底。放在两处发送**之后**才算得到这一轮刚记上的那几条。
+         */
+        const ledgerNow = next.othersSent ?? pruned.sent;
+        const sentAgo = (at?: number) => at !== undefined && Date.now() - at < AUTO_RESEED_BASE_RESEND_MS;
+        if (
+          (sentAgo(next.baseSentAt) && base?.verdict === "notFound") ||
+          allOthers.some((item, i) => sentAgo(ledgerNow[reseedItemKey(item)]) && others[i]?.verdict === "notFound")
+        ) {
+          quickRecheckPending = true;
         }
 
         /**
@@ -645,7 +682,7 @@ async function autoReseedTick() {
    * 「那一条任务不吭声」这一层，其余任务和这一行的 flush 都照常走到。
    */
   await notices.flush();
-  scheduleMoveRecheck(movePending);
+  scheduleQuickRecheck(quickRecheckPending);
 }
 
 /**

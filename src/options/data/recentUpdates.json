@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-13 10:32:21",
-  "headSha": "51c5aaa",
+  "generatedAt": "2026-10-13 11:54:36",
+  "headSha": "7d6938d",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.94.2",
+      "date": "2026-10-13 11:54:36",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "基准本来就在下载器里下完的任务，创建完之后那几条是逐条推、逐条显示「辅种中」的：不再等整批串行发完才一起翻面，新挂上的那几条也在几秒到十几秒内被查回来（原先最迟要等满一分钟）"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.94.1",
       "date": "2026-10-13 10:32:21",

@@ -10,6 +10,7 @@ import { findAllReseedGroups, type IReseedGroup } from "@/shared/bestReseed.ts";
 import type { ISearchResultTorrent } from "@/shared/types/storages/runtime.ts";
 
 import { tableCustomFilter } from "./utils/filter.ts";
+import { planHorizontalWheel } from "./utils/horizontalWheel.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
@@ -135,6 +136,22 @@ function selectSite(siteId: string) {
   selectedSite.value = siteId;
   updateQuickSiteFilter();
 }
+
+/**
+ * 滚轮横向滚这一排 chip —— 判据在 `./utils/horizontalWheel.ts`（那里断言了「什么时候不接管」
+ * 那三条边界）。这里只做两件事：把算出来的 scrollLeft 写回去，以及**真的接管了**才 preventDefault。
+ *
+ * 监听挂在普通 div 上（不是 window / document / body），Chrome 那条 wheel 默认 passive 的干预
+ * 不适用，所以 preventDefault 有效。
+ */
+function scrollSiteRowOnWheel(event: WheelEvent) {
+  const el = event.currentTarget as HTMLElement | null;
+  if (!el) return;
+  const next = planHorizontalWheel(el, { deltaX: event.deltaX, deltaY: event.deltaY, deltaMode: event.deltaMode });
+  if (next === null) return;
+  el.scrollLeft = next;
+  event.preventDefault();
+}
 </script>
 
 <template>
@@ -156,7 +173,7 @@ function selectSite(siteId: string) {
           </a-tag>
 
           <!-- 分站点选项（可横向滚动，对应 v-chip-group 的 scroll-to-active + show-arrows） -->
-          <div class="site-filter-scroll d-flex flex-nowrap align-center">
+          <div class="site-filter-scroll d-flex flex-nowrap align-center" @wheel="scrollSiteRowOnWheel">
             <a-tag
               v-for="siteId in advanceItemPropsRef.site"
               :key="siteId"
@@ -275,8 +292,11 @@ function selectSite(siteId: string) {
      要真吃掉 10px 高：chip 一多到溢出，这一格就被顶高 10px，而父级是 align-center 的 flex ——
      行变高之后外面那几颗（「全部站点」/「已选中 N 条」）跟着居中到新的行中线，里面这排还贴在顶部，
      台架 .tmp-build/bench-chips 实测差 **5.2px**（正好半个滚动条），界面表现就是他报的
-     「满了之后这块会往上偏移，没有水平对齐」。改成不画轨道、只保留可滚（滚轮 / 触控板 / 拖选照旧）：
+     「满了之后这块会往上偏移，没有水平对齐」。改成不画轨道、只保留可滚：
      右边那颗被切一半的 chip 已经是「还有更多」的提示，不靠这条 10px 的轨道说话。
+     ⚠️ 当时那句「滚轮照旧」不成立 —— 浏览器不会把 deltaY 折成横滚，普通滚轮只走纵向，
+     能横滚的一直只有「Shift + 滚轮」和触控板横向手势。滚轮这一条是后来由
+     `scrollSiteRowOnWheel` 接上 deltaY 才真的有的。
      两套写法都给，与 style.css 那条同口径（老 Chrome / Edge 只认伪元素那条）。 */
   scrollbar-width: none;
   /* chip 之间原先靠每颗自带 mr-1（4px），「全部」那颗没有 → 两颗零间距贴边。

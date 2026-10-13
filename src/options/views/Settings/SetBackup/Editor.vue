@@ -222,10 +222,13 @@ async function checkConnect() {
 <template>
   <!-- 用户 2026-10-13 要的「这个不要 border」指的是这一块（弹窗里的表单），不是弹窗后面那张列表：
        a-card 默认带 0.8px #f0f0f0 的边框 + 8px 圆角，套在弹窗里像给表单又画了一层表框。
-       ⚠️ `:bordered="false"` 与 `variant="borderless"` 实测等价（台架 .tmp-build/bench-tcell：
-       两者都把 border 归 0，但都会换上 antd 那三层 box-shadow `rgba(0,0,0,.05) 0 1px 2px` 等）——
+       ⚠️ 写法用 `variant="borderless"`：`bordered` 在 `antdv-next/dist/card/Card.d.ts` 里明写
+       `@deprecated Please use 'variant' instead`，而仓里另外三张卡（ExportUserInfoDialog、
+       UserDataStatistic、UserDataTimeline）已经都写 `variant="outlined"`。台架
+       .tmp-build/bench-tcell 实测两种写法产出完全相同：边框都归 0，但都换上 antd 那三层
+       box-shadow `rgba(0,0,0,.05) 0 1px 2px` 等 ——
        所以光去掉边框会留一层阴影，得连它一起清掉，见下面 `.editor-card`。 -->
-  <a-card :bordered="false" class="editor-card mb-5">
+  <a-card variant="borderless" class="editor-card mb-5">
     <a-form v-if="clientConfig" ref="formRef" :model="clientConfig" layout="vertical" class="editor-form">
       <div class="section-label my-2">{{ t("common.basicInfo") }}</div>
       <a-row :gutter="[16, 8]">

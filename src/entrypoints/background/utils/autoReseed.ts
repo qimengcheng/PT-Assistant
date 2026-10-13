@@ -23,7 +23,7 @@ import {
   AUTO_RESEED_BASE_RESEND_MS,
   buildReseedAddTorrentOptions,
   othersAlreadySent,
-  othersStillPending,
+  othersStillToSend,
   planAutoReseed,
   pruneUnlandedOthers,
   reseedItemKey,
@@ -431,8 +431,15 @@ async function autoReseedTick() {
          */
         const pruned = pruneUnlandedOthers({ state: task.autoState ?? {}, items: allOthers, statuses: others, now: Date.now() });
         const stateForPlan: IKeepUploadTask["autoState"] = { ...(task.autoState ?? {}), othersSent: pruned.sent, othersResent: pruned.resent };
-        /** 其中还没成功发出去的那几条（逐条记，不再拿「整批发过一次」当闸） */
-        const othersToSend = othersStillPending(stateForPlan, allOthers);
+        /**
+         * 其中「台账没记上、这一轮在下载器里也查不到」的那几条。
+         *
+         * 两道缺一不可，而且它们各挡一种死循环：只看台账 → 那条早就在做种、台账当初却因为 add
+         * 回了错而没记上的，会被每分钟重发一次（他 2026-10-13 那排 409 就是这个形状）；
+         * 只看实况 → 刚发出去、还在下载器那份 15 秒列表缓存闸后面的会被当成没发过，原地再发一遍。
+         * 逐条记，不再拿「整批发过一次」当闸。
+         */
+        const othersToSend = othersStillToSend({ state: stateForPlan, items: allOthers, statuses: others });
 
         /**
          * 基准那份数据**此刻**到底在不在任务目录里。

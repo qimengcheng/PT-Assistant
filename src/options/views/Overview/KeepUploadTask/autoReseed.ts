@@ -316,8 +316,10 @@ export function reseedItemKey(item: { hash?: string; title?: string }): string {
  * 这一批里「已经成功发出去」的那几条，返回 `键 → 时刻`。
  *
  * 旧任务（这份逐条记录之前建的）只有整批的 `othersSentAt`，那种情况**认它全发过**：
- * 否则升级到这一版的第一分钟，后台会把那一批原样重发一遍 —— 对 qBittorrent 是幂等的
- * （add 同一条只会返回已在那儿的那份），但对站点是白打 N 次种子下载请求。
+ * 否则升级到这一版的第一分钟，后台会把那一批原样重发一遍 —— 站点那边白打 N 次种子下载请求，
+ * 而下载器对已在列表的那几条回的是失败（qBittorrent 回 409），不是幂等返回。
+ * （那句「对 qBittorrent 是幂等的」是这一版之前写在这里的判断，他 2026-10-13 那排 409 日志
+ *  把它证伪了：正因为不幂等，重发一次就多一条红，所以才需要 `othersStillToSend` 那道实况闸。）
  */
 export function othersAlreadySent(
   state: IKeepUploadTaskAutoState,
@@ -338,6 +340,37 @@ export function othersStillPending<T extends { hash?: string; title?: string }>(
 ): T[] {
   const sent = othersAlreadySent(state, items);
   return items.filter((item) => sent[reseedItemKey(item)] === undefined);
+}
+
+/**
+ * 这一轮**真的还要发**的那几条：台账说没记上，**且**这一轮在下载器里也查不到。
+ *
+ * 为什么不能只看台账（他 2026-10-13 报的那一幕）：台账记的是「我们成功发出去过」，而一次失败的
+ * add 不留任何记录。那几条种子早就在下载器里做种（界面上「辅种完成 11/11」），台账却因为最初
+ * 那次 add 回了错永远缺那两笔 —— 对已在列表里的种子再 add，qBittorrent 回的是 409 失败，
+ * 不是幂等地返回已有那条（`othersAlreadySent` 上面那段注释原先写的是幂等，那是错的）。于是：
+ * 回站点取 .torrent → 推给下载器 → 409 → 算失败、台账照旧不记 → 下一分钟重来。
+ * 白打他的站点流量与配额，日志刷成一排红。
+ *
+ * 手动那三颗键 v0.99.2 已经有同一条闸（`nothingLeftToReseed` / `baseAlreadySent`，理由就写在
+ * `seedVerify.ts` 那段注释里），漏的是自动这一条。
+ *
+ * `statuses[i]` 是 `undefined` 有两种，都得照旧按台账发：这条没记 infoHash（压根没法查）、
+ * 下载器连不上（那种情况 `sendOthers` 本身已被 `reachable` 挡住，轮不到这里判）。
+ * 只有「查了、列表里确实没有」（`notFound`）才算还需要发。
+ */
+export function othersStillToSend<T extends { hash?: string; title?: string }>(params: {
+  state: IKeepUploadTaskAutoState;
+  items: readonly T[];
+  /** 与 `items` 同下标的这一轮结论（后台 `probe` 出来的那一份） */
+  statuses: readonly (IReseedItemStatus | undefined)[];
+}): T[] {
+  const sent = othersAlreadySent(params.state, params.items);
+  return params.items.filter((item, i) => {
+    if (sent[reseedItemKey(item)] !== undefined) return false;
+    const status = params.statuses[i];
+    return !status || status.verdict === "notFound";
+  });
 }
 
 /**

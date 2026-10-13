@@ -386,7 +386,22 @@ async function refreshPendingBaseMoves() {
 }
 
 onMounted(() => {
-  loadTasks();
+  void loadTasks().then(() => {
+    /**
+     * 进这一页就自动回查一次（用户 2026-10-13：「进入辅种任务界面的时候自动刷新一次」）。
+     *
+     * 为什么不是「读一次存储」就够：`loadTasks` 拿回来的是**上一轮回查落库的结论**，
+     * 那一列于是写着「未回查 / 下载器中未找到」，而种子其实早就在做种了 —— 这一页不点那颗
+     * 「回查做种状态」就永远显示旧账。这与「定时轮询的那条不许翻 loading、用户主动点的那类
+     * 不算」（AGENTS §3.4）是同一个取向：状态该贴着动作当场兑现，不该等人再点一下。
+     *
+     * 空列表不跑：`recheckSeeding` 没东西可查时那句是「没有可回查的任务」的警告，
+     * 打开一张空页面被警告一句是凭空多出来的噪音。
+     * `quiet` 压掉的只有「一切正常」那句总结 —— 这一趟不是用户点的，成功不必汇报，
+     * 但判坏的、连不上的、认不出 hash 的那几条照原样说。
+     */
+    if (tasks.value.length > 0) void recheckSeeding(undefined, { quiet: true });
+  });
   autoRefreshTimer = window.setInterval(refreshTasksFromStorage, AUTO_REFRESH_MS);
   /**
    * 后台每弹出一批进展，就顺手把这张表拉一次 —— 不等那个 60 秒的轮询。
@@ -760,8 +775,11 @@ function reseedStatusSource(task: IKeepUploadTask): Record<string, IReseedItemSt
  * 光报一句「重新建一次就有了」是把活儿推回给人 —— 下载器列表里往往就有那一条，按标题（其次按大小）
  * 能唯一对上的就把 hash 写回任务、照常对账。**对不出唯一的那条不动**：猜错等于把 A 站的状态记到
  * B 站种子头上，那比查不到更糟。
+ *
+ * `quiet` 只给进入这一页时那一趟自动回查用： suppress 的是「一切正常」那句总结，坏消息一条都不压
+ * （判据见下面 `onMounted` 那条注释）。
  */
-async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
+async function recheckSeeding(only?: TKeepUploadTaskKey[], { quiet = false } = {}) {
   const list = tasks.value.filter((task) => !only || only.includes(task.id));
   if (list.length === 0) {
     runtimeStore.showSnakebar(t("KeepUploadTask.recheck.none"), { color: "warning" });
@@ -911,7 +929,7 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[]) {
     );
   } else if (unreachable > 0) {
     runtimeStore.showSnakebar(t("KeepUploadTask.recheck.unreachable", { count: unreachable }), { color: "warning" });
-  } else {
+  } else if (!quiet) {
     runtimeStore.showSnakebar(t("KeepUploadTask.recheck.summary", { total: checked, seeding }), { color: "success" });
   }
 

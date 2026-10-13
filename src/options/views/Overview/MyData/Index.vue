@@ -35,6 +35,7 @@ import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { buildSortOrderMap, toTableColumns } from "@/options/components/tableSorters.ts";
 import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
+import { RATIO_DANGER_CEIL, ratioTier } from "@/shared/ratioGuard.ts";
 
 import SiteName from "@/options/components/SiteName.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
@@ -204,6 +205,35 @@ const abnormalColumns = computed<TableColumnsType<IUserInfoItem>>(() => [
   { title: t("MyData.index.siteStatus"), key: "status" },
   { title: t("MyData.table.updateAt"), key: "updateAt" },
   { title: t("common.action"), key: "action", align: "center", width: 72 },
+]);
+
+/**
+ * 分享率低于 1 的站点再单独一张表（用户 2026-10-13）。它们要的不是「重新登录」而是「去补上传」，
+ * 混在几十行里靠手动排序翻，正好像现在这样只有一两个坏消息时反而最容易看漏。
+ *
+ * 判据不写第二份：用 `@/shared/ratioGuard.ts` 的 `ratioTier`，`danger` 那一档就是发送下载器时
+ * 拦人确认的同一档，两处各判一次迟早分叉。标题里那个阈值也直接取 `RATIO_DANGER_CEIL`，
+ * 常量改了文案跟着改。站点没报出数（`-1` / `NaN` / 空串）由它归成 `unknown`，本来就进不来；
+ * `+Infinity`（有上传没下载）是达标里最好的一档，同样不进。
+ *
+ * 与异常表同两条口径：走 tableData 不走 filteredTableData（他搜某个站时，别的站欠着分享率
+ * 这件事不该因此消失）；一条都没有时整块不渲染。
+ *
+ * 刻意**不**再按 status 筛一道：这一格显示的就是主表同一行显示的那个数，再筛一次会出现
+ * 「主表写着 0.23、这块却说没有」的自相矛盾。读取失败那条由上面那块点名，不重复报。
+ */
+const lowRatioTableData = computed(() =>
+  tableData.value
+    .filter((row) => ratioTier(row.ratio) === "danger")
+    .sort((a, b) => Number(a.ratio) - Number(b.ratio)),
+);
+
+const lowRatioColumns = computed<TableColumnsType<IUserInfoItem>>(() => [
+  { title: t("common.site"), key: "site" },
+  { title: t("common.username"), key: "name" },
+  { title: t("levelRequirement.ratio"), key: "ratio", align: "end" },
+  { title: t("MyData.table.levelName"), key: "levelName" },
+  { title: t("MyData.table.updateAt"), key: "updateAt" },
 ]);
 
 const tableNonBooleanControlKey = [
@@ -615,7 +645,7 @@ const showLevelProgressDialog = ref(false);
          flex 规则是给「主表」准备的，异常表若也当直接子节点，会被同一条 flex:1 0 auto 拉去
          跟主表抢高度；包一层之后它按 `.page-panel > :not(.ant-table-wrapper)` 拿 flex-shrink:0。 -->
     <div v-if="abnormalTableData.length > 0" class="abnormal-block">
-      <a-flex align="center" gap="small" class="abnormal-title">
+      <a-flex align="center" gap="small" class="block-title">
         <ExclamationCircleOutlined class="cell-icon cell-icon--red" />
         <span>{{ t("MyData.index.abnormalSites", { n: abnormalTableData.length }) }}</span>
       </a-flex>
@@ -661,6 +691,53 @@ const showLevelProgressDialog = ref(false);
                 <template #icon><SyncOutlined /></template>
               </a-button>
             </a-tooltip>
+          </template>
+        </template>
+      </a-table>
+    </div>
+
+    <!-- 分享率低于 1 的站点单独一张表（用户 2026-10-13）：判据与阈值都取自 ratioGuard，
+         理由写在上面的 lowRatioTableData 那段注释里。外层那层 div 同异常块 —— 不能让这张表
+         当 .page-panel 的直接子节点，否则它会跟主表抢那条 flex: 1 0 auto。 -->
+    <div v-if="lowRatioTableData.length > 0" class="low-ratio-block">
+      <a-flex align="center" gap="small" class="block-title">
+        <AlertOutlined class="cell-icon cell-icon--yellow" />
+        <span>
+          {{ t("MyData.index.lowRatioSites", { n: lowRatioTableData.length, ceil: RATIO_DANGER_CEIL }) }}
+        </span>
+      </a-flex>
+      <a-table
+        bordered
+        size="small"
+        :columns="lowRatioColumns"
+        :data-source="lowRatioTableData"
+        :row-key="(r: any) => r.site"
+        :pagination="false"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'site'">
+            <a-flex align="center" gap="small">
+              <SiteFavicon :site-id="record.site" :size="18" />
+              <SiteName :site-id="record.site" />
+            </a-flex>
+          </template>
+
+          <template v-else-if="column.key === 'name'">
+            <span :title="record.id as string" class="text-no-wrap">
+              {{ configStore.myDataTableControl.showUserName ? (record.name ?? "-") : "******" }}
+            </span>
+          </template>
+
+          <template v-else-if="column.key === 'ratio'">
+            <span class="text-no-wrap">{{ formatRatio(record) }}</span>
+          </template>
+
+          <template v-else-if="column.key === 'levelName'">
+            <span class="text-no-wrap">{{ record.levelName ?? "-" }}</span>
+          </template>
+
+          <template v-else-if="column.key === 'updateAt'">
+            <span class="text-no-wrap">{{ record.updateAt ? formatDate(record.updateAt) : "-" }}</span>
           </template>
         </template>
       </a-table>
@@ -993,12 +1070,14 @@ const showLevelProgressDialog = ref(false);
   overflow-y: auto;
 }
 
-/* 异常表与主表之间留一道缝（全站口径 8px 的放大档：这里隔着的是两张表的表头，不是两个控件） */
-.abnormal-block {
+/* 主表上面那两块小表（异常 / 低分享率）各自与下面的内容留一道缝
+   （全站口径 8px 的放大档：这里隔着的是两张表的表头，不是两个控件） */
+.abnormal-block,
+.low-ratio-block {
   margin-bottom: 16px;
 }
 
-.abnormal-title {
+.block-title {
   margin-bottom: 6px;
   font-size: 13px;
   color: var(--pt-color-text-secondary);

@@ -492,6 +492,7 @@
         "aliveWeek": "相对周数"
       },
       "levelProgress": "升级进度",
+      "lowRatioSites": "分享率低于 {ceil} 的站点（{n}）",
       "multiOpen": "批量打开",
       "noSiteSelectedCancelRefresh": "未选择任何站点，取消刷新",
       "noSiteSelectedRefreshAll": "未选择任何站点，默认刷新全部站点",

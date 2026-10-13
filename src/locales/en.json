@@ -492,6 +492,7 @@
         "aliveWeek": "Relative Weeks"
       },
       "levelProgress": "Upgrade Progress",
+      "lowRatioSites": "Sites with a ratio below {ceil} ({n})",
       "multiOpen": "Open in batch",
       "noSiteSelectedCancelRefresh": "No site selected, refresh cancelled",
       "noSiteSelectedRefreshAll": "No site selected, refreshing all sites by default",

@@ -289,6 +289,29 @@ export function reseedStage(input: {
   return info("reseeding");
 }
 
+/**
+ * 档位读出来的两件事，给「操作」那三颗手动发送键用（他 2026-10-13：「辅种都完成了还可以发送种子？
+ * 基准下载中怎么还能发送基准？」）。判据**就是上面那一个 stage**，界面不再自己判一遍 ——
+ * 按钮和「做种状态」那一列必须同源，否则同一行会出现两个说法。
+ *
+ * 为什么必须拦：`sendTorrentsToDownloader` 里没有「下载器已经有这条就跳过」，点下去会逐条回站点
+ * 重新下载 .torrent 再 add，下载器回一句 Already in the download list，代价是他的站点流量与配额。
+ */
+
+/**
+ * 基准已经在那台下载器里（正在下 / 已下完 / 连它一起都在做种）—— 那颗「发送基准」按住。
+ * `wrong` 刻意不算进来：那一档只说「有某条状态不对」，可能在基准上也可能在别的条目上，
+ * 判不出基准在不在；判不出就放行，不替他猜。
+ */
+export function baseAlreadySent(stage: TReseedStage): boolean {
+  return stage === "baseDownloading" || stage === "baseReady" || stage === "reseeding" || stage === "done";
+}
+
+/** 除基准外每一条都已在做种（或压根没有别的条目）—— 那两颗「发送其他 / 全部发送」按住。 */
+export function nothingLeftToReseed(stage: TReseedStage): boolean {
+  return stage === "done";
+}
+
 /** 任务级汇总：界面那一列只显示这一个数 */
 export interface IReseedTaskSummary {
   total: number;

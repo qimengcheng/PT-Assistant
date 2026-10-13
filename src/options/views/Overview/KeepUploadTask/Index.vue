@@ -35,8 +35,10 @@ import {
 import { watchReseedNotice } from "@/shared/reseedPresence.ts";
 import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
 import {
+  baseAlreadySent,
   judgeReseedTorrent,
   linkItemToTorrent,
+  nothingLeftToReseed,
   reseedStage,
   shouldPauseReseed,
   summarizeReseed,
@@ -1028,6 +1030,13 @@ function taskStage(task: IKeepUploadTask) {
 
 const stageColorOf = (task: IKeepUploadTask) => RESEED_STAGE_COLOR[taskStage(task).stage];
 
+/**
+ * 「操作」那三颗手动发送键的闸，吃的就是「做种状态」那一列同一个 `taskStage` ——
+ * 判据本体在 `seedVerify.ts`（那份能直接跑断言），这里只把任务摊成档位。
+ */
+const taskBaseAlreadySent = (task: IKeepUploadTask) => baseAlreadySent(taskStage(task).stage);
+const taskNothingLeftToReseed = (task: IKeepUploadTask) => nothingLeftToReseed(taskStage(task).stage);
+
 /** 阶段那一行的文字：只有百分比和 x/y 计数接在标签后面（标签本身不带参数，切语言才重算得动） */
 function stageText(task: IKeepUploadTask): string {
   const info = taskStage(task);
@@ -1436,13 +1445,21 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                  所以这两颗没有对象 —— 他 2026-10-09 要求的是**按住不给点**而不是藏起来（「这个按钮就应该是不可用的」），
                  藏起来会让人以为这一版没做这个功能，按住了 + 悬停说原因才是「这里确实不需要」。 -->
             <a-tooltip
-              :title="record.task.baseLocal ? t('KeepUploadTask.sendBaseDisabled') : t('KeepUploadTask.sendBaseTorrent')"
+              :title="
+                record.task.baseLocal
+                  ? t('KeepUploadTask.sendBaseDisabled')
+                  : taskBaseAlreadySent(record.task)
+                    ? t('KeepUploadTask.sendBaseAlready')
+                    : t('KeepUploadTask.sendBaseTorrent')
+              "
             >
               <a-button
                 size="small"
                 type="text"
                 :loading="sendingOf(record.task.id) === 'base'"
-                :disabled="!!record.task.baseLocal || !!sendingOf(record.task.id)"
+                :disabled="
+                  !!record.task.baseLocal || !!sendingOf(record.task.id) || taskBaseAlreadySent(record.task)
+                "
                 @click="sendBaseTorrent(record.task)"
               >
                 <template #icon>
@@ -1452,14 +1469,20 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
             </a-tooltip>
             <a-tooltip
               :title="
-                record.task.baseLocal ? t('KeepUploadTask.sendOtherDisabled') : t('KeepUploadTask.sendOtherTorrents')
+                record.task.baseLocal
+                  ? t('KeepUploadTask.sendOtherDisabled')
+                  : taskNothingLeftToReseed(record.task)
+                    ? t('KeepUploadTask.sendAllDone')
+                    : t('KeepUploadTask.sendOtherTorrents')
               "
             >
               <a-button
                 size="small"
                 type="text"
                 :loading="sendingOf(record.task.id) === 'other'"
-                :disabled="!!record.task.baseLocal || !!sendingOf(record.task.id)"
+                :disabled="
+                  !!record.task.baseLocal || !!sendingOf(record.task.id) || taskNothingLeftToReseed(record.task)
+                "
                 @click="sendOtherTorrents(record.task)"
               >
                 <template #icon>
@@ -1468,13 +1491,19 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
               </a-button>
             </a-tooltip>
             <a-tooltip
-              :title="record.task.baseLocal ? t('KeepUploadTask.sendReseedOne') : t('KeepUploadTask.sendAllTorrents')"
+              :title="
+                record.task.baseLocal
+                  ? t('KeepUploadTask.sendReseedOne')
+                  : taskNothingLeftToReseed(record.task)
+                    ? t('KeepUploadTask.sendAllDone')
+                    : t('KeepUploadTask.sendAllTorrents')
+              "
             >
               <a-button
                 size="small"
                 type="text"
                 :loading="sendingOf(record.task.id) === 'all'"
-                :disabled="!!sendingOf(record.task.id)"
+                :disabled="!!sendingOf(record.task.id) || taskNothingLeftToReseed(record.task)"
                 @click="sendAllTorrents(record.task)"
               >
                 <template #icon>

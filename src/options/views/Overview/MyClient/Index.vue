@@ -9,11 +9,13 @@ import {
   ClockCircleOutlined,
   ColumnWidthOutlined,
   DeleteOutlined,
+  DownOutlined,
   FieldTimeOutlined,
   FileSearchOutlined,
   PauseOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
+  RightOutlined,
   SearchOutlined,
   StopOutlined,
   SwapOutlined,
@@ -37,11 +39,19 @@ import { formatSize, formatDate } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
-import { buildSortOrderMap, isPageSizePicked, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
+import { buildSortOrderMap, isPageSizePicked, makeSorter, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
+import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
 import PushToDownloaderDialog from "./PushToDownloaderDialog.vue";
+import {
+  assignGroups,
+  buildTaskGroups,
+  collapseGroups,
+  type IGroupMeta,
+  type IRowForGroup,
+} from "./reseedGroups.ts";
 import TorrentStateTd from "./TorrentStateTd.vue";
 import ClientStatusDialog from "./ClientStatusDialog.vue";
 import TorrentDetailDialog from "./TorrentDetailDialog.vue";
@@ -165,6 +175,112 @@ const filteredTorrents = computed(() => {
 });
 
 /**
+ * 辅种任务台账。折叠判据要它才能精确认出「这几条是同一批辅种发出去的」，
+ * 走的是辅种任务页同一条消息（同一份数据，不另开一条路）。取失败不影响这一页：
+ * 判据第二层（内容指纹）本来就独立于台账。
+ */
+const reseedTasks = ref<IKeepUploadTask[]>([]);
+
+async function loadReseedTasks() {
+  try {
+    reseedTasks.value = await sendMessage("getKeepUploadTasks", undefined);
+  } catch (e) {
+    console.error("[MyClient] 读取辅种任务台账失败，同内容折叠退回只按内容指纹判：", e);
+  }
+}
+
+/** 展开着哪些组。空集 = 全部折叠（用户 2026-10-13：默认折叠） */
+const expandedGroups = ref<Set<string>>(new Set());
+
+function toggleGroup(group: string) {
+  const next = new Set(expandedGroups.value);
+  if (next.has(group)) next.delete(group);
+  else next.add(group);
+  expandedGroups.value = next;
+}
+
+/**
+ * 排序由这一页自己做，不交给 a-table。
+ *
+ * 原因：分组要求同组的行**相邻**，而 a-table 是在拿到 dataSource 之后按列的 compare 再排一遍 ——
+ * 它一重排，代表行和它的组员就被分到两个位置，折叠就没了意义（展开时那一组会散在整页里）。
+ * 所以下面 tableHeader 里 sorter 给的是 `true` 而不是 compare（这确实是 AGENTS §3.4 记着的那条
+ * 「箭头动、数据不排」的形状，但这里是故意的：排已经在上游排完了），比较函数仍用公共那一份
+ * `makeSorter`，不抄第二套。
+ *
+ * 他没点任何一列时用「添加时间」当默认排序（用户 2026-10-13：「按添加的时间排序」）：
+ * 折叠态露出来的那一行就是这一组里**最早加进去**的那条，展开后组员从旧到新排下去。
+ * 各下载器原生返回的顺序不统一（qBittorrent 按 hash、Transmission 按 id），拿它当分组基准
+ * 会让同一组的位置每次刷新都漂。
+ */
+const byAddedAt = makeSorter<CTorrent>("dateAdded");
+const sortedTorrents = computed<CTorrent[]>(() => {
+  const sortBy = configStore.tableBehavior["MyClient"]?.sortBy ?? [];
+  if (sortBy.length === 0) return [...filteredTorrents.value].sort(byAddedAt);
+  const sorters = sortBy.map((s) => ({ compare: makeSorter<CTorrent>(s.key), desc: s.order === "desc" }));
+  return [...filteredTorrents.value].sort((a, b) => {
+    for (const s of sorters) {
+      const r = s.compare(a, b);
+      if (r !== 0) return s.desc ? -r : r;
+    }
+    return 0;
+  });
+});
+
+/** collapseGroups 要的行形状：CTorrent 上没有 `key`，包一层而不是复制整条记录 */
+interface IGroupEntry extends IRowForGroup {
+  row: CTorrent;
+}
+
+/**
+ * 折叠后的那一列行，连同两组附属信息：
+ * `meta` 给名称那一格挂「N 条同内容」那颗标记，`members` 给勾选代表行时连着整组一起算。
+ */
+const grouped = computed(() => {
+  const taskByHash = buildTaskGroups(reseedTasks.value);
+  const entries: IGroupEntry[] = sortedTorrents.value.map((t) => ({
+    key: torrentKey(t),
+    clientId: t.clientId,
+    name: t.name,
+    totalSize: t.totalSize,
+    savePath: t.savePath,
+    infoHash: t.infoHash,
+    row: t,
+  }));
+  const groupMap = assignGroups(entries, taskByHash);
+  const result = collapseGroups<IGroupEntry>(entries, (e) => groupMap.get(e.key) ?? null, expandedGroups.value);
+  return {
+    rows: result.rows.map((e) => e.row),
+    meta: result.meta,
+    members: result.members,
+  };
+});
+
+/**
+ * 名称那一格那颗折叠标记要的三个数。
+ *
+ * 只有**代表行**有值：折叠态下组员根本不在 `grouped.rows` 里，展开态下它们又都在，
+ * 所以标记挂组员身上会画出一排重复的「12 条同内容」—— 挂在代表行、点一下整组进出才对。
+ * 三次调用都是 Map 取值，一页最多三十来行，不做缓存。
+ */
+function groupAnchorMeta(record: CTorrent): IGroupMeta | undefined {
+  const meta = grouped.value.meta.get(torrentKey(record));
+  return meta?.anchor ? meta : undefined;
+}
+
+const isGroupExpanded = (record: CTorrent) => {
+  const meta = groupAnchorMeta(record);
+  return !!meta && expandedGroups.value.has(meta.group);
+};
+
+const groupCountOf = (record: CTorrent) => groupAnchorMeta(record)?.count ?? 0;
+
+function toggleGroupFor(record: CTorrent) {
+  const meta = groupAnchorMeta(record);
+  if (meta) toggleGroup(meta.group);
+}
+
+/**
  * 标签全部走字面 `t()`：防线③（check-locale-keys）看不见 `t("前缀" + x)` 这种拼出来的键，
  * 而这里七个状态名和表格里那颗 chip 共用同一批键 —— 写成动态的就等于把这七处交给肉眼核对。
  */
@@ -254,6 +370,11 @@ const fullTableHeader = computed(
  * 而 antd 只在列上带 sorter 时才渲染排序箭头 —— 结果是「客户端」页面完全无法排序，
  * handleTableChange 收到的 sorter 恒为空对象，configStore.tableBehavior.MyClient.sortBy
  * 是个死配置（表格可以排但排完记不下来）。
+ *
+ * ⚠️ 但 compare 现在**不能**交给 a-table 用：排序已经在上游 `sortedTorrents` 做完了
+ * （同组的行必须相邻，见那一段的注释），所以这里把 sorter 换成字面 `true` —— antd 只画箭头、
+ * 报 @change，不再自己重排。这正是 AGENTS §3.4 里「箭头动、数据不排」那条的形状，
+ * 区别是这一页的数据确实排过了，只是不由它排。别顺手把 compare 加回来，那会让折叠散架。
  */
 const tableHeader = computed<TableColumnsType<CTorrent>>(
   () =>
@@ -262,7 +383,7 @@ const tableHeader = computed<TableColumnsType<CTorrent>>(
         (item) => item?.props?.disabled || configStore.tableBehavior["MyClient"]?.columns?.includes(item.key),
       ),
       tableSortOrder.value,
-    ),
+    ).map((col) => ({ ...col, sorter: col.sorter === false ? false : true })),
 );
 
 /** 列显隐多选：v-model 走 configStore，setter 里调 updateTableBehavior 保持原「双写」语义 */
@@ -305,6 +426,9 @@ const toggleColumn = (key: string, on: boolean) => {
 // ── data loading ──────────────────────────────────────────────────────────
 /** Manual full refresh: fetch all active downloaders, skipping the circuit-broken ones. */
 async function loadTorrents() {
+  // 台账和种子列表一起取：折叠判据的第一层吃它，晚一步就是先画一排「没在台账里」的组、
+  // 下一次刷新又并到任务组去，同一份内容两组来回跳。
+  void loadReseedTasks();
   const targetIds = activeDownloaderIds.value.filter((id) => !suspendedDownloaders.value.has(id));
   if (targetIds.length === 0) {
     // 全被熔断时点刷新会"什么都没发生"，必须说清去哪恢复
@@ -343,6 +467,11 @@ onMounted(async () => {
     loadTorrents();
   } else if (configStore.download.initDownloaderTorrentOnEnter) {
     loadTorrents();
+  } else {
+    // 这两条分支都会经 loadTorrents 取台账，只有「进来不自动拉列表」这条路不会。
+    // 而种子列表是模块级 ref，从别的页切回来时行还在 —— 不补这一次读取就只剩内容指纹
+    // 那一层判据，跨站改过名的辅种组会折不上。
+    void loadReseedTasks();
   }
 });
 
@@ -447,14 +576,24 @@ function torrentKey(torrent: CTorrent) {
 }
 
 // ── table glue ────────────────────────────────────────────────────────────
-/** antd 无 v-model：受控选择，等价于 v-data-table 的 v-model + return-object */
+/** antd 无 v-model：受控选择，等价于 v-data-table 的 v-model + return-object；key 走 torrentKey */
 const rowSelection = computed<TableRowSelection<CTorrent>>(() => ({
   selectedRowKeys: tableSelected.value.map((t) => torrentKey(t)),
   onChange: (keys: (string | number)[]) => {
+    const before = new Set(tableSelected.value.map((t) => torrentKey(t)));
+    const next = new Set(keys.map(String));
+    // 勾代表行 = 勾整组。折叠时组员根本不在列表里，不连着算就没法一次处理一整组
+    // （批量暂停 / 删除本来就是按 tableSelected 走的）；取消代表行的勾选时整组一起退出。
+    // 只在「新选中 / 新取消」那一刻展开，否则 antd 每次回调都会把没勾的组员又捞回来。
+    for (const list of grouped.value.members.values()) {
+      const anchor = list[0];
+      if (!anchor) continue;
+      if (next.has(anchor) && !before.has(anchor)) list.forEach((k) => next.add(k));
+      else if (!next.has(anchor) && before.has(anchor)) list.forEach((k) => next.delete(k));
+    }
     // 用 Set 查找：原来在 filter 回调里 keys.map(String).includes(...)，
     // 每行都重新 map + 线性扫描，5000 行 × 100 选中 = 每次选择变化 50 万次字符串比较。
-    const keySet = new Set(keys.map(String));
-    tableSelected.value = filteredTorrents.value.filter((t) => keySet.has(torrentKey(t)));
+    tableSelected.value = filteredTorrents.value.filter((t) => next.has(torrentKey(t)));
   },
 }));
 
@@ -473,18 +612,20 @@ const pickedSize = computed(() => {
 });
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,
-  rows: () => filteredTorrents.value,
+  // 量的是**折叠后真正出现**的那些行：每页条数要按看得见的行数铺满，不是按台账条数
+  rows: () => grouped.value.rows,
 });
 
 // 分页统一走 toPagination：它兜底 Vuetify 遗留的 -1/0（原先这页直接把 -1 交给 antd，
 // 会让 slice(0,-1) 吃掉最后一行），并带上「一页放得下就不出分页条」（用户 2026-10-07）。
+// 总数用折叠后的行数 —— 折叠的意义就是「一屏放得下的条目变多了」，还按 523 条算会白切页。
 const tablePagination = computed(() =>
   toPagination(pageSize.value, 25, {
     size: "small",
-    totalRows: filteredTorrents.value.length,
+    totalRows: grouped.value.rows.length,
     fitSize: fitPageSize.value,
     picked: pickedSize.value,
-    extraConfig: { current: tablePage.value, total: filteredTorrents.value.length },
+    extraConfig: { current: tablePage.value, total: grouped.value.rows.length },
   }),
 );
 
@@ -651,7 +792,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
     <a-table
       bordered
       :columns="tableHeader"
-      :data-source="filteredTorrents"
+      :data-source="grouped.rows"
       :row-key="(record: CTorrent) => torrentKey(record)"
       :row-selection="rowSelection"
       :loading="loading"
@@ -674,13 +815,30 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           <div>
             <!-- 名称只给一行，剩下的交给 popover（用户 2026-10-13：长标题折行把行高撑得很高，不好看）。
                  这一页每页条数是 useAutoFitPageSize 按实测行高算的，标题多折一行就少一整条。
-                 全文揭示走 a-popover 而不是原生 title，规格与搜索页的 TorrentTitleTd.vue 同一条。 -->
-            <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
-              <template #content>
-                <div class="reveal-text">{{ record.name }}</div>
-              </template>
-              <div class="torrent-name font-weight-medium text-truncate">{{ record.name }}</div>
-            </a-popover>
+                 全文揭示走 a-popover 而不是原生 title，规格与搜索页的 TorrentTitleTd.vue 同一条。
+                 「N 条同内容」那颗和标题排在同一行：再单独占一行就等于把上面那条高度预算还回去。 -->
+            <div class="torrent-name-row">
+              <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+                <template #content>
+                  <div class="reveal-text">{{ record.name }}</div>
+                </template>
+                <div class="torrent-name font-weight-medium text-truncate">{{ record.name }}</div>
+              </a-popover>
+              <a-button
+                v-if="groupAnchorMeta(record)"
+                class="torrent-group-toggle"
+                size="small"
+                type="text"
+                @click="toggleGroupFor(record)"
+              >
+                <!-- 图标走 #icon 而不是默认插槽：默认插槽那一档会带一段宽度过渡，点一下就把列撑宽 -->
+                <template #icon>
+                  <DownOutlined v-if="isGroupExpanded(record)" />
+                  <RightOutlined v-else />
+                </template>
+                {{ t("MyClient.table.sameContent", { count: groupCountOf(record) }) }}
+              </a-button>
+            </div>
             <!-- 分类（qBittorrent 的 category / 各家的主标签）与全部标签一起摆出来：
                  原先只有 record.label 一个值，用户 2026-10-13 指着这行说「只显示了分类，
                  要把标签也显示出来」。判据在 columnText.ts 的 labelChips（去重 + 丢空）。 -->
@@ -934,6 +1092,31 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
  */
 .torrent-name {
   max-width: 420px;
+}
+
+/**
+ * 标题那一行：名称 + 那颗「N 条同内容」。
+ *
+ * 台架实测（.tmp-build/bench-group，真 a-table、容器 391）两条：
+ * ① 那颗 chip 实测 106px，直接并排会把表的 max-content 从 497 顶到 612 —— 折叠省下十几行，
+ *    却换来整张表加宽 115px，不划算。所以有 chip 的那一行把标题上限从 420 让到 306
+ *    （306 + 8 缝 + 106 = 420，正好是原来那一列的宽度），实测表宽回到 498、标题照旧截断。
+ *    `:has()` 万一不支持就是这条规则整体失效，退化成加宽 115px，不会把内容截没了。
+ * ② 不需要补 `min-width: 0`：`.text-truncate` 自带 `overflow: hidden`，而 flex 子项的自动最小
+ *    尺寸只在 overflow 可见时才生效 —— 台架把那条规则拿掉做对照组，量到与线上写法一字不差。
+ */
+.torrent-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.torrent-name-row:has(.torrent-group-toggle) .torrent-name {
+  max-width: 306px;
+}
+
+.torrent-group-toggle {
+  flex: 0 0 auto;
 }
 
 /* popover 里的全文：与搜索页 TorrentTitleTd.vue 同一条规格（480 上限 + 换行铺开 +

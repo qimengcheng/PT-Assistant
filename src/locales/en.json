@@ -373,6 +373,7 @@
       "progress": "Progress",
       "ratio": "Ratio",
       "savePath": "Save Path",
+      "sameContent": "{count} identical copies",
       "seeds": "Seeds",
       "size": "Size",
       "status": "Status",

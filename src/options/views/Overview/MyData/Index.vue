@@ -682,15 +682,15 @@ const showLevelProgressDialog = ref(false);
       <!-- 站点信息 -->
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'siteUserConfig.sortIndex'">
-          <a-badge
-            class="site-unread-badge"
-            :count="unreadBadge(record).count"
-            :dot="unreadBadge(record).dot"
-            color="#f44336"
-            :title="t('MyData.messages.badgeTip')"
-            @click="onBadgeClick($event, record)"
-          >
-            <div class="site-cell">
+          <div class="site-cell">
+            <a-badge
+              class="site-unread-badge"
+              :count="unreadBadge(record).count"
+              :dot="unreadBadge(record).dot"
+              color="#f44336"
+              :title="t('MyData.messages.badgeTip')"
+              @click="onBadgeClick($event, record)"
+            >
               <div class="favicon-hover-wrapper favicon-hover-bg">
                 <SiteFavicon
                   :site-id="record.site"
@@ -698,10 +698,10 @@ const showLevelProgressDialog = ref(false);
                   @click="() => flushSiteLastUserInfo([record.site])"
                 />
               </div>
+            </a-badge>
 
-              <SiteName v-if="configStore.myDataTableControl.showSiteName" :site-id="record.site" />
-            </div>
-          </a-badge>
+            <SiteName v-if="configStore.myDataTableControl.showSiteName" :site-id="record.site" />
+          </div>
         </template>
 
         <!-- 用户名，用户ID -->
@@ -1030,21 +1030,33 @@ const showLevelProgressDialog = ref(false);
 }
 
 /* 站点列：图标在左、站名在右（原来是上下两行，行高被堆成 63.8px）。
-   未读徽标因此改成包住「图标 + 站名」整块：antd 的数字挂在被包元素右边缘之外半个自身宽度
-   （台架实测一位数溢出 9.5px、两位数 13.4px），只包图标时横排后数字会压到站名第一个字
-   （gap 4 实测重叠 5.5px），要让开就得把图标到文字撑到 18px 以上。包整块之后数字落在
-   站名右上角，图标与文字就能留紧的 8px（含悬停圆底那 4px 内衬，实测墨迹间距 12px）。 */
+   缝 8px：含悬停圆底那 4px 内衬，实测墨迹间距 12px。 */
 .site-cell {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* 红数字/圆点是读站内信的入口，得看着能点（图标本体是刷新，另有 cursor） */
+/**
+ * 红数字/圆点是读站内信的入口，得看着能点（图标本体是刷新，另有 cursor）。
+ *
+ * 徽标只包图标那一块 —— 它标的是「这个站有几封未读」，锚点该是图标。原先包住「图标 + 站名」
+ * 整块，那颗就落在站名最后一个字母的角上（台架实测中心在图标右沿外 79.3px、离图标墨迹 0 重叠），
+ * 看着是浮在文字上方，而不是挂在站点上。
+ *
+ * inset-inline-end 从 0 收到 8px（正好等于图标到站名的那道缝）：antd 把指示物的中心放在被包
+ * 元素的右外角，最宽的那档（`messageCount === 10` 的两位数胶囊，实测宽 26.8px）不收就会越过
+ * 站名盒左沿 5.4px、压住第一个字；收 8px 之后一位数离站名 6.5px、两位数 2.6px、圆点 13.5px，
+ * 三档都不碰文字，代价是胶囊盖住图标墨迹右上角约 23%（两位数 30%）。
+ *
+ * 只挪 inset-inline-end、不改 transform：入场动画的 keyframes 写死了 translate(50%, -50%)，
+ * 改了 transform 会在动画结束时被 keyframes 顶回原位再跳一下。
+ */
 .site-unread-badge {
   :deep(.ant-badge-count),
   :deep(.ant-badge-dot) {
     cursor: pointer;
+    inset-inline-end: 8px;
   }
 }
 

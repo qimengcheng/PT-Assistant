@@ -1,8 +1,18 @@
 {
   "generatedAt": "2026-10-13 12:55:19",
-  "headSha": "265f4f4",
+  "headSha": "3c6f38e",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.95.1",
+      "date": "2026-10-13 13:19:17",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「我的数据」站点列那颗未读消息的红徽章改挂在站点图标的右上角：以前它落在站名最后一个字母的正上方，离图标隔着整整一个站名，认不出是标哪个站的。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.95.0",
       "date": "2026-10-13 12:55:19",

@@ -188,6 +188,15 @@ export interface CTorrent<RAW = any> {
   completedDate?: number;
   /** 当前 tracker 的地址或主机名 */
   tracker?: string;
+  /**
+   * 这条种子挂的**全部**标签。与上面那个 `label` 不是一回事：`label` 是各家那一个「主标签」
+   * （qBittorrent 存的是分类 category、Transmission 是 labels[0]、Flood 是 tags[0]），
+   * 而这里是完整的标签集，界面上「分类 + 标签」要一起摆出来才不丢信息。
+   * 报不出的留 undefined：Deluge 的字段表里没有 tags（要它得改请求字段，
+   * 而请求一个服务端不认的键会让整张 `get_torrent_status` 失败），ruTorrent 的元组里没有，
+   * uTorrent 只有一个 LABEL 字符串，Aria2 / 群晖 没有这个概念。
+   */
+  tags?: string[];
 
   raw: RAW;
   clientId: string;

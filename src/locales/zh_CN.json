@@ -365,7 +365,7 @@
       "completedAt": "完成时间",
       "dlSpeed": "下载速度",
       "eta": "剩余时间",
-      "label": "标签",
+      "label": "分类/标签",
       "name": "种子名称",
       "peers": "下载数",
       "progress": "进度",

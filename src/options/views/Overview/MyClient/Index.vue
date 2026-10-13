@@ -58,7 +58,7 @@ import {
   toPercent,
   useClientRefresh,
 } from "./utils.ts";
-import { countText, etaText } from "./columnText.ts";
+import { countText, etaText, labelChips } from "./columnText.ts";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -157,6 +157,9 @@ const filteredTorrents = computed(() => {
       t.name.toLowerCase().includes(q) ||
       t.infoHash.toLowerCase().includes(q) ||
       (t.label ?? "").toLowerCase().includes(q) ||
+      // 标签也在搜索范围内：占位文案里就写了「标签」，而 qBittorrent 的 label 是分类、
+      // 真正的标签住在 tags 里，只查 label 会让那颗按标签筛的入口落空
+      (t.tags ?? []).some((tag) => tag.toLowerCase().includes(q)) ||
       t.savePath.toLowerCase().includes(q),
   );
 });
@@ -670,8 +673,17 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
         <template v-else-if="column.key === 'name'">
           <div>
             <span class="font-weight-medium">{{ record.name }}</span>
-            <div v-if="record.label" class="text-body-small text-grey">
-              <TagsOutlined style="font-size: 10px" /> {{ record.label }}
+            <!-- 分类（qBittorrent 的 category / 各家的主标签）与全部标签一起摆出来：
+                 原先只有 record.label 一个值，用户 2026-10-13 指着这行说「只显示了分类，
+                 要把标签也显示出来」。判据在 columnText.ts 的 labelChips（去重 + 丢空）。 -->
+            <div
+              v-if="labelChips(record.label, record.tags).length"
+              class="torrent-labels text-body-small text-grey"
+            >
+              <TagsOutlined class="torrent-labels__icon" />
+              <span v-for="chip in labelChips(record.label, record.tags)" :key="chip" class="torrent-labels__chip">
+                {{ chip }}
+              </span>
             </div>
           </div>
         </template>
@@ -762,10 +774,16 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           <span class="text-no-wrap text-body-small">{{ etaText(record.eta, configStore.lang === "zh_CN") }}</span>
         </template>
 
-        <!-- 标签：与「设置标签」那格写回去的是同一个字段（qBittorrent 存成分类、
-             Transmission 存成 labels[0]、Flood 存成 tags[0]，各家语义不同但都是那一个值） -->
+        <!-- 分类 / 标签：与名称下面那一行同源（columnText.ts 的 labelChips）。
+             各家语义不同：qBittorrent 的 label 是分类、Transmission 是 labels[0]、
+             Flood 是 tags[0]，完整标签集在 tags 里，两边都要摆出来才不丢信息。 -->
         <template v-else-if="column.key === 'label'">
-          <span class="text-body-small text-no-wrap">{{ record.label || "-" }}</span>
+          <div v-if="labelChips(record.label, record.tags).length" class="torrent-labels text-body-small text-grey">
+            <span v-for="chip in labelChips(record.label, record.tags)" :key="chip" class="torrent-labels__chip">
+              {{ chip }}
+            </span>
+          </div>
+          <span v-else class="text-body-small text-grey">-</span>
         </template>
 
         <!-- Tracker -->
@@ -897,5 +915,32 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   width: 14px;
   height: 14px;
   margin-right: 4px;
+}
+
+/**
+ * 名称下面那行的「分类 + 标签」。
+ *
+ * 刻意不用 `a-tag`：antd 那颗默认 20px 高 + `margin-inline-end: 8px`，挂进这一格会把
+ * 行高从「一行小字」顶到 22px 以上，而这一页的行高是 `useAutoFitPageSize` 实测出来算每页
+ * 条数的 —— 一行标签就让整页条数掉一档。这里压到 16px，跟原来的小字行同高。
+ */
+.torrent-labels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.torrent-labels__icon {
+  font-size: 10px;
+}
+
+.torrent-labels__chip {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.045);
 }
 </style>

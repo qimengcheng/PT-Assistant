@@ -580,6 +580,8 @@ export default class Transmission extends AbstractBittorrentClient<TorrentClient
         completedDate: torrent.doneDate,
         // trackers 里第一个 announce 常常是空串（本地节点发现占的那格），所以取第一个非空的
         tracker: torrent.trackers?.find((item) => item.announce)?.announce,
+        // 完整标签集：上面那个 label 只是 labels[0]，界面上要的是全部
+        tags: torrent.labels,
         raw: torrent,
         clientId: this.config.id,
       } as CTorrent<rawTorrent>;

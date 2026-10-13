@@ -316,6 +316,8 @@ export default class Flood extends AbstractBittorrentClient {
         eta: rawTorrent.eta,
         // Flood 给的是 URI 数组，取第一个非空的当「当前 tracker」
         tracker: rawTorrent.trackerURIs?.find((uri) => !!uri),
+        // 完整标签集：上面那个 label 只是 tags[0]，界面上要的是全部
+        tags: rawTorrent.tags,
         raw: rawTorrent,
         clientId: this.config.id,
       } as CTorrent<TorrentProperties>;

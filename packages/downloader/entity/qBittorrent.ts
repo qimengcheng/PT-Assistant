@@ -181,6 +181,21 @@ interface rawTorrent {
   time_active: number;
 
   category: string; // Category name
+  /** 标签：qBittorrent 的 /torrents/info 把它们拼成一个逗号分隔的字符串给出来 */
+  tags?: string;
+}
+
+/**
+ * 把 qBittorrent 那个逗号拼接的 `tags` 字符串拆成数组。
+ * 标签名本身含逗号时会被拆成两条 —— 那是那个拼接格式的固有限制，这里没有可依据的转义规则。
+ */
+function splitTags(raw: string | undefined): string[] | undefined {
+  if (!raw) return undefined;
+  const list = raw
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return list.length ? list : undefined;
 }
 
 interface QbittorrentTorrent extends CTorrent<rawTorrent> {
@@ -669,6 +684,7 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
         eta: torrent.eta,
         completedDate: torrent.completion_on,
         tracker: torrent.tracker,
+        tags: splitTags(torrent.tags),
         raw: torrent,
         clientId: this.config.id,
       } as QbittorrentTorrent;

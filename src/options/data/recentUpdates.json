@@ -1,8 +1,21 @@
 {
-  "generatedAt": "2026-10-13 14:14:38",
-  "headSha": "5e8e8f8",
+  "generatedAt": "2026-10-13 15:03:27",
+  "headSha": "81dc865",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.99.0",
+      "date": "2026-10-13 15:34:52",
+      "added": [
+        "「我的下载器」里种子名称下面那一行不再只有分类：这颗种子挂的标签会跟着一起摆出来，一颗一个小方块。qBittorrent 报的是「分类 + 标签」两样，Transmission 与 Flood 报的是全部标签，Deluge / ruTorrent / uTorrent / Aria2 / 群晖 没有独立的标签集，那一行就只有原来那一个值。",
+        "工具条右上角的搜索框现在也按标签名筛（占位文案里本来就写着「标签」，以前只搜得到分类）。"
+      ],
+      "addedTotal": 2,
+      "improved": [
+        "「自定义列」里那一列的名字从「标签」改成「分类/标签」—— 它显示的是两者，旧名字对 qBittorrent 用户是错的。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.98.0",
       "date": "2026-10-13 15:03:27",

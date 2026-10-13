@@ -270,12 +270,20 @@ jobs:
       # 因为写成 bodyPath 被静默忽略，Release 页面只剩 GitHub 自动生成的那行
       # Full Changelog）。相对路径以 workspace 为基准。
       #
-      # `targetCommitish` 必须显式钉成 `github.sha`：不写时它默认取 `GitHub.ref`，
-      # 对 push 事件那就是分支名 `master`（实测三个 Release 的 `target_commitish` 全是
-      # `master`），而 GitHub 是**在建 tag 那一刻**才去解析分支尖。仓库按 §2.4 是
-      # 「每个版本号单独 push」，但两个 job 的排队时间不同步：v0.99.4 的 release job 还没跑到
-      # 建 tag，v0.99.5 已经推上去了 —— 于是 `v0.99.4` 和 `v0.99.5` 两个 tag 指向同一个提交
-      # （`626778d`）。写死 sha 之后分支尖不再参与，分步 push 不再互相抢。
+      # `commit` 必须显式钉成 `github.sha`：不写时 action 走 `GitHub.ref`，对 push 事件那就是
+      # 分支名 `master`（实测三个 Release 的 `target_commitish` 全是 `master`），而 GitHub 是
+      # **在建 tag 那一刻**才去解析分支尖。本仓库按 §2.4 是「每个版本号单独 push」，两个版本的
+      # release job 排队时间不同步：v0.99.4 那条 job 还没跑到建 tag，v0.99.5 已经推上去了 ——
+      # 于是 `v0.99.4` 和 `v0.99.5` 两个 tag 指向同一个提交（`626778d`）。钉成 sha 之后分支尖
+      # 不再参与，分步 push 不再互相抢。
+      #
+      # ⚠️ 键名是 `commit`，**不是** `targetCommitish`（v0.100.2 那次就写成后者，被静默忽略：
+      # CI 全绿、tag 也照样指对（那次场上只有一个 push，本来就撞不上），但 Release 的
+      # `target_commitish` 仍然是 `master` —— 那就是没生效的证据）。依据：action 自己的
+      # `action.yml` 的 inputs 里没有 `targetCommitish`，只有 `commit`；`src/Releases.ts` 里
+      # 是 `target_commitish: commitHash`，而 `commitHash` 来自 `Inputs.commit`。
+      # 未知输入只会打一行 warning，不会让 job 失败，所以这条只能靠回读 Release 的
+      # `target_commitish` 来验，不能靠「CI 绿了」。
       #
       # version 改从 verify job 取（它只需要 checkout + node，早期阶段 build 被跳过时
       # 仍然有值）；artifacts 在早期阶段没有产物，必须留空 —— 写死文件名会让
@@ -285,7 +293,7 @@ jobs:
         with:
           name: v${{ needs.verify.outputs.version }}
           tag: v${{ needs.verify.outputs.version }}
-          targetCommitish: ${{ github.sha }}
+          commit: ${{ github.sha }}
           skipIfReleaseExists: true
           bodyFile: release-notes.md
           generateReleaseNotes: true

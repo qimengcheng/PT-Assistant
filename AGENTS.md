@@ -414,6 +414,12 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
   **版本号那条线不在这里了**（在 verify，且 verify 红时 build 因 `needs` + `success()` 根本不会跑）。
 - `release`：`ncipollo/release-action` 按 `package.json` 的 version 打 `v<version>` tag 并挂上
   三个产物，随后是 Publish to Chrome Web Store / Publish to Firefox Add-ons 两步。
+  **`with.commit` 必须钉成 `${{ github.sha }}`**：不钉时 tag 的目标是分支名 `master`，
+  而 GitHub 在建 tag 那一刻才解析分支尖 —— 下面「一次 push 只会被打一个 tag」那条纪律在
+  **连续两次 push** 时就会被抢（实测：`v0.99.4` 与 `v0.99.5` 两个 tag 一度都指向 `626778d`）。
+  键名只有 `commit`，**没有** `targetCommitish`（写错不报错也不失败，只打一行 warning，
+  Release 的 `target_commitish` 照旧是 `master` —— v0.100.2 就这么假修过一次）。所以这条
+  改完要回读 Release 的 `target_commitish` 来验，不能拿「CI 绿」当证据。
 
 **本地只跑 Chrome 构建即可**，不要为了 Firefox 产物在本地重复构建。
 

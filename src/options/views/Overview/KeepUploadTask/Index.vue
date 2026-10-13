@@ -442,6 +442,8 @@ async function refreshTasksFromStorage() {
  * 判据本身仍只有后台那一份 tick（同「辅种检测」建任务那条路），这里只是把它的**触发时刻**提前。
  *
  * 等回包是必要的：那条消息现在跑完才回，所以这一刻存储里已是新值，拉回来的不是上一轮的状态。
+ * 但**等的是这一条自己的 promise，不是「回查做种状态」那颗按钮的 loading** —— 一轮要多久取决于
+ * 这一批发几条种子，不该把它算进用户那一下点击的等待里，见 `recheckSeeding` 末尾那段。
  */
 async function advanceAutoReseed() {
   try {
@@ -898,11 +900,25 @@ async function recheckSeeding(only?: TKeepUploadTaskKey[], { quiet = false } = {
     for (const task of touched) {
       await sendMessage("updateKeepUploadTask", task);
     }
-    // 查完当场把「该做的」做掉（发基准 / 发还没发出去的那几条），不等下一分钟
-    await advanceAutoReseed();
   } finally {
+    /**
+     * 「查」到这里就结束了，那颗圈到这里就该撒手。
+     *
+     * 原先它一路押着下面那一轮后台推进（v0.90.2 起 `runAutoReseedTick` 改成等真跑完才回包），
+     * 于是用户 2026-10-13 报的「回查做种状态的按钮怎么一直转圈圈，以前手动点用不了这么久」：
+     * 一轮 tick 的长短**取决于这一批要发几条** —— 每条都要回站点取 .torrent 再交给下载器，
+     * 八条就是十几二十秒；它还可能撞上后台自己那几趟快查（6/15/30/60 秒）正在跑，那种情况下
+     * `runAutoReseedTick` 的串行锁要等**两轮**才回包。押着 loading 还有个连带后果：antd 在
+     * loading 期间直接吃掉点击（`button/Button.js` 的 `handleClick`：`if (innerLoading) { preventDefault(); return }`），
+     * 第二下点下去连反应都没有。v0.94.1 把这趟搬到进页面就自动跑之后，圈还是他**没点**也转。
+     */
     rechecking.value = false;
   }
+
+  // 查完当场把「该做的」做掉（发基准 / 发还没发出去的那几条），不等下一分钟。
+  // 这一轮跑完由 `advanceAutoReseed` 自己重读一次存储，界面该翻的照样翻 —— v0.90.2 那句
+  // 「点了回查，什么都没发生」不会因为这行挪到 loading 之外回来。
+  await advanceAutoReseed();
 
   if (linked > 0) {
     runtimeStore.showSnakebar(t("KeepUploadTask.recheck.linked", { count: linked }), { color: "info" });

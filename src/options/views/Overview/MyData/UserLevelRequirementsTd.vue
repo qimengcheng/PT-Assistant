@@ -172,7 +172,12 @@ const visibleLevelRequirements = computed(() => {
             "
             class="level-requirement-row level-requirement-row--next"
           >
-            <UserNextLevelUnMet :next-level-un-met="nextLevelUnMet" :user-info="userInfo" icon-class="mr-1" />
+            <UserNextLevelUnMet
+              :next-level-un-met="nextLevelUnMet"
+              :user-info="userInfo"
+              :show-level-score-conversion="true"
+              icon-class="mr-1"
+            />
           </div>
 
           <div v-if="showAllLevels" class="text-body-small text-medium-emphasis">

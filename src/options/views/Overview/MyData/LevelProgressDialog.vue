@@ -279,6 +279,7 @@ function rankText(row: ILevelProgressRow): string {
                 :next-level-un-met="row.unmet"
                 :user-info="row.userInfo"
                 :show-next-level-name="false"
+                :show-level-score-conversion="true"
                 icon-class="mr-1"
               />
             </span>

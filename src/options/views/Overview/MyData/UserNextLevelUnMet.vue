@@ -9,11 +9,14 @@ const {
   userInfo,
   showNextLevelName = true,
   iconClass = "mr-3",
+  showLevelScoreConversion = false,
 } = defineProps<{
   nextLevelUnMet: Partial<IImplicitUserInfo & { level?: ILevelRequirement }>;
   userInfo: IUserInfo;
   showNextLevelName?: boolean;
   iconClass?: string;
+  /** 把海胆那类站的「等级积分还差 N」摊成四种等价物（这一行本来就是「还差多少」，默认可开） */
+  showLevelScoreConversion?: boolean;
 }>();
 </script>
 
@@ -23,7 +26,12 @@ const {
 
   <span v-if="showNextLevelName && nextLevelUnMet.level">{{ nextLevelUnMet.level.name }}:&nbsp;</span>
 
-  <UserLevelsComponent :user-info="userInfo" :level-requirement="nextLevelUnMet" :hide-ratio-in-table="true" />
+  <UserLevelsComponent
+    :user-info="userInfo"
+    :level-requirement="nextLevelUnMet"
+    :hide-ratio-in-table="true"
+    :show-level-score-conversion="showLevelScoreConversion"
+  />
 </template>
 
 <style scoped lang="scss">

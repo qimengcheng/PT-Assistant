@@ -113,6 +113,19 @@ describe("groupBottleneck / alternativeBottleneck：组内最短板", () => {
   it("所有方案都拿不出数字 → null", () => {
     expect(alternativeBottleneck([g(1, []), g(1, [f("x", Number.NaN, 1)])])).toBeNull();
   });
+  it("标成不可比的项不供完成度（海胆那一格是等级积分，99% 不等于「只差一点」）", () => {
+    expect(groupBottleneck(g(1, [{ key: "seedingBonus", current: 4965, required: 5000, comparable: false }]))).toBeNull();
+  });
+  it("一组里既有不可比项也有可算项时，完成度由可算项供", () => {
+    expect(
+      groupBottleneck(
+        g(2, [{ key: "seedingBonus", current: 4965, required: 5000, comparable: false }, f("uploaded", 100, 200)]),
+      ),
+    ).toBe(0.5);
+  });
+  it("comparable 缺省（undefined）照旧可比", () => {
+    expect(groupBottleneck(g(1, [{ key: "seedingBonus", current: 4965, required: 5000 }]))).toBeCloseTo(0.993, 3);
+  });
 });
 
 describe("rankLevelProgress：整行的差几项与最卡那档", () => {
@@ -161,6 +174,14 @@ describe("rankLevelProgress：整行的差几项与最卡那档", () => {
       bottleneck: null,
     });
   });
+  it("不可比项照计入「差几项」，只是不供完成度", () => {
+    expect(
+      rankLevelProgress({
+        state: "rankable",
+        primary: g(2, [{ key: "seedingBonus", current: 4965, required: 5000, comparable: false }, f("ratio", 6, 1)]),
+      }),
+    ).toEqual({ state: "rankable", unmetCount: 2, bottleneck: 1 });
+  });
 });
 
 describe("compareLevelProgress：先分档，档内差几项，再比完成度", () => {
@@ -202,6 +223,7 @@ it("整批混排：单条都对不等于整批排得对", () => {
     { n: "已达标", ...r("rankable", 0, null) },
     { n: "站点没给等级表", ...r("noRequirements", 0, null) },
     { n: "差 1 项·完成 90%", ...r("rankable", 1, 0.9) },
+    { n: "差 2 项·等级积分不可比", ...r("rankable", 2, null) },
     { n: "差 3 项·完成 99%", ...r("rankable", 3, 0.99) },
     { n: "贵宾", ...r("special", 0, null) },
     { n: "差 1 项·算不出", ...r("rankable", 1, null) },
@@ -210,12 +232,15 @@ it("整批混排：单条都对不等于整批排得对", () => {
   const order = [...rows]
     .sort((a, b) => compareLevelProgress(a, b) || a.n.localeCompare(b.n, "zh"))
     .map((x) => x.n);
-  // 差 3 项·99% 不该插到差 1 项·50% 前面 —— 「离升级最近」看的是差几项，不是百分比
+  // 差 3 项·99% 不该插到差 1 项·50% 前面 —— 「离升级最近」看的是差几项，不是百分比。
+  // 差 2 项·等级积分不可比落在所有「有完成度」的差 2 项位置之后、差 3 项之前：
+  // 那一格是复合分（还差 35 分 = 7000 点魔力值），拿它的 99% 去跟别的站的完成度比远近是假信号。
   expect(order).toEqual([
     "已达标",
     "差 1 项·完成 90%",
     "差 1 项·完成 50%",
     "差 1 项·算不出",
+    "差 2 项·等级积分不可比",
     "差 3 项·完成 99%",
     "已到底级",
     "贵宾",

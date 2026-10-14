@@ -9,11 +9,14 @@ const {
   levelRequirement,
   hideRatioInTable = false,
   useJoinTimeAsRef = false,
+  showLevelScoreConversion = false,
 } = defineProps<{
   userInfo: IUserInfo;
   levelRequirement: Omit<ILevelRequirement, "id" | "name">;
   hideRatioInTable?: boolean;
   useJoinTimeAsRef?: boolean;
+  /** 见 UserLevelShowSpan 上的同名 prop：只有「还差多少」那一行才该打开 */
+  showLevelScoreConversion?: boolean;
 }>();
 </script>
 
@@ -23,6 +26,7 @@ const {
     :level-requirement="levelRequirement"
     :hide-ratio-in-table="hideRatioInTable"
     :use-join-time-as-ref="useJoinTimeAsRef"
+    :show-level-score-conversion="showLevelScoreConversion"
   />
   <template v-if="levelRequirement.alternative">
     <TableOutlined class="level-icon" />
@@ -34,6 +38,7 @@ const {
         :level-requirement="alternative"
         :hide-ratio-in-table="hideRatioInTable"
         :use-join-time-as-ref="useJoinTimeAsRef"
+        :show-level-score-conversion="showLevelScoreConversion"
       />
       ]
     </template>

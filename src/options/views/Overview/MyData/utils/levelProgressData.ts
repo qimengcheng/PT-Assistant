@@ -29,6 +29,7 @@ import {
   type IUnmetGroup,
   type TLevelProgressState,
 } from "@/shared/levelProgress.ts";
+import { isCompositeLevelScore } from "@/shared/levelScoreSites.ts";
 
 /** `getNextLevelUnMet` 的返回里这几项是算出来的副产物，不是一种「要求」，不能计入差几项 */
 const DERIVED_KEYS = new Set(["level", "passTime", "bonusNeededInterval", "seedingBonusNeededInterval", "alternative"]);
@@ -173,7 +174,14 @@ function buildUnmetGroup(
     }
 
     if (required === null || current === null) continue;
-    fields.push({ key, current, required, direction: LT_KEYS.has(key) ? "lt" : "gt" });
+    fields.push({
+      key,
+      current,
+      required,
+      direction: LT_KEYS.has(key) ? "lt" : "gt",
+      // 这一站的 seedingBonus 存的是等级积分（四项加权和），完成度不能跟别的站的单一维度比
+      comparable: isCompositeLevelScore(userInfo.site, key) ? false : undefined,
+    });
   }
 
   return { count: keys.length, fields };

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   type IImplicitUserInfo,
@@ -10,6 +11,7 @@ import {
 import { formatNumber, formatSize, formatDate, simplifyNumber } from "@/options/utils";
 import { useConfigStore } from "@/options/stores/config";
 import { formatRatioText } from "@/shared/ratioGuard.ts";
+import { COMPOSITE_LEVEL_SCORES, convertLevelScoreGap, LEVEL_SCORE_CURRENCIES, type TLevelScoreCurrency } from "@/shared/levelScoreSites.ts";
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
@@ -36,11 +38,18 @@ const {
   levelRequirement,
   hideRatioInTable = false,
   useJoinTimeAsRef = false,
+  showLevelScoreConversion = false,
 } = defineProps<{
   userInfo: IUserInfo;
   levelRequirement: IImplicitUserInfo;
   hideRatioInTable?: boolean;
   useJoinTimeAsRef?: boolean; // 在 formatIntervalDate 中是否使用 joinTime 作为参考时间，默认参考为 currentTime
+  /**
+   * 这一格是「还差多少」而不是「现在有多少」时才可以打开：把海胆那类站的等级积分缺口
+   * 换算成上传/下载/魔力值/活种四种等价物（判据与系数见 `@/shared/levelScoreSites.ts`）。
+   * 「当前值」那张卡传 false —— 那里摆的是积分本身，换算一个已有的数是编造。
+   */
+  showLevelScoreConversion?: boolean;
 }>();
 
 const { t } = useI18n();
@@ -125,6 +134,36 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
       : "")
   );
 }
+
+/**
+ * 海胆那类站点把「等级积分」存进了 `seedingBonus`：那一格上的数字不是做种积分，
+ * 而是一串四项加权和的差额。光看「还差 38」用户无从判断代价，所以按站点自己公布的
+ * 公式把它摊成四种等价物（系数与来由见 `@/shared/levelScoreSites.ts`）。
+ */
+const LEVEL_SCORE_ICONS: Record<TLevelScoreCurrency, Component> = {
+  uploaded: ArrowUpOutlined,
+  downloaded: ArrowDownOutlined,
+  bonus: DollarOutlined,
+  seeding: BranchesOutlined,
+};
+
+const levelScoreEquivalents = computed<{ key: TLevelScoreCurrency; icon: Component; text: string }[]>(() => {
+  if (!showLevelScoreConversion || !COMPOSITE_LEVEL_SCORES[userInfo.site]) return [];
+  const gap = Number(levelRequirement.seedingBonus) || 0;
+  const out: { key: TLevelScoreCurrency; icon: Component; text: string }[] = [];
+  for (const currency of LEVEL_SCORE_CURRENCIES) {
+    const value = convertLevelScoreGap(userInfo.site, currency, gap);
+    if (value === null) continue;
+    const text =
+      currency === "uploaded" || currency === "downloaded"
+        ? // formatSize 解不开时原样退回入参（类型上是 string | number）
+          String(formatSize(value))
+        : // 魔力值与活种都是按个计的：半个种凑不出来所以向上取整，点数也不留两位小数
+          formatNumber(Math.ceil(value), { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    out.push({ key: currency, icon: LEVEL_SCORE_ICONS[currency], text });
+  }
+  return out;
+});
 </script>
 
 <template>
@@ -207,13 +246,28 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
   </template>
 
   <template v-if="levelRequirement.seedingBonus">
-    <ThunderboltOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.seedingBonus')" />
+    <ThunderboltOutlined
+      class="level-require-icon level-require-icon--green"
+      :title="t(COMPOSITE_LEVEL_SCORES[userInfo.site] ? 'levelRequirement.levelScore' : 'levelRequirement.seedingBonus')"
+    />
     <span
       :title="formatNumber(levelRequirement.seedingBonus)"
       style="cursor: pointer; user-select: none"
       @dblclick="toggleNumberSimplification"
     >
-      {{ formatBonus("seedingBonus") }} </span>;
+      {{ formatBonus("seedingBonus") }} </span>
+    <!-- 缺口换算只在「还差多少」那一行出（showLevelScoreConversion）。下面这四个键是动态拼出来的，
+         防线③ 看不见这种键，所以逐个对过：uploaded / downloaded / bonus / seeding 两侧 locale 都在。 -->
+    <span v-if="levelScoreEquivalents.length" class="level-score-convert">
+      （≈
+      <template v-for="(item, i) in levelScoreEquivalents" :key="item.key">
+        <span v-if="i > 0"> / </span>
+        <component :is="item.icon" class="level-require-icon" :title="t(`levelRequirement.${item.key}`)" />
+        {{ item.text }}
+      </template>
+      ）
+    </span>
+    ;
   </template>
 
   <template v-if="levelRequirement.bonusPerHour">
@@ -250,6 +304,15 @@ function formatBonus(bonusKey: "bonus" | "seedingBonus") {
 <style scoped lang="scss">
 .level-require-icon {
   font-size: 14px; /* 原 <v-icon size="small"> */
+}
+
+/*
+ * 换算那一串里图标与后随数字之间要留缝：Vue 编译模板时会把「元素 + 换行 + 文本」之间的空白
+ * 整个折叠掉（whitespace: condense），而行内图标自己不带缝 —— 全站那条
+ * `.d-flex > .cell-icon { margin-inline: 4px }` 只在 flex 容器里生效，这一串是行内流。
+ */
+.level-score-convert .level-require-icon {
+  margin-inline-end: 2px;
 }
 .level-require-icon--green {
   color: #388e3c; /* Vuetify green-darken-4 */

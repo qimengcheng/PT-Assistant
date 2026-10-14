@@ -69,6 +69,13 @@ export interface IProgressField {
    * 要求 0 条而当前 5 条时那个商是无穷大，越差反而排得越前。
    */
   direction?: "gt" | "lt";
+  /**
+   * 显式标成 `false` 的项**不参与比谁更近**（计数照算）。用于「完成度这个数没有意义」的字段 ——
+   * 海胆那一格存的是等级积分（四项加权和），4965/5000 = 99% 说的只是「还差 35 分」，
+   * 而那 35 分按站点公式是 7000 点魔力值，跟别的站「还差 18.25 GiB 下载量」不是一个量纲。
+   * 判据与系数在 `@/shared/levelScoreSites.ts`。
+   */
+  comparable?: boolean;
 }
 
 /** 一组要求：条数按站点判据数出来的原样（含拿不出数字的项），fields 只放能算完成度的那些 */
@@ -108,9 +115,12 @@ export function fieldFraction(field: IProgressField): number | null {
   return clamp01(current / required);
 }
 
-/** 一组要求的完成度 = 其中最卡那一项（要全部满足才算过） */
+/** 一组要求的完成度 = 其中最卡那一项（要全部满足才算过）；标成不可比的项不参与 */
 export function groupBottleneck(group: IUnmetGroup): number | null {
-  const fractions = group.fields.map(fieldFraction).filter((v): v is number => v !== null);
+  const fractions = group.fields
+    .filter((field) => field.comparable !== false)
+    .map(fieldFraction)
+    .filter((v): v is number => v !== null);
   if (fractions.length === 0) return null;
   return Math.min(...fractions);
 }

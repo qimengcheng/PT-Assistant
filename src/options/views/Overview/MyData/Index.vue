@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 // 注意：antdv-next 根入口把这几个类型做了别名再导出（ColumnType -> TableColumnType 等）
@@ -167,16 +167,21 @@ const tableColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
 );
 
 /**
- * 主表上方两块单列表（异常 / 低分享率）用的列：**就是主表那一份 tableHeader**，
- * 同一批列、同一顺序、同一标题与对齐（用户 2026-10-13：「单列出来的站点，表头的列要和下面的一样」）。
+ * 主表上方两块小表（异常 / 低分享率）用的列：**就是主表那一份 tableHeader**，同一批列、
+ * 同一顺序、同一标题与对齐（用户 2026-10-13：「单列出来的站点，表头的列要和下面的一样」）。
  * 原先两块各自手写 5 列，与主表的列名、顺序、宽度全不一样，同一个站在两块里像两张表的数据。
  *
- * 唯一去掉的是排序：这两块没有 @change 接，把带 sorter 的那份直接递过去会留下
- * 「箭头点了没反应」的死控件（AGENTS 记的那一族：sorter 无 compare / 无回调时数据不排）。
- * 低分享率那块自己按分享率升序排（最欠的排前面，见 lowRatioTableData），排序交给 JS，不让 antd 插手。
+ * 排序这一档与上一版的差别：这里不再把 `sortable` 抹成 false。台架实测（`.tmp-build/bench-align`）
+ * 箭头本身占掉一格标题的宽度，小表没有箭头就和主表差一截 —— 而 `toTableColumns` 给的是真正的
+ * compare 函数（不是 AGENTS 记的那种 `sorter: true` 空壳），不传 sortOrderMap 就是非受控，
+ * 点了本地真排（`HistoryDataViewDialog.vue` 一直是这个写法）。
+ *
+ * 宽度这一档走 `blockColumnWidths`：照抄主表实测的那一列一列，见下面那条注释。
  */
 const blockColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
-  toTableColumns<IUserInfoItem>(tableHeader.value.map((header) => ({ ...header, sortable: false }))),
+  toTableColumns<IUserInfoItem>(tableHeader.value).map((column, i) =>
+    blockColumnWidths.value[i] ? { ...column, width: blockColumnWidths.value[i] } : column,
+  ),
 );
 
 /**
@@ -333,6 +338,48 @@ const filteredTableData = computed<IUserInfoItem[]>(() => {
 // 挂载时 sites 还是水合前的空对象，取数空跑一遍，真正让数据出现的是水合触发 watcher、5 秒后
 // 重建整表 —— 实测「水合 → 首行」5403ms，其中 5000ms 是白等的 debounce。
 // 那是给一条 Vue 已经免费提供的边手动补的轮子。v0.22.9 用 $onReady 止血，本次连同轮子一起拆掉。
+
+/**
+ * 上面两块小表的列宽：照抄主表实测的那一档。
+ *
+ * 为什么不能各算各的：这张表没有 fixed 列、`scroll.x: 'max-content'` 让 rc-table 停在
+ * `table-layout: auto`，列宽跟着内容走 —— 同一列在小表里只有一行、在主表里有几十行，
+ * 两边量出来的宽度天然不一样。台架（`.tmp-build/bench-align`）三种改法的实测：
+ * 只给小表补上复选框列，边界最大还差 **21.1px**；再抄一份主表实测宽度才是逐列 **0.00**；
+ * 反过来给主表也钉死宽度能到 0，但会改掉它「长站名自己撑宽」的现有行为，代价更大。
+ *
+ * 抄是单向的（主表 → 小表），小表不参与主表的宽度计算，所以不会自指。
+ */
+const mainTableRef = useTemplateRef<{ $el?: HTMLElement }>("mainTable");
+const blockColumnWidths = ref<number[]>([]);
+
+function measureBlockColumnWidths() {
+  const ths = mainTableRef.value?.$el?.querySelectorAll("thead th");
+  if (!ths || ths.length === 0) return;
+  // 第一格是 row-selection 加出来的复选框列，不在 columns 数组里，抄的时候跳过它
+  const next = Array.from(ths).slice(1).map((th) => th.getBoundingClientRect().width);
+  // 数值没变就别换数组引用：小表会整表重渲染一次，而 ResizeObserver 可能连着报好几轮
+  if (next.length === blockColumnWidths.value.length && next.every((v, i) => v === blockColumnWidths.value[i])) return;
+  blockColumnWidths.value = next;
+}
+
+// 上面那段说的「不用挂 onMounted」是**取数**这件事；这里挂的是量宽，读的是 DOM，不碰 store。
+let blockWidthObserver: ResizeObserver | null = null;
+onMounted(() => {
+  nextTick(measureBlockColumnWidths);
+  blockWidthObserver = new ResizeObserver(() => measureBlockColumnWidths());
+  const el = mainTableRef.value?.$el;
+  if (el) blockWidthObserver.observe(el);
+});
+onBeforeUnmount(() => {
+  blockWidthObserver?.disconnect();
+  blockWidthObserver = null;
+});
+// 列显隐一改（列集合变了）、或换了一批数据（站名/数字变长会把列撑宽），都要重新抄一次
+watch(
+  () => `${tableHeader.value.map((header) => header.key).join(",")}|${filteredTableData.value.length}`,
+  () => nextTick(measureBlockColumnWidths),
+);
 
 const showHistoryDataViewDialog = ref<boolean>(false);
 const historyDataViewDialogSiteId = ref<TSiteID | null>(null);
@@ -604,8 +651,10 @@ const showLevelProgressDialog = ref(false);
         :columns="blockColumns"
         :data-source="abnormalTableData"
         :row-key="(r: any) => r.site"
+        :row-selection="tableRowSelection"
         :pagination="false"
         :scroll="{ x: 'max-content' }"
+        :table-layout="'fixed'"
         class="table-header-no-wrap"
       >
         <template #bodyCell="{ column, record }">
@@ -635,8 +684,10 @@ const showLevelProgressDialog = ref(false);
         :columns="blockColumns"
         :data-source="lowRatioTableData"
         :row-key="(r: any) => r.site"
+        :row-selection="tableRowSelection"
         :pagination="false"
         :scroll="{ x: 'max-content' }"
+        :table-layout="'fixed'"
         class="table-header-no-wrap"
       >
         <template #bodyCell="{ column, record }">
@@ -651,6 +702,7 @@ const showLevelProgressDialog = ref(false);
     </div>
 
     <a-table
+      ref="mainTable"
       bordered
       :columns="tableColumns"
       :data-source="filteredTableData"

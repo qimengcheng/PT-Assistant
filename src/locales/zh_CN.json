@@ -1492,6 +1492,7 @@
       "downloadLinkSuffixExample": "如插件获得的链接为 https://example.com/download.php?id=1，此处设置为 &passkey=xxxx， 则最终下载链接为 https://example.com/download.php?id=1&passkey=xxxx. 通常无须填写，仅在无法获得 passkey 时可手动添加",
       "downloadLinkSuffixHint": "该字段会被自动添加到该站点的下载链接后",
       "otherSettings": "其他设置",
+      "isOfflineHint": "离线后该站点不再参与搜索，也不再自动刷新用户信息；列表里那一行的「允许搜索」「获取个人信息」会同时按住。",
       "requestTimeout": "请求超时",
       "requestTimeoutHint": "影响该站点请求（种子搜索、用户信息获取）的超时等待时间",
       "categoryMap": "分类映射",

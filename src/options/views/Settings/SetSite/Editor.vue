@@ -378,6 +378,20 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
 
     <div class="section-title">{{ t("SetSite.Editor.otherSettings") }}</div>
 
+    <!-- 这颗开关原先只有列表里那一颗，而列表那颗在 v0.100.6 之前是一把单向锁（打开就再也关不掉）。
+         编辑器里再放一颗，是让「离不离线」在两个入口都改得动。
+         形状走 `SetDownloader/Editor.vue` 的 .switch-row（标签左、开关右）—— 不要写成
+         「一个开关一个竖排 a-form-item」，那一档实测要 82~95px 高，是用户点过名的浪费。
+         站点定义标死（isDead）时不必在这里再写一遍 :disabled —— 上面 <a-form :disabled> 会经
+         Switch 的 useDisabledContext() 进来（`props.disabled ?? disabled.value`）。 -->
+    <div class="switch-row">
+      <div class="switch-row-text">
+        <div class="switch-row-label">{{ t("SetSite.common.isOffline") }}</div>
+        <div class="switch-row-hint">{{ t("SetSite.Editor.isOfflineHint") }}</div>
+      </div>
+      <a-switch v-model:checked="siteUserConfig.isOffline" size="small" />
+    </div>
+
     <a-form-item>
       <template #label>
         <span>{{ t("SetSite.Editor.downloadLinkSuffix") }}</span>
@@ -465,6 +479,30 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
 .section-title {
   margin: 8px 0;
   font-weight: 600;
+}
+
+/* 标签左、开关右的一行（与 SetDownloader/Editor.vue 同一形状，别改回竖排 a-form-item） */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+}
+
+.switch-row-text {
+  min-width: 0;
+}
+
+.switch-row-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.switch-row-hint {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .full-width {

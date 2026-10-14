@@ -36,16 +36,19 @@ interface IStats {
 }
 
 /**
- * git 里的名字 → 厂商名与官方 logo 直链（每条都实测过 200，且吃 chrome-extension Referer 也不被拦）。
+ * git 里的名字 → 厂商名与 logo（远程直链都实测过 200，且吃 chrome-extension Referer 也不被拦）。
  *
  * 2026-10-07 本机逐条测过快慢（`.tmp-build/speedtest-logos.mjs`，直连、不走代理）：
  * 国内 CDN 一律 0.04~0.38s；`.ai` 那几条是 1.1~2.1s，慢在 TLS 往返，不是文件大。
  * 所以能换国内镜像的都换了（WorkBuddy / TraeCode，两条都和新地址逐字节相同）。
- * 剩下三家只有 `.ai` 域名（OpenCode 与 ZEN 用 opencode.ai、OpenRouter 用 openrouter.ai），
- * 官网没有别的 TLD，npmmirror 也不放 simple-icons（unpkg 白名单 403），换第三方镜像等于给
- * 别人的品牌图加一层依赖。**这台机器上那两个域名是 `ERR_CONNECTION_CLOSED`（不是慢，是连不上），
- * 每次进这一页控制台就红一条网络错误** —— 所以自 v0.103.1 起这三家不再发请求，`logo` 留空，
- * 直接走首字母徽章那一档（`logoOf` 见下面，空串就不挂 `<img>`）。
+ * 剩下三家只有 `.ai` 域名（OpenCode 与 ZEN 用同一张 opencode.ai 的图、OpenRouter 用
+ * openrouter.ai），官网没有别的 TLD，npmmirror 也不放 simple-icons（unpkg 白名单 403），
+ * 换第三方镜像等于给别人的品牌图加一层依赖；GitHub 那条路本机直连是超时/ECONNRESET。
+ * **v0.103.1 曾把这三家的 `logo` 留空**（理由是「这台机器上 `.ai` 连不通，每次进这一页控制台
+ * 就红一条」）—— 用户 2026-10-14 指出这三家的图标之前是出得来的，留空是把一张**能显示**的图
+ * 换成永久首字母徽章。最终处置也是他同日定的：这两张图**随包**（`public/icons/brand/`，
+ * 逐字节取自官网，合计 18 KB），进这一页不再发任何网络请求 —— 慢源的不确定性就此消掉，
+ * 而「控制台红一条」也不再可能出现。其余各家仍走直链，图挂了由 `@error` 退回徽章。
  */
 const BRANDS: Record<string, { vendor?: string; logo: string }> = {
   Qoder: { logo: "https://qoder.com.cn/favIcon.svg" },
@@ -63,8 +66,8 @@ const BRANDS: Record<string, { vendor?: string; logo: string }> = {
     // 1.19s → 0.084s，而且这条路径不带部署哈希。
     logo: "https://lf-cdn.trae.com.cn/obj/trae-com-cn/trae_website_prod_cn/favicon.png",
   },
-  // 这三家只有 `.ai` 域名，这台机器上连不上（见上面那段），所以不发请求：`logo` 留空即走徽章那一档。
-  OpenCode: { logo: "" },
+  // 这两张随包（见上面那段）：OpenCode 与 ZEN 共用同一张图，所以两处同一个地址。
+  OpenCode: { logo: chrome.runtime.getURL("icons/brand/opencode.png") },
   "Qwen3.8-Flash": {
     vendor: "千问",
     logo: "https://img.alicdn.com/imgextra/i4/O1CN01OXv3EM1FN8t9W4P79_!!6000000000474-2-tps-80-80.png",
@@ -82,10 +85,10 @@ const BRANDS: Record<string, { vendor?: string; logo: string }> = {
     vendor: "字节跳动 · 火山引擎",
     logo: "https://portal.volccdn.com/obj/volcfe/misc/favicon.png",
   },
-  OpenRouter: { logo: "" },
+  OpenRouter: { logo: chrome.runtime.getURL("icons/brand/openrouter.png") },
   ZEN: {
     vendor: "OpenCode",
-    logo: "",
+    logo: chrome.runtime.getURL("icons/brand/opencode.png"),
   },
 };
 

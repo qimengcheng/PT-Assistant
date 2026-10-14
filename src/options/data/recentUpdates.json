@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-14 19:42:40",
-  "headSha": "c94516a",
+  "generatedAt": "2026-10-14 20:00:56",
+  "headSha": "5a78fda",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.105.1",
+      "date": "2026-10-14 20:00:56",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「特别感谢」页的 OpenCode、OpenRouter、ZEN 三家恢复了官网图标，并把那两张图打进扩展包，进这一页不再联网取图。上一版把它们换成了首字母徽章，理由是那几家的域名只有 `.ai`、本机打不开；实测其实通（0.9~1.9 秒返回，是慢不是连不上），等于把一张能显示的图永久换成了字母。两张图标合计 18 KB，OpenCode 与 ZEN 共用同一张。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.105.0",
       "date": "2026-10-14 19:42:40",

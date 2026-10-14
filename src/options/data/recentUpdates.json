@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-14 18:39:02",
-  "headSha": "099a779",
+  "generatedAt": "2026-10-14 18:54:27",
+  "headSha": "de0f22d",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.104.2",
+      "date": "2026-10-14 18:54:27",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「我的下载器」里点开「N 条同内容」展开那几条副本时，不再整块直接出现在位置上，改成带一段 180 毫秒的淡入下滑；收回时仍是立即消失。系统开了「减少动态效果」的话不动。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.104.1",
       "date": "2026-10-14 18:39:02",

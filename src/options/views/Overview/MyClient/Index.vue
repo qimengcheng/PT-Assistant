@@ -282,6 +282,17 @@ function toggleGroupFor(record: CTorrent) {
 }
 
 /**
+ * 组员行挂入场动画用的类（用户 2026-10-14：「展开的时候加点动画，现在太突兀了」）。
+ *
+ * 只给组员，不给代表行：代表行本来就一直摆在表里，DOM 节点不换引用，给它挂 `animation`
+ * 等于每次展开都让那一行闪一下。组员是展开那一刻才插进来的新节点，动画正好只在那时跑。
+ */
+function torrentRowClass(record: CTorrent) {
+  const meta = grouped.value.meta.get(torrentKey(record));
+  return meta && !meta.anchor ? "torrent-group-member" : "";
+}
+
+/**
  * 标签全部走字面 `t()`：防线③（check-locale-keys）看不见 `t("前缀" + x)` 这种拼出来的键，
  * 而这里七个状态名和表格里那颗 chip 共用同一批键 —— 写成动态的就等于把这七处交给肉眼核对。
  */
@@ -819,6 +830,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
       :columns="tableHeader"
       :data-source="grouped.rows"
       :row-key="(record: CTorrent) => torrentKey(record)"
+      :row-class-name="torrentRowClass"
       :row-selection="rowSelection"
       :loading="loading"
       :pagination="tablePagination"
@@ -1178,5 +1190,27 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   padding: 0 5px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.045);
+}
+
+/* 展开一组同内容时，组员行从代表行下面滑出来，而不是整块直接出现在位置上。
+   `<tr>` 由 a-table 内部组件渲染，拿不到本组件的 scope id，所以必须走 :deep ——
+   编译后是 `[data-v-*] .torrent-group-member`，靠本组件模板里那层 `.page-panel` 提供 scope id。
+   时长压到 180ms：再长就开始觉得「等一下」，而 19 条一起动也只有一帧的差别。 */
+:deep(.torrent-group-member) {
+  animation: torrent-group-row-in 180ms ease-out;
+}
+
+@keyframes torrent-group-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* 系统开了「减少动态效果」就不滑，只留下原本的直接出现 */
+@media (prefers-reduced-motion: reduce) {
+  :deep(.torrent-group-member) {
+    animation: none;
+  }
 }
 </style>

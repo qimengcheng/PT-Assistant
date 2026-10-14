@@ -42,6 +42,8 @@ import {
   type TReseedRecommendKind,
 } from "@/shared/reseedRecommend.ts";
 import { detectBasePathMismatch, isCategorySavePath, type IClientCategory } from "@/shared/reseedPath.ts";
+import { pickRelocateCohort } from "@/shared/reseedMoveCohort.ts";
+import { moveReseedCohort } from "@/options/utils/reseedMove.ts";
 import { invalidateCategoryTable, loadCategoryTable } from "@/options/utils/categoryPaths.ts";
 import { isFreeTorrent } from "@/shared/torrentFree.ts";
 import type { TRatioImpact } from "@/shared/ratioGuard.ts";
@@ -446,6 +448,11 @@ function useLocalBasePath() {
  * 这里只**发起**搬运，不当它已经搬完：几十万行的数据在 NAS 上要跑几分钟，而发送那道闸
  * 看的是基准的实际路径（`baseLocal.savePath`，回查时按下载器报的刷新），搬完才放行。
  * 所以点完之后的提示是「正在搬」而不是把警告撤掉 —— 撤掉等于谎报。
+ *
+ * ⚠️ 一起搬的不止基准：同一份内容在下载器里往往是好几条种子（每站一条，共用盘上同一个文件夹），
+ * 只搬基准会把那个文件夹从其余那几条脚下抽走，第二天开下载器一排「丢失文件」
+ * （用户 2026-10-14 在辅种任务页报的，这一屏是同一个洞）。哪些算相关由
+ * `@/shared/reseedMoveCohort.ts` 判，与那一屏共用一份。
  */
 async function moveLocalBaseToTaskPath() {
   const mismatch = basePathMismatch.value;
@@ -454,9 +461,19 @@ async function moveLocalBaseToTaskPath() {
 
   baseMoving.value = true;
   try {
+    const downloaderId = selectedDownloaderId.value;
+    const cohort = pickRelocateCohort({
+      // 这份索引就是该下载器的全部种子（基准候选是从它里挑的），不必再取一遍列表
+      torrents: (localIndex.value?.entries ?? []).map((x) => ({ hash: x.hash, name: x.name, savePath: x.savePath })),
+      baseHash: hash,
+      oldPath: mismatch.basePath,
+      newPath: mismatch.taskPath,
+    });
+
     const moved = await sendMessage("setClientTorrentLocation", {
-      downloaderId: selectedDownloaderId.value,
-      id: hash,
+      downloaderId,
+      // 基准先走：真挪文件的是它，后面那几条只是把落点改过来
+      id: cohort.hashes[0],
       // 取 mismatch 里那一份，不是输入框的原样：那一格可以写 `category:电影`，那是分类不是目录，
       // 原样发过去会被下载器当场拒掉（用户 2026-10-11 报的 409）。判据已经把它翻成真实目录了。
       location: mismatch.taskPath,
@@ -466,8 +483,22 @@ async function moveLocalBaseToTaskPath() {
       runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.unsupported"), { color: "warning" });
       return;
     }
+
+    const { failed } = await moveReseedCohort(downloaderId, cohort.hashes.slice(1), mismatch.taskPath);
+
     baseMoveRequested.value = true;
-    runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveSent"), { color: "success" });
+    runtimeStore.showSnakebar(
+      cohort.hashes.length > 1
+        ? t("KeepUploadTask.pathMismatch.moveSentCohort", { n: cohort.hashes.length })
+        : t("KeepUploadTask.pathMismatch.moveSent"),
+      { color: "success" },
+    );
+    if (failed > 0) {
+      runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveCohortPartial", { n: failed }), {
+        color: "warning",
+        timeout: 12,
+      });
+    }
   } catch (e) {
     runtimeStore.showSnakebar(
       t("KeepUploadTask.pathMismatch.moveFailed", { reason: e instanceof Error ? e.message : String(e) }),

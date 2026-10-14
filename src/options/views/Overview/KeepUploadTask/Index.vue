@@ -32,8 +32,10 @@ import {
   refreshBaseLocalPaths,
   type IClientCategory,
 } from "@/shared/reseedPath.ts";
+import { pickRelocateCohort, type IRelocateCohort } from "@/shared/reseedMoveCohort.ts";
 import { watchReseedNotice } from "@/shared/reseedPresence.ts";
 import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
+import { moveReseedCohort } from "@/options/utils/reseedMove.ts";
 import {
   baseAlreadySent,
   judgeReseedTorrent,
@@ -297,7 +299,14 @@ async function useLocalBasePath(task: IKeepUploadTask) {
   }
 }
 
-/** 处置二：让下载器把基准那份数据搬到任务目录；搬完之前发送那道闸不会放行 */
+/**
+ * 处置二：让下载器把基准那份数据搬到任务目录；搬完之前发送那道闸不会放行。
+ *
+ * ⚠️ 一起搬的不止基准：同一份内容在下载器里往往是好几条种子（每站一条，共用盘上同一个文件夹），
+ * 只搬基准那一条会把那个文件夹从其余那几条脚下抽走 —— 用户 2026-10-14 报的「今天重新打开
+ * qbittorrent 这些种子就因为找不到文件报错了」就是这个。哪些算相关由
+ * `@/shared/reseedMoveCohort.ts` 判（同目录 + 同种子名，外加这条任务自己记着的那几条）。
+ */
 async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
   const mismatch = basePathMismatchOf(task);
   const hash = task.baseLocal?.hash;
@@ -305,9 +314,14 @@ async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
 
   movingBase.value[task.id] = true;
   try {
+    const downloaderId = task.downloadOptions.downloaderId;
+    const cohort = await pickTaskCohort(task, mismatch, downloaderId);
+
+    // 基准先走：真挪文件的是它，后面那几条只是把落点改过来。顺序反了基准的源就没了，
+    // 发送那道闸会永远不放行。
     const moved = await sendMessage("setClientTorrentLocation", {
-      downloaderId: task.downloadOptions.downloaderId,
-      id: hash,
+      downloaderId,
+      id: cohort.hashes[0],
       // 取 mismatch 里那一份：它和 downloadOptions.savePath 同值，但类型上是确定的字符串
       location: mismatch.taskPath,
     });
@@ -316,9 +330,26 @@ async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
       runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.unsupported"), { color: "warning" });
       return;
     }
+
+    const { failed } = await moveReseedCohort(downloaderId, cohort.hashes.slice(1), mismatch.taskPath);
+
     task.baseLocal!.moveToTaskPath = true;
     await sendMessage("updateKeepUploadTask", task).catch(() => {});
-    runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveSent"), { color: "success" });
+    runtimeStore.showSnakebar(
+      // 三条措辞按"带上了几条、其中几条不是这条任务的"分档，写全 literal 键好让防线③ 查得到
+      cohort.hashes.length === 1
+        ? t("KeepUploadTask.pathMismatch.moveSent")
+        : cohort.outsideTaskCount > 0
+          ? t("KeepUploadTask.pathMismatch.moveSentAll", { n: cohort.hashes.length, extra: cohort.outsideTaskCount })
+          : t("KeepUploadTask.pathMismatch.moveSentCohort", { n: cohort.hashes.length }),
+      { color: "success" },
+    );
+    if (failed > 0) {
+      runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveCohortPartial", { n: failed }), {
+        color: "warning",
+        timeout: 12,
+      });
+    }
     // 盯到它落地，落地那一刻当场接着发（见 MOVE_WATCH_DELAYS_MS 那一段）。
     // 这一趟催轮是顺手的：数据没挪动时后台仍然判得出「还是不一致」，不会替用户把闸放开。
     watchBaseMoveLanded(task.id);
@@ -330,6 +361,30 @@ async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
     );
   } finally {
     movingBase.value[task.id] = false;
+  }
+}
+
+/**
+ * 这一条任务该带上哪几条种子。列表拿不到时退回「只搬基准」—— 那等于今天的老行为，
+ * 比猜一批不相干的 hash 出去改路径安全。
+ */
+async function pickTaskCohort(
+  task: IKeepUploadTask,
+  mismatch: { basePath: string; taskPath: string },
+  downloaderId: string,
+): Promise<IRelocateCohort> {
+  const baseHash = task.baseLocal?.hash ?? "";
+  try {
+    const torrents = await sendMessage("getClientTorrents", downloaderId);
+    return pickRelocateCohort({
+      torrents: torrents.map((x) => ({ hash: x.infoHash ?? "", name: x.name, savePath: x.savePath })),
+      baseHash,
+      oldPath: mismatch.basePath,
+      newPath: mismatch.taskPath,
+      itemHashes: task.items.map((item) => item.hash),
+    });
+  } catch {
+    return { hashes: [baseHash], outsideTaskCount: 0 };
   }
 }
 

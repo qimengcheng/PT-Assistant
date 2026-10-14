@@ -165,6 +165,8 @@ export interface IConfigPiniaStorageSchema {
     >;
     dateRange: number | "custom" | "all";
     hidePerSitePrecentThreshold: number; // 0-100，百分比，隐藏掉低于该百分比的站点（不会隐藏当前指向的站点）
+    /** 每张图占容器宽度的哪一档：half = 一行两张，full = 一行一张铺满 */
+    chartWidth: "half" | "full";
     selectedSites: TSiteID[]; // 需要展示的站点
   };
 

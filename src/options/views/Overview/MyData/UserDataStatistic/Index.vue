@@ -81,6 +81,9 @@ const perChartHeight = 400;
 
 const allowEditName = ref<boolean>(false);
 
+/** 顶部设置面板：默认收起，把宽度让给图表；不入库（这是看一次就切的临时态） */
+const settingsPanelKeys = ref<string[]>([]);
+
 const rawDataRef = shallowRef<IUserDataStatistic>({ siteDateRange: {}, dailyUserInfo: {}, incrementalData: {} });
 
 const allDateRanges = computed(() => Object.keys(rawDataRef.value.dailyUserInfo));
@@ -579,8 +582,138 @@ provide(THEME_KEY, echartsTheme);
 <template>
   <!-- 根卡挂 .page-fill：卡片自带白底，撑满一屏就不会在图表下面露出整片灰底 -->
   <a-card variant="outlined" class="page-fill">
-    <div class="user-statistic-layout">
-      <div id="chartContainer" class="user-statistic-charts">
+    <div class="user-statistic-page">
+      <!-- 顶部那一行常驻：动作键 + 图表宽度档。宽度档不进折叠面板 —— 它是切一下要立刻看到效果的，
+           收进面板就等于每次切都要先展开。 -->
+      <a-flex align="center" gap="small" wrap class="statistic-bar">
+        <a-button @click="() => router.back()"><template #icon><ArrowLeftOutlined /></template><span>{{ t('common.back') }}</span></a-button>
+        <span class="statistic-bar-label">{{ t("UserDataStatistic.chart.width") }}</span>
+        <a-radio-group v-model:value="configStore.userStatisticControl.chartWidth" name="statistic-chart-width" button-style="solid">
+          <a-radio-button value="half">{{ t("UserDataStatistic.chart.widthHalf") }}</a-radio-button>
+          <a-radio-button value="full">{{ t("UserDataStatistic.chart.widthFull") }}</a-radio-button>
+        </a-radio-group>
+        <div class="flex-1-1-0" />
+        <a-button @click="exportStatisticImg"><template #icon><ExportOutlined /></template><span>{{ t('common.exportImage') }}</span></a-button>
+        <a-button type="primary" class="ml-2" @click="saveControl"><template #icon><SaveOutlined /></template><span>{{ t('common.saveSettings') }}</span></a-button>
+      </a-flex>
+
+      <!-- 原先这一栏竖排在图表右边，占掉 420px；现在整栏收进顶部折叠面板，默认收起，宽度全给图表。
+           面板标题就是原来那条 a-alert 的「数据图表样式设置」，所以那一层提示不再重复摆。 -->
+      <a-collapse v-model:active-key="settingsPanelKeys" bordered class="statistic-settings">
+        <a-collapse-panel key="settings" :header="t('UserDataStatistic.chart.chartStyleSettings')">
+          <div class="statistic-fields">
+        <div class="user-statistic-field">
+          <span class="user-statistic-field-label">{{ t("common.username") }}</span>
+          <div class="user-statistic-field-control d-flex align-center">
+            <!-- 文案随状态走：解锁图标 → 提示「锁定」；锁定图标 → 提示「解锁」 -->
+            <a-tooltip :title="allowEditName ? t('common.lock') : t('common.unlock')">
+              <a-button type="text" size="small" @click="allowEditName = !allowEditName">
+                <template #icon>
+                  <UnlockOutlined v-if="allowEditName" class="text-green" />
+                  <LockOutlined v-else />
+                </template>
+              </a-button>
+            </a-tooltip>
+            <!-- AutoComplete 没有 `readonly` prop：不声明的属性会被透传到根 <div readonly>（SSR 实测），
+                   压根没到内部 input，锁定状态下照样能打字。用 `disabled`。 -->
+            <a-auto-complete
+              v-model:value="configStore.userName"
+              :options="userNameOptions"
+              :disabled="!allowEditName"
+              :popup-match-select-width="true"
+              class="flex-1-1-0"
+            />
+            <a-button type="text" size="small" :title="configStore.getUserNames.perfName" @click="configStore.userName = configStore.getUserNames.perfName">
+              <template #icon>
+                <HistoryOutlined />
+              </template>
+            </a-button>
+          </div>
+        </div>
+
+        <div class="user-statistic-field">
+          <span class="user-statistic-field-label">{{ t("UserDataStatistic.chart.dateRange") }}</span>
+          <div class="user-statistic-field-control d-flex flex-wrap align-center" style="gap: 8px">
+            <a-segmented :value="dateRangePresetValue" :options="dateRangePresetOptions" @change="selectDateRangePreset" />
+            <a-popover trigger="click" placement="bottomLeft">
+              <a-button size="small" :type="dateRangeControl === 'custom' ? 'primary' : 'default'">
+                {{ t("UserDataStatistic.dateRange.custom") }}
+              </a-button>
+              <template #content>
+                <a-range-picker
+                  :disabled-date="disabledDateOutsideData"
+                  :allow-empty="[false, false]"
+                  @change="(_dates: any, dateStrings: [string, string]) => applyCustomDateRange(dateStrings)"
+                />
+              </template>
+            </a-popover>
+          </div>
+        </div>
+
+        <div class="user-statistic-field">
+          <span class="user-statistic-field-label">{{ t("UserDataStatistic.chart.chartSettings") }}</span>
+          <div class="user-statistic-field-control">
+            <a-input-number
+              v-model:value="configStore.userStatisticControl.hidePerSitePrecentThreshold"
+              name="statistic-hide-threshold"
+              :min="0"
+              :max="100"
+              :step="1"
+              :precision="2"
+              size="small"
+              addon-after="%"
+              class="hide-threshold"
+            />
+            <div class="field-hint mt-1">{{ t("UserDataStatistic.chart.hideLowPercentHint") }}</div>
+          </div>
+        </div>
+
+        <!-- 这一格 14 个勾选项，独占整行；放在最后一格，前面三格才不会被它挤到下一行去 -->
+        <div class="user-statistic-field user-statistic-field--wide">
+          <span class="user-statistic-field-label">{{ t("UserDataStatistic.chart.displayChart") }}</span>
+          <div class="user-statistic-field-control user-statistic-chart-toggles">
+            <a-checkbox
+              v-for="toggle in chartToggles"
+              :key="toggle.key"
+              :checked="toggle.value"
+              @update:checked="(checked: boolean) => setShowChart(toggle.key, checked)"
+            >
+              {{ t(`UserDataStatistic.chart.${toggle.key}`) }}
+            </a-checkbox>
+          </div>
+        </div>
+        </div><!-- /.statistic-fields -->
+
+        <div class="statistic-sites">
+          <div class="d-flex align-center">
+            <a-alert
+              type="info"
+              :title="t('UserDataStatistic.chart.displaySiteSettings')"
+              :description="t('UserDataStatistic.chart.hideLowPercentLabel')"
+              class="flex-1-1-0"
+            />
+            <CheckSwitchButton v-model="selectedSites" :all="allSites" class="ml-2" />
+          </div>
+
+          <a-checkbox-group v-model:value="selectedSites" class="user-statistic-site-toggles">
+            <div v-for="siteId in allSites" :key="siteId" class="user-statistic-site-toggle">
+              <a-checkbox :value="siteId" :disabled="!availableSites.includes(siteId)">
+                <span class="d-inline-flex align-center">
+                  <SiteFavicon :site-id="siteId" :size="16" />
+                  <SiteName :site-id="siteId" class="ml-1" />
+                </span>
+              </a-checkbox>
+            </div>
+          </a-checkbox-group>
+        </div>
+        </a-collapse-panel>
+      </a-collapse>
+
+      <div
+        id="chartContainer"
+        class="user-statistic-charts"
+        :class="{ 'user-statistic-charts--single': configStore.userStatisticControl.chartWidth === 'full' }"
+      >
         <!-- 总上传、总下载、总积分 -->
         <a-card v-if="configStore.userStatisticControl.showChart.totalSiteBase" class="user-statistic-card" size="small" :styles="{ body: { padding: '8px' } }">
           <VChart
@@ -623,147 +756,71 @@ provide(THEME_KEY, echartsTheme);
           </a-card>
         </template>
       </div>
-
-      <div class="user-statistic-control">
-        <div class="d-flex align-center mb-2">
-          <a-button @click="() => router.back()"><template #icon><ArrowLeftOutlined /></template><span>{{ t('common.back') }}</span></a-button>
-          <div class="flex-1-1-0" />
-          <a-button @click="exportStatisticImg"><template #icon><ExportOutlined /></template><span>{{ t('common.exportImage') }}</span></a-button>
-          <a-button type="primary" class="ml-2" @click="saveControl"><template #icon><SaveOutlined /></template><span>{{ t('common.saveSettings') }}</span></a-button>
-        </div>
-
-        <a-alert type="info" :title="t('UserDataStatistic.chart.chartStyleSettings')" class="mb-2" />
-
-        <div class="user-statistic-field">
-          <span class="user-statistic-field-label">{{ t("common.username") }}</span>
-          <div class="user-statistic-field-control d-flex align-center">
-            <!-- 文案随状态走：解锁图标 → 提示「锁定」；锁定图标 → 提示「解锁」 -->
-            <a-tooltip :title="allowEditName ? t('common.lock') : t('common.unlock')">
-              <a-button type="text" size="small" @click="allowEditName = !allowEditName">
-                <template #icon>
-                  <UnlockOutlined v-if="allowEditName" class="text-green" />
-                  <LockOutlined v-else />
-                </template>
-              </a-button>
-            </a-tooltip>
-            <!-- AutoComplete 没有 `readonly` prop：不声明的属性会被透传到根 <div readonly>（SSR 实测），
-                   压根没到内部 input，锁定状态下照样能打字。用 `disabled`。 -->
-            <a-auto-complete
-              v-model:value="configStore.userName"
-              :options="userNameOptions"
-              :disabled="!allowEditName"
-              :popup-match-select-width="true"
-              class="flex-1-1-0"
-            />
-            <a-button type="text" size="small" :title="configStore.getUserNames.perfName" @click="configStore.userName = configStore.getUserNames.perfName">
-              <template #icon>
-                <HistoryOutlined />
-              </template>
-            </a-button>
-          </div>
-        </div>
-
-        <div class="user-statistic-field">
-          <span class="user-statistic-field-label">{{ t("UserDataStatistic.chart.displayChart") }}</span>
-          <div class="user-statistic-field-control user-statistic-chart-toggles">
-            <a-checkbox
-              v-for="toggle in chartToggles"
-              :key="toggle.key"
-              :checked="toggle.value"
-              @update:checked="(checked: boolean) => setShowChart(toggle.key, checked)"
-            >
-              {{ t(`UserDataStatistic.chart.${toggle.key}`) }}
-            </a-checkbox>
-          </div>
-        </div>
-
-        <div class="user-statistic-field">
-          <span class="user-statistic-field-label">{{ t("UserDataStatistic.chart.dateRange") }}</span>
-          <div class="user-statistic-field-control d-flex flex-wrap align-center" style="gap: 8px">
-            <a-segmented :value="dateRangePresetValue" :options="dateRangePresetOptions" @change="selectDateRangePreset" />
-            <a-popover trigger="click" placement="bottomLeft">
-              <a-button size="small" :type="dateRangeControl === 'custom' ? 'primary' : 'default'">
-                {{ t("UserDataStatistic.dateRange.custom") }}
-              </a-button>
-              <template #content>
-                <a-range-picker
-                  :disabled-date="disabledDateOutsideData"
-                  :allow-empty="[false, false]"
-                  @change="(_dates: any, dateStrings: [string, string]) => applyCustomDateRange(dateStrings)"
-                />
-              </template>
-            </a-popover>
-          </div>
-        </div>
-
-        <div class="user-statistic-field">
-          <span class="user-statistic-field-label">{{ t("UserDataStatistic.chart.chartSettings") }}</span>
-          <div class="user-statistic-field-control">
-            <a-input-number
-              v-model:value="configStore.userStatisticControl.hidePerSitePrecentThreshold"
-              :min="0"
-              :max="100"
-              :step="1"
-              :precision="2"
-              size="small"
-              addon-after="%"
-              class="hide-threshold"
-            />
-            <div class="field-hint mt-1">{{ t("UserDataStatistic.chart.hideLowPercentHint") }}</div>
-          </div>
-        </div>
-
-        <div class="d-flex align-center">
-          <a-alert
-            type="info"
-            :title="t('UserDataStatistic.chart.displaySiteSettings')"
-            :description="t('UserDataStatistic.chart.hideLowPercentLabel')"
-            class="flex-1-1-0"
-          />
-          <CheckSwitchButton v-model="selectedSites" :all="allSites" class="ml-2" />
-        </div>
-
-        <a-checkbox-group v-model:value="selectedSites" class="user-statistic-site-toggles">
-          <div v-for="siteId in allSites" :key="siteId" class="user-statistic-site-toggle">
-            <a-checkbox :value="siteId" :disabled="!availableSites.includes(siteId)">
-              <span class="d-inline-flex align-center">
-                <SiteFavicon :site-id="siteId" :size="16" />
-                <SiteName :site-id="siteId" class="ml-1" />
-              </span>
-            </a-checkbox>
-          </div>
-        </a-checkbox-group>
-      </div>
     </div>
   </a-card>
 </template>
 
 <style scoped lang="scss">
-.user-statistic-layout {
+/* 纵向三段：常驻工具条 → 可折叠的设置面板 → 图表网格。
+   原先是「图表 | 右侧 420px 设置栏」的横向两栏，那条栏把一整屏宽度吃掉了一块。
+   container-type 是给下面两条 @container 用的：设置栏搬走之后，图表区宽 = 内容区宽，
+   再按视口判会算错（视口 1000 时内容区只有 ~770，两列各 372 塞不下一张图）。 */
+.user-statistic-page {
+  container-type: inline-size;
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.user-statistic-charts {
-  flex: 1 1 60%;
-  min-width: 0;
+.statistic-bar {
+  min-height: 32px;
+}
+
+.statistic-bar-label {
+  margin-inline-end: 4px;
+}
+
+/* 面板里默认一列，够宽才并排两列。
+   门槛按「英文那版分段控件 500.1px + 88 的标签 + 8 的缝」倒推：一格要 ≥ 596，两列要 ≥ 1224，
+   面板体比这一层窄约 80，所以取 1300。窄轨道里分段控件不缩，会直接压到右边那一格上
+   （台架 .tmp-build/bench-statlayout 量到跨出 67~121px）。 */
+.statistic-fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+  column-gap: 32px;
+}
+
+.user-statistic-field--wide {
+  grid-column: 1 / -1;
+}
+
+@container (min-width: 1300px) {
+  .statistic-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.statistic-sites {
+  margin-top: 4px;
+}
+
+/* 图表网格：默认一行一张，够宽才两列 */
+.user-statistic-charts {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 12px;
   align-content: start;
 }
 
-/* 窄容器（如分屏浏览）退化为单列 */
-@media (max-width: 900px) {
-  .user-statistic-charts {
-    grid-template-columns: 1fr;
+@container (min-width: 1100px) {
+  .user-statistic-charts:not(.user-statistic-charts--single) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.user-statistic-control {
-  flex: 1 1 320px;
-  max-width: 420px;
+/* 「全宽」档：谁都不并排 */
+.user-statistic-charts--single {
+  grid-template-columns: 1fr;
 }
 
 .chart {
@@ -799,19 +856,19 @@ provide(THEME_KEY, echartsTheme);
 
 .user-statistic-chart-toggles {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 4px 8px;
 }
 
 .user-statistic-site-toggles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px 12px;
+  margin-top: 8px;
 }
 
 .user-statistic-site-toggle {
-  flex: 0 0 25%;
-  min-width: 140px;
+  min-width: 0;
 }
 
 .hide-threshold {

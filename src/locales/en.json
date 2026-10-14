@@ -1668,7 +1668,10 @@
       "totalLabel": "Total",
       "totalSiteBase": "Basic Data",
       "totalSiteSeeding": "Seeding Data",
-      "uploadLabel": "Upload"
+      "uploadLabel": "Upload",
+      "width": "Chart Width",
+      "widthFull": "Full",
+      "widthHalf": "Half"
     },
     "dateRange": {
       "all": "All",

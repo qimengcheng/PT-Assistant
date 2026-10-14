@@ -1668,7 +1668,10 @@
       "totalLabel": "总和",
       "totalSiteBase": "基本数据",
       "totalSiteSeeding": "做种数据",
-      "uploadLabel": "上传"
+      "uploadLabel": "上传",
+      "width": "图表宽度",
+      "widthFull": "全宽",
+      "widthHalf": "二分之一"
     },
     "dateRange": {
       "all": "全部",

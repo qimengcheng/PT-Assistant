@@ -354,6 +354,7 @@ export const useConfigStore = defineStore("config", {
       },
       dateRange: 30,
       hidePerSitePrecentThreshold: 1,
+      chartWidth: "half",
       selectedSites: [],
     },
 

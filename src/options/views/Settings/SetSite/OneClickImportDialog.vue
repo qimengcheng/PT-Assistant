@@ -52,6 +52,14 @@ const metadataStore = useMetadataStore();
 const canAddSites = shallowRef<Record<TSiteID, ISiteMetadata>>({});
 
 /**
+ * `canAddSites` 是哪一份「已添加站点名单」的补集 —— 名单没动过，这一份就没变，
+ * 不必再跑一遍：`getCanAddedSiteMetadata()` 是逐个站点取定义的，未添加的两三百个 ——
+ * 头一次是两三百次 dynamic import（要等），之后每次重开至少也还是两三百次 await
+ * 加上一整轮全量重渲染。名单没变时这些都能整段省掉。
+ */
+const loadedForAddedIds = shallowRef<string | null>(null);
+
+/**
  * 搜索过滤（用户 2026-10-12：「这个界面应该支持搜索过滤」）。
  * 未添加的站点有几百张卡，原先只能一页一页翻 —— 想找「所有 NexusPHP 的站」或「海胆」都得靠肉眼。
  * 判据在 `@/shared/siteSearchFilter.ts`（能直接跑断言），这里不另写一份字符串匹配。
@@ -73,40 +81,74 @@ const siteTotal = computed(() => Object.keys(canAddSites.value).length);
 /**
  * 旧版返回 mdi-xxx 字符串图标，antdv-next 要求组件对象；
  * 分支条件与旧版逐条对应（helper/close/wrench/check/alert/pencil）。
+ *
+ * ⚠️ 这里原来写的是 `(site) => computed(() => …)`，而模板里每张卡取三次 ——
+ * 那等于**每次重渲染都 new 出 3×N 个 computed**（未添加的站点有 239 张卡，一轮 717 个）。
+ * 渲染期 `getCurrentScope()` 实测是 undefined（台架 .tmp-build/bench-computed-leak），
+ * 所以这些 computed 不归属任何 effect scope；弹窗内容首次打开后又不卸载，
+ * 于是除了 Vue 自己在依赖通知时剪掉的，剩下那些（实测堆 +6.8MB vs +2.3MB、
+ * 累积后整表重建 3.80ms vs 0.80ms）都是白建白占的。
+ *
+ * 正解是算一次、存进 Map，模板只做 O(1) 取值。顺带把原来每张卡都要做的
+ * `success.includes()` / `toWork.includes()`（各 O(选中数)）换成 Set 查表。
  */
-const statusIconPropComputed = (site: TSiteID) =>
-  computed(() => {
-    let progressIcon: Component = QuestionCircleOutlined; // 默认 progress-helper
-    let progressColor = "grey";
-    let progressTitle = "";
-    if (canAddSites.value[site]?.userInputSettingMeta) {
-      progressIcon = CloseCircleOutlined; // 需要手动添加 (progress-close)
-      progressColor = "purple";
-      progressTitle = t("SetSite.oneClickImportDialog.status.manual");
-    } else if (importStatus.value.working === site) {
-      progressIcon = ToolOutlined; // 正在尝试中 (progress-wrench)
-      progressColor = "blue";
-      progressTitle = t("SetSite.oneClickImportDialog.status.trying");
-    } else if (importStatus.value.success.includes(site)) {
-      progressIcon = CheckCircleOutlined; // 已添加成功 (progress-check)
-      progressColor = "green";
-      progressTitle = t("SetSite.oneClickImportDialog.status.success");
-    } else if (importStatus.value.failed.includes(site)) {
-      progressIcon = ExclamationCircleOutlined; // 添加失败 (progress-alert)
-      progressColor = "red";
-      progressTitle = t("SetSite.oneClickImportDialog.status.failed");
-    } else if (importStatus.value.toWork.includes(site)) {
-      progressIcon = EditOutlined; // 已选择 (progress-pencil)
-      progressColor = "";
-      progressTitle = t("SetSite.oneClickImportDialog.status.selected");
-    }
+interface IStatusIcon {
+  icon: Component;
+  color: string;
+  title: string;
+}
 
-    return {
-      icon: progressIcon,
-      color: progressColor,
-      title: progressTitle,
-    };
-  });
+const statusIcon = computed(() => {
+  const status = importStatus.value;
+  const success = new Set(status.success);
+  const selected = new Set(status.toWork);
+  const failed = new Set(status.failed);
+  const byId = new Map<TSiteID, IStatusIcon>();
+
+  for (const site of filteredSites.value) {
+    const id = site.id;
+    if (site.userInputSettingMeta) {
+      // 需要手动添加 (progress-close)
+      byId.set(id, {
+        icon: CloseCircleOutlined,
+        color: "purple",
+        title: t("SetSite.oneClickImportDialog.status.manual"),
+      });
+    } else if (status.working === id) {
+      // 正在尝试中 (progress-wrench)
+      byId.set(id, {
+        icon: ToolOutlined,
+        color: "blue",
+        title: t("SetSite.oneClickImportDialog.status.trying"),
+      });
+    } else if (success.has(id)) {
+      // 已添加成功 (progress-check)
+      byId.set(id, {
+        icon: CheckCircleOutlined,
+        color: "green",
+        title: t("SetSite.oneClickImportDialog.status.success"),
+      });
+    } else if (failed.has(id)) {
+      // 添加失败 (progress-alert)
+      byId.set(id, {
+        icon: ExclamationCircleOutlined,
+        color: "red",
+        title: t("SetSite.oneClickImportDialog.status.failed"),
+      });
+    } else if (selected.has(id)) {
+      // 已选择 (progress-pencil)
+      byId.set(id, { icon: EditOutlined, color: "", title: t("SetSite.oneClickImportDialog.status.selected") });
+    } else {
+      byId.set(id, { icon: QuestionCircleOutlined, color: "grey", title: "" });
+    }
+  }
+
+  return { byId, success };
+});
+
+function statusIconProp(siteId: TSiteID): IStatusIcon {
+  return statusIcon.value.byId.get(siteId) ?? { icon: QuestionCircleOutlined, color: "grey", title: "" };
+}
 
 async function doAutoImport() {
   importStatus.value.isWorking = true;
@@ -199,8 +241,15 @@ async function doAutoImport() {
 async function dialogEnter() {
   resetImportStatus(); // 重置状态
   keyword.value = ""; // 上次筛的那一串不该留给下一次打开
+
+  // 「待添加」就是全部定义的补集：已添加的那份名单没动过，这一份就没变，整段取数
+  // 连同那一次全量重渲染都可以跳过（判据与代价见 `loadedForAddedIds` 那条注释）。
+  const addedIds = Object.keys(metadataStore.sites).sort().join(",");
+  if (loadedForAddedIds.value === addedIds) return;
+
   const allCanAddedSite = await getCanAddedSiteMetadata(); // 加载待添加站点
   canAddSites.value = pickBy(allCanAddedSite, (site) => site.isDead !== true) as Record<string, ISiteMetadata>;
+  loadedForAddedIds.value = addedIds;
 }
 </script>
 
@@ -269,10 +318,8 @@ async function dialogEnter() {
           <div class="site-card">
             <a-checkbox
               :value="site.id"
-              :indeterminate="!!site.userInputSettingMeta || importStatus.success.includes(site.id)"
-              :disabled="
-                !!site.userInputSettingMeta || importStatus.isWorking || importStatus.success.includes(site.id)
-              "
+              :indeterminate="!!site.userInputSettingMeta || statusIcon.success.has(site.id)"
+              :disabled="!!site.userInputSettingMeta || importStatus.isWorking || statusIcon.success.has(site.id)"
             />
             <SiteFavicon :site-id="site.id" :size="28" class="mr-2" flush-on-click />
             <div class="site-card-main">
@@ -286,10 +333,10 @@ async function dialogEnter() {
               </a-tag>
             </div>
             <a :href="site.urls[0]" target="_blank" rel="noopener noreferrer nofollow">
-              <a-tooltip :title="statusIconPropComputed(site.id).value.title">
+              <a-tooltip :title="statusIconProp(site.id).title">
                 <component
-                  :is="statusIconPropComputed(site.id).value.icon"
-                  :style="{ color: statusIconPropComputed(site.id).value.color }"
+                  :is="statusIconProp(site.id).icon"
+                  :style="{ color: statusIconProp(site.id).color }"
                   class="status-icon"
                 />
               </a-tooltip>

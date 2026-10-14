@@ -643,6 +643,7 @@
         "label": "Status: ",
         "missingFiles": "Missing files",
         "needManual": "No file list to compare - confirm it yourself and add it",
+        "noBase": "No base torrent to compare against",
         "success": "Verification passed",
         "waiting": "Waiting for verification..."
       },

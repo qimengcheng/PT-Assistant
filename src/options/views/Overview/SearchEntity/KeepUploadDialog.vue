@@ -78,10 +78,15 @@ const runtimeStore = useRuntimeStore();
 type TVerifiedBy = "infoHash" | "pieces" | "files" | "legacy";
 
 /**
- * 一条的结论档位（`statusText` 的那八个键）。
+ * 一条的结论档位（`statusText` 的那九个键）。
  *
  * 存档位而不是存文案：locale 是活值，把 `t()` 的结果留在条目上，切语言之后行里挂的还是旧文案，
  * 而下面那行汇总要**按档位分桶计数** —— 照文案比就会在切语言当场把每一条都算进「未通过」。
+ *
+ * `failed` / `downloadFailed` / `noBase` 是三件事，不许互相顶：内容不是同一份 / 这一条自己的
+ * 种子文件没下下来 / 数据拿到了但没有参照物可比。原先后两种都被写成 `failed`，
+ * 于是一整屏「验证失败」看着像「这五个站都不是同一份数据」，而真因是五个 .torrent 都没下到
+ * （用户 2026-10-14 报的）。
  */
 type TVerifyStatus =
   | "downloading"
@@ -91,7 +96,8 @@ type TVerifyStatus =
   | "failed"
   | "downloadFailed"
   | "missingFiles"
-  | "needManual";
+  | "needManual"
+  | "noBase";
 
 interface IVerifiedItem {
   id: string; // Map key
@@ -694,6 +700,7 @@ const statusText = computed(() => ({
   downloadFailed: t("SearchEntity.KeepUploadDialog.status.downloadFailed"),
   missingFiles: t("SearchEntity.KeepUploadDialog.status.missingFiles"),
   needManual: t("SearchEntity.KeepUploadDialog.status.needManual"),
+  noBase: t("SearchEntity.KeepUploadDialog.status.noBase"),
 }));
 
 /**
@@ -1030,7 +1037,8 @@ function applyBaseComparison(item: IVerifiedItem) {
 
   const base = baseTorrent.value;
   if (!base || !listItemBase.value?.verified) {
-    item.status = "failed";
+    // 走到这里说明这一条的数据是拿到手的，只是没有参照物 —— 不是「比过、不是同一份」
+    item.status = "noBase";
     applyLocalDecision(item);
     return;
   }
@@ -1122,8 +1130,11 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
       applyBaseComparison(item);
       return;
     }
+    // 这一条自己就没下到种子文件 —— 写成「验证失败」会把人指向「内容不是同一份」，
+    // 而真因是拿不到文件。`getTorrent` 的 catch 已经标过这一档，这里再显式写一次是因为
+    // `reDownload` 会先把状态置成「正在下载种子信息」，不写就停在那一档上。
     item.verified = false;
-    item.status = "failed";
+    item.status = "downloadFailed";
     return;
   }
 
@@ -1152,14 +1163,23 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
   }
 
   item.loading = false;
-  if (!baseItem?.verified) {
+  // 先把这一趟拿到手的数据存下，再判基准在不在。原先的顺序是「基准不可用就直接 return」，
+  // `item.torrent` 留空 —— 而 `recompareAll` 开头就是 `if (!item.torrent) return`，
+  // 于是之后换基准、改挑下载器里那条当基准，全都跳过这一条，它只能停在失败档等手动重下。
+  if (torrent) item.torrent = torrent;
+
+  if (!torrent) {
+    // 这一条自己的种子文件就没下下来，跟「内容不是同一份」不是一回事
     item.verified = false;
-    item.status = "failed";
+    item.status = "downloadFailed";
     return;
   }
-  if (!torrent) return;
-
-  item.torrent = torrent;
+  if (!baseItem?.verified) {
+    // 数据是好的，只是场上没有参照物可比 —— 不能报成「验证失败」
+    item.verified = false;
+    item.status = "noBase";
+    return;
+  }
   applyBaseComparison(item);
 }
 

@@ -643,6 +643,7 @@
         "label": "状态：",
         "missingFiles": "缺少文件",
         "needManual": "算不出文件清单，需要你确认后手动加入",
+        "noBase": "基准种子未取到，无法比对",
         "success": "验证通过",
         "waiting": "等待验证..."
       },

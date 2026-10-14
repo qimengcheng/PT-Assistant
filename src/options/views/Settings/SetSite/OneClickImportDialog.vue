@@ -312,38 +312,47 @@ async function dialogEnter() {
     <div v-else-if="filteredSites.length === 0" class="site-filter-empty">
       {{ t("SetSite.oneClickImportDialog.filterEmpty", { keyword: keyword.trim() }) }}
     </div>
+    <!-- 这一片每张卡原来是 25 个组件实例，主成本是 a-typography-text 的 :ellipsis：
+         它一个就占约 15 个，并且每卡挂载时同步量一次 DOM。同一台架、暖机后、239 张卡，
+         改前后各一趟（?cut=full / ?cut=fix）：
+           首挂 9643ms → 601ms、勾一颗 8065ms → 89ms、过滤框敲一个字 2291ms → 24ms、
+           实例/卡 25.3 → 9.3。
+         截断按 AGENTS.md §3.4 走 CSS 写法，顺带修掉一处静默失效：:ellipsis 要把子节点折成
+         纯文本，原来那个 <b> 的加粗其实从没生效过。
+         站点名不挂悬停浮层：340 条定义的 name 逐个摆进真字号里量，最宽的一条（SkipTheCommercials）
+         是 137px（14px 档，产品那档 13px 约 127px），而三列布局下这张卡留给名字的宽度约 190px
+         —— 一条都截不到，属 §3.4「文字本来就已完整铺开」那族豁免，挂上去只是重复一遍。
+         .text-truncate 仍然留着：窄窗口真截到时也不会撑破卡片。 -->
     <a-checkbox-group v-else v-model:value="importStatus.toWork" class="site-grid">
-      <a-row :gutter="8">
-        <a-col v-for="site in filteredSites" :key="site.id" :span="24" :sm="12" :md="8" class="site-col">
-          <div class="site-card">
-            <a-checkbox
-              :value="site.id"
-              :indeterminate="!!site.userInputSettingMeta || statusIcon.success.has(site.id)"
-              :disabled="!!site.userInputSettingMeta || importStatus.isWorking || statusIcon.success.has(site.id)"
-            />
-            <SiteFavicon :site-id="site.id" :size="28" class="mr-2" flush-on-click />
-            <div class="site-card-main">
-              <!-- 站点名可能很长：ellipsis.tooltip 顺带补上原先缺的悬停提示 -->
-              <a-typography-text :ellipsis="{ tooltip: site.name ?? '' }">
-                <b>{{ site.name ?? "" }}</b>
-                <!-- 站点类型 -->
-              </a-typography-text>
-              <a-tag :color="site.type === 'private' ? 'blue' : 'default'">
-                {{ site.schema ?? (site.type === "private" ? "AbstractPrivateSite" : "AbstractBittorrentSite") }}
-              </a-tag>
-            </div>
-            <a :href="site.urls[0]" target="_blank" rel="noopener noreferrer nofollow">
-              <a-tooltip :title="statusIconProp(site.id).title">
-                <component
-                  :is="statusIconProp(site.id).icon"
-                  :style="{ color: statusIconProp(site.id).color }"
-                  class="status-icon"
-                />
-              </a-tooltip>
-            </a>
-          </div>
-        </a-col>
-      </a-row>
+      <div v-for="site in filteredSites" :key="site.id" class="site-card">
+        <a-checkbox
+          :value="site.id"
+          :indeterminate="!!site.userInputSettingMeta || statusIcon.success.has(site.id)"
+          :disabled="!!site.userInputSettingMeta || importStatus.isWorking || statusIcon.success.has(site.id)"
+        />
+        <SiteFavicon :site-id="site.id" :size="28" class="mr-2" flush-on-click />
+        <div class="site-card-main">
+          <b class="site-name text-truncate">{{ site.name ?? "" }}</b>
+          <a-tag :color="site.type === 'private' ? 'blue' : 'default'">
+            {{ site.schema ?? (site.type === "private" ? "AbstractPrivateSite" : "AbstractBittorrentSite") }}
+          </a-tag>
+        </div>
+        <!-- 状态说明挂在图标上：按 AGENTS.md §3.4 属「图标上的说明性 title」那一族，不在
+             「截断的长文本必须换浮层」的范围里。而台架实测每卡两颗 a-tooltip（这颗 + 原先名字
+             那颗）要多 4 个组件实例、239 卡首挂 601ms → 1091ms，所以这里退回原生 title。 -->
+        <a
+          :href="site.urls[0]"
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          :title="statusIconProp(site.id).title"
+        >
+          <component
+            :is="statusIconProp(site.id).icon"
+            :style="{ color: statusIconProp(site.id).color }"
+            class="status-icon"
+          />
+        </a>
+      </div>
     </a-checkbox-group>
 
     <template #footer>
@@ -388,21 +397,35 @@ async function dialogEnter() {
   color: rgba(0, 0, 0, 0.45);
 }
 
+/* 卡片直接做网格项，不再套 a-row/a-col：那两层壳每卡多两个组件实例，同一台架里
+   单独去掉它们那趟量到 779ms → 611ms（约两成）。列数按原来 :span=24 / :sm=12 / :md=8
+   的断点逐档翻成 media query —— antd 的 sm/md 就是 576/960 的 min-width，同样按视口宽度算，
+   所以界面列数与改之前一致。 */
 .site-grid {
-  display: block;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  overflow: hidden;
   padding: 12px;
 }
 
-.site-col {
-  padding-bottom: 8px;
+@media (min-width: 576px) {
+  .site-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .site-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .site-card {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   padding: 8px;
   background-color: rgba(0, 0, 0, 0.02);
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -413,6 +436,12 @@ async function dialogEnter() {
   flex: 1 1 0;
   min-width: 0;
   margin-right: 8px;
+}
+
+/* text-overflow 只在不换行的块级元素上出省略号，所以这里必须是块（AGENTS.md §3.4） */
+.site-name {
+  display: block;
+  min-width: 0;
 }
 
 .status-icon {

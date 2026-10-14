@@ -31,6 +31,7 @@ vi.mock("@/storage.ts", () => ({
 }));
 
 import {
+  gatedLogger,
   installConsoleLogGate,
   isConsoleLogEnabled,
   renameLogPrefix,
@@ -93,6 +94,34 @@ describe("闸门本身", () => {
     calls = [];
     console.log("[PTD] once");
     expect(calls).toEqual([["log", "[PT-Assistant] once"]]);
+  });
+});
+
+describe("gatedLogger：给第三方库当 console 替身的那一份出口", () => {
+  /**
+   * 库在**模块 import 期**就打日志，那一刻 `wrapConsoleLevels()` 还没被调用，原生 console 是裸的
+   * （`@webext-core/job-scheduler` 每注册一条定时任务打一行，用户 2026-10-14 控制台里那四行就是它）。
+   * 所以这份出口自己判开关，不等闸门。
+   *
+   * 这里的「关着不出」区分不开是哪一层挡住的（本文件的 `wrapConsoleLevels` 在 beforeAll 就装了，
+   * 两层都在判同一个标志）—— 它钉的是可观测结果：开关说了算、error 不受开关影响。
+   */
+  it("关着时 log / info / debug / warn 一条都不出，error 照出", () => {
+    setConsoleLogEnabled(false);
+    for (const level of ["log", "info", "debug", "warn", "error"] as const) {
+      gatedLogger[level]("Scheduling job: autoFlushUserInfo");
+    }
+    expect(calls).toEqual([["error", "Scheduling job: autoFlushUserInfo"]]);
+  });
+
+  it("开着时四档都出", () => {
+    setConsoleLogEnabled(true);
+    gatedLogger.log("a");
+    gatedLogger.warn("b");
+    expect(calls).toEqual([
+      ["log", "a"],
+      ["warn", "b"],
+    ]);
   });
 });
 

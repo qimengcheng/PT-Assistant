@@ -9,6 +9,8 @@
  */
 import { format } from "date-fns";
 import { defineJobScheduler } from "@webext-core/job-scheduler";
+
+import { gatedLogger } from "@/shared/consoleLog.ts";
 import { EResultParseStatus, type TSiteID } from "@ptd/site/types/base.ts";
 
 import { extStore } from "@/storage.ts";
@@ -30,7 +32,7 @@ export enum EJobType {
   AutoBackup = "autoBackup",
 }
 
-const jobs = defineJobScheduler();
+const jobs = defineJobScheduler({ logger: gatedLogger });
 
 function autoFlushUserInfo(retryIndex: number = 0) {
   return async () => {

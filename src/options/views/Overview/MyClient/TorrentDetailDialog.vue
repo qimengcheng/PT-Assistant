@@ -496,6 +496,7 @@ function formatTimestamp(timestamp: number | undefined): string {
         <a-space style="margin-bottom: 8px; width: 100%">
           <a-input
             v-model:value="trackerInput"
+            name="my-client-add-tracker"
             :placeholder="t('MyClient.detail.addTrackerTitle')"
             style="width: 320px"
             @press-enter="addTracker"

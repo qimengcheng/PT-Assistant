@@ -744,6 +744,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
             <div style="margin-bottom: 8px">{{ t("MyClient.autoRefresh.intervalLabel") }}</div>
             <a-input-number
               v-model:value="globalRefreshInterval"
+              name="my-client-refresh-interval"
               :min="0"
               :max="3600"
               size="small"
@@ -770,7 +771,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
         <!-- 固定几选一一律 a-radio-group + button-style="solid"（选中实心蓝底白字），不用 a-segmented：
              segmented 的选中态是灰底轨道上一块白浮标，落在那条浅灰栏里几乎看不出选的是哪个（AGENTS §3.4）。
              工具条里的控件不写 size —— 这一排是 32px 档，跟同栏那几颗按钮齐平。 -->
-        <a-radio-group v-model:value="stateFilter" button-style="solid">
+        <a-radio-group v-model:value="stateFilter" name="my-client-state-filter" button-style="solid">
           <a-radio-button v-for="opt in stateFilterOptions" :key="opt.value" :value="opt.value">
             {{ opt.label }}
           </a-radio-button>
@@ -806,7 +807,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           代价说清：占位文案「搜索种子名称、Hash、标签、路径」实测 260 完整、220 起被截断，
           所以这一档那行提示语会缺尾巴（原生 placeholder 只裁、不加省略号）。
         -->
-        <a-input v-model:value="searchText" :placeholder="t('MyClient.searchPlaceholder')" allow-clear style="width: 200px">
+        <a-input v-model:value="searchText" name="my-client-torrent-search" :placeholder="t('MyClient.searchPlaceholder')" allow-clear style="width: 200px">
           <template #prefix><SearchOutlined /></template>
         </a-input>
       </a-flex>

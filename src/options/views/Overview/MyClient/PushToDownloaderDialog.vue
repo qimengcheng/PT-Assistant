@@ -123,6 +123,7 @@ async function submit() {
     <template v-if="inputMode === 'url'">
       <a-textarea
         v-model:value="urlInput"
+        name="my-client-push-url"
         :placeholder="t('MyClient.pushToDownloader.urlInputLabel')"
         :rows="3"
         :auto-size="{ minRows: 3, maxRows: 10 }"

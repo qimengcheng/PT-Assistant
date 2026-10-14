@@ -13,6 +13,8 @@
  * 所以每一步的进度都必须落盘在任务上（`autoState`），不能存内存。
  */
 import { defineJobScheduler } from "@webext-core/job-scheduler";
+
+import { gatedLogger } from "@/shared/consoleLog.ts";
 import type { CTorrent } from "@ptd/downloader";
 
 import { extStore } from "@/storage.ts";
@@ -100,7 +102,7 @@ function scheduleQuickRecheck(pending: boolean): void {
   }, delay);
 }
 
-const jobs = defineJobScheduler();
+const jobs = defineJobScheduler({ logger: gatedLogger });
 
 /**
  * 一轮内进展通知的收集器：任务循环里**只登记**，整轮跑完再一次性投递（`flush`）。

@@ -1,4 +1,4 @@
-import axios from "axios";
+import axiosRaw from "axios";
 import { uniq } from "es-toolkit";
 
 import { commonParseFactory } from "../utils";
@@ -14,7 +14,15 @@ import { REPO_URL } from "~/helper.ts";
 import { setupReplaceUnsafeHeader } from "~/extends/axios/replaceUnsafeHeader.ts";
 import { name as EXT_NAME, version as EXT_VERSION } from "~/../package.json";
 
-setupReplaceUnsafeHeader(axios);
+/**
+ * 用**自己那一份**实例，不要拿去包 `axios` 的默认导出：
+ * `packages/site/utils/adapter.ts` 已经在同一个默认实例上包过一遍了，这里再包一次只会撞进
+ * `setupReplaceUnsafeHeader` 的防重守卫，在模块 import 期漏一条「setupReplaceUnsafeHeader()
+ * 只应调用一次」到控制台 —— 那一刻入口的日志闸门还没装上，吞不掉（用户 2026-10-14 报的）。
+ * 下载器那一路本来就是 `axios.create()` 一份自己的（`packages/downloader/utils/adapter.ts`），
+ * 这里与它同写法。
+ */
+const axios = setupReplaceUnsafeHeader(axiosRaw.create());
 
 const bgmUrlPattern = /^(?:https?:\/\/)?(?:bgm\.tv|bangumi\.tv|chii\.in)\/subject\/(\d+)\/?/;
 

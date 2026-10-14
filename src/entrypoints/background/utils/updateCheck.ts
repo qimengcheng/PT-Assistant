@@ -6,6 +6,8 @@
  */
 import { defineJobScheduler } from "@webext-core/job-scheduler";
 
+import { gatedLogger } from "@/shared/consoleLog.ts";
+
 import { extStore } from "@/storage.ts";
 import { onMessage, sendMessage } from "@/messages.ts";
 import type { IConfigPiniaStorageSchema, IUpdateCheckState, TUpdateDownloadState } from "@/shared/types.ts";
@@ -22,7 +24,7 @@ import {
 
 const JOB_ID = "checkForUpdate";
 
-const jobs = defineJobScheduler();
+const jobs = defineJobScheduler({ logger: gatedLogger });
 
 function currentVersion(): string {
   return browser.runtime.getManifest().version;

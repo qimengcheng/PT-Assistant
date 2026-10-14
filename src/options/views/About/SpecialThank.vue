@@ -41,10 +41,11 @@ interface IStats {
  * 2026-10-07 本机逐条测过快慢（`.tmp-build/speedtest-logos.mjs`，直连、不走代理）：
  * 国内 CDN 一律 0.04~0.38s；`.ai` 那几条是 1.1~2.1s，慢在 TLS 往返，不是文件大。
  * 所以能换国内镜像的都换了（WorkBuddy / TraeCode，两条都和新地址逐字节相同）。
- * 剩下两条没有国内镜像、只能留在海外源：OpenCode 与 ZEN 用 opencode.ai、OpenRouter 用
- * openrouter.ai —— 它们的官网只有 `.ai` 这一个域名，npmmirror 又不放 simple-icons
- * （unpkg 白名单 403），换第三方镜像等于给别人的品牌图加一层依赖，不划算。
- * 这两条的观感靠「先亮首字母徽章、图到了再换」兜住，见模板里那段注释。
+ * 剩下三家只有 `.ai` 域名（OpenCode 与 ZEN 用 opencode.ai、OpenRouter 用 openrouter.ai），
+ * 官网没有别的 TLD，npmmirror 也不放 simple-icons（unpkg 白名单 403），换第三方镜像等于给
+ * 别人的品牌图加一层依赖。**这台机器上那两个域名是 `ERR_CONNECTION_CLOSED`（不是慢，是连不上），
+ * 每次进这一页控制台就红一条网络错误** —— 所以自 v0.103.1 起这三家不再发请求，`logo` 留空，
+ * 直接走首字母徽章那一档（`logoOf` 见下面，空串就不挂 `<img>`）。
  */
 const BRANDS: Record<string, { vendor?: string; logo: string }> = {
   Qoder: { logo: "https://qoder.com.cn/favIcon.svg" },
@@ -62,7 +63,8 @@ const BRANDS: Record<string, { vendor?: string; logo: string }> = {
     // 1.19s → 0.084s，而且这条路径不带部署哈希。
     logo: "https://lf-cdn.trae.com.cn/obj/trae-com-cn/trae_website_prod_cn/favicon.png",
   },
-  OpenCode: { logo: "https://opencode.ai/apple-touch-icon-v3.png" },
+  // 这三家只有 `.ai` 域名，这台机器上连不上（见上面那段），所以不发请求：`logo` 留空即走徽章那一档。
+  OpenCode: { logo: "" },
   "Qwen3.8-Flash": {
     vendor: "千问",
     logo: "https://img.alicdn.com/imgextra/i4/O1CN01OXv3EM1FN8t9W4P79_!!6000000000474-2-tps-80-80.png",
@@ -80,10 +82,10 @@ const BRANDS: Record<string, { vendor?: string; logo: string }> = {
     vendor: "字节跳动 · 火山引擎",
     logo: "https://portal.volccdn.com/obj/volcfe/misc/favicon.png",
   },
-  OpenRouter: { logo: "https://openrouter.ai/favicon/glyph.png" },
+  OpenRouter: { logo: "" },
   ZEN: {
     vendor: "OpenCode",
-    logo: "https://opencode.ai/apple-touch-icon-v3.png",
+    logo: "",
   },
 };
 
@@ -91,7 +93,7 @@ const stats = rawStats as unknown as IStats;
 const { t } = useI18n();
 
 const failed = ref<Record<string, boolean>>({});
-/** 图已经下好了才换掉徽章：没配好的海外站点（opencode.ai / openrouter.ai）要 1~2s，先亮徽章比留个空洞好 */
+/** 图已经下好了才换掉徽章：慢源要先亮徽章，别留个空洞 */
 const loaded = ref<Record<string, boolean>>({});
 
 /**

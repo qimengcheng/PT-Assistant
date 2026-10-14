@@ -74,6 +74,35 @@ export function wrapConsoleLevels(): void {
   }
 }
 
+/**
+ * 给第三方库当 console 替身的那一份出口。
+ *
+ * 为什么要有它：库在**模块 import 期**就打日志 —— `@webext-core/job-scheduler` 每注册一条定时任务
+ * 打一条 `Scheduling job:`，而后台一共有四处顶层注册。入口的 `installConsoleLogGate()` 要等
+ * 所有 import 跑完才轮得到执行，所以那四条走的是**还没被包过的原生 console**，
+ * 开关关着也照打（用户 2026-10-14 的控制台截图里那四行就是这么来的）。
+ * 把库的 logger 指到这里，判据就从「谁先执行」变成「调用那一刻开关是什么」。
+ *
+ * `error` 不判开关，与本文件头的口径一致。
+ */
+export const gatedLogger: Record<TGatedLevel | "error", TConsoleFn> = {
+  log: (...args) => {
+    if (enabled) console.log(...args);
+  },
+  info: (...args) => {
+    if (enabled) console.info(...args);
+  },
+  debug: (...args) => {
+    if (enabled) console.debug(...args);
+  },
+  warn: (...args) => {
+    if (enabled) console.warn(...args);
+  },
+  error: (...args) => {
+    console.error(...args);
+  },
+};
+
 /** 读不到配置就按默认（关）。这里不能 console 报一句 —— 那正是本模块要吞掉的东西 */
 async function syncFlag(): Promise<void> {
   try {

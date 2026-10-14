@@ -105,12 +105,12 @@ async function doSetLimit() {
     <div class="field-row">
       <span class="field-label">{{ t("MyClient.speedLimit.upload") }}</span>
       <!-- 原 v-text-field type="number" v-model.number clearable：清空后同样是 null -->
-      <a-input-number v-model:value="uploadLimit" :min="0" :step="1" class="flex-1-1-0" />
+      <a-input-number v-model:value="uploadLimit" name="my-client-speed-limit-upload" :min="0" :step="1" class="flex-1-1-0" />
     </div>
 
     <div class="field-row">
       <span class="field-label">{{ t("MyClient.speedLimit.download") }}</span>
-      <a-input-number v-model:value="downloadLimit" :min="0" :step="1" class="flex-1-1-0" />
+      <a-input-number v-model:value="downloadLimit" name="my-client-speed-limit-download" :min="0" :step="1" class="flex-1-1-0" />
     </div>
 
     <template #footer>

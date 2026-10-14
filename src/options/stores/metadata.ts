@@ -24,6 +24,7 @@ import {
   type TSolutionKey,
   type ISearchSolutionMetadata,
 } from "@/shared/types.ts";
+import { siteIdsNeedingGroups } from "@/shared/siteGroupsBackfill.ts";
 import { sendMessage } from "@/messages.ts";
 import { i18n } from "@/options/plugins/i18n.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
@@ -36,7 +37,20 @@ type TSimplePatchFieldKey = keyof Pick<
 >;
 
 export const useMetadataStore = defineStore("metadata", {
-  persistWebExt: true,
+  persistWebExt: {
+    /**
+     * 水合一完成就跑一次回填。其余持久化行为与 `persistWebExt: true` 完全一致 ——
+     * 插件对这些字段都有同样的默认值（`autoSaveType: false`、`writeDefaultState: true`、
+     * storageArea: local），见 `src/extends/pinia/webExtPersistence.ts` 的解构默认值。
+     */
+    afterRestore: (context) => {
+      // 此刻 hydrated 已置位（插件在调 afterRestore 之前先置位），所以这里读到的一定是水合完的存量。
+      // 不 await：那次回填要逐个取站点定义，压在水合链路上会把首屏一起拖住；失败只记日志不崩页面。
+      void context.store.backfillEmptySiteGroupsFromDefinitions().catch((error: unknown) => {
+        console.error("[metadata] 站点分类回填没有跑完", error);
+      });
+    },
+  },
   state: (): IMetadataPiniaStorageSchema => ({
     sites: {},
     solutions: {},
@@ -56,6 +70,8 @@ export const useMetadataStore = defineStore("metadata", {
 
     siteHostMap: {},
     siteNameMap: {},
+
+    siteGroupsBackfilled: false,
   }),
 
   getters: {
@@ -610,6 +626,38 @@ export const useMetadataStore = defineStore("metadata", {
 
     async removeBackupServer(backupServerId: string) {
       delete this.backupServers[backupServerId];
+      await this.$save();
+    },
+
+    /**
+     * v0.101.2 起的一次性回填：把空白的「站点分类」按站点定义的 `tags` 补进用户配置。
+     *
+     * 为什么光补定义不够：用户配置里的 `groups` 是**添加站点那一刻**从定义抄进存储的
+     * （`offscreen/utils/site.ts` 的 `groups ??=` 只在整份配置为空或 flush 时才跑），
+     * 那 28 个当时没有 `tags` 的站点抄到的就是空数组，此后没人回头补 —— 站点管理那一列
+     * 一直空着（用户 2026-10-14 报的 alingPT / 咖啡 / PandaPT 等）。
+     *
+     * 判据只认「缺失或空数组」，非空一律不动，所以用户填过的分组不会被盖；代价是
+     * **刻意清空过分组的人会被填回一次**，且只此一轮（跑完置 `siteGroupsBackfilled`），
+     * 与 config store 那几条数字档版本门是同一笔账。
+     */
+    async backfillEmptySiteGroupsFromDefinitions() {
+      if (this.siteGroupsBackfilled) return;
+
+      for (const siteId of siteIdsNeedingGroups(this.sites)) {
+        let tags: string[];
+        try {
+          tags = (await getDefinedSiteMetadata(siteId)).tags ?? [];
+        } catch (error) {
+          // 站点升级后定义被删、而用户库里还留着那条（同 SetSite/utils.ts 的占位处理）
+          console.error(`[metadata] 回填站点分类时读不到站点定义：${siteId}`, error);
+          continue;
+        }
+        if (tags.length === 0) continue;
+        this.sites[siteId].groups = [...tags];
+      }
+
+      this.siteGroupsBackfilled = true;
       await this.$save();
     },
   },

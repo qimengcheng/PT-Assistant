@@ -168,4 +168,13 @@ export interface IMetadataPiniaStorageSchema {
 
   // 站点 ID 到站点名称的映射表
   siteNameMap: Record<TSiteKey, string>;
+
+  /**
+   * 「站点分类」的一次性回填跑过了没有（v0.101.2 起）。
+   *
+   * 为什么用自带标记而不是 config 那套 version 门：config store 的 afterRestore 末尾就把
+   * `version` 追平成当前版本了，两条水合是各自独立的异步过程，谁先谁后说不准 —— 等回填
+   * 轮到跑的时候门可能已经判不出「更旧」了。标记落在被改的那份数据自己头上，不看别人脸色。
+   */
+  siteGroupsBackfilled?: boolean;
 }

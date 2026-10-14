@@ -54,11 +54,16 @@
     "detail": {
       "errorMessage": "失败原因"
     },
+    "dialog": {
+      "recordOnly": "只删除下载历史记录，下载器里的种子与已下载的数据不受影响。"
+    },
     "filterPlaceholder": "过滤下载记录",
     "loadError": "加载下载历史失败",
     "reDownload": "重新下载",
     "refresh": "刷新下载记录列表",
+    "removeSelected": "删除（{0}）",
     "searchTorrent": "全站搜索此种子",
+    "selectAllFailed": "选中全部失败记录",
     "status": {
       "completed": "已完成",
       "downloading": "下载中",
@@ -69,7 +74,14 @@
       "downloadAt": "下载时间",
       "downloader": "下载服务器",
       "status": "下载状态",
-      "title": "种子"
+      "title": "种子",
+      "trigger": "发起方式"
+    },
+    "trigger": {
+      "auto": "自动",
+      "manual": "手动",
+      "unknown": "未记录",
+      "unknownHint": "发起方式自 v0.103.0 起才记录，更早的记录一律显示为未记录。"
     }
   },
   "KeepUploadTask": {

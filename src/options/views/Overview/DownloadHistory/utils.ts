@@ -5,6 +5,9 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   DownloadOutlined,
+  QuestionCircleOutlined,
+  RobotOutlined,
+  UserOutlined,
 } from "@antdv-next/icons";
 
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
@@ -12,7 +15,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { ptdIndexDb } from "@/shared/indexdb.ts";
 
-import type { ITorrentDownloadMetadata, TTorrentDownloadKey } from "@/shared/types.ts";
+import type { ITorrentDownloadMetadata, TDownloadTrigger, TTorrentDownloadKey } from "@/shared/types.ts";
 
 // 使用 shallowRef 优化大量下载历史数据的性能
 export const downloadHistory = shallowRef<Record<TTorrentDownloadKey, ITorrentDownloadMetadata>>({});
@@ -144,7 +147,7 @@ function i18nLoadErrorText(): string {
 
 export const throttleLoadDownloadHistory = throttle(loadDownloadHistory, 1e3);
 
-export interface IDownloadStatusMeta {
+export interface IDownloadTagMeta {
   /**
    * i18n 键而不是文案本身：这是非组件模块，拿不到 useI18n，写死中文会让英文界面
    * 显示中文（AGENTS.md §3.5 零容忍）。由调用方用 t() 解析。
@@ -155,9 +158,28 @@ export interface IDownloadStatusMeta {
   color: string;
 }
 
-export const downloadStatusMap: Record<ITorrentDownloadMetadata["downloadStatus"], IDownloadStatusMeta> = {
+export const downloadStatusMap: Record<ITorrentDownloadMetadata["downloadStatus"], IDownloadTagMeta> = {
   downloading: { titleKey: "DownloadHistory.status.downloading", icon: DownloadOutlined, color: "processing" },
   pending: { titleKey: "DownloadHistory.status.pending", icon: ClockCircleOutlined, color: "warning" },
   completed: { titleKey: "DownloadHistory.status.completed", icon: CheckCircleOutlined, color: "success" },
   failed: { titleKey: "DownloadHistory.status.failed", icon: CloseCircleOutlined, color: "error" },
 };
+
+/**
+ * 「发起方式」这一列的三档。
+ *
+ * `unknown` 不是第三种发起方，而是**字段缺失**：v0.103.0 之前落库的存量记录、以及从备份整表
+ * 导入的老数据，都没有这一项。之所以不猜：自动辅种与辅种任务页的手动发送共用同一个
+ * `buildReseedAddTorrentOptions`，落下来的 `addTorrentOptions` 一字不差，反推只会把一半标错。
+ * 存量条目本来也留不住 —— 它们绝大多数正是这一页要批量删掉的那批失败记录。
+ */
+export const downloadTriggerMap: Record<TDownloadTrigger | "unknown", IDownloadTagMeta> = {
+  manual: { titleKey: "DownloadHistory.trigger.manual", icon: UserOutlined, color: "blue" },
+  auto: { titleKey: "DownloadHistory.trigger.auto", icon: RobotOutlined, color: "purple" },
+  unknown: { titleKey: "DownloadHistory.trigger.unknown", icon: QuestionCircleOutlined, color: "default" },
+};
+
+/** 记录里的 `trigger` 缺失时按「未记录」那一档画，其余原样取表 */
+export function triggerMetaOf(trigger: ITorrentDownloadMetadata["trigger"]): IDownloadTagMeta {
+  return downloadTriggerMap[trigger ?? "unknown"];
+}

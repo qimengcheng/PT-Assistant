@@ -54,11 +54,16 @@
     "detail": {
       "errorMessage": "Error Message"
     },
+    "dialog": {
+      "recordOnly": "This only removes history entries. Torrents in the client and downloaded files are untouched."
+    },
     "filterPlaceholder": "Filter download history",
     "loadError": "Failed to load download history",
     "reDownload": "Re-download",
     "refresh": "Refresh download history list",
+    "removeSelected": "Delete ({0})",
     "searchTorrent": "Search this torrent across all sites",
+    "selectAllFailed": "Select all failed records",
     "status": {
       "completed": "Completed",
       "downloading": "Downloading",
@@ -69,7 +74,14 @@
       "downloadAt": "Download Time",
       "downloader": "Downloader",
       "status": "Download Status",
-      "title": "Torrent"
+      "title": "Torrent",
+      "trigger": "Initiated by"
+    },
+    "trigger": {
+      "auto": "Auto",
+      "manual": "Manual",
+      "unknown": "Not recorded",
+      "unknownHint": "The initiator has been recorded since v0.103.0; earlier entries are shown as not recorded."
     }
   },
   "KeepUploadTask": {

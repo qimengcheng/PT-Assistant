@@ -336,6 +336,10 @@ function buildDownloadHistory(downloadOption: IDownloadTorrentOption): ITorrentD
     link: torrent.link,
     downloadAt: +Date.now(),
     downloadStatus: "pending",
+    // 发起方式在这一处归一化，而不是逐个调用点去补：界面上点出来的那几处（搜索页、站点页按钮、
+    // 右键菜单、辅种任务页、下载历史的重新下载）都不声明自己，唯一声明的是后台自动辅种。
+    // 落在这里还有一层作用：新记录一定带值，界面那个「未记录」就只剩一个含义 —— v0.103.0 之前的存量。
+    trigger: downloadOption.trigger ?? "manual",
   } as ITorrentDownloadMetadata;
 }
 

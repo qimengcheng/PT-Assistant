@@ -220,6 +220,9 @@ async function sendOne(task: IKeepUploadTask, item: IKeepUploadTaskItem, downloa
     },
     downloaderId: task.downloadOptions.downloaderId,
     addTorrentOptions,
+    // 后台这一轮没有界面在等结果，所以这条记录是「自动」。手动那几处（含辅种任务页上那排发送键）
+    // 都不声明，由落库那一步归一化成 manual —— 判据是「发送那一刻有没有人看着界面」，见 TDownloadTrigger。
+    trigger: "auto",
   });
   if (result?.downloadStatus === "failed") throw new Error(result.errorMessage || item.title);
 }

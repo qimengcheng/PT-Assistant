@@ -521,6 +521,16 @@ const canCreateTask = computed(() => {
   if (!selectedDownloaderId.value) return false;
   // 只勾一条时基准只能来自下载器：没选定基准就没有参照物，建出来的任务会把那一条当成基准再下一遍
   if (isSingleMode.value && !useLocalBase.value) return false;
+  /**
+   * 候选所在站点的分享率全都明确低于 1 → 不建（用户 2026-10-14：「辅种任务不能让分享率低于 1 的
+   * 站点当基准种子」）。v0.82.0 那版这里是「照旧允许 + 一句提示」，界面上因此出现过「标着
+   * 低分享率的那一条正是基准」。
+   *
+   * 判据只盖「基准取自列表第一条」这条路（`listBaseCandidates` 自己就在那两种情形下返回空表）：
+   * 基准取自下载器时那一份**已经在本地**，整批不会再下一遍，也就不会给任何站点记下载量 ——
+   * 而这条规则拦的正是「为了当基准而完整下一次，把那一站的分享率继续往下拉」。
+   */
+  if (allBaseRatiosLow.value) return false;
   return includedVerifiedCount.value >= (useLocalBase.value ? 1 : 2);
 });
 
@@ -609,7 +619,7 @@ function ratioTag(item: IVerifiedItem) {
 }
 
 /**
- * 一个达标的都没有 —— 那一行退让提示的判据（措辞见 locale 里的 baseRatio.allLow） */
+ * 一个达标的都没有 —— 「创建任务」停用 + 那一行说明的判据（措辞见 locale 里的 baseRatio.allLow） */
 const allBaseRatiosLow = computed(() => allBasesTooLow(listBaseCandidates.value));
 
 /**
@@ -801,7 +811,8 @@ const includedVerifiedCount = computed(() => includedItems.value.filter((item) =
  *
  * 为什么可以放心代换：这类行压根没有「设为基准种子」那颗按钮（见 `canPromote`），
  * 用户没法显式选它 —— 它排在头一位只可能是勾选顺序带进来的。
- * 全都低于 1 时 `pickDefaultBaseId` 退回头一条，这个 watch 因此不动手，界面另有那句提示。
+ * 全都低于 1 时 `pickDefaultBaseId` 返回 null，这个 watch 因此不动手 —— 基准总归是列表头那一条，
+ * 但 `canCreateTask` 已经把「创建任务」停掉，界面上另有一行说明（`baseRatio.allLow`）。
  *
  * ⚠️ 这一段必须排在 `includedItems` **之后**：`immediate: true` 会在 setup 里就把
  * `listBaseCandidates` 求一遍值，而那份 computed 读的就是 `includedItems` —— 放在它上面是
@@ -1615,8 +1626,8 @@ async function createKeepUploadTask() {
       </a-tooltip>
     </div>
 
-    <!-- 一个达标的都没有时规则退让（照旧拿列表第一条当基准），但要说清为什么退让 ——
-         否则他刚看到那一行的「低分享率」标记，转头又发现被标着的这条就是基准，两句互相矛盾。 -->
+    <!-- 一个达标的都没有：基准那一条要完整下一遍，所以这一批一条都不许当基准 —— 「创建任务」停用，
+         这里写清为什么停、以及两条出路（再勾一条达标站 / 改挑下载器里已有的那条当基准）。 -->
     <a-alert v-if="allBaseRatiosLow" class="mb-2" type="warning" show-icon>
       <template #message>{{ t("SearchEntity.KeepUploadDialog.baseRatio.allLow") }}</template>
     </a-alert>

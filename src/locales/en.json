@@ -675,7 +675,7 @@
         "lowTip": "This site's ratio is below 1: the base torrent is downloaded in full, which pushes this site's ratio down further, so it is not offered as a base candidate.",
         "unknown": "Ratio unknown",
         "unknownTip": "No ratio has been fetched for this site yet (refresh user data in My Data), so it is still treated as eligible.",
-        "allLow": "Every candidate site here has a ratio below 1, so there is nothing to fall back to - the first entry is used as the base."
+        "allLow": "Every candidate site here has a ratio below 1, so none of them can serve as the base and Create Task is disabled. The base torrent is downloaded in full, which pushes that site's ratio down further. Include one more entry from a site whose ratio is at least 1, or choose a downloader and make an existing torrent there the base - that way nothing is downloaded again."
       },
       "localBase": {
         "byFiles": "File lists match - selected for you",

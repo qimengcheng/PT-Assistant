@@ -122,6 +122,20 @@ export function assignGroups<T extends IRowForGroup>(
 }
 
 /**
+ * 这一行所在的组里一共有哪几行（含它自己）。
+ *
+ * 不属于任何组、或组里只有一条时返回**空数组** —— 调用方据此判「要不要把整组一起端出去」，
+ * 不用自己再比一次长度。`members` 里是组内全部行 key，包括折叠态下没出现在列表里的那些，
+ * 所以这一句也回答了「看不见的那几条算不算」：算。
+ */
+export function groupSiblingsOf(key: string, meta: Map<string, IGroupMeta>, members: Map<string, string[]>): string[] {
+  const info = meta.get(key);
+  if (!info) return [];
+  const list = members.get(info.group) ?? [];
+  return list.length > 1 ? list : [];
+}
+
+/**
  * 把**已经排好序**的行重排成「同组相邻」，并按折叠状态决定组员出不出现。
  *
  * 组的位置 = 组内第一条在输入里的位置；组内顺序 = 它们在输入里的相对顺序。

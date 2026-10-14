@@ -313,6 +313,7 @@
     "dialog": {
       "removeData": "同时删除数据",
       "deletingList": "删除的是这几条：",
+      "pickRows": "以下为同一份内容的多条副本，请勾选要一起删除的条目：",
       "removeDataIgnored": "其中 {count} 条在群晖 Download Station 上：那边只调「删任务」这一个接口，这个勾选对它不起作用。"
     },
     "label": {

@@ -313,6 +313,7 @@
     "dialog": {
       "removeData": "Also remove data",
       "deletingList": "These are the ones to delete:",
+      "pickRows": "These entries are copies of the same content. Select the ones to delete together:",
       "removeDataIgnored": "{count} of them are on Synology Download Station: that API only has one “delete task” call, so this checkbox does nothing for them."
     },
     "label": {

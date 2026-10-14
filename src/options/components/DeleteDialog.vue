@@ -4,11 +4,16 @@ import { useI18n } from "vue-i18n";
 import { message } from "antdv-next";
 
 const showDialog = defineModel<boolean>();
-const { toDeleteIds, confirmDelete: confirmDeleteFn, width } = defineProps<{
+const { toDeleteIds, confirmDelete: confirmDeleteFn, width, okDisabled = false } = defineProps<{
   toDeleteIds: Id[];
   confirmDelete: (toDeleteId: Id) => Promise<void> | void;
   /** 调用点要塞列表（而不是只有一句「删除 N 项」）时才需要加宽，不给就保持原来的窄确认框 */
   width?: number;
+  /**
+   * 调用方自己判「这一批是不是空的」时用（例如列表带勾选框、他可以把勾全取消）。
+   * 不给就等于不禁用 —— 空批按原样走：一次请求都不发、关掉窗口、报「已删除 0 项」。
+   */
+  okDisabled?: boolean;
 }>();
 const emits = defineEmits<{
   (e: "allDelete"): void;
@@ -70,7 +75,7 @@ async function dialogEnter() {
       <a-button type="text" @click="showDialog = false">
         <span class="ml-1">{{ t("common.dialog.cancel") }}</span>
       </a-button>
-      <a-button danger :loading="isDeleting" type="primary" @click="confirmDelete">
+      <a-button danger :loading="isDeleting" :disabled="okDisabled" type="primary" @click="confirmDelete">
         <!-- 这个组件只做删除，按钮要说清动作，不能是通用的「完成」（common.dialog.ok 归增改类弹窗） -->
         <span class="ml-1">{{ t("common.remove") }}</span>
       </a-button>

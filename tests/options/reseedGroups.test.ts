@@ -17,6 +17,7 @@ import {
   buildTaskGroups,
   collapseGroups,
   contentFingerprint,
+  groupSiblingsOf,
   type IRowForGroup,
 } from "@/options/views/Overview/MyClient/reseedGroups.ts";
 
@@ -182,5 +183,25 @@ describe("collapseGroups：折叠只出代表行，展开整组相邻", () => {
   it("组内保持输入顺序 —— 添加时间的先后由调用方排好，这里不重新排", () => {
     const pair = [row({ key: "z", infoHash: "h1" }), row({ key: "y", infoHash: "h2" })];
     expect(collapseGroups(pair, () => "G1", new Set(["G1"])).rows.map((r) => r.key)).toEqual(["z", "y"]);
+  });
+});
+
+describe("groupSiblingsOf：行内那颗删除键要端出去的那几条", () => {
+  const rows = [row({ key: "a" }), row({ key: "b" }), row({ key: "solo" })];
+  const { meta, members } = collapseGroups(rows, (r) => (["a", "b"].includes(r.key) ? "G1" : null), new Set());
+
+  it("代表行 → 整组，含折叠态下没出现在列表里的那条", () => {
+    expect(groupSiblingsOf("a", meta, members)).toEqual(["a", "b"]);
+  });
+  it("组员行（展开态下点它）→ 同样是整组，不只是它自己", () => {
+    expect(groupSiblingsOf("b", meta, members)).toEqual(["a", "b"]);
+  });
+  it("不成组的行 → 空数组，调用方据此走原来的单条确认框", () => {
+    expect(groupSiblingsOf("solo", meta, members)).toEqual([]);
+  });
+  it("meta 有但组里只剩一条（数据自相矛盾）→ 也返回空，不出「整组就一条」的勾选框", () => {
+    const one = new Map(meta);
+    one.set("a", { group: "G9", count: 1, anchor: true });
+    expect(groupSiblingsOf("a", one, new Map([["G9", ["a"]]]))).toEqual([]);
   });
 });

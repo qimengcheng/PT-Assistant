@@ -49,6 +49,7 @@ import {
   assignGroups,
   buildTaskGroups,
   collapseGroups,
+  groupSiblingsOf,
   type IGroupMeta,
   type IRowForGroup,
 } from "./reseedGroups.ts";
@@ -502,9 +503,32 @@ async function resumeTorrents(torrents: CTorrent[]) {
   await Promise.allSettled(affectedIds.map(loadSingleDownloader));
 }
 
-function openDeleteDialog(torrentList: CTorrent[]) {
+/** 确认框里每一条前面要不要勾选框（只有行内那颗键、且这一条在同内容组里时才要） */
+const deleteSelectable = ref(false);
+
+function openDeleteDialog(torrentList: CTorrent[], selectable = false) {
   toDeleteTorrents.value = torrentList;
+  deleteSelectable.value = selectable;
   showDeleteDialog.value = true;
+}
+
+/**
+ * 行内那颗删除键：这一条属于同内容组时，把整组一起端进确认框，并让他能勾。
+ *
+ * 用户 2026-10-14：「点删除的时候只删除了一条，应该可以选择一起删除」—— 折叠态下组员根本不在
+ * 列表里，行内键只送一条就等于把同内容的其余几条永远留在那儿，一条条点着删。
+ * 默认全勾（他要的就是「一起」），但每条可取消 —— 不然「只删这一条」反而没了入口。
+ * 组里只有一条 / 这一条不成组时走原样：单条、不出勾选框。
+ */
+function openDeleteDialogForRow(record: CTorrent) {
+  const siblings = groupSiblingsOf(torrentKey(record), grouped.value.meta, grouped.value.members);
+  if (siblings.length <= 1) {
+    openDeleteDialog([record]);
+    return;
+  }
+  const byKey = new Map(sortedTorrents.value.map((t) => [torrentKey(t), t]));
+  const rows = siblings.map((k) => byKey.get(k)).filter((t): t is CTorrent => !!t);
+  openDeleteDialog(rows.length > 1 ? rows : [record], rows.length > 1);
 }
 
 function openDetailDialog(item: CTorrent) {
@@ -1015,7 +1039,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
             </a-tooltip>
 
             <a-tooltip :title="t('MyClient.action.delete')">
-              <a-button type="primary" size="small" danger @click="() => openDeleteDialog([record])">
+              <a-button type="primary" size="small" danger @click="() => openDeleteDialogForRow(record)">
                 <template #icon><DeleteOutlined /></template>
               </a-button>
             </a-tooltip>
@@ -1049,6 +1073,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
     v-model="showDeleteDialog"
     :to-delete-ids="toDeleteTorrents.map((t) => torrentKey(t))"
     :torrents="toDeleteTorrents"
+    :selectable="deleteSelectable"
     :confirm-delete="confirmDeleteTorrent"
     @all-delete="loadTorrents"
   />

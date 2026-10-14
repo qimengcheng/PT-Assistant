@@ -698,6 +698,17 @@
         "needManual": "待你确认 {n} 条",
         "failed": "未通过 {n} 条",
         "checking": "检测中 {n} 条"
+      },
+      "dupTask": {
+        "content": "已有一条辅种任务在管同一份内容：「{title}」（{count} 条种子，建于 {date}）。",
+        "contentWeak": "有一条辅种任务的标题与大小和这一条完全相同，可能是同一份内容：「{title}」（{count} 条种子，建于 {date}）。",
+        "whyShared": "两条任务里有 {n} 条是同一条种子。",
+        "whyHash": "两条任务里有 {n} 条种子的 infoHash 相同。",
+        "whyTitleSize": "没有发现同一条种子，只按标题与大小判。",
+        "baseDiffers": "两边的基准不是同一条种子，冲突会更直接。",
+        "more": "另有 {n} 条任务也是同一份内容。",
+        "conflict": "两条任务会各自按自己的基准搬目录、各自回查，容易互相冲突。仍要再建一条吗？",
+        "ok": "仍然创建"
       }
     },
     "SaveSnapshotDialog": {

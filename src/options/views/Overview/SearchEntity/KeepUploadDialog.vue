@@ -32,7 +32,8 @@ import {
   type ILocalFingerprintIndex,
   type ILocalTorrentFingerprintEntry,
 } from "@/shared/fingerprint/index.ts";
-import { formatSize } from "@/options/utils.ts";
+import { formatSize, formatDate } from "@/options/utils.ts";
+import { findDuplicateTasks } from "@/shared/reseedTaskDup.ts";
 import { countText, toCount } from "@/shared/torrentCount.ts";
 import {
   allBasesTooLow,
@@ -1415,6 +1416,38 @@ async function createKeepUploadTask() {
         hash: item.torrent?.infoHash,
       })) as IKeepUploadTaskItem[],
     };
+
+    /**
+     * 建之前先看场上有没有别的任务已经在管同一份内容（用户 2026-10-14：「辅种任务重复建立时要有提示，
+     * 不然两个一样的辅种任务但是基准又不一样会发生冲突」）。
+     *
+     * 只提示、不硬拦：同一份内容分两批站去辅是合法做法，判据给的是一条他能不能自己否掉的确认框。
+     * 取任务列表失败就当没有重复 —— 不能把「查不了」变成「建不了」。判据在 `shared/reseedTaskDup.ts`。
+     */
+    const existing = await sendMessage("getKeepUploadTasks", undefined).catch(() => [] as IKeepUploadTask[]);
+    const dup = findDuplicateTasks(task, existing ?? []);
+    if (dup.length > 0) {
+      const hit = dup[0];
+      const args = { title: hit.task.title, count: hit.task.items?.length ?? 0, date: formatDate(hit.task.time) };
+      // 键全部写字面 t()：防线③（check-locale-keys）看不见 `"前缀" + x` 拼出来的键，
+      // 而这一屏有九条文案要中英两边都在场，拼一次就等于把它交给肉眼。
+      const lead =
+        hit.reason === "sameTitleSize"
+          ? t("SearchEntity.KeepUploadDialog.dupTask.contentWeak", args)
+          : t("SearchEntity.KeepUploadDialog.dupTask.content", args);
+      const why =
+        hit.reason === "sameItem"
+          ? t("SearchEntity.KeepUploadDialog.dupTask.whyShared", { n: hit.sharedItems })
+          : hit.reason === "sameHash"
+            ? t("SearchEntity.KeepUploadDialog.dupTask.whyHash", { n: hit.sharedItems })
+            : t("SearchEntity.KeepUploadDialog.dupTask.whyTitleSize");
+      const parts = [lead, why];
+      if (hit.baseDiffers) parts.push(t("SearchEntity.KeepUploadDialog.dupTask.baseDiffers"));
+      if (dup.length > 1) parts.push(t("SearchEntity.KeepUploadDialog.dupTask.more", { n: dup.length - 1 }));
+      parts.push(t("SearchEntity.KeepUploadDialog.dupTask.conflict"));
+
+      if (!(await confirmDanger(parts.join(""), "primary", t("SearchEntity.KeepUploadDialog.dupTask.ok")))) return;
+    }
 
     await sendMessage("createKeepUploadTask", task);
     // 催后台立刻走一轮自动辅种。不催的话这条新任务要等下一次定时（最多 1 分钟）才被看到，

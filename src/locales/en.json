@@ -698,6 +698,17 @@
         "needManual": "{n} awaiting your confirmation",
         "failed": "{n} failed",
         "checking": "{n} still checking"
+      },
+      "dupTask": {
+        "content": "Another reseed task already covers the same data: \"{title}\" ({count} torrents, created {date}). ",
+        "contentWeak": "Another reseed task has exactly the same title and size, so it may be the same data: \"{title}\" ({count} torrents, created {date}). ",
+        "whyShared": "{n} of the torrents are the same item in both tasks. ",
+        "whyHash": "{n} torrents share an infoHash between the two tasks. ",
+        "whyTitleSize": "No identical torrent was found; this is judged by title and size only. ",
+        "baseDiffers": "The two tasks use different base torrents, so the clash is more direct. ",
+        "more": "Another {n} task(s) cover the same data as well. ",
+        "conflict": "Both tasks move the data and re-check it against their own base, which can fight each other. Create it anyway?",
+        "ok": "Create anyway"
       }
     },
     "SaveSnapshotDialog": {

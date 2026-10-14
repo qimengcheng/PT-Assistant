@@ -93,7 +93,7 @@ const navItems = computed(() => {
     { path: "/sites", label: t("layout.nav.sites"), icon: GlobalOutlined },
     { path: "/search", label: t("common.search"), icon: SearchOutlined },
     { path: "/my-data", label: t("route.Overview.MyData"), icon: BarChartOutlined },
-    // /my-client 早就注册在 router.ts 里，页面也写完了，但此前只有「下载器」页那个 ⓘ
+    // /my-client 早就注册在 router.ts 里，页面也写完了，但此前只有「下载器管理」页那个 ⓘ
     // 按钮能跳过来（manageDownloader），左侧导航漏了这条 —— 文件在 ≠ 用户能看到。
     // 放在「我的数据」后面：两个「我的」页面相邻；下载器设置仍在下面 /set-downloader。
     { path: "/my-client", label: t("layout.nav.myClient"), icon: DatabaseOutlined },

@@ -1495,7 +1495,7 @@
       "downloadLinkSuffixExample": "E.g. if the plugin gets https://example.com/download.php?id=1 and you set &passkey=xxxx, the final download link will be https://example.com/download.php?id=1&passkey=xxxx. Leave this empty by default, and only fill in the passkey if the correct download link cannot be obtained.",
       "downloadLinkSuffixHint": "This field will be automatically appended to the site's download links",
       "otherSettings": "Other Settings",
-      "isOfflineHint": "An offline site is excluded from search and from the automatic user-info refresh; the \"Allow Search\" and \"Allow access USP\" switches on its row are held down as well.",
+      "isOfflineHint": "An offline site is excluded from search and from the automatic user-info refresh. Marking a site offline also turns off its \"Allow Search\" and \"Allow access USP\" switches; clearing the offline mark does not restore them.",
       "requestTimeout": "Request Timeout",
       "requestTimeoutHint": "Affects the timeout for site requests (torrent search, user info retrieval)",
       "categoryMap": "Category mapping",

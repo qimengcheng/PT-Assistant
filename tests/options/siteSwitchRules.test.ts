@@ -1,7 +1,8 @@
 /**
- * 站点列表那几颗布尔开关的「哪颗该按住」（`src/options/views/Settings/SetSite/siteSwitchDisabled.ts`）。
+ * 站点那几颗布尔开关的两条落库规则（`src/options/views/Settings/SetSite/siteSwitchRules.ts`）：
+ * 哪颗该按住、按下要连带改哪几颗。
  *
- * 为什么要单独一份断言：这条判据在模板里，vue-tsc / check-dead-props / ESLint 全都看不见它，
+ * 为什么要单独一份断言：这两条判据都住在模板里，vue-tsc / check-dead-props / ESLint 全都看不见它，
  * 而它坏一次的形状是**单向锁** —— 用户把某个站点标成「已离线」之后那一行三颗开关（开了内容
  * 脚本例外时四颗）全部按住，包括「已离线」自己，而站点编辑器里根本没有这颗开关，界面上就再也
  * 关不回去了（v0.8.0 平移带出、用户 2026-10-13 报）。所以「控制 X 的那一颗不许被 X 按住」要能
@@ -9,7 +10,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { siteSwitchDisabled } from "@/options/views/Settings/SetSite/siteSwitchDisabled.ts";
+import {
+  offlineCascade,
+  siteSwitchDisabled,
+  siteSwitchPatch,
+} from "@/options/views/Settings/SetSite/siteSwitchRules.ts";
 
 const OFFLINE = "userConfig.isOffline";
 const SEARCH = "userConfig.allowSearch";
@@ -70,5 +75,43 @@ describe("反空转：判据真的按列分档，不是无条件放行也不是�
     expect(siteSwitchDisabled(SEARCH, row)).toBe(true);
     expect(siteSwitchDisabled(USERINFO, row)).toBe(false);
     expect(siteSwitchDisabled(OFFLINE, row)).toBe(false);
+  });
+});
+
+describe("打开「已离线」要连带关掉的那两颗（用户 2026-10-14 提的）", () => {
+  it("开离线：允许搜索、获取个人信息一起置成 false", () => {
+    expect(offlineCascade(true)).toEqual({ allowSearch: false, allowQueryUserInfo: false });
+  });
+
+  it("取消离线：什么都不连带 —— 不替用户决定「这个站我又要拿去搜了」", () => {
+    expect(offlineCascade(false)).toEqual({});
+  });
+
+  it("连带只碰那两颗，不动 sortIndex / timeout / 内容脚本例外这一整片", () => {
+    expect(Object.keys(offlineCascade(true)).sort()).toEqual(["allowQueryUserInfo", "allowSearch"]);
+  });
+});
+
+describe("列表那一格按下去写回的整份补丁", () => {
+  it("「已离线」按下：自己 + 连带那两颗，一次写回", () => {
+    expect(siteSwitchPatch(OFFLINE, true)).toEqual({
+      isOffline: true,
+      allowSearch: false,
+      allowQueryUserInfo: false,
+    });
+  });
+
+  it("「已离线」弹回：只写自己那颗，那两颗留在原地", () => {
+    expect(siteSwitchPatch(OFFLINE, false)).toEqual({ isOffline: false });
+  });
+
+  it("另外两列自己按下时不连带任何东西", () => {
+    expect(siteSwitchPatch(SEARCH, true)).toEqual({ allowSearch: true });
+    expect(siteSwitchPatch(USERINFO, false)).toEqual({ allowQueryUserInfo: false });
+    expect(siteSwitchPatch(CONTENT_SCRIPT, true)).toEqual({ allowContentScript: true });
+  });
+
+  it("写回的键名是 userConfig 上的字段名，不带列键那层 userConfig. 前缀", () => {
+    expect(Object.keys(siteSwitchPatch(OFFLINE, true))).not.toContain("userConfig.isOffline");
   });
 });

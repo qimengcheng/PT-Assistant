@@ -38,7 +38,7 @@ import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 // 数据来源
 import { allAddedSiteInfo, isLoadingAllAddedSites, type ISiteTableItem } from "./utils.ts";
-import { siteSwitchDisabled } from "./siteSwitchDisabled.ts";
+import { siteSwitchDisabled, siteSwitchPatch } from "./siteSwitchRules.ts";
 
 const { t } = useI18n();
 
@@ -550,7 +550,8 @@ function keywordChecked(keyword: string) {
 
         <template v-else-if="String(column.key).startsWith('userConfig.')">
           <!-- 哪一颗按住由 `siteSwitchDisabled` 判（含「已离线」自己那颗不许被离线按住那条），
-               判据本体与用例在 ./siteSwitchDisabled.ts —— 这里以前是一条内联表达式，
+               按下要连带改哪几颗由 `siteSwitchPatch` 判（开离线时把「允许搜索」「获取个人信息」
+               一起关掉）。两条判据的本体与用例在 ./siteSwitchRules.ts —— 这里以前是一条内联表达式，
                v0.8.0 把上游四段插槽抄成一段时把「已离线」也一起按住了。 -->
           <a-switch
             size="small"
@@ -558,12 +559,7 @@ function keywordChecked(keyword: string) {
             :disabled="siteSwitchDisabled(String(column.key), record)"
             @change="
               (checked: boolean | string | number) =>
-                metadataStore.simplePatch(
-                  'sites',
-                  record.id,
-                  String(column.key).replace('userConfig.', ''),
-                  !!checked,
-                )
+                metadataStore.simplePatchMany('sites', record.id, siteSwitchPatch(String(column.key), !!checked))
             "
           />
         </template>

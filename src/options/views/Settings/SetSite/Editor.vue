@@ -11,6 +11,7 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate, formValidateRules } from "@/options/utils.ts";
 import { CATEGORY_KINDS, categoryKindLabelKey } from "@/shared/category.ts";
+import { offlineCascade } from "./siteSwitchRules.ts";
 
 const { t } = useI18n();
 const metadataStore = useMetadataStore();
@@ -383,13 +384,20 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
          形状走 `SetDownloader/Editor.vue` 的 .switch-row（标签左、开关右）—— 不要写成
          「一个开关一个竖排 a-form-item」，那一档实测要 82~95px 高，是用户点过名的浪费。
          站点定义标死（isDead）时不必在这里再写一遍 :disabled —— 上面 <a-form :disabled> 会经
-         Switch 的 useDisabledContext() 进来（`props.disabled ?? disabled.value`）。 -->
+         Switch 的 useDisabledContext() 进来（`props.disabled ?? disabled.value`）。
+         @change 里那一次 Object.assign 是「开离线就把允许搜索/获取个人信息一起关掉」的联动，
+         判据与列表那颗共用 `siteSwitchRules.ts` 的 `offlineCascade`（编辑器里没有那两颗开关，
+         改的是这份表单对象，点「保存」时整份写回）。 -->
     <div class="switch-row">
       <div class="switch-row-text">
         <div class="switch-row-label">{{ t("SetSite.common.isOffline") }}</div>
         <div class="switch-row-hint">{{ t("SetSite.Editor.isOfflineHint") }}</div>
       </div>
-      <a-switch v-model:checked="siteUserConfig.isOffline" size="small" />
+      <a-switch
+        v-model:checked="siteUserConfig.isOffline"
+        size="small"
+        @change="(checked: boolean | string | number) => Object.assign(siteUserConfig, offlineCascade(Boolean(checked)))"
+      />
     </div>
 
     <a-form-item>

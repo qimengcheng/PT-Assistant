@@ -437,6 +437,22 @@ export const useMetadataStore = defineStore("metadata", {
     },
 
     /**
+     * `simplePatch` 的多键版：按下一次要同时改几个字段时用（例如「已离线」连带关掉
+     * 「允许搜索」「获取个人信息」）。逐键 `simplePatch` 会 $save 三次，中间任何一次落盘
+     * 失败都会留下「离线开了、那两颗没关」的半截状态。
+     */
+    async simplePatchMany<Field extends TSimplePatchFieldKey, Id extends keyof IMetadataPiniaStorageSchema[Field]>(
+      schemaKey: Field,
+      id: Id,
+      entries: Record<string, unknown>,
+    ) {
+      for (const [key, value] of Object.entries(entries)) {
+        set(this[schemaKey][id], key, value);
+      }
+      await this.$save();
+    },
+
+    /**
      * 按给定顺序重写站点 sortIndex（降序：越靠前值越大，与 getSortedAddedSites 的排法一致）。
      *
      * orderedIds 允许只是「可见子集」（搜索作用域面板里只列可搜站点），所以先把新顺序

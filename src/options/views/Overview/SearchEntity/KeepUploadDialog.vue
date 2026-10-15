@@ -32,10 +32,11 @@ import {
   type ILocalFingerprintIndex,
   type ILocalTorrentFingerprintEntry,
 } from "@/shared/fingerprint/index.ts";
-import { formatSize, formatDate } from "@/options/utils.ts";
+import { formatSize, formatDate, sizeText } from "@/options/utils.ts";
 import { siteCurrentRatio } from "@/options/utils/siteRatio.ts";
 import { findDuplicateTasks } from "@/shared/reseedTaskDup.ts";
 import { countText, toCount } from "@/shared/torrentCount.ts";
+import { pickTorrentSizeBytes } from "@/shared/torrentSize.ts";
 import {
   allBasesTooLow,
   pickBaseRecommendations,
@@ -596,6 +597,20 @@ function ratioVerdictOf(item: IVerifiedItem) {
 }
 
 /**
+ * 这一行的大小取哪个数：**.torrent 自己的总字节优先**，页面那个数只作兜底。
+ *
+ * 这一屏每一条都已经把 .torrent 取回来解析过（`item.torrent`，验证与指纹都比的是它），
+ * `length` 就是这份内容的真实字节，跟站点皮肤把那一格写成什么无关。而 `data.size` 是从
+ * 搜索结果页那一格**文本**解析出来的，解析层读不懂时回的是 0（判据与原因见 `@/shared/torrentSize`），
+ * 于是 1PTBar 那一行显示 0 B、建任务落库也是 0（用户 2026-10-15 报的）。
+ * 只有 .torrent 还没拿回来的那几条才退回页面值；两个都读不出返回 null，
+ * 由调用方决定画 `-` 还是走「算不出」那一档。
+ */
+function rowSizeBytes(item: IVerifiedItem): number | null {
+  return pickTorrentSizeBytes({ torrentLength: item.torrent?.length, pageShownSize: item.data.size });
+}
+
+/**
  * 站点那一格悬停时，「下完这一条之后」要不要真算 —— 判的是这一条在当前流程里会不会被下载。
  *
  * 辅种只有**基准那一条**要真下一次（其余是跳过校验直接算完成），基准取自下载器时那一条
@@ -606,8 +621,7 @@ function siteRatioImpact(item: IVerifiedItem): TRatioImpact {
   if (useLocalBase.value) return "localBase";
   if (item.id !== baseId.value) return "skipCheck";
   if (isFreeTorrent(item.data.tags)) return "free";
-  const size = item.data.size;
-  if (typeof size !== "number" || !Number.isFinite(size) || size <= 0) return "noSize";
+  if (rowSizeBytes(item) === null) return "noSize";
   return "download";
 }
 
@@ -1443,7 +1457,7 @@ async function createKeepUploadTask() {
       time: Date.now(),
       title: verifiedList[0].data.title || "Unknown",
       subTitle: verifiedList[0].data.subTitle,
-      size: verifiedList[0].data.size || 0,
+      size: rowSizeBytes(verifiedList[0]) ?? 0,
       downloadOptions,
       // 自动辅种：建完任务后由后台每分钟替人往下走那条链（判据在 `KeepUploadTask/autoReseed.ts`）。
       // 这里**必须显式写值**：任务页/后台判的是 `=== true`，写成 undefined 的旧任务不会被突然
@@ -1472,7 +1486,7 @@ async function createKeepUploadTask() {
         category: item.data.category,
         link: item.data.url || "", // ITorrent.url = 详情页链接
         url: item.data.link || "", // ITorrent.link = 下载链接
-        size: item.data.size || 0,
+        size: rowSizeBytes(item) ?? 0,
         seeders: item.data.seeders,
         leechers: item.data.leechers,
         // 验证阶段已经下载过这条的 .torrent，infoHash 就在手上；不记下来，任务页回查时
@@ -1743,7 +1757,7 @@ async function createKeepUploadTask() {
           <template v-else-if="column.key === 'site'">
             <SiteRatioPopover
               :site-id="record.data.site"
-              :size="record.data.size"
+              :size="rowSizeBytes(record) ?? undefined"
               :impact="siteRatioImpact(record)"
             >
               <div class="d-flex align-center ga-1 site-cell">
@@ -1788,7 +1802,7 @@ async function createKeepUploadTask() {
           </template>
 
           <template v-else-if="column.key === 'size'">
-            {{ formatSize(record.data.size ?? 0) }}
+            {{ sizeText(rowSizeBytes(record)) }}
           </template>
 
           <template v-else-if="column.key === 'files'">

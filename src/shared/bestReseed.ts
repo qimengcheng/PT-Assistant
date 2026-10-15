@@ -36,6 +36,8 @@
  * 常常是体积最大的一份，重下一次代价太高时用户想换小一档）。
  */
 
+import { toSizeBytes } from "./torrentSize.ts";
+
 /** 一行结果里这一判据要吃的字段（ISearchResultTorrent 的结构子集，方便单测造夹具） */
 export interface IReseedGroupRow {
   site?: string;
@@ -84,16 +86,6 @@ export interface IReseedGroup<T> {
   seedingCount: number;
   /** 这一组有没有**任何**一条报得出状态；false 时界面上那一格留空，不画 0 */
   statusKnown: boolean;
-}
-
-/**
- * 站点报的大小：类型写的是 `size?: number`，但解析层是从页面文本来的，运行时可能是数字串。
- * 只认能落成正有限数的值，其余（缺字段 / 0 / NaN / "56.58 GiB" 这种带单位的）一律不参与分组。
- */
-export function toSizeBytes(raw: unknown): number | null {
-  if (raw === null || raw === undefined || raw === "") return null;
-  const n = typeof raw === "number" ? raw : Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 /**

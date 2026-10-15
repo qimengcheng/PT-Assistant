@@ -24,7 +24,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { buildSortOrderMap, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
-import { formatDate, formatSize, formatTimeAgo } from "@/options/utils.ts";
+import { formatDate, formatTimeAgo, sizeText } from "@/options/utils.ts";
 import type { IConfigPiniaStorageSchema, ISearchResultTorrent } from "@/shared/types.ts";
 import { categoryKindLabelKey, categoryKindOf, compareCategory } from "@/shared/category.ts";
 
@@ -1003,7 +1003,7 @@ const hasSearchStatus = computed<boolean>(() => {
                      而 .d-flex 是块级 flex 容器、默认 justify-content:flex-start，
                      里面那颗 span 照样贴左沿（台架 .tmp-build/bench-size-align 量到右沿留 35~42px）。 -->
                 <div class="d-flex justify-end">
-                  <span class="t_size text-no-wrap">{{ formatSize(record.size ?? 0) }}</span>
+                  <span class="t_size text-no-wrap">{{ sizeText(record.size) }}</span>
                 </div>
                 <!-- 这里不能再套一层 d-flex：TorrentProcessTd 的根自己就是 flex 行，
                      套上之后它变成 flex item、按 max-content 收缩，而里面那条进度条是

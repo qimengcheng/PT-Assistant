@@ -12,7 +12,7 @@ import {
 import { ETorrentStatus, type ITorrent } from "@ptd/site";
 import type { TableColumnsType } from "antdv-next";
 
-import { formatDate, formatSize } from "@/options/utils.ts";
+import { formatDate, formatSize, sizeText } from "@/options/utils.ts";
 import { countText } from "@/shared/torrentCount.ts";
 import { sendMessage } from "@/messages.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
@@ -244,7 +244,7 @@ const rowSelection = computed(() => ({
 
         <!-- 种子大小 -->
         <template v-else-if="column.key === 'size'">
-          <span class="text-no-wrap">{{ formatSize(record.size ?? 0) }}</span>
+          <span class="text-no-wrap">{{ sizeText(record.size) }}</span>
         </template>
 
         <!-- 这三格原本直接打解析值：站点那一格里常混着自己的图标字符（详见 torrentCount.ts），

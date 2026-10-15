@@ -11,6 +11,7 @@ import {
   format as dateFormat,
 } from "date-fns";
 import { i18n } from "@/options/plugins/i18n.ts";
+import { toSizeBytes } from "@/shared/torrentSize.ts";
 
 export function deepToRaw<T>(sourceObj: T): T {
   const objectIterator = (input: unknown): unknown => {
@@ -55,6 +56,21 @@ export const formatSize = (size: number | string, options?: FilesizeOptions) => 
   } catch (e) {
     return size;
   }
+};
+
+/**
+ * 种子大小那一格的文字：判不出处给 `-`，不写 `0 B`。
+ *
+ * 「什么算判不出」不在这里重写一遍，用的是 `@/shared/torrentSize` 的 `toSizeBytes` ——
+ * 解析层读不懂页面文本时回的是 0（`@ptd/site` 的 `parseSizeString`：文本不匹配 `sizePattern`
+ * 就 `return 0`，它把「读不懂」折成了「零字节」），而 0 字节不是任何一份真实内容。
+ * 照着 `formatSize(x ?? 0)` 画出来就是「这个站说这份种子是 0 字节」—— 1PTBar 那一行（用户
+ * 2026-10-15 报的）。同一口径先用在人数列（`@/shared/torrentCount` 的 `countText`）与进度（`toPercent`）。
+ */
+export const sizeText = (size: unknown): string => {
+  const bytes = toSizeBytes(size);
+  // formatSize 的返回类型是 `string | number`（它 catch 分支原样回吐入参），这里统一成字符串
+  return bytes === null ? "-" : String(formatSize(bytes));
 };
 
 export const formatDate = (date: Date | number | string, format: string = "yyyy-MM-dd HH:mm:ss") => {

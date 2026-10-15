@@ -16,7 +16,7 @@ import {
 import type { CTorrent } from "@ptd/downloader";
 import type { IKeepUploadTask, TKeepUploadTaskKey } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
-import { formatSize, formatDate } from "@/options/utils.ts";
+import { formatDate, sizeText } from "@/options/utils.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -1433,7 +1433,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
         </template>
 
         <template v-else-if="column.key === 'size'">
-          {{ formatSize(rowSize(record)) }}
+          {{ sizeText(rowSize(record)) }}
         </template>
 
         <!-- 这一列第一行是**进度阶段**（他 2026-10-09：「要能看到现在是已发基准、基准下载完成还是在辅种」）。

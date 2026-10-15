@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-15 17:29:44",
-  "headSha": "8401cf7",
+  "generatedAt": "2026-10-15 17:46:11",
+  "headSha": "9435bcc",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.105.11",
+      "date": "2026-10-15 17:46:11",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "接上一版：PTZone 的断种放回来了。你实测 `incldead=0` 那条地址也是完整的，所以插件改成发 `incldead=0`（站点档位上写的「包括斷種」，也就是最宽那一档），不再是为了拿全页而只能看活种。",
+        "还剩一件事没分开：到底是「没带站点表单那套参数」还是「带了 notnewword=1」让站点只回半页，你给的三条地址还分不出来（两条正常的都既带全套表单键、又不带 notnewword）。要分只需再开一条裸地址 `torrents.php?search=关键词`：完整就说明毒的是 notnewword，插件以后可以少发一半参数；仍断就说明必须把表单那套键发齐。"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.105.10",
       "date": "2026-10-15 17:29:44",

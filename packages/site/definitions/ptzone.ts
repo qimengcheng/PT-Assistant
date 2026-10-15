@@ -27,18 +27,25 @@ export const siteMetadata: ISiteMetadata = {
 
   /**
    * ⚠️ 这里把参数逐个写全，是因为公共那份 `SchemaMetadata.search` 只带 `notnewword=1`，
-   * 而 PTzone 对那一条地址**稳定只返回 3 行、且第 3 行是半行**（用户 2026-10-15 实测：
-   * `torrents.php?notnewword=1&search=<词>` 出 3 行，站点自己搜索表单那条完整地址出 50 行/共 124）。
-   * 结果就是插件比站点少一大截，还被那半行冒充成一条种子（v0.105.9 的截断判据会把它报出来）。
+   * 而 PTzone 对那一条地址**稳定只返回 3 行、且第 3 行是半行**（v0.105.9 的截断判据会把它报出来，
+   * 但报出来不等于拿得全）。用户 2026-10-15 在自己的浏览器里跑了三条地址，实测原话逐条抄在这里：
+   * - `torrents.php?notnewword=1&search=<词>` → 「确实只有3行，第三行还是只有一半」
+   * - `torrents.php?incldead=1&spstate=0&inclbookmarked=0&approval_status=&size_begin=&…&search_area=0&search_mode=0`
+   *   → 「这个地址就是正常的」（第 1 页 50 行、共 124）
+   * - `torrents.php?inclbookmarked=0&incldead=0&spstate=0&search_area=0&search=<词>&search_mode=0&page=0`
+   *   → 「这个是完整」
    *
-   * 下面这份就是**站点自己那张表单发出去的参数**，逐个照抄：
-   * - `incldead` 在 PTzone 的档位文字是 `0|包括斷種 / 1|活種 / 2|斷種`，站点默认给的是 `1`＝**只要活种**，
-   *   与 NexusPHP 常见理解（1=包含断种）相反，所以这条会**看不到断种**；
-   *   换回 `0`（= 我们此前不带参数时的实际语义，最宽）能不能拿全页，目前没有实测，
-   *   要验就只改这一个数：断种能否回来取决于它。
-   * - 那些空值参数（`size_begin=` 等）是站点表单本来就发的，照抄，不是猜的。
-   * - `keywordPath` 沿用 schema 的 `params.search`；IMDb 那条高级搜索词仍会在运行时把
-   *   `search_area` 改成 4（`SchemaMetadata.search.advanceKeywordParams`）。
+   * ⇒ **截断是由请求本身决定、可复现的**，不是网络抖动；而两条正常的地址都①带整套表单键、
+   * ②都不带 `notnewword`。到底是"缺表单键"还是"`notnewword=1`"触发的，这两条实验分不开
+   * （要分只需再跑一条 `torrents.php?search=<词>`，裸关键词、不带 notnewword），
+   * 所以这里一次满足两条：照抄表单键集合、去掉 `notnewword`。
+   *
+   * 值取哪一档：`incldead` 在 PTzone 的档位文字是 `0|包括斷種 / 1|活種 / 2|斷種`
+   * （与 NexusPHP 常见理解 1=包含断种**相反**，也与本文件上面 `CategoryIncldead` 那套一致），
+   * 第 2 条用的是 1=只要活种，而第 3 条实测**`0`（包括断种、最宽）同样完整** ——
+   * 断种对辅种正是最有用的那一批（本地已有数据、站点却没人做种），所以取 `0`。
+   * 另外 `keywordPath` 沿用 schema 的 `params.search`；IMDb 那条高级搜索词仍会在运行时把
+   * `search_area` 改成 4（`SchemaMetadata.search.advanceKeywordParams`）。
    */
   search: {
     ...SchemaMetadata.search,
@@ -46,7 +53,7 @@ export const siteMetadata: ISiteMetadata = {
       ...SchemaMetadata.search?.requestConfig,
       url: "/torrents.php",
       params: {
-        incldead: 1,
+        incldead: 0,
         spstate: 0,
         inclbookmarked: 0,
         approval_status: "",

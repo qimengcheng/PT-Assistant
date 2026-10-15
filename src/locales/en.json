@@ -725,6 +725,7 @@
         "noNonLatin": "Non-Latin characters not supported",
         "searchEntityNotEnabled": "The search entry not enabled",
         "siteNotEnabled": "The site not enabled",
+        "truncatedSearchPage": "The search page was cut off inside the results table, so this list is incomplete",
         "userCancel": "You Cancel this search"
       },
       "successMsg": "Find {0} results in {0}s",

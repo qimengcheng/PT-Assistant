@@ -9,7 +9,9 @@ import {
   type IElementQuery,
   type ILevelRequirement,
   type ISearchCategories,
+  type ISearchEntryRequestConfig,
   type ISearchInput,
+  type ISearchResult,
   type ISiteMessage,
   type ISiteMessageActionResult,
   type ISiteMetadata,
@@ -25,6 +27,7 @@ import {
   parseTimeToLiveToDate,
   parseValidTimeString,
   sizePattern,
+  sleep,
 } from "../utils";
 
 export const CategoryIncldead: ISearchCategories = {
@@ -823,6 +826,45 @@ export default class NexusPHP extends PrivateSite {
     return "table.torrentname";
   }
 
+  /**
+   * 上一次解析的那一页是不是「断在某一行的中间」。null = 没发现断点。
+   *
+   * 为什么要记这一笔：站点（或它前面那层代理）把响应掐断时，浏览器照常把已经收到的那半行
+   * 留在表里，于是解析器看到的是「一张少了后面几十行的表」，一路成功 ——
+   * 界面上就是「站点自己 124 条、插件只有 3 条，而状态写成功」，
+   * 其中最后一条只有标题，大小/做种/下载/完成/评论/发布于 全空（它根本没有那些格）。
+   * 判据与复现见 .tmp-build/bench-ptzone（PTZone 真页 + 三种截法，用户 2026-10-15）。
+   */
+  protected searchPageTailCut: { rowCount: number; cells: number; headCells: number } | null = null;
+
+  public override async getSearchResult(
+    keywords?: string,
+    searchEntry: ISearchEntryRequestConfig = {},
+  ): Promise<ISearchResult> {
+    this.searchPageTailCut = null;
+    const first = await super.getSearchResult(keywords, searchEntry);
+    if (!this.searchPageTailCut) {
+      return first;
+    }
+
+    // 半截页先重要一次：那一头多半是渲染到一半就停了，重发有几率拿全
+    // （⚠️ 「有几率」是按成因推的，没在多站统计过命中率）
+    const cut = this.searchPageTailCut;
+    this.searchPageTailCut = null;
+    await sleep(1000);
+    const second = await super.getSearchResult(keywords, searchEntry);
+    if (!this.searchPageTailCut) {
+      return second;
+    }
+
+    // 两次都断：把这一站标成不完整，不能让手里这几条冒充整页结果
+    // （已经拿到的那些照常留着，只是状态与文案要说清它不是全的）
+    this.searchPageTailCut = cut;
+    second.status = EResultParseStatus.parseError;
+    second.statusMsg = "i18n.truncatedSearchPage";
+    return second;
+  }
+
   public override async transformSearchPage(
     doc: Document | object | any,
     searchConfig: ISearchInput,
@@ -837,7 +879,8 @@ export default class NexusPHP extends PrivateSite {
       // 对于NPHP，一般来说，表的第一行应该是标题行，即 `> tbody > tr:nth-child(1)` ，但是也有部分站点为 `> thead > tr`
       const legacyTableHasThead = Sizzle(`${legacyTableSelector} > thead > tr`, doc).length > 0;
 
-      if (!searchEntry!.selectors!.rows) {
+      const rowsWereGuessed = !searchEntry!.selectors!.rows;
+      if (rowsWereGuessed) {
         searchEntry!.selectors!.rows = {
           // 对于有thead的站点，认为 > tbody > tr 均为种子信息，而无 thead 的站点则为 > tbody > tr:gt(0)
           selector: `${legacyTableSelector} > tbody > tr` + (legacyTableHasThead ? "" : ":gt(0)"),
@@ -848,6 +891,32 @@ export default class NexusPHP extends PrivateSite {
       const headSelector =
         legacyTableSelector + (legacyTableHasThead ? " > thead > tr > th" : " > tbody > tr:eq(0) > td");
       const headAnother = Sizzle(headSelector, doc) as HTMLElement[];
+
+      // ── 截断判据（只在我们自己建 rows 那一族上挂）──
+      // 认的形状很窄：**只有末尾那一行比表头短、其余行都齐**。
+      // 这一种只可能是响应流断在行中间（浏览器把没收完的那半行照常留在表里）；
+      // 整表行行都短是另一回事（那一站的表头与数据本就不是一套），不在这里出声，
+      // 免得把 134 个共用这一段的站点里本来能用的搜索误判成失败。
+      const headCellCount = headAnother.length;
+      if (rowsWereGuessed && headCellCount >= 2 && searchEntry!.selectors!.rows) {
+        searchEntry!.selectors!.rows.filter = (rows: HTMLElement[]) => {
+          if (!Array.isArray(rows) || rows.length < 2) {
+            return rows;
+          }
+          const cellCountOf = (row: HTMLElement) => Sizzle("> td", row).length;
+          const lastRow = rows[rows.length - 1];
+          const lastRowCells = cellCountOf(lastRow);
+          if (lastRowCells >= headCellCount) {
+            return rows;
+          }
+          if (rows.slice(0, -1).some((row) => cellCountOf(row) < headCellCount)) {
+            return rows;
+          }
+          this.searchPageTailCut = { rowCount: rows.length, cells: lastRowCells, headCells: headCellCount };
+          // 那半行没有 id、没有下载链接，摆在列表里就是一条点不动的假种子，取掉
+          return rows.slice(0, -1);
+        };
+      }
       // 第一轮认上了哪些字段、各认在哪一格：第二轮只补没认上的那些，且不跟已占掉的格子抢
       const assignedAt = new Map<string, number>();
       headAnother.forEach((element, elementIndex) => {

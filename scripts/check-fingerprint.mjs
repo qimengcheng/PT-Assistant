@@ -281,6 +281,37 @@ check(
   decideFingerprintAction({ match: identical, site: "siteb", piecesPolicy: "review" }).action,
   "review",
 );
+// 同一份内容在下载器里有多份副本、每份挂在不同站点上：那道「同站已挂」的闸必须看全
+// 每一条命中，只看第一条 = N 份副本里只有 1 个站认得出来，其余那几行会被标成「本地已有」
+// （用户 2026-10-15 报的：本地只有 5 条，列表里每一行却都写「本地已有」）
+const lookupTwoCopies = buildFingerprintIndexLookup({
+  downloaderId: "d1",
+  updatedAt: Date.now(),
+  totalTorrents: 2,
+  unresolved: 0,
+  entries: [localEntry, { ...localEntry, hash: "copy2", sites: ["sitec"] }],
+});
+const identicalCopies = matchLocalFingerprint(
+  { files: fpB, titleKey: buildTitleSizeKey("别的标题", 4005) },
+  lookupTwoCopies,
+);
+check("两份副本都进 matches（match 仍是第一条）", identicalCopies.matches?.length, 2);
+check("命中的第一条仍是 match", identicalCopies.match?.hash, "abc");
+check(
+  "两个站都不是副本挂的 → 本地已有",
+  decideFingerprintAction({ match: identicalCopies, site: "siteb" }).reason,
+  "local-identical",
+);
+check(
+  "第一条副本挂的站 → 同站已挂",
+  decideFingerprintAction({ match: identicalCopies, site: "sitea" }).reason,
+  "same-site-already",
+);
+check(
+  "第二条副本挂的站 → 同站已挂（只看第一条时这条必挂）",
+  decideFingerprintAction({ match: identicalCopies, site: "sitec" }).reason,
+  "same-site-already",
+);
 // piece 抽样一致 / 不一致时的降级行为（本地条目带 piece 样本的场景）
 const lookupWithPieces = buildFingerprintIndexLookup({
   downloaderId: "d1",

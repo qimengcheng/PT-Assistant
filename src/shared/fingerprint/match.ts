@@ -146,6 +146,7 @@ export function matchLocalFingerprint(
         verdict: pieces === "mismatch" ? "different" : "identical",
         matchedBy: "files",
         match,
+        matches: matched,
         comparedCount: comparableCount,
         pieces,
       };
@@ -163,6 +164,7 @@ export function matchLocalFingerprint(
         verdict: "candidate",
         matchedBy: "titleSize",
         match: matched[0],
+        matches: matched,
         comparedCount: comparableCount,
       };
     }
@@ -174,6 +176,7 @@ export function matchLocalFingerprint(
           verdict: "candidate",
           matchedBy: "size",
           match: sizeMatched[0],
+          matches: sizeMatched,
           comparedCount: comparableCount,
         };
       }
@@ -247,14 +250,17 @@ export function screenByTitleSizeKey<T extends { title?: string; size?: number }
  * 反过来，`unavailable`（本地一条可比条目都没有）落到的是 `review` 而**不是** `add` ——
  * 没证据时不该自动辅种。上面三条都排在 tracker 那道闸门之后。
  *
- * 另外单独看 tracker：`match.sites` 里有目标站点，说明这份数据已经挂在那个站上，
- * 从根上避免把同一站的东西再辅一遍。
+ * 另外单独看 tracker：命中的那些本地条目里，只要**有一份**已经挂在目标站点上，
+ * 就说明这份数据在那个站上挂过了，从根上避免把同一站的东西再辅一遍。
+ * ⚠️ 必须是「命中的全部条目」而不是第一条 —— 同一份内容在下载器里往往有好几份副本，
+ * 每份挂在不同站点上（见 `IFingerprintMatchResult.matches`）。
  */
 export function decideFingerprintAction(input: IFingerprintPolicyInput): IFingerprintPolicyDecision {
   const { match, site, existingSites, piecesPolicy = "trust-files" } = input;
 
   // tracker 已经挂在同一站点上了 —— 无论指纹结论如何，都不必再辅一遍
-  const sites = existingSites ?? match.match?.sites ?? [];
+  const matchedEntries = match.matches ?? (match.match ? [match.match] : []);
+  const sites = existingSites ?? matchedEntries.flatMap((entry) => entry.sites ?? []);
   if (site && sites.includes(site)) {
     return { action: "exclude", reason: "same-site-already", suggestPieceVerify: false };
   }

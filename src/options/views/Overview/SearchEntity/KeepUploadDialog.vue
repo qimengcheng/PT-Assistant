@@ -1308,6 +1308,20 @@ interface IFingerprintBadge {
   title?: string;
 }
 
+/**
+ * 命中的那几条本地副本已经挂在哪些站上（由 tracker 反解），去重、按索引顺序。
+ *
+ * 取的是 `matches`（全部命中条目）而不是 `match`（第一条）：同一份内容在下载器里常常
+ * 有好几份副本、每份挂在不同站点上，只看第一条就等于只有 1 个站认得出来，
+ * 其余那几行会被标成「本地已有」而不是「这一站我已经挂了」（用户 2026-10-15 报的）。
+ * 同一份 `matches` 也是 `decideFingerprintAction` 那道同站闸的输入，两边因此不会各说一套。
+ */
+function matchedSitesOf(item: IVerifiedItem): string[] {
+  const result = item.localMatch;
+  const entries = result?.matches ?? (result?.match ? [result.match] : []);
+  return [...new Set(entries.flatMap((entry) => entry.sites ?? []))];
+}
+
 function localBadges(item: IVerifiedItem): IFingerprintBadge[] {
   const decision = item.localDecision;
   const match = item.localMatch;
@@ -1318,7 +1332,7 @@ function localBadges(item: IVerifiedItem): IFingerprintBadge[] {
     ? t("SearchEntity.KeepUploadDialog.fingerprint.suggestPieceVerify")
     : undefined;
 
-  const siteNames = (match.match?.sites ?? []).map(
+  const siteNames = matchedSitesOf(item).map(
     (site) => metadataStore.siteNameMap?.[site] ?? metadataStore.getSiteName(site),
   );
 
@@ -1730,7 +1744,7 @@ async function createKeepUploadTask() {
                 {{ badge.text }}
               </a-tag>
               <span
-                v-for="site in record.localMatch?.match?.sites ?? []"
+                v-for="site in matchedSitesOf(record)"
                 :key="site"
                 class="text-body-small text-grey"
               >

@@ -165,8 +165,17 @@ export type TFingerprintMatchedBy = "none" | "titleSize" | "size" | "files" | "p
 export interface IFingerprintMatchResult {
   verdict: TFingerprintVerdict;
   matchedBy: TFingerprintMatchedBy;
-  /** 命中的本地种子（verdict 为 identical/candidate 时有值） */
+  /** 命中的本地种子（verdict 为 identical/candidate 时有值）—— 多份副本时这是**其中的第一条** */
   match?: ILocalTorrentFingerprintEntry;
+  /**
+   * 命中的**全部**本地条目（`match` 是它的第一条）。
+   *
+   * 为什么要把整份带出来：同一份内容在下载器里常常有好几份副本（一条一条辅出来的），
+   * 每份挂在不同站点上，而「这一站是不是已经挂了」那道闸吃的正是条目由 tracker 反解出的
+   * `sites`。只看第一条 = N 份副本里只有 1 个站认得出来，其余 N-1 行会被标成「本地已有」
+   * 而不是「这一站已经挂过了」（用户 2026-10-15 报的：本地只有 5 条，列表里每一行都写本地已有）。
+   */
+  matches?: ILocalTorrentFingerprintEntry[];
   /** 参与比对的本地条目数 */
   comparedCount: number;
   /** 做了 piece 抽样比对时的结论 */
@@ -198,7 +207,7 @@ export interface IFingerprintPolicyInput {
   match: IFingerprintMatchResult;
   /** 目标种子所在站点 */
   site?: string;
-  /** 命中条目里已经挂着的站点 */
+  /** 命中条目里已经挂着的站点（缺省时由 `match.matches` 的并集给出，见 `decideFingerprintAction`） */
   existingSites?: string[];
   /**
    * piece 抽样未通过时的处理策略：

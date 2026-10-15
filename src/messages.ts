@@ -162,6 +162,12 @@ export interface ProtocolMap {
     siteId: TSiteID;
     keyword?: string;
     searchEntry?: IAdvancedSearchRequestConfig;
+    /**
+     * 结果取前几页（1 起）。缺省 = 1 页。
+     * 只有声明了翻页规则的站点会真的多发几次请求，其余站点这个值不起作用（见
+     * `packages/site/utils/pagination.ts`）。
+     */
+    pageCount?: number;
   }): ISearchResult;
   getMediaServerSearchResult(data: {
     mediaServerId: IMediaServerId;

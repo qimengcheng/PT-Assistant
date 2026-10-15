@@ -16,10 +16,21 @@ const configStore = useConfigStore();
     <a-form layout="vertical" class="compact-form">
       <div class="group">
         <div class="group-title">{{ t("SetBase.SearchEntityWindow.groupSearchBehavior") }}</div>
-        <div class="switch-item" style="margin-bottom: 10px">
-          <span class="label" style="min-width: 110px">{{ t("SetBase.SearchEntityWindow.queueConcurrency") }}</span>
-          <a-input-number v-model:value="configStore.searchEntity.queueConcurrency" :min="1" :max="20" style="width: 120px" />
-        </div>
+        <a-row :gutter="24">
+          <a-col :span="12">
+            <a-form-item :label="t('SetBase.SearchEntityWindow.queueConcurrency')">
+              <a-input-number v-model:value="configStore.searchEntity.queueConcurrency" :min="1" :max="20" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item
+              :label="t('SetBase.SearchEntityWindow.searchPageCount')"
+              :extra="t('SetBase.SearchEntityWindow.searchPageCountHint')"
+            >
+              <a-input-number v-model:value="configStore.searchEntity.searchPageCount" :min="1" :max="5" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <div class="switch-grid">
           <div class="switch-item">
             <a-switch v-model:checked="configStore.searchEntity.allowSingleSiteSearch" size="small" />

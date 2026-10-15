@@ -403,6 +403,9 @@ export const useConfigStore = defineStore("config", {
     searchEntity: {
       queueConcurrency: 8,
 
+      // 老用户拿的就是这一份默认值（$patch 只覆盖存档里已有的键），所以行为不变
+      searchPageCount: 1,
+
       allowSingleSiteSearch: false,
       treatTTQueryAsImdbSearch: true,
 

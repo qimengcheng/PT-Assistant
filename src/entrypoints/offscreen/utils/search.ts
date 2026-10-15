@@ -13,16 +13,16 @@ import { logger } from "./logger.ts";
 import { getSiteInstance } from "./site.ts";
 import { extStore } from "@/storage.ts";
 
-onMessage("getSiteSearchResult", async ({ data: { siteId, keyword = "", searchEntry = {} } }) => {
+onMessage("getSiteSearchResult", async ({ data: { siteId, keyword = "", searchEntry = {}, pageCount } }) => {
   const configStorage = (await extStore.getItem("config")) as IConfigPiniaStorageSchema;
 
   logger({
     msg: `获取站点搜索结果：${siteId}，关键词 ${keyword}`,
-    data: { siteId, keyword, searchEntry },
+    data: { siteId, keyword, searchEntry, pageCount },
   });
   const site = await getSiteInstance<"public">(siteId);
 
-  const searchResult = await site.getSearchResult(keyword, searchEntry);
+  const searchResult = await site.getSearchResultPages(keyword, searchEntry, pageCount ?? 1);
 
   if (searchResult.data.length > 0) {
     let autoDetectOfficialGroupFromTitlePattern: TPatterns | undefined;

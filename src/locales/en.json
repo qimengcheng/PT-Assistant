@@ -1157,6 +1157,8 @@
     "SearchEntityWindow": {
       "groupSearchBehavior": "Search behavior",
       "queueConcurrency": "Sites searched concurrently",
+      "searchPageCount": "Pages of results to fetch",
+      "searchPageCountHint": "Only applies to sites whose paging rule is known (currently the NexusPHP family); other sites still return the first page only. Each extra page is one more request and the site's own request delay still applies, so a round takes longer.",
       "allowSingleSiteSearch": "Allow searching only the selected site",
       "saveLastFilter": "Remember the last filter used",
       "quickSiteFilter": "Enable quick site filter",

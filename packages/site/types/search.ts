@@ -17,6 +17,21 @@ export interface ISearchInput {
 
 export type TSearchRequestConfigTransformer = (input: ISearchInput) => AxiosRequestConfig;
 
+/**
+ * 翻页规则：要第 n 页（**1 起**）时，往请求的哪个位置写什么值。
+ *
+ * 只允许由有实测依据的 schema/站点声明。猜键名等于白发一次请求 ——
+ * 站点会忽略它不认识的参数、把第一页原样再给一遍，而界面上看起来像"已经取了 2 页"。
+ */
+export interface ITorrentPaginationRule {
+  /** 页码写进 `params`（query string）还是 `data`（POST 表单），默认 params */
+  where?: "params" | "data";
+  /** 页码的参数名，例如 NexusPHP 的 `page` */
+  param: string;
+  /** 第一页对应的值：NexusPHP 是 0（它自己的分页条把 `page=1` 标成「51-100」），有些站是 1。默认 1 */
+  firstPageIndex?: number;
+}
+
 export interface IBaseSearchConfig {
   /**
    * 搜索时进行请求的 axios 配置项
@@ -111,6 +126,9 @@ export interface ISearchConfig extends IBaseSearchConfig {
     TAdvanceSearchKeyword,
     IAdvanceKeywordSearchConfig | false /* 等同于 { enabled: false } */
   >;
+
+  /** 这一站的翻页规则；没声明 = 「取前 N 页」那个设置对它无效（永远只取第一页） */
+  pagination?: ITorrentPaginationRule;
 
   selectors?: {
     /**

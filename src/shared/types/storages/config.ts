@@ -248,6 +248,13 @@ export interface IConfigPiniaStorageSchema {
     // 搜索时的最大并发数
     queueConcurrency: number;
 
+    /**
+     * 搜索结果取前几页（1 起）。
+     * 只有声明了翻页规则（`ISiteMetadata.search.pagination`）的站点会真的多要几页，
+     * 其余站点恒为第一页 —— 猜页码参数名等于白发一次请求。
+     */
+    searchPageCount: number;
+
     // 是否允许单站点搜索
     allowSingleSiteSearch: boolean;
     // 是否将 tt\d{7,8} 的搜索词视为 IMDb 搜索

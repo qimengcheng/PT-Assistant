@@ -6,6 +6,8 @@ import { supportSocialSite } from "@ptd/social";
 
 // noinspection ES6PreferShortImport
 import { axios, isCloudflareBlocked, retrieve, sleep, store } from "../utils/adapter";
+// noinspection ES6PreferShortImport
+import { mergeSearchPages, withSearchPage } from "../utils/pagination";
 import {
   EResultParseStatus,
   type IElementQuery,
@@ -363,6 +365,53 @@ export default class BittorrentSite {
       result.statusMsg = e instanceof Error ? e.message : String(e);
     }
     return result;
+  }
+
+  /**
+   * 按「搜索结果取前 N 页」那份设置去搜，并把多页拼成一份列表（第 1 页在前）。
+   *
+   * 三条刻意的边界：
+   * - 站点/族没有声明 `search.pagination` ⇒ 只取第一页。猜键名等于白发一次请求：
+   *   站点会忽略它不认识的参数、把第一页原样再给一遍，而界面上看起来像"已经拿到 N 页"。
+   * - 某一页报错或一条都没有 ⇒ 到此为止，不再往后要（后面的页只会撞同一堵墙）。
+   * - 某一页**一条新内容都没带来** ⇒ 也到此为止：那多半是这一站的翻页规则失效了
+   *   （改版、或这条规则本身判错），继续发只是白占这一站的 requestDelay。
+   *
+   * 每一页都仍走 `getSearchResult`，所以站点级的重发/判据那套照旧生效
+   * （最坏情况 = 页数 × 每页的重发次数）。
+   */
+  public async getSearchResultPages(
+    keywords?: string,
+    searchEntry: ISearchEntryRequestConfig = {},
+    pageCount = 1,
+  ): Promise<ISearchResult> {
+    const pagination = this.metadata.search?.pagination;
+    if (!pagination || pageCount <= 1) {
+      return this.getSearchResult(keywords, searchEntry);
+    }
+
+    const first = await this.getSearchResult(keywords, withSearchPage(searchEntry, pagination, 1));
+    if (first.status !== EResultParseStatus.success || first.data.length === 0) {
+      return first;
+    }
+
+    let merged = first.data;
+    for (let pageIndex = 2; pageIndex <= pageCount; pageIndex += 1) {
+      const page = await this.getSearchResult(keywords, withSearchPage(searchEntry, pagination, pageIndex));
+      if (page.status !== EResultParseStatus.success || page.data.length === 0) {
+        console?.log(`[Site] ${this.name} 第 ${pageIndex} 页没有拿到结果，停止继续翻页`);
+        break;
+      }
+
+      const next = mergeSearchPages([merged, page.data]);
+      if (next.length === merged.length) {
+        console?.log(`[Site] ${this.name} 第 ${pageIndex} 页没有带来新内容（翻页参数大概没生效），停止继续翻页`);
+        break;
+      }
+      merged = next;
+    }
+
+    return { ...first, data: merged };
   }
 
   /**

@@ -355,6 +355,14 @@ export const SchemaMetadata: Pick<
   timezoneOffset: "+0800", // NPHP 一般都是国内用，时区多为 +0800
   search: {
     keywordPath: "params.search",
+    /**
+     * 翻页规则，由用户 2026-10-15 给的那一页 PTzone 真页源码定死（不靠上游仓库猜）：
+     * 结果共 124 条、每页 50 条，那一页的分页条 `<p class="nexus-pagination">` 写的是
+     * `当前 <b>1 - 50</b> | <a href="?…&page=1"><b>51 - 100</b></a> | <a href="?…&page=2"><b>101 - 124</b></a>`
+     * ⇒ **`page` 是 0 基**：不带（或 `page=0`）= 第一页，`page=1` = 第二页。
+     * 这一族的 169 个站点定义共用这条规则；个别改版站如果不一样，要它自己的定义里覆盖。
+     */
+    pagination: { param: "page", firstPageIndex: 0 },
     requestConfig: {
       url: "/torrents.php",
       params: { notnewword: 1 },

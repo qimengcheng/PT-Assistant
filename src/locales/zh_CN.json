@@ -1157,6 +1157,8 @@
     "SearchEntityWindow": {
       "groupSearchBehavior": "搜索行为",
       "queueConcurrency": "同时搜索站点数",
+      "searchPageCount": "搜索结果取前几页",
+      "searchPageCountHint": "只对已经知道怎么翻页的站点生效（目前只有 NexusPHP 那一族），其余站点照旧只取第一页。每多要一页就多一次请求，站点自己的请求间隔仍会等，整轮搜索会更久。",
       "allowSingleSiteSearch": "允许只搜索选中的单个站点",
       "saveLastFilter": "记住上次使用的筛选条件",
       "quickSiteFilter": "启用快捷站点筛选",

@@ -204,6 +204,8 @@ export async function doSearchEntity(
         keyword: searchKeyword,
         siteId,
         searchEntry,
+        // 取前几页由「设置 → 基础设置 → 搜索」那一条决定；只有声明了翻页规则的站点会真的多发请求
+        pageCount: configStore.searchEntity.searchPageCount ?? 1,
       });
 
       // 请求回来时可能已经被取消了（或已经开始了新一轮搜索）—— 这时它的结果

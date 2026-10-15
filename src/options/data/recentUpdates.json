@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-15 17:06:20",
-  "headSha": "4d128c7",
+  "generatedAt": "2026-10-15 17:29:44",
+  "headSha": "8401cf7",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.105.10",
+      "date": "2026-10-15 17:29:44",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "PTZone 只回 3 条这件事定死了：不是你机器上的问题，也不是取数没取到。插件那条地址（torrents.php?notnewword=1&search=…）在站点上**稳定只出 3 行，而且第 3 行只有半行**；站点自己搜索表单发出去的那条完整参数地址出 50 行（共 124）。现在 PTZone 的搜索改成按站点表单那套参数发、不再带 notnewword，与你在站点里搜出来的结果一致。",
+        "这一条代价要说清：站点表单默认那档 incldead=1 在 PTZone 自己站上写的是「活種」，所以 PTZone 的搜索结果暂时不含断种。把断种放回来只需要把这一档改回 0（等于这次之前的实际语义），但改回 0 之后站点还给不给完整页还没实测，所以先按能拿到完整页的那一档发。"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.105.9",
       "date": "2026-10-15 17:06:20",

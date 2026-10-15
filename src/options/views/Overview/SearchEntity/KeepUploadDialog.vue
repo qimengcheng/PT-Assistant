@@ -1089,7 +1089,12 @@ function applyBaseComparison(item: IVerifiedItem) {
   const base = baseTorrent.value;
   if (!base || !listItemBase.value?.verified) {
     // 走到这里说明这一条的数据是拿到手的，只是没有参照物 —— 不是「比过、不是同一份」
-    item.status = "noBase";
+    //
+    // ⚠️ 但「基准还在下载种子文件」和「压根没有基准」不是一件事：换基准时新基准那一条的
+    // `.torrent` 常常还没到，那一段等待期报「基准种子未取到」就是把一段过程说成结论，
+    // 界面上会同时出现「基准：种子信息已下载」+「其余全部：基准种子未取到」这句自相矛盾的话
+    // （基准的数据是**后到**的，见 `verification()` 里第一条那一支）。
+    item.status = listItemBase.value?.loading ? "waiting" : "noBase";
     applyLocalDecision(item);
     return;
   }
@@ -1179,6 +1184,10 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
     if (torrent) {
       item.torrent = torrent;
       applyBaseComparison(item);
+      // 基准的数据是**后到**的（换基准那一刻它自己的种子文件常常还在下载），
+      // 而那些行不会自己醒：它们停在「等待基准/未取到」上，界面上就成了
+      // 「基准已下载 + 其余全部未取到」这句矛盾话。基准一到位就整体重算一遍。
+      recompareAll();
       return;
     }
     // 这一条自己就没下到种子文件 —— 写成「验证失败」会把人指向「内容不是同一份」，
@@ -1186,6 +1195,9 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
     // `reDownload` 会先把状态置成「正在下载种子信息」，不写就停在那一档上。
     item.verified = false;
     item.status = "downloadFailed";
+    // 同上，只是方向相反：基准拿不到文件，那些停在「等待验证」档的行要落到「未取到」，
+    // 不能让人以为再等一会儿就有结论
+    recompareAll();
     return;
   }
 
@@ -1828,7 +1840,10 @@ async function createKeepUploadTask() {
           <template v-else-if="column.key === 'action'">
             <!-- 「有参照物可比」的两种来路：基准取列表第一条时要求它已经验证通过（所以除它以外的行才比得了，
                  判据是 id 而不是渲染序 —— 这一列现在能按做种/下载排序）；
-                 基准取下载器那条时参照物一直在，第一条也允许人工确认 / 重下 -->
+                 基准取下载器那条时参照物一直在，第一条也允许人工确认 / 重下。
+                 那颗「重下」还多放行一种：这一条**自己就是基准而它没拿到种子文件** ——
+                 全场都停在「基准种子未取到」上时，唯一的出路就是让它重下一遍，
+                 原先那颗键被 `id !== baseId` 挡掉，这一档就成了死路。 -->
             <HoverTip
               v-if="!record.loading && !record.verified && (useLocalBase || (record.id !== baseId && baseItem?.verified))"
               :text="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
@@ -1839,7 +1854,9 @@ async function createKeepUploadTask() {
             </HoverTip>
 
             <HoverTip
-              v-if="!record.loading && !record.torrent && (useLocalBase || (record.id !== baseId && baseItem?.verified))"
+              v-if="
+                !record.loading && !record.torrent && (useLocalBase || record.id === baseId || baseItem?.verified)
+              "
               :text="t('SearchEntity.KeepUploadDialog.redownload')"
             >
               <a-button type="text" size="small" @click.stop="reDownload(record.id)">

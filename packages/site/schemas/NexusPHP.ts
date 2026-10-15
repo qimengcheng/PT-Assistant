@@ -783,6 +783,9 @@ export const SchemaMetadata: Pick<
  */
 const isDateTimeText = (text: string): boolean => /\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}/.test(text);
 
+/** 解析那一页时发现「末尾一行比表头短」记下的现场（行数 / 那半行有几格 / 表头有几格） */
+type ITailCut = { rowCount: number; cells: number; headCells: number };
+
 export default class NexusPHP extends PrivateSite {
   protected guessSearchFieldIndexConfig(): Record<string, string[]> {
     return {
@@ -835,34 +838,41 @@ export default class NexusPHP extends PrivateSite {
    * 其中最后一条只有标题，大小/做种/下载/完成/评论/发布于 全空（它根本没有那些格）。
    * 判据与复现见 .tmp-build/bench-ptzone（PTZone 真页 + 三种截法，用户 2026-10-15）。
    */
-  protected searchPageTailCut: { rowCount: number; cells: number; headCells: number } | null = null;
+  protected searchPageTailCut: ITailCut | null = null;
+
+  /**
+   * 「发现断点就重发」一共允许发几次（含第一次）。
+   *
+   * 为什么是 3 而不是 2：用户 2026-10-15 在同一站点上给了两个相反方向的实测 ——
+   * 「第一次只有 2 条半，但是刷新一下就好了」（⇒ 重发有用）和
+   * 「我从一个新的标签页打开也是只有两行半」（⇒ 一次重发不够，偶发不能按"每次都能碰上一次"来赌）。
+   * 每次重发之间隔 1s，最坏多花 2s，只发生在"这一页确实断了"那一条路上，完整的页一次就返回。
+   */
+  protected searchPageTailCutAttempts = 3;
 
   public override async getSearchResult(
     keywords?: string,
     searchEntry: ISearchEntryRequestConfig = {},
   ): Promise<ISearchResult> {
-    this.searchPageTailCut = null;
-    const first = await super.getSearchResult(keywords, searchEntry);
-    if (!this.searchPageTailCut) {
-      return first;
+    const cutAttempts: { result: ISearchResult; cut: ITailCut }[] = [];
+
+    for (let attempt = 0; attempt < this.searchPageTailCutAttempts; attempt += 1) {
+      if (attempt > 0) await sleep(1000);
+      this.searchPageTailCut = null;
+      const result = await super.getSearchResult(keywords, searchEntry);
+      // 没记断点 = 这一趟拿到的是完整页（或压根没走到表格，如未登录/无结果），照原样返回
+      const cut = this.searchPageTailCut;
+      if (!cut) return result;
+      cutAttempts.push({ result, cut });
     }
 
-    // 半截页先重要一次：那一头多半是渲染到一半就停了，重发有几率拿全
-    // （⚠️ 「有几率」是按成因推的，没在多站统计过命中率）
-    const cut = this.searchPageTailCut;
-    this.searchPageTailCut = null;
-    await sleep(1000);
-    const second = await super.getSearchResult(keywords, searchEntry);
-    if (!this.searchPageTailCut) {
-      return second;
-    }
-
-    // 两次都断：把这一站标成不完整，不能让手里这几条冒充整页结果
-    // （已经拿到的那些照常留着，只是状态与文案要说清它不是全的）
-    this.searchPageTailCut = cut;
-    second.status = EResultParseStatus.parseError;
-    second.statusMsg = "i18n.truncatedSearchPage";
-    return second;
+    // 几次都断：留着条目最多的那一次（后面那次的行数少不代表站点信息更少），
+    // 再把这一站标成不完整 —— 不能让手里这几条冒充整页结果
+    const best = cutAttempts.reduce((a, b) => (b.result.data.length > a.result.data.length ? b : a));
+    this.searchPageTailCut = best.cut;
+    best.result.status = EResultParseStatus.parseError;
+    best.result.statusMsg = "i18n.truncatedSearchPage";
+    return best.result;
   }
 
   public override async transformSearchPage(

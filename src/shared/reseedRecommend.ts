@@ -27,9 +27,12 @@ export interface IReseedBaseCandidate {
   seeders?: unknown;
   tags?: { name: string }[] | null;
   /**
-   * 该站的分享率（`metadataStore.lastUserInfo[site].ratio`，与「我的数据」那一列同一个数）。
-   * 同样写成 unknown：这个字段是可选的，站点不报或还没刷过用户信息时就是 undefined，
-   * 判据要能区分「报得出且低于 1」与「压根没数」——见 `reseedRatioVerdict`。
+   * 该站分享率的**数值**。传调用方取好的那份派生（options 侧是 `@/options/utils/siteRatio.ts`
+   * 的 `siteCurrentRatio`，与「我的数据」那一列同一个数），**不要直读**
+   * `metadataStore.lastUserInfo[site].ratio`：那是解析器的原值，而 NexusPHP 那一族不报这个字段、
+   * 只报上下行，直读到的 `undefined` 会把一整批有数的站判成「未知」（v0.105.3 修的分叉）。
+   * 同样写成 unknown：这个字段可以压根没有（从没刷过用户信息），判据要能区分
+   * 「报得出且低于 1」与「压根没数」——见 `reseedRatioVerdict`。
    */
   ratio?: unknown;
 }

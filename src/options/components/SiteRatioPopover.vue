@@ -14,6 +14,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { formatSize } from "@/options/utils.ts";
+import { siteCurrentRatio } from "@/options/utils/siteRatio.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { formatRatioText, projectRatio, type TRatioImpact } from "@/shared/ratioGuard.ts";
 
@@ -39,7 +40,9 @@ function bytesOf(value: unknown): string {
 
 const uploadedText = computed(() => bytesOf(account.value?.uploaded));
 const downloadedText = computed(() => bytesOf(account.value?.downloaded));
-const ratioText = computed(() => formatRatioText(account.value?.ratio));
+// 走 siteCurrentRatio 而不是直读 `account.ratio`：站点不报那个字段时原值是 undefined，
+// 而「我的数据」那一格显示的是按上下行算出来的数 —— 两处读法不同，同一个站在两处会一个有数、一个「-」。
+const ratioText = computed(() => formatRatioText(siteCurrentRatio(account.value)));
 
 /**
  * 「下完这一条之后」那一行。四种不产生的情形各说各的原因 —— 都写成「不变」会把

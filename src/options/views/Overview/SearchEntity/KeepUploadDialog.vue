@@ -33,6 +33,7 @@ import {
   type ILocalTorrentFingerprintEntry,
 } from "@/shared/fingerprint/index.ts";
 import { formatSize, formatDate } from "@/options/utils.ts";
+import { siteCurrentRatio } from "@/options/utils/siteRatio.ts";
 import { findDuplicateTasks } from "@/shared/reseedTaskDup.ts";
 import { countText, toCount } from "@/shared/torrentCount.ts";
 import {
@@ -563,7 +564,7 @@ const baseId = computed(() => verifiedItemsOrder.value[0] ?? "");
 const baseItem = computed(() => verifiedItems.value.get(baseId.value) ?? null);
 
 /**
- * 「能当基准的候选」这一份清单，三个出口共用：两组推荐、默认基准挪哪一条、那句退让提示。
+ * 「能当基准的候选」这一份清单，三个出口共用：两组推荐、默认基准挪哪一条、那句「没有一条能当基准」的说明。
  *
  * 只在这张表真的靠「列表第一条」当基准时才有意义：基准取自下载器（`useLocalBase`）或只勾一条时
  * 列表里没有「当基准」这一说 —— 跟角色列同一判据（所以那一列撤掉时这三样也一起撤，
@@ -578,13 +579,19 @@ const listBaseCandidates = computed(() => {
       id: item.id,
       seeders: item.data.seeders,
       tags: item.data.tags,
-      ratio: metadataStore.lastUserInfo?.[item.data.site]?.ratio,
+      ratio: siteCurrentRatio(metadataStore.lastUserInfo?.[item.data.site]),
     }));
 });
 
-/** 这一条所在站的分享率报不报得出、低于不低于 1（判据在 `@/shared/reseedRecommend.ts`） */
+/**
+ * 这一条所在站的分享率报不报得出、低于不低于 1（判据在 `@/shared/reseedRecommend.ts`）。
+ *
+ * 数一律经 `siteCurrentRatio` 取，不直读 `lastUserInfo[site].ratio`：NexusPHP 那一族不报那个字段，
+ * 原值是 `undefined`，而「我的数据」同一格显示的是按上下行算出来的 0.21 —— 两处读法不同就会
+ * 一个说「分享率未知」、一个说有数（用户 2026-10-15 报的），那道闸也随之空转。
+ */
 function ratioVerdictOf(item: IVerifiedItem) {
-  return reseedRatioVerdict(metadataStore.lastUserInfo?.[item.data.site]?.ratio);
+  return reseedRatioVerdict(siteCurrentRatio(metadataStore.lastUserInfo?.[item.data.site]));
 }
 
 /**

@@ -181,13 +181,17 @@ function canAdvanceSearch(site: TSupportSocialSite) {
                   </template>
 
                   <a-divider class="my-1" />
+                  <a-divider class="my-1" />
+                  <!-- 原先这颗按钮挂原生 title 重复一遍「douban: 12345」，删掉而不是换成浮层：
+                       ① 同一张卡下面那行 `( douban: 12345 )` 已经完整写着它，
+                       ② 这张卡本身就在 a-popover 里 —— 悬停浮层里再套悬停浮层，
+                          指针移进内层时外层判定 mouseleave 会连内层触发元素一起销毁。 -->
                   <a-button
                     type="text"
                     block
                     :href="meta(item[`ext_${key}`]! as string)"
                     target="_blank"
                     rel="noopener noreferrer nofollow"
-                    :title="`${key}: ${item[`ext_${key}`]}`"
                   >
                     <template #icon><ExportOutlined /></template>
                     {{ t("common.visit") }}

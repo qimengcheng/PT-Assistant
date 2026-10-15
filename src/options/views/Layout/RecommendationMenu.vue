@@ -7,6 +7,7 @@ import { Empty } from "antdv-next";
 import type { ISocialRecommendationItem, TSocialRecommendationCategory } from "@ptd/social";
 
 import { sendMessage } from "@/messages.ts";
+import HoverTip from "@/options/components/HoverTip.vue";
 
 const MOVIE_PLACEHOLDER = "/icons/movie_placeholder.png";
 
@@ -199,7 +200,10 @@ watch(isRecommendationMenuOpen, (isOpen) => {
 
 <template>
   <a-popover v-model:open="isRecommendationMenuOpen" trigger="click" placement="bottom">
-    <a-button type="text" :disabled="disabled" :title="t('layout.header.hotRecommendations.title')">
+    <!-- 这颗图标钮原先挂原生 title 说「热门推荐」，删掉：面板自己的标题行写的就是同一句
+         （下面 `.hot-recommendation-header-title`），而它又是那层点击浮层的触发元素，
+         再包一层悬停浮层就是同一片命中区上叠两个。 -->
+    <a-button type="text" :disabled="disabled">
       <template #icon>
         <FireOutlined />
       </template>
@@ -210,17 +214,18 @@ watch(isRecommendationMenuOpen, (isOpen) => {
         <div class="hot-recommendation-header">
           <FireOutlined class="hot-recommendation-header-icon" />
           <span class="hot-recommendation-header-title">{{ t("layout.header.hotRecommendations.title") }}</span>
-          <a-button
-            type="text"
-            size="small"
-            :loading="isLoadingRecommendations"
-            :title="t('layout.header.hotRecommendations.refresh')"
-            @click="() => loadRecommendations(true)"
-          >
-            <template #icon>
-              <ReloadOutlined />
-            </template>
-          </a-button>
+          <HoverTip :text="t('layout.header.hotRecommendations.refresh')">
+            <a-button
+              type="text"
+              size="small"
+              :loading="isLoadingRecommendations"
+              @click="() => loadRecommendations(true)"
+            >
+              <template #icon>
+                <ReloadOutlined />
+              </template>
+            </a-button>
+          </HoverTip>
         </div>
 
         <a-divider style="margin: 0" />

@@ -70,7 +70,7 @@ function formatDuration(rawSeconds: number) {
         <a-image v-if="item.poster" :src="item.poster" :alt="item.name" class="poster-img" />
       </a-col>
       <a-col :xs="24" :md="16">
-        <a :href="item.url" :title="item.name" class="item-title" rel="noopener noreferrer nofollow" target="_blank">
+        <a :href="item.url" class="item-title" rel="noopener noreferrer nofollow" target="_blank">
           {{ item.name }}
         </a>
         <p class="item-desc">{{ item.description ?? "" }}</p>

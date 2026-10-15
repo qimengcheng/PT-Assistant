@@ -12,6 +12,7 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
 import SolutionDetail from "@/options/components/SolutionDetail.vue";
 import ResultParseStatus from "@/options/components/ResultParseStatus.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 
 import { doSearchEntity, raiseSearchPriority } from "./utils/search.ts";
 
@@ -141,27 +142,24 @@ const filteredSearchPlan = computed(() => {
         <a-divider orientation="vertical" class="mx-2" />
         <a-space-compact size="small">
           <!-- 上移队列 -->
-          <a-button
-            v-if="searchPlan.status === EResultParseStatus.waiting"
-            type="text"
-            :title="t('SearchEntity.SearchStatusDialog.moveUp')"
-            @click="() => raiseSearchPriority(solutionKey)"
-          >
-            <template #icon><ArrowUpOutlined /></template>
-          </a-button>
+          <HoverTip v-if="searchPlan.status === EResultParseStatus.waiting" :text="t('SearchEntity.SearchStatusDialog.moveUp')">
+            <a-button type="text" @click="() => raiseSearchPriority(solutionKey)">
+              <template #icon><ArrowUpOutlined /></template>
+            </a-button>
+          </HoverTip>
           <!-- 重新搜索 -->
-          <a-button
-            v-else
-            type="text"
-            danger
-            :loading="searchPlan.status === EResultParseStatus.working"
-            :title="t('SearchEntity.SearchStatusDialog.searchAgain')"
-            @click="
-              () => doSearchEntity(searchPlan.siteId, searchPlan.searchEntryName, searchPlan.searchEntry, true)
-            "
-          >
-            <template #icon><SyncOutlined /></template>
-          </a-button>
+          <HoverTip v-else :text="t('SearchEntity.SearchStatusDialog.searchAgain')">
+            <a-button
+              type="text"
+              danger
+              :loading="searchPlan.status === EResultParseStatus.working"
+              @click="
+                () => doSearchEntity(searchPlan.siteId, searchPlan.searchEntryName, searchPlan.searchEntry, true)
+              "
+            >
+              <template #icon><SyncOutlined /></template>
+            </a-button>
+          </HoverTip>
         </a-space-compact>
       </div>
     </div>

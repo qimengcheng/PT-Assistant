@@ -9,6 +9,7 @@ import {
   type IUserInfo,
 } from "@ptd/site";
 import { formatNumber, formatSize, formatDate, simplifyNumber } from "@/options/utils";
+import HoverTip from "@/options/components/HoverTip.vue";
 import { useConfigStore } from "@/options/stores/config";
 import { formatRatioText } from "@/shared/ratioGuard.ts";
 import { COMPOSITE_LEVEL_SCORES, convertLevelScoreGap, LEVEL_SCORE_CURRENCIES, type TLevelScoreCurrency } from "@/shared/levelScoreSites.ts";
@@ -169,33 +170,44 @@ const levelScoreEquivalents = computed<{ key: TLevelScoreCurrency; icon: Compone
 <template>
   <slot name="prepend"></slot>
   <template v-if="levelRequirement.interval">
-    <ClockCircleOutlined class="level-require-icon" :title="t('levelRequirement.interval')" />
-    <span
-      :title="getIntervalDisplay(levelRequirement.interval).title"
-      style="cursor: pointer; user-select: none"
-      @dblclick="toggleIntervalDisplay"
-    >
-      {{ getIntervalDisplay(levelRequirement.interval).text }} </span>;
+    <HoverTip :text="t('levelRequirement.interval')">
+      <ClockCircleOutlined class="level-require-icon" />
+    </HoverTip>
+    <HoverTip :text="getIntervalDisplay(levelRequirement.interval).title">
+      <span style="cursor: pointer; user-select: none" @dblclick="toggleIntervalDisplay">
+        {{ getIntervalDisplay(levelRequirement.interval).text }} ;
+      </span>
+    </HoverTip>
   </template>
   <template v-if="levelRequirement.uploaded">
-    <ArrowUpOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.uploaded')" />
+    <HoverTip :text="t('levelRequirement.uploaded')">
+      <ArrowUpOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
     {{ formatSize(levelRequirement.uploaded) }};
   </template>
   <template v-if="levelRequirement.trueUploaded">
-    <VerticalAlignTopOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.trueUploaded')" />
+    <HoverTip :text="t('levelRequirement.trueUploaded')">
+      <VerticalAlignTopOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
     {{ formatSize(levelRequirement.trueUploaded) }};
   </template>
   <template v-if="levelRequirement.downloaded">
-    <ArrowDownOutlined class="level-require-icon level-require-icon--red" :title="t('levelRequirement.downloaded')" />
+    <HoverTip :text="t('levelRequirement.downloaded')">
+      <ArrowDownOutlined class="level-require-icon level-require-icon--red" />
+    </HoverTip>
     {{ formatSize(levelRequirement.downloaded) }};
   </template>
   <template v-if="levelRequirement.trueDownloaded">
-    <VerticalAlignBottomOutlined class="level-require-icon level-require-icon--red" :title="t('levelRequirement.trueDownloaded')" />
+    <HoverTip :text="t('levelRequirement.trueDownloaded')">
+      <VerticalAlignBottomOutlined class="level-require-icon level-require-icon--red" />
+    </HoverTip>
     {{ formatSize(levelRequirement.trueDownloaded) }};
   </template>
 
   <template v-if="levelRequirement.totalTraffic">
-    <SwapOutlined class="level-require-icon level-require-icon--orange" :title="t('levelRequirement.totalTraffic')" />
+    <HoverTip :text="t('levelRequirement.totalTraffic')">
+      <SwapOutlined class="level-require-icon level-require-icon--orange" />
+    </HoverTip>
     {{ formatSize(levelRequirement.totalTraffic) }};
   </template>
 
@@ -206,63 +218,76 @@ const levelScoreEquivalents = computed<{ key: TLevelScoreCurrency; icon: Compone
     需求侧的整数 1 因此画成 1.00 —— 两处共用一份格式化，比让需求与现状两种写法更稳。
   -->
   <template v-if="levelRequirement.ratio && !hideRatioInTable">
-    <ColumnHeightOutlined class="level-require-icon level-require-icon--orange" :title="t('levelRequirement.ratio')" />
+    <HoverTip :text="t('levelRequirement.ratio')">
+      <ColumnHeightOutlined class="level-require-icon level-require-icon--orange" />
+    </HoverTip>
     {{ formatRatioText(levelRequirement.ratio) }};
   </template>
 
   <template v-if="levelRequirement.trueRatio && !hideRatioInTable">
-    <AimOutlined class="level-require-icon level-require-icon--orange" :title="t('levelRequirement.trueRatio')" />
+    <HoverTip :text="t('levelRequirement.trueRatio')">
+      <AimOutlined class="level-require-icon level-require-icon--orange" />
+    </HoverTip>
     {{ formatRatioText(levelRequirement.trueRatio) }};
   </template>
 
   <template v-if="levelRequirement.seeding">
-    <BranchesOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.seeding')" />
+    <HoverTip :text="t('levelRequirement.seeding')">
+      <BranchesOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
     {{ formatNumber(levelRequirement.seeding, { minimumFractionDigits: 0 }) }};
   </template>
 
   <template v-if="levelRequirement.seedingSize">
-    <DatabaseOutlined class="level-require-icon level-require-icon--blue" :title="t('levelRequirement.seedingSize')" />
+    <HoverTip :text="t('levelRequirement.seedingSize')">
+      <DatabaseOutlined class="level-require-icon level-require-icon--blue" />
+    </HoverTip>
     {{ formatSize(levelRequirement.seedingSize) }};
   </template>
 
   <template v-if="levelRequirement.seedingTime">
-    <ClockCircleOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.seedingTime')" />
+    <HoverTip :text="t('levelRequirement.seedingTime')">
+      <ClockCircleOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
     {{ formatDuration(levelRequirement.seedingTime) }};
   </template>
 
   <template v-if="levelRequirement.averageSeedingTime">
-    <ClockCircleOutlined class="level-require-icon level-require-icon--blue" :title="t('levelRequirement.averageSeedingTime')" />
+    <HoverTip :text="t('levelRequirement.averageSeedingTime')">
+      <ClockCircleOutlined class="level-require-icon level-require-icon--blue" />
+    </HoverTip>
     {{ formatDuration(levelRequirement.averageSeedingTime) }};
   </template>
 
   <template v-if="levelRequirement.bonus">
-    <DollarOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.bonus')" />
-    <span
-      :title="formatNumber(Number(levelRequirement.bonus) || 0)"
-      style="cursor: pointer; user-select: none"
-      @dblclick="toggleNumberSimplification"
-    >
-      {{ formatBonus("bonus") }} </span>;
+    <HoverTip :text="t('levelRequirement.bonus')">
+      <DollarOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
+    <HoverTip :text="formatNumber(Number(levelRequirement.bonus) || 0)">
+      <span style="cursor: pointer; user-select: none" @dblclick="toggleNumberSimplification">
+        {{ formatBonus("bonus") }} ;
+      </span>
+    </HoverTip>
   </template>
 
   <template v-if="levelRequirement.seedingBonus">
-    <ThunderboltOutlined
-      class="level-require-icon level-require-icon--green"
-      :title="t(COMPOSITE_LEVEL_SCORES[userInfo.site] ? 'levelRequirement.levelScore' : 'levelRequirement.seedingBonus')"
-    />
-    <span
-      :title="formatNumber(levelRequirement.seedingBonus)"
-      style="cursor: pointer; user-select: none"
-      @dblclick="toggleNumberSimplification"
-    >
-      {{ formatBonus("seedingBonus") }} </span>
+    <HoverTip :text="t(COMPOSITE_LEVEL_SCORES[userInfo.site] ? 'levelRequirement.levelScore' : 'levelRequirement.seedingBonus')">
+      <ThunderboltOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
+    <HoverTip :text="formatNumber(levelRequirement.seedingBonus)">
+      <span style="cursor: pointer; user-select: none" @dblclick="toggleNumberSimplification">
+        {{ formatBonus("seedingBonus") }}
+      </span>
+    </HoverTip>
     <!-- 缺口换算只在「还差多少」那一行出（showLevelScoreConversion）。下面这四个键是动态拼出来的，
          防线③ 看不见这种键，所以逐个对过：uploaded / downloaded / bonus / seeding 两侧 locale 都在。 -->
     <span v-if="levelScoreEquivalents.length" class="level-score-convert">
       （≈
       <template v-for="(item, i) in levelScoreEquivalents" :key="item.key">
         <span v-if="i > 0"> / </span>
-        <component :is="item.icon" class="level-require-icon" :title="t(`levelRequirement.${item.key}`)" />
+        <HoverTip :text="t(`levelRequirement.${item.key}`)">
+          <component :is="item.icon" class="level-require-icon" />
+        </HoverTip>
         {{ item.text }}
       </template>
       ）
@@ -271,32 +296,44 @@ const levelScoreEquivalents = computed<{ key: TLevelScoreCurrency; icon: Compone
   </template>
 
   <template v-if="levelRequirement.bonusPerHour">
-    <TagsOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.bonusPerHour')" />
+    <HoverTip :text="t('levelRequirement.bonusPerHour')">
+      <TagsOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
     {{ formatNumber(Number(levelRequirement.bonusPerHour) || 0) }};
   </template>
 
   <template v-if="levelRequirement.uploads">
-    <CloudUploadOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.uploads')" />
+    <HoverTip :text="t('levelRequirement.uploads')">
+      <CloudUploadOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
     {{ formatNumber(levelRequirement.uploads, { minimumFractionDigits: 0 }) }};
   </template>
 
   <template v-if="levelRequirement.leeching">
-    <CloudDownloadOutlined class="level-require-icon level-require-icon--red" :title="t('levelRequirement.leeching')" />
+    <HoverTip :text="t('levelRequirement.leeching')">
+      <CloudDownloadOutlined class="level-require-icon level-require-icon--red" />
+    </HoverTip>
     {{ formatNumber(levelRequirement.leeching, { minimumFractionDigits: 0 }) }};
   </template>
 
   <template v-if="levelRequirement.snatches">
-    <FileDoneOutlined class="level-require-icon level-require-icon--orange" :title="t('levelRequirement.snatches')" />
+    <HoverTip :text="t('levelRequirement.snatches')">
+      <FileDoneOutlined class="level-require-icon level-require-icon--orange" />
+    </HoverTip>
     {{ formatNumber(levelRequirement.snatches, { minimumFractionDigits: 0 }) }};
   </template>
 
   <template v-if="levelRequirement.posts">
-    <FileAddOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.posts')" />
+    <HoverTip :text="t('levelRequirement.posts')">
+      <FileAddOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
     {{ formatNumber(levelRequirement.posts, { minimumFractionDigits: 0 }) }};
   </template>
 
   <template v-if="levelRequirement.adoptions">
-    <LikeOutlined class="level-require-icon level-require-icon--green" :title="t('levelRequirement.adoptions')" />
+    <HoverTip :text="t('levelRequirement.adoptions')">
+      <LikeOutlined class="level-require-icon level-require-icon--green" />
+    </HoverTip>
     {{ formatNumber(levelRequirement.adoptions, { minimumFractionDigits: 0 }) }};
   </template>
 </template>

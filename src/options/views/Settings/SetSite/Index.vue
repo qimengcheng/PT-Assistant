@@ -413,10 +413,10 @@ function keywordChecked(keyword: string) {
 
       <a-button @click="showOneClickImportDialog = true"><template #icon><AimOutlined /></template><span>{{ t('SetSite.index.oneClickImport') }}</span></a-button>
 
+      <!-- 那颗键自己就写着「刷新站点图标」，原先挂的原生 title 是同一句话，删掉 -->
       <a-button
         :disabled="tableSelected.length === 0"
         :loading="isFaviconFlushing"
-        :title="t('SetSite.index.table.flushFavicon')"
         @click="() => refreshSiteFavicon(tableSelected)"
       >
         <template #icon>

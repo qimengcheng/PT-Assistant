@@ -23,6 +23,7 @@ import { BackupFields, type IBackupServerMetadata, type TBackupServerKey } from 
 import { sendMessage } from "@/messages.ts";
 
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 import AddDialog from "./AddDialog.vue";
 import EditDialog from "./EditDialog.vue";
 import LocalExportConfirmDialog from "./LocalExportConfirmDialog.vue";
@@ -188,12 +189,9 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'type'">
-          <img
-            class="server-type-icon"
-            :src="getBackupServerIcon(record.type)"
-            :alt="record.type"
-            :title="record.type"
-          />
+          <HoverTip :text="record.type">
+            <img class="server-type-icon" :src="getBackupServerIcon(record.type)" :alt="record.type" />
+          </HoverTip>
         </template>
 
         <template v-else-if="column.key === 'backupFields'">
@@ -210,15 +208,18 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
         </template>
 
         <template v-else-if="column.key === 'retention'">
-          <FilterOutlined
-            class="retention-icon"
-            :style="{ color: hasBackupRetentionToApply(record.retention) ? '#52c41a' : undefined }"
-            :title="
+          <HoverTip
+            :text="
               hasBackupRetentionToApply(record.retention)
                 ? t('SetBackup.table.retentionEnabled')
                 : t('SetBackup.table.retentionDisabled')
             "
-          />
+          >
+            <FilterOutlined
+              class="retention-icon"
+              :style="{ color: hasBackupRetentionToApply(record.retention) ? '#52c41a' : undefined }"
+            />
+          </HoverTip>
         </template>
 
         <template v-else-if="column.key === 'lastBackupAt'">

@@ -1614,6 +1614,7 @@
       "status": {
         "failed": "添加失败",
         "manual": "该站点需要手动添加",
+        "none": "未选择",
         "selected": "已选择",
         "success": "已添加成功",
         "trying": "正在尝试中"

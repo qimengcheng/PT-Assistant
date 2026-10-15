@@ -17,6 +17,7 @@ import { formatNumber, formatSize, formatDate } from "@/options/utils.ts";
 import { formatRatio } from "./utils/format.ts";
 import { loadSiteHistoryData } from "./utils/lastUserData.ts";
 
+import HoverTip from "@/options/components/HoverTip.vue";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import { toTableColumns } from "@/options/components/tableSorters.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -203,7 +204,9 @@ function afterEnter() {
 
         <!-- 用户名，用户ID -->
         <template v-else-if="column.key === 'name'">
-          <span :title="record.id as string" class="text-no-wrap">{{ record.name ?? "-" }}</span>
+          <HoverTip :text="record.id as string">
+            <span class="text-no-wrap">{{ record.name ?? "-" }}</span>
+          </HoverTip>
         </template>
 
         <!-- 等级 -->

@@ -37,6 +37,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
 import CheckSwitchButton from "@/options/components/CheckSwitchButton.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 
 import {
   canThisSiteShow,
@@ -793,16 +794,17 @@ function saveControl() {
                 <SiteFavicon :site-id="siteId" :size="16" />
                 <span class="ml-1">
                   <SiteName :site-id="siteId" />
-                  <StopOutlined
-                    v-if="allAddedSiteMetadata[siteId]?.isDead"
-                    class="ml-1 text-grey"
-                    :title="t('UserDataTimeline.siteIsDead')"
-                  />
-                  <DisconnectOutlined
+                  <!-- v-if 挂在外壳上而不是里面的图标上：子节点缺席时 Popover 会给自己补一个
+                       空 <span> 当触发元素（AGENTS §3.4），那一排就凭空多出一格。 -->
+                  <HoverTip v-if="allAddedSiteMetadata[siteId]?.isDead" :text="t('UserDataTimeline.siteIsDead')">
+                    <StopOutlined class="ml-1 text-grey" />
+                  </HoverTip>
+                  <HoverTip
                     v-else-if="allAddedSiteMetadata[siteId]?.isOffline"
-                    class="ml-1 text-grey"
-                    :title="t('UserDataTimeline.siteIsOffline')"
-                  />
+                    :text="t('UserDataTimeline.siteIsOffline')"
+                  >
+                    <DisconnectOutlined class="ml-1 text-grey" />
+                  </HoverTip>
                 </span>
               </span>
             </a-checkbox>

@@ -250,7 +250,9 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
           <template #itemRender="item">
             <div class="masonry-item">
               <div v-if="item.poster" class="poster-wrap">
-                <img :src="item.poster" :title="item.name" :alt="item.name" class="poster-img" />
+                <!-- 海报上原先挂的原生 title 已删：`.item-name` 是 `white-space: normal` 的整块
+                     标题，名字本来就完整写在图下面，提示只是把同一句重复一遍。 -->
+                <img :src="item.poster" :alt="item.name" class="poster-img" />
 
                 <!-- 左上角：格式 / 大小 -->
                 <div class="poster-tags poster-tags-left">
@@ -285,7 +287,7 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
               </div>
 
               <div class="item-caption">
-                <a :href="item.url" :title="item.name" class="item-name" target="_blank">{{ item.name }}</a>
+                <a :href="item.url" class="item-name" target="_blank">{{ item.name }}</a>
                 <div v-if="metadataStore.mediaServers[item.server]" class="item-server">
                   <img
                     :src="getMediaServerIcon(metadataStore.mediaServers[item.server].type)"

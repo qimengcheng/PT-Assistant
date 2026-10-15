@@ -23,6 +23,7 @@ import ResultParseStatus from "@/options/components/ResultParseStatus.vue";
 
 import UserLevelRequirementsTd from "./UserLevelRequirementsTd.vue";
 import BonusFormatSpan from "./BonusFormatSpan.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 
 import { bonusFullText, formatRatio } from "./utils/format.ts";
 import { flushSiteLastUserInfo, type IUserInfoItem } from "./utils/lastUserData.ts";
@@ -66,6 +67,18 @@ function unreadBadge(record: IUserInfoItem) {
   }
   // 超过 10 条时原实现只显示一个小圆点（content 传 undefined）
   return messageCount > 10 ? { count: 0, dot: true } : { count: messageCount, dot: false };
+}
+
+/**
+ * 那颗红数字/圆点的悬浮说明。
+ *
+ * 没有徽章时返回 undefined —— `HoverTip` 拿到空文案就不挂浮层、原样渲染子节点。
+ * 原先这儿的原生 title 是挂在 `a-badge` 的指示物上的，指示物不出来的行本来也没有提示，
+ * 换成浮层要自己守住同一条件，否则整格图标都会开始弹「阅读站内信」。
+ */
+function badgeTipOf(record: IUserInfoItem) {
+  const badge = unreadBadge(record);
+  return badge.count > 0 || badge.dot ? t("MyData.messages.badgeTip") : undefined;
 }
 
 /**
@@ -115,22 +128,23 @@ function bonusRevealLines(record: IUserInfoItem) {
   <!-- 站点信息 -->
   <template v-if="column.key === 'siteUserConfig.sortIndex'">
     <div class="site-cell">
-      <a-badge
-        class="site-unread-badge"
-        :count="unreadBadge(record).count"
-        :dot="unreadBadge(record).dot"
-        color="#f44336"
-        :title="t('MyData.messages.badgeTip')"
-        @click="onBadgeClick($event, record)"
-      >
-        <div class="favicon-hover-wrapper favicon-hover-bg">
-          <SiteFavicon
-            :site-id="record.site"
-            :size="configStore.myDataTableControl.showSiteName ? 18 : 24"
-            @click="() => flushSiteLastUserInfo([record.site])"
-          />
-        </div>
-      </a-badge>
+      <HoverTip :text="badgeTipOf(record)">
+        <a-badge
+          class="site-unread-badge"
+          :count="unreadBadge(record).count"
+          :dot="unreadBadge(record).dot"
+          color="#f44336"
+          @click="onBadgeClick($event, record)"
+        >
+          <div class="favicon-hover-wrapper favicon-hover-bg">
+            <SiteFavicon
+              :site-id="record.site"
+              :size="configStore.myDataTableControl.showSiteName ? 18 : 24"
+              @click="() => flushSiteLastUserInfo([record.site])"
+            />
+          </div>
+        </a-badge>
+      </HoverTip>
 
       <SiteName v-if="configStore.myDataTableControl.showSiteName" :site-id="record.site" />
     </div>
@@ -138,9 +152,11 @@ function bonusRevealLines(record: IUserInfoItem) {
 
   <!-- 用户名，用户ID -->
   <template v-else-if="column.key === 'name'">
-    <span :title="record.id as string" class="text-no-wrap">
-      {{ configStore.myDataTableControl.showUserName ? (record.name ?? "-") : "******" }}
-    </span>
+    <HoverTip :text="record.id as string">
+      <span class="text-no-wrap">
+        {{ configStore.myDataTableControl.showUserName ? (record.name ?? "-") : "******" }}
+      </span>
+    </HoverTip>
   </template>
 
   <!-- 等级信息，升级信息 -->
@@ -210,7 +226,9 @@ function bonusRevealLines(record: IUserInfoItem) {
           v-if="typeof record.hnrPreWarning !== 'undefined' && record.hnrPreWarning > 0"
           class="d-inline-flex align-center ml-2"
         >
-          <AlertOutlined class="cell-icon cell-icon--yellow" :title="t('levelRequirement.hnrPreWarning')" />
+          <HoverTip :text="t('levelRequirement.hnrPreWarning')">
+            <AlertOutlined class="cell-icon cell-icon--yellow" />
+          </HoverTip>
           <span class="text-no-wrap">
             {{ record.hnrPreWarning }}
           </span>
@@ -219,10 +237,9 @@ function bonusRevealLines(record: IUserInfoItem) {
           v-if="typeof record.hnrUnsatisfied !== 'undefined' && record.hnrUnsatisfied > 0"
           class="d-inline-flex align-center ml-1"
         >
-          <ExclamationCircleOutlined
-            class="cell-icon cell-icon--red"
-            :title="t('levelRequirement.hnrUnsatisfied')"
-          />
+          <HoverTip :text="t('levelRequirement.hnrUnsatisfied')">
+            <ExclamationCircleOutlined class="cell-icon cell-icon--red" />
+          </HoverTip>
           <span class="text-no-wrap">
             {{ record.hnrUnsatisfied }}
           </span>

@@ -3,6 +3,8 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { EResultParseStatus } from "@ptd/site";
 
+import HoverTip from "@/options/components/HoverTip.vue";
+
 const { status } = defineProps<{
   status: EResultParseStatus;
 }>();
@@ -48,9 +50,11 @@ const meta = computed<{ text: string; color?: string; title?: string }>(() => {
      无 @deprecated），hooks/useColor.js:16 真读它，语义是**降级**：
      bordered === false 时强制把 variant 压成 filled（默认值就是 true）。
      也就是说它能「取消描边」，但永远造不出描边 —— 要描边请写 variant="outlined" -->
-  <a-tag :color="meta.color" :title="meta.title" style="margin-inline-end: 0">
-    {{ meta.text }}
-  </a-tag>
+  <HoverTip :text="meta.title">
+    <a-tag :color="meta.color" style="margin-inline-end: 0">
+      {{ meta.text }}
+    </a-tag>
+  </HoverTip>
 </template>
 
 <style scoped lang="scss"></style>

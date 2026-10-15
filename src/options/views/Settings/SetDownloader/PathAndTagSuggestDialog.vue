@@ -177,16 +177,14 @@ function saveClientConfig() {
           class="field-textarea"
         />
         <div class="chip-group">
-          <a-tag
-            v-for="pathReplace in pathReplaceMap"
-            :key="pathReplace[1]"
-            :title="pathReplace[2]"
-            class="kw-chip"
-            color="blue"
-            @click="() => (suggestFolderInput += '/' + pathReplace[1])"
-          >
-            {{ pathReplace[1] }}
-          </a-tag>
+          <!-- 这颗 chip 原先写的是 `title="pathReplace[2]"` —— 少了冒号，是个**静态**属性，
+               浏览器于是把字面量 "pathReplace[2]" 当成提示画出来（11 颗 chip 全一样）。
+               这里按本意补成绑定，并换成浮层（原生提示已全站撤掉，见 HoverTip）。 -->
+          <HoverTip v-for="pathReplace in pathReplaceMap" :key="pathReplace[1]" :text="pathReplace[2]">
+            <a-tag class="kw-chip" color="blue" @click="() => (suggestFolderInput += '/' + pathReplace[1])">
+              {{ pathReplace[1] }}
+            </a-tag>
+          </HoverTip>
         </div>
       </a-collapse-panel>
 
@@ -217,16 +215,11 @@ function saveClientConfig() {
           class="field-textarea"
         />
         <div class="chip-group">
-          <a-tag
-            v-for="pathReplace in pathReplaceMap"
-            :key="pathReplace[1]"
-            :title="pathReplace[2]"
-            class="kw-chip"
-            color="blue"
-            @click="() => (suggestTagInput += pathReplace[1])"
-          >
-            {{ pathReplace[1] }}
-          </a-tag>
+          <HoverTip v-for="pathReplace in pathReplaceMap" :key="pathReplace[1]" :text="pathReplace[2]">
+            <a-tag class="kw-chip" color="blue" @click="() => (suggestTagInput += pathReplace[1])">
+              {{ pathReplace[1] }}
+            </a-tag>
+          </HoverTip>
         </div>
       </a-collapse-panel>
 

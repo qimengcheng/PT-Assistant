@@ -14,6 +14,7 @@ import { CheckOutlined, DownOutlined, HolderOutlined, PushpinOutlined, SearchOut
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 
 const searchPlanKey = defineModel<string>({ required: true });
 
@@ -246,26 +247,24 @@ watch(searchPlanKey, (key) => (checkedSiteIds.value = key.startsWith("site:") ? 
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'site'">
                 <span class="search-scope-site-cell">
-                  <HolderOutlined
-                    :title="t('SearchEntity.scope.dragToSort')"
-                    class="search-scope-drag-handle"
-                    draggable="true"
-                    @dragstart="onDragStartSite(record.id, $event)"
-                    @dragend="dragSiteId = ''; highlightRow('')"
-                  />
+                  <HoverTip :text="t('SearchEntity.scope.dragToSort')">
+                    <HolderOutlined
+                      class="search-scope-drag-handle"
+                      draggable="true"
+                      @dragstart="onDragStartSite(record.id, $event)"
+                      @dragend="dragSiteId = ''; highlightRow('')"
+                    />
+                  </HoverTip>
                   <SiteFavicon :site-id="record.id" :size="16" />
                   <SiteName :site-id="record.id" tag="span" />
                 </span>
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-button
-                  :title="t('SearchEntity.scope.pin')"
-                  size="small"
-                  type="text"
-                  @click="pinSite(record.id)"
-                >
-                  <template #icon><PushpinOutlined /></template>
-                </a-button>
+                <HoverTip :text="t('SearchEntity.scope.pin')">
+                  <a-button size="small" type="text" @click="pinSite(record.id)">
+                    <template #icon><PushpinOutlined /></template>
+                  </a-button>
+                </HoverTip>
               </template>
             </template>
           </a-table>

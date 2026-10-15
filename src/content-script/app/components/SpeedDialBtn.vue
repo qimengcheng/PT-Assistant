@@ -3,6 +3,7 @@ import { computed, useAttrs, useTemplateRef, type Component, type TransitionProp
 import { useElementHover } from "@vueuse/core";
 
 import { useConfigStore } from "@/options/stores/config.ts";
+import HoverTip from "@/options/components/HoverTip.vue";
 
 const {
   title,
@@ -33,20 +34,24 @@ const shouldFadeEnter = computed<boolean>(
 
 <template>
   <Transition v-bind="transition">
-    <a-button
-      ref="btn"
-      v-bind="attrs"
-      :class="{ 'ptd-fade-enter': shouldFadeEnter }"
-      :style="stacked ? { background: isHovered ? color : 'transparent', borderColor: color } : undefined"
-      :title="title"
-      shape="circle"
-      size="large"
-    >
-      <template #icon>
-        <component :is="icon" />
-      </template>
-      <span v-if="stacked" :style="{ color: color }">{{ title }}</span>
-    </a-button>
+    <!-- 堆叠模式（图标 + 文字）文字已经写着这一句，不再挂浮层；只剩圆图标那一档才需要。
+         原先是无条件挂原生 title，而它落在 shadowRoot 之外的系统层上：字号、行宽、
+         出现延迟都不归页面管（用户 2026-10-15「所有的悬浮提示都不要用原生的 title」）。 -->
+    <HoverTip :text="stacked ? undefined : title">
+      <a-button
+        ref="btn"
+        v-bind="attrs"
+        :class="{ 'ptd-fade-enter': shouldFadeEnter }"
+        :style="stacked ? { background: isHovered ? color : 'transparent', borderColor: color } : undefined"
+        shape="circle"
+        size="large"
+      >
+        <template #icon>
+          <component :is="icon" />
+        </template>
+        <span v-if="stacked" :style="{ color: color }">{{ title }}</span>
+      </a-button>
+    </HoverTip>
   </Transition>
 </template>
 

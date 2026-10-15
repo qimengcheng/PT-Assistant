@@ -40,6 +40,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
 import CheckSwitchButton from "@/options/components/CheckSwitchButton.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 
 import { type IUserDataStatistic, loadFullData, setSubDate } from "./utils.ts";
 import { allAddedSiteMetadata, loadAllAddedSiteMetadata } from "../utils/siteMetadata.ts";
@@ -623,11 +624,13 @@ provide(THEME_KEY, echartsTheme);
               :popup-match-select-width="true"
               class="flex-1-1-0"
             />
-            <a-button type="text" size="small" :title="configStore.getUserNames.perfName" @click="configStore.userName = configStore.getUserNames.perfName">
-              <template #icon>
-                <HistoryOutlined />
-              </template>
-            </a-button>
+            <HoverTip :text="configStore.getUserNames.perfName">
+              <a-button type="text" size="small" @click="configStore.userName = configStore.getUserNames.perfName">
+                <template #icon>
+                  <HistoryOutlined />
+                </template>
+              </a-button>
+            </HoverTip>
           </div>
         </div>
 

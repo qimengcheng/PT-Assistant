@@ -35,6 +35,7 @@ import TorrentTitleTd from "@/options/components/TorrentTitleTd.vue";
 import ActionTd from "./ActionTd.vue";
 import TorrentProcessTd from "./TorrentProcessTd.vue";
 import QuickFilterNotice from "./QuickFilterNotice.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 import SearchStatusDialog from "./SearchStatusDialog.vue";
 import SaveSnapshotDialog from "./SaveSnapshotDialog.vue";
 import SnapshotManagerDialog from "./SnapshotManagerDialog.vue";
@@ -789,22 +790,18 @@ const hasSearchStatus = computed<boolean>(() => {
       <div class="d-flex align-center">
         <!-- 启动/暂停 搜索队列 -->
         <a-space-compact>
-          <a-button
-            v-show="isSearchingParsed"
-            :title="t('SearchEntity.index.action.start')"
-            type="text"
-            @click="() => startSearchQueue()"
-          >
-            <template #icon><PlayCircleOutlined style="color: #52c41a" /></template>
-          </a-button>
-          <a-button
-            v-show="!isSearchingParsed"
-            :title="t('SearchEntity.index.action.pause')"
-            type="text"
-            @click="() => pauseSearchQueue()"
-          >
-            <template #icon><PauseCircleOutlined style="color: #52c41a" /></template>
-          </a-button>
+          <!-- v-show 留在按钮上而不是挪到 HoverTip 上：HoverTip 的根是一层浮层组件（多根），
+               v-show 落不到具体元素上会静默不生效，那一排就永远少不了一键。 -->
+          <HoverTip :text="t('SearchEntity.index.action.start')">
+            <a-button v-show="isSearchingParsed" type="text" @click="() => startSearchQueue()">
+              <template #icon><PlayCircleOutlined style="color: #52c41a" /></template>
+            </a-button>
+          </HoverTip>
+          <HoverTip :text="t('SearchEntity.index.action.pause')">
+            <a-button v-show="!isSearchingParsed" type="text" @click="() => pauseSearchQueue()">
+              <template #icon><PauseCircleOutlined style="color: #52c41a" /></template>
+            </a-button>
+          </HoverTip>
 
           <!-- 取消/重试 搜索队列 -->
           <a-tooltip :title="t('SearchEntity.index.action.cancel')">
@@ -817,27 +814,29 @@ const hasSearchStatus = computed<boolean>(() => {
               <template #icon><CloseCircleOutlined /></template>
             </a-button>
           </a-tooltip>
-          <a-button
-            v-show="!runtimeStore.search.isSearching"
-            :disabled="isSearchingParsed"
-            :title="t('SearchEntity.index.action.retry')"
-            type="text"
-            danger
-            @click="() => doSearch(null as unknown as string, null as unknown as string, true)"
-          >
-            <template #icon><SyncOutlined /></template>
-          </a-button>
+          <HoverTip :text="t('SearchEntity.index.action.retry')">
+            <a-button
+              v-show="!runtimeStore.search.isSearching"
+              :disabled="isSearchingParsed"
+              type="text"
+              danger
+              @click="() => doSearch(null as unknown as string, null as unknown as string, true)"
+            >
+              <template #icon><SyncOutlined /></template>
+            </a-button>
+          </HoverTip>
 
           <!-- 重试失败的搜索 -->
-          <a-button
-            :disabled="searchPlanStatus.error === 0"
-            :title="t('SearchEntity.index.action.retryFailed')"
-            type="text"
-            style="color: #faad14"
-            @click="() => retrySearch()"
-          >
-            <template #icon><SyncOutlined /></template>
-          </a-button>
+          <HoverTip :text="t('SearchEntity.index.action.retryFailed')">
+            <a-button
+              :disabled="searchPlanStatus.error === 0"
+              type="text"
+              style="color: #faad14"
+              @click="() => retrySearch()"
+            >
+              <template #icon><SyncOutlined /></template>
+            </a-button>
+          </HoverTip>
         </a-space-compact>
 
         <a-divider type="vertical" class="mx-2" />
@@ -860,8 +859,11 @@ const hasSearchStatus = computed<boolean>(() => {
 
         <a-divider type="vertical" class="mx-2" />
 
-        <!-- 显示偏好设置 -->
+        <!-- 显示偏好设置：这颗图标钮原先挂原生 title 说自己是干什么的。它同时是这层
+             点击浮层的触发元素，再包一层悬停浮层就是同一片命中区上叠两个浮层，
+             所以把名字挪进面板自己的标题行 —— 点开第一行就读得出来这是哪一栏。 -->
         <a-popover trigger="click" placement="bottomLeft">
+          <template #title>{{ t("SearchEntity.index.action.displayPreferences") }}</template>
           <template #content>
             <div class="display-preferences">
               <div v-for="item in filteredTableBooleanControlKeys" :key="item" class="mb-1">
@@ -882,7 +884,7 @@ const hasSearchStatus = computed<boolean>(() => {
               />
             </div>
           </template>
-          <a-button type="text" :title="t('SearchEntity.index.action.displayPreferences')">
+          <a-button type="text">
             <template #icon><SettingOutlined style="color: #1677ff" /></template>
           </a-button>
         </a-popover>
@@ -1030,29 +1032,27 @@ const hasSearchStatus = computed<boolean>(() => {
 
             <!-- 评论人数：有评论才给跳转，点开是站点详情页的评论区 -->
             <template v-else-if="column.key === 'comments'">
-              <a
-                v-if="commentsHref(record)"
-                :href="commentsHref(record)"
-                rel="noopener noreferrer nofollow"
-                target="_blank"
-                :title="t('SearchEntity.index.table.commentsLink')"
-              >
-                <span class="text-no-wrap">{{ countText(record.comments) }}</span>
-              </a>
+              <HoverTip v-if="commentsHref(record)" :text="t('SearchEntity.index.table.commentsLink')">
+                <a :href="commentsHref(record)" rel="noopener noreferrer nofollow" target="_blank">
+                  <span class="text-no-wrap">{{ countText(record.comments) }}</span>
+                </a>
+              </HoverTip>
               <span v-else class="text-no-wrap">{{ countText(record.comments) }}</span>
             </template>
 
             <!-- 发布日期 -->
             <template v-else-if="column.key === 'time'">
-              <span class="t_time text-no-wrap" :title="record.time ? (formatDate(record.time) as string) : '-'">
-                {{
-                  record.time
-                    ? configStore.searchEntifyControl.uploadAtFormatAsAlive
-                      ? formatTimeAgo(record.time)
-                      : formatDate(record.time)
-                    : "-"
-                }}
-              </span>
+              <HoverTip :text="record.time ? (formatDate(record.time) as string) : undefined">
+                <span class="t_time text-no-wrap">
+                  {{
+                    record.time
+                      ? configStore.searchEntifyControl.uploadAtFormatAsAlive
+                        ? formatTimeAgo(record.time)
+                        : formatDate(record.time)
+                      : "-"
+                  }}
+                </span>
+              </HoverTip>
             </template>
 
             <!-- 其他操作 -->

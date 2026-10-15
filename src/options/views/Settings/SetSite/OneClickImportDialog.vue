@@ -92,10 +92,54 @@ const siteTotal = computed(() => Object.keys(canAddSites.value).length);
  * 正解是算一次、存进 Map，模板只做 O(1) 取值。顺带把原来每张卡都要做的
  * `success.includes()` / `toWork.includes()`（各 O(选中数)）换成 Set 查表。
  */
+/**
+ * 六种状态：图标/颜色与文案各一份，卡片和头部那行图例读的是同一批，不会各说一套。
+ *
+ * 图例是新加的那一环：状态说明原先挂在每颗图标的原生 title 上，而 239 张卡每卡换一颗
+ * 浮层组件要多 ~0.5s（v0.101.6 刚把这页从 9.6s 降到 0.6s），所以把说明从卡片里挪到头部。
+ */
+type TStatusKind = "manual" | "trying" | "success" | "failed" | "selected" | "none";
+
+const STATUS_ICONS: Record<TStatusKind, { icon: Component; color: string }> = {
+  // 需要手动添加 (progress-close)
+  manual: { icon: CloseCircleOutlined, color: "purple" },
+  // 正在尝试中 (progress-wrench)
+  trying: { icon: ToolOutlined, color: "blue" },
+  // 已添加成功 (progress-check)
+  success: { icon: CheckCircleOutlined, color: "green" },
+  // 添加失败 (progress-alert)
+  failed: { icon: ExclamationCircleOutlined, color: "red" },
+  // 已选择 (progress-pencil)
+  selected: { icon: EditOutlined, color: "" },
+  // 没选、也没处理过
+  none: { icon: QuestionCircleOutlined, color: "grey" },
+};
+
+/** 图例的排列顺序 = 一次导入从选到完的流程顺序 */
+const STATUS_ORDER: TStatusKind[] = ["selected", "trying", "success", "failed", "manual", "none"];
+
+// computed：标签里有 t()，写成常量切语言不会重算（AGENTS §3.4）
+const statusText = computed<Record<TStatusKind, string>>(() => ({
+  manual: t("SetSite.oneClickImportDialog.status.manual"),
+  trying: t("SetSite.oneClickImportDialog.status.trying"),
+  success: t("SetSite.oneClickImportDialog.status.success"),
+  failed: t("SetSite.oneClickImportDialog.status.failed"),
+  selected: t("SetSite.oneClickImportDialog.status.selected"),
+  none: t("SetSite.oneClickImportDialog.status.none"),
+}));
+
+const statusLegend = computed(() =>
+  STATUS_ORDER.map((kind) => ({
+    kind,
+    icon: STATUS_ICONS[kind].icon,
+    color: STATUS_ICONS[kind].color,
+    text: statusText.value[kind],
+  })),
+);
+
 interface IStatusIcon {
   icon: Component;
   color: string;
-  title: string;
 }
 
 const statusIcon = computed(() => {
@@ -108,38 +152,17 @@ const statusIcon = computed(() => {
   for (const site of filteredSites.value) {
     const id = site.id;
     if (site.userInputSettingMeta) {
-      // 需要手动添加 (progress-close)
-      byId.set(id, {
-        icon: CloseCircleOutlined,
-        color: "purple",
-        title: t("SetSite.oneClickImportDialog.status.manual"),
-      });
+      byId.set(id, STATUS_ICONS.manual);
     } else if (status.working === id) {
-      // 正在尝试中 (progress-wrench)
-      byId.set(id, {
-        icon: ToolOutlined,
-        color: "blue",
-        title: t("SetSite.oneClickImportDialog.status.trying"),
-      });
+      byId.set(id, STATUS_ICONS.trying);
     } else if (success.has(id)) {
-      // 已添加成功 (progress-check)
-      byId.set(id, {
-        icon: CheckCircleOutlined,
-        color: "green",
-        title: t("SetSite.oneClickImportDialog.status.success"),
-      });
+      byId.set(id, STATUS_ICONS.success);
     } else if (failed.has(id)) {
-      // 添加失败 (progress-alert)
-      byId.set(id, {
-        icon: ExclamationCircleOutlined,
-        color: "red",
-        title: t("SetSite.oneClickImportDialog.status.failed"),
-      });
+      byId.set(id, STATUS_ICONS.failed);
     } else if (selected.has(id)) {
-      // 已选择 (progress-pencil)
-      byId.set(id, { icon: EditOutlined, color: "", title: t("SetSite.oneClickImportDialog.status.selected") });
+      byId.set(id, STATUS_ICONS.selected);
     } else {
-      byId.set(id, { icon: QuestionCircleOutlined, color: "grey", title: "" });
+      byId.set(id, STATUS_ICONS.none);
     }
   }
 
@@ -147,7 +170,7 @@ const statusIcon = computed(() => {
 });
 
 function statusIconProp(siteId: TSiteID): IStatusIcon {
-  return statusIcon.value.byId.get(siteId) ?? { icon: QuestionCircleOutlined, color: "grey", title: "" };
+  return statusIcon.value.byId.get(siteId) ?? STATUS_ICONS.none;
 }
 
 async function doAutoImport() {
@@ -283,6 +306,15 @@ async function dialogEnter() {
         <span v-if="importStatus.isWorking">
           {{ t("SetSite.oneClickImportDialog.trying", { name: canAddSites[importStatus.working].name }) }}
         </span>
+        <!-- 六种状态的图例。卡片右上角那颗图标不再挂提示：239 张卡每卡多一颗浮层组件要多
+             ~0.5s（v0.101.6 刚把这页从 9.6s 降到 0.6s），所以说明从每卡挪到这里，一次画完。
+             图标沿用全局 `.cell-icon`（那 0.5px 的光学补偿也在这一条上）。 -->
+        <div class="status-legend d-flex align-center flex-wrap">
+          <span v-for="item in statusLegend" :key="item.kind" class="status-legend-item d-flex align-center">
+            <component :is="item.icon" class="cell-icon" :style="{ color: item.color || undefined }" />
+            {{ item.text }}
+          </span>
+        </div>
       </template>
       <template #action>
         <!-- 原先这里包了一层 a-space :size="4"，对多根组件不起作用（它只数得见一个孩子），
@@ -337,14 +369,13 @@ async function dialogEnter() {
             {{ site.schema ?? (site.type === "private" ? "AbstractPrivateSite" : "AbstractBittorrentSite") }}
           </a-tag>
         </div>
-        <!-- 状态说明挂在图标上：按 AGENTS.md §3.4 属「图标上的说明性 title」那一族，不在
-             「截断的长文本必须换浮层」的范围里。而台架实测每卡两颗 a-tooltip（这颗 + 原先名字
-             那颗）要多 4 个组件实例、239 卡首挂 601ms → 1091ms，所以这里退回原生 title。 -->
+        <!-- 状态说明不再挂在每颗图标上：这里曾是原生 title，而 239 张卡每卡多一颗浮层组件
+             要多 ~0.5s（v0.101.6 刚把这页从 9.6s 降到 0.6s，翻倍不能接受）。
+             所以改成下面那行图例 —— 一次渲染，六种状态一次说清，卡片本身零浮层。 -->
         <a
           :href="site.urls[0]"
           target="_blank"
           rel="noopener noreferrer nofollow"
-          :title="statusIconProp(site.id).title"
         >
           <component
             :is="statusIconProp(site.id).icon"
@@ -384,6 +415,15 @@ async function dialogEnter() {
   align-items: center;
   gap: 8px;
   padding: 0 12px;
+}
+
+/* 状态图例：整行放在说明那条 alert 里，缝 4/12（项内 4、项间 12） */
+.status-legend {
+  gap: 4px 12px;
+  width: 100%;
+}
+.status-legend-item {
+  gap: 4px;
 }
 
 .site-filter-count {

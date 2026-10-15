@@ -24,6 +24,7 @@ import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
 import TorrentTitleTd from "@/options/components/TorrentTitleTd.vue";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 import DownloaderLabel from "@/options/components/DownloaderLabel.vue";
 import ReDownloadSelectDialog from "./ReDownloadSelectDialog.vue";
 import AdvanceFilterGenerateDialog from "./AdvanceFilterGenerateDialog.vue";
@@ -301,14 +302,12 @@ onUnmounted(() => {
           <!-- 这一档只说「记录里有没有写明是谁发起的」，不替存量数据编一个来源：
                自动辅种与辅种任务页的手动发送落到库里的 addTorrentOptions 一字不差，反推只会一半标错。
                「未记录」那一条挂一句说明，告诉他这一档是从哪一版才开始有的。 -->
-          <a-tag
-            :color="metaOfTrigger(record).color"
-            :title="record.trigger ? undefined : t('DownloadHistory.trigger.unknownHint')"
-            class="download-tag"
-          >
-            <template #icon><component :is="metaOfTrigger(record).icon" /></template>
-            {{ t(metaOfTrigger(record).titleKey) }}
-          </a-tag>
+          <HoverTip :text="record.trigger ? undefined : t('DownloadHistory.trigger.unknownHint')">
+            <a-tag :color="metaOfTrigger(record).color" class="download-tag">
+              <template #icon><component :is="metaOfTrigger(record).icon" /></template>
+              {{ t(metaOfTrigger(record).titleKey) }}
+            </a-tag>
+          </HoverTip>
         </template>
 
         <template v-else-if="column.key === 'action'">

@@ -1614,6 +1614,7 @@
       "status": {
         "failed": "Failed to add",
         "manual": "This site needs to be added manually",
+        "none": "Not selected",
         "selected": "Selected",
         "success": "Added successfully",
         "trying": "Trying"

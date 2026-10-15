@@ -57,6 +57,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import SiteName from "@/options/components/SiteName.vue";
 import SiteRatioPopover from "@/options/components/SiteRatioPopover.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
 import {
   CATEGORY_FOLDER_PREFIX,
@@ -729,6 +730,17 @@ const statusText = computed(() => ({
  */
 function statusLabel(item: IVerifiedItem): string {
   return statusText.value[item.status];
+}
+
+/**
+ * 状态那颗键的浮层文案：验证结果，外加（未通过时）那颗 ✕ 点下去做什么。
+ *
+ * 原先这两句分在两层浮层上（外层 a-tooltip 说状态、内层图标自己再挂原生 title 说移除），
+ * 而它们盖的是同一片命中区 —— 鼠标一进去两个一起弹。撤掉原生 title 之后合成一条。
+ */
+function statusHintOf(item: IVerifiedItem): string {
+  const status = statusLabel(item);
+  return item.verified ? status : `${status} · ${t("SearchEntity.KeepUploadDialog.removeFromKeepUpload")}`;
 }
 
 // 打开对话框时初始化
@@ -1717,9 +1729,11 @@ async function createKeepUploadTask() {
             <!-- 分享率那一档为什么标在角色列：它说的就是「这一条能不能当基准」，与上面那颗标记同一件事。
                  低于 1 的行没有「设为基准种子」（见 canPromote），不标一下就成了静默消失。 -->
             <div v-if="ratioVerdictOf(record) !== 'ok'" class="role-recommend role-ratio">
-              <a-tag :color="ratioVerdictOf(record) === 'low' ? 'volcano' : 'default'" :title="ratioTag(record).tip">
-                {{ ratioTag(record).text }}
-              </a-tag>
+              <HoverTip :text="ratioTag(record).tip">
+                <a-tag :color="ratioVerdictOf(record) === 'low' ? 'volcano' : 'default'">
+                  {{ ratioTag(record).text }}
+                </a-tag>
+              </HoverTip>
             </div>
           </template>
 
@@ -1760,9 +1774,9 @@ async function createKeepUploadTask() {
               <!-- 这里原本给 a-tag 传了 `bordered`，已删。注意它**不是死属性**（早先注释这么写是错的）：
                    Tag 声明了 bordered?: boolean 且无 @deprecated，hooks/useColor.js:16 真读它，
                    语义是降级（false → 强制 filled）—— 它造不出描边，要描边请用 variant="outlined" -->
-              <a-tag v-for="badge in localBadges(record)" :key="badge.key" :color="badge.color" :title="badge.title">
-                {{ badge.text }}
-              </a-tag>
+              <HoverTip v-for="badge in localBadges(record)" :key="badge.key" :text="badge.title">
+                <a-tag :color="badge.color">{{ badge.text }}</a-tag>
+              </HoverTip>
               <span
                 v-for="site in matchedSitesOf(record)"
                 :key="site"
@@ -1801,52 +1815,49 @@ async function createKeepUploadTask() {
             <!-- 「有参照物可比」的两种来路：基准取列表第一条时要求它已经验证通过（所以除它以外的行才比得了，
                  判据是 id 而不是渲染序 —— 这一列现在能按做种/下载排序）；
                  基准取下载器那条时参照物一直在，第一条也允许人工确认 / 重下 -->
-            <a-button
+            <HoverTip
               v-if="!record.loading && !record.verified && (useLocalBase || (record.id !== baseId && baseItem?.verified))"
-              type="text"
-              size="small"
-              :title="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
-              @click.stop="addToVerified(record.id)"
+              :text="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
             >
-              <template #icon><PlusOutlined /></template>
-            </a-button>
+              <a-button type="text" size="small" @click.stop="addToVerified(record.id)">
+                <template #icon><PlusOutlined /></template>
+              </a-button>
+            </HoverTip>
 
-            <a-button
+            <HoverTip
               v-if="!record.loading && !record.torrent && (useLocalBase || (record.id !== baseId && baseItem?.verified))"
-              type="text"
-              size="small"
-              :title="t('SearchEntity.KeepUploadDialog.redownload')"
-              @click.stop="reDownload(record.id)"
+              :text="t('SearchEntity.KeepUploadDialog.redownload')"
             >
-              <template #icon><SyncOutlined /></template>
-            </a-button>
+              <a-button type="text" size="small" @click.stop="reDownload(record.id)">
+                <template #icon><SyncOutlined /></template>
+              </a-button>
+            </HoverTip>
 
             <!-- 原先是一颗向上的箭头图标，悬停才有说明：行右侧同时挂着三颗图标钮，
-                 「向上」看不出是「把这一条挪成基准」，所以直接写成文字。 -->
+                 「向上」看不出是「把这一条挪成基准」，所以直接写成文字。
+                 文字本身就是这颗键的名字，不再挂提示（挂了就是一模一样的话说两遍）。 -->
             <a-button
               v-if="canPromote(record)"
               type="link"
               size="small"
-              :title="t('SearchEntity.KeepUploadDialog.setAsBase')"
               @click.stop="setItemBase(record.id)"
             >
               {{ t("SearchEntity.KeepUploadDialog.setAsBase") }}
             </a-button>
 
-            <a-tooltip :title="statusLabel(record)">
+            <!-- 一层浮层说两件事：这一条的验证结果，以及（未通过时）那颗 ✕ 点下去是「从辅种列表移除」。
+                 原先是外层 a-tooltip 管状态、内层图标自己再挂一个提示 —— 两层悬停浮层套在同一片命中区上，
+                 鼠标一进去两个一起弹。原生 title 撤掉之后没有第二层可挂了，所以并成一条。 -->
+            <HoverTip :text="statusHintOf(record)">
               <a-button type="text" size="small" :loading="record.loading">
                 <template v-if="record.verified" #icon>
                   <CheckOutlined style="color: #52c41a" />
                 </template>
                 <template v-else #icon>
-                  <CloseOutlined
-                    style="color: #ff4d4f"
-                    :title="t('SearchEntity.KeepUploadDialog.removeFromKeepUpload')"
-                    @click.stop="removeVerifiedItem(record.id)"
-                  />
+                  <CloseOutlined style="color: #ff4d4f" @click.stop="removeVerifiedItem(record.id)" />
                 </template>
               </a-button>
-            </a-tooltip>
+            </HoverTip>
           </template>
         </template>
       </a-table>

@@ -59,6 +59,7 @@ import TorrentDetailDialog from "./TorrentDetailDialog.vue";
 import SpeedLimitDialog from "./SpeedLimitDialog.vue";
 import LabelDialog from "./LabelDialog.vue";
 import RecheckConfirmDialog from "./RecheckConfirmDialog.vue";
+import HoverTip from "@/options/components/HoverTip.vue";
 
 import {
   torrents,
@@ -793,14 +794,16 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           {{ clientName(selectedDownloaderIds[0]) }}
         </a-tag>
 
-        <a-button type="primary" :title="t('MyClient.clientStatusDialog.openBtn')" @click="showClientStatusDialog = true">
-          <template #icon><ThunderboltOutlined /></template>
-          {{ allTorrents.length }}
-          <ArrowUpOutlined style="color: #389e0d" />
-          {{ formatSize(totalUpSpeed) }}/s
-          <ArrowDownOutlined style="color: #cf1322" />
-          {{ formatSize(totalDlSpeed) }}/s
-        </a-button>
+        <HoverTip :text="t('MyClient.clientStatusDialog.openBtn')">
+          <a-button type="primary" @click="showClientStatusDialog = true">
+            <template #icon><ThunderboltOutlined /></template>
+            {{ allTorrents.length }}
+            <ArrowUpOutlined style="color: #389e0d" />
+            {{ formatSize(totalUpSpeed) }}/s
+            <ArrowDownOutlined style="color: #cf1322" />
+            {{ formatSize(totalDlSpeed) }}/s
+          </a-button>
+        </HoverTip>
 
         <a-button @click="showColumnDialog = true">
           <template #icon><ColumnWidthOutlined /></template>

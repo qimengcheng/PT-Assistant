@@ -26,25 +26,31 @@ export const siteMetadata: ISiteMetadata = {
   favicon: "./_default_nexusphp.png",
 
   /**
-   * ⚠️ 这里把参数逐个写全，是因为公共那份 `SchemaMetadata.search` 只带 `notnewword=1`，
-   * 而 PTzone 对那一条地址**稳定只返回 3 行、且第 3 行是半行**（v0.105.9 的截断判据会把它报出来，
-   * 但报出来不等于拿得全）。用户 2026-10-15 在自己的浏览器里跑了三条地址，实测原话逐条抄在这里：
-   * - `torrents.php?notnewword=1&search=<词>` → 「确实只有3行，第三行还是只有一半」
-   * - `torrents.php?incldead=1&spstate=0&inclbookmarked=0&approval_status=&size_begin=&…&search_area=0&search_mode=0`
-   *   → 「这个地址就是正常的」（第 1 页 50 行、共 124）
-   * - `torrents.php?inclbookmarked=0&incldead=0&spstate=0&search_area=0&search=<词>&search_mode=0&page=0`
-   *   → 「这个是完整」
+   * PTzone 的搜索偶尔只回半页（下面第 4 条是用户实测），这一条**不是靠参数治好的**，
+   * 这里的参数只说明"我们想问站点什么问题"。用户 2026-10-15 在自己浏览器里跑的四条，原话逐条抄：
+   * - `?notnewword=1&search=<词>`（= 公共 schema 那份、也是本条改之前实际发的）
+   *   →「确实只有3行，第三行还是只有一半」
+   * - `?incldead=1&spstate=0&inclbookmarked=0&approval_status=&…&search_area=0&search_mode=0`
+   *   →「这个地址就是正常的」（第 1 页 50 行、共 124）
+   * - `?inclbookmarked=0&incldead=0&spstate=0&search_area=0&search=<词>&search_mode=0&page=0` →「这个是完整」
+   * - `?search=<词>`（裸关键词，**不带 `notnewword`**）→「第一次只有2条半，但是刷新一下就好了」
    *
-   * ⇒ **截断是由请求本身决定、可复现的**，不是网络抖动；而两条正常的地址都①带整套表单键、
-   * ②都不带 `notnewword`。到底是"缺表单键"还是"`notnewword=1`"触发的，这两条实验分不开
-   * （要分只需再跑一条 `torrents.php?search=<词>`，裸关键词、不带 notnewword），
-   * 所以这里一次满足两条：照抄表单键集合、去掉 `notnewword`。
+   * ⇒ 最后一条把「参数决定论」推翻了：**同一条地址会断也会完整**，所以「缺整套表单键」和
+   * `notnewword=1` 都不是决定因素；能同时解释四条观察的只剩「站点这一头偶发地只 echo 到半页」
+   * （慢/超时那一类；为什么偶发只有站点那侧的代码定得了，我们没有）。
+   * 真正兜住它的是 **v0.105.9 那条自动重发**（NexusPHP 发现"末行比表头短"就再要一次），端到端实测在
+   * `.tmp-build/bench-ptzone/retry.mjs`：第一次给半页 → 第二次 50 条、状态 success；两次都半页 →
+   * 留 2 条并把状态写成「站点返回的页面在表格中途断开，结果不完整」；第一次就完整 → 不多发一次。
    *
-   * 值取哪一档：`incldead` 在 PTzone 的档位文字是 `0|包括斷種 / 1|活種 / 2|斷種`
-   * （与 NexusPHP 常见理解 1=包含断种**相反**，也与本文件上面 `CategoryIncldead` 那套一致），
-   * 第 2 条用的是 1=只要活种，而第 3 条实测**`0`（包括断种、最宽）同样完整** ——
-   * 断种对辅种正是最有用的那一批（本地已有数据、站点却没人做种），所以取 `0`。
-   * 另外 `keywordPath` 沿用 schema 的 `params.search`；IMDb 那条高级搜索词仍会在运行时把
+   * 那这里还留 `incldead: 0` 做什么：写清「这一站要最宽那一档」。`incldead` 在 PTzone 的档位文字是
+   * `0|包括斷種 / 1|活種 / 2|斷種`（与 NexusPHP 常见理解 1=包含断种**相反**，与本文件 `CategoryIncldead`
+   * 一致），断种对辅种正是最有用的那一批（本地已有数据、站点却没人做种），所以绝不能按 `1` 发。
+   * 上面第 3 条实测也证明发 `0` 并不更容易断。
+   * 不发的东西也有交代：`notnewword=1` 是公共 schema 那份**故意**带的（让站点不要把关键词包进
+   * `<b class=newword>`，好让解析拿到干净 HTML），撤掉它换不来完整页，所以留着；
+   * 那 10 个空值 range 键（`size_begin=` 等）发与不发都是「全部」档（第 3、4 条一条带一条不带都正常），
+   * 抄过来只会让人以为它们在起作用，所以不抄。
+   * `keywordPath` 沿用 schema 的 `params.search`；IMDb 那条高级搜索词仍会在运行时把
    * `search_area` 改成 4（`SchemaMetadata.search.advanceKeywordParams`）。
    */
   search: {
@@ -53,22 +59,8 @@ export const siteMetadata: ISiteMetadata = {
       ...SchemaMetadata.search?.requestConfig,
       url: "/torrents.php",
       params: {
+        notnewword: 1,
         incldead: 0,
-        spstate: 0,
-        inclbookmarked: 0,
-        approval_status: "",
-        size_begin: "",
-        size_end: "",
-        seeders_begin: "",
-        seeders_end: "",
-        leechers_begin: "",
-        leechers_end: "",
-        times_completed_begin: "",
-        times_completed_end: "",
-        added_begin: "",
-        added_end: "",
-        search_area: 0,
-        search_mode: 0,
       },
     },
   },

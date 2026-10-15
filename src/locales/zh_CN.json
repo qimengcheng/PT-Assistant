@@ -609,11 +609,13 @@
       "fingerprint": {
         "local": {
           "candidate": "疑似：仅标题+大小匹配",
-          "identical": "本地已有",
-          "sameSite": "同站已挂"
+          "identical": "数据已在本地",
+          "identicalTip": "下载器里有同一份数据，但这一站还没挂 —— 辅它不必重新下载。",
+          "sameSite": "做种中",
+          "sameSiteTip": "下载器里已经有一条来自这个站点的相同内容（已完成），这一条不必再辅。"
         },
         "localIndex": {
-          "excludeLocal": "排除本地已有的（{0}）",
+          "excludeLocal": "排除「做种中」和「数据已在本地」的（{0}）",
           "loading": "正在读取本地种子指纹索引…",
           "needDownloader": "选择下载器后即可与本地种子比对指纹",
           "ready": "本地索引：{0} 个种子，其中 {1} 个可按文件清单比对",

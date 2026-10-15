@@ -143,7 +143,7 @@ const localBaseTouched = ref(false);
 const localIndex = ref<ILocalFingerprintIndex | null>(null);
 const indexLoading = ref(false);
 const indexSupported = ref(true);
-/** 勾上后，把「本地已有 / 同站已挂」的条目排除出辅种列表（默认关，绝不静默替用户做决定） */
+/** 勾上后，把「数据已在本地 / 做种中」的条目排除出辅种列表（默认关，绝不静默替用户做决定） */
 const excludeLocalDuplicates = ref(false);
 const localLookup = computed<IFingerprintIndexLookup>(() => buildFingerprintIndexLookup(localIndex.value));
 
@@ -792,19 +792,25 @@ const localIndexText = computed(() => {
   ]);
 });
 
-/** 把「本地已有 / 同站已挂」的条目从待辅种列表里摘掉 */
+/** 这两类一共有多少条。开关没勾时标签上也要报这个数 —— 那个数说的是「勾了会拿掉几条」 */
+const excludableIds = computed(
+  () =>
+    new Set(
+      Array.from(verifiedItems.value.values())
+        .filter((item) => item.verified && item.localDecision?.action === "exclude")
+        .map((item) => item.id),
+    ),
+);
+
+/** 把「数据已在本地 / 做种中」的条目从待辅种列表里摘掉 */
 const excludedIds = computed(() => {
-  // 基准就在下载器里时这条开关必须失效：那种任务的**每一条**都「本地已有」——
-  // 那正是它成立的前提（拿已有的数据去挂这一站）。照原样排除会把整个列表清空。
+  // 基准就在下载器里时这条开关必须失效：那种任务的**每一条**都属这两类 —— 基准那份数据就在本地，
+  // 而这一站挂着的那条正是它。那正是这种任务成立的前提，照原样排除会把整个列表清空。
   if (!excludeLocalDuplicates.value || useLocalBase.value) return new Set<string>();
-  return new Set(
-    Array.from(verifiedItems.value.values())
-      .filter((item) => item.verified && item.localDecision?.action === "exclude")
-      .map((item) => item.id),
-  );
+  return excludableIds.value;
 });
 
-/** 参与辅种的条目（勾选排除时，被指纹判定为本地已有的条目会被剔掉） */
+/** 参与辅种的条目（勾选排除时，被标成上面那两类的条目会被剔掉） */
 const includedItems = computed(() =>
   verifiedItemsOrder.value
     .map((id) => verifiedItems.value.get(id))
@@ -1300,7 +1306,15 @@ function verifiedByText(item: IVerifiedItem): string | null {
   }
 }
 
-/** 本地比对徽标：本地已有 / 同站已挂 / 仅标题疑似 */
+/**
+ * 本地比对徽标：数据已在本地 / 做种中 / 仅标题疑似。
+ *
+ * 前两档的旧名叫「本地已有」「同站已挂」，用户 2026-10-15 连着说看不懂 —— 前者会被读成
+ * 「已经在做种了」（它其实只说数据在本地、这一站还没挂），后者没说清"同"的是哪个站。
+ * 现在按 PT 用户的日常词给：**做种中** = 这一站已经挂着这份了（不必再辅），
+ * **数据已在本地** = 数据在本地、这个站还没挂（辅它不必重新下载）。
+ * 精确的因果各写在浮层里（`identicalTip` / `sameSiteTip`），标签只负责一眼读得出来。
+ */
 interface IFingerprintBadge {
   key: string;
   color: string;
@@ -1313,7 +1327,7 @@ interface IFingerprintBadge {
  *
  * 取的是 `matches`（全部命中条目）而不是 `match`（第一条）：同一份内容在下载器里常常
  * 有好几份副本、每份挂在不同站点上，只看第一条就等于只有 1 个站认得出来，
- * 其余那几行会被标成「本地已有」而不是「这一站我已经挂了」（用户 2026-10-15 报的）。
+ * 其余那几行会被标成「数据已在本地」而不是「这一站已经在做种」（用户 2026-10-15 报的）。
  * 同一份 `matches` 也是 `decideFingerprintAction` 那道同站闸的输入，两边因此不会各说一套。
  */
 function matchedSitesOf(item: IVerifiedItem): string[] {
@@ -1332,20 +1346,26 @@ function localBadges(item: IVerifiedItem): IFingerprintBadge[] {
     ? t("SearchEntity.KeepUploadDialog.fingerprint.suggestPieceVerify")
     : undefined;
 
-  const siteNames = matchedSitesOf(item).map(
-    (site) => metadataStore.siteNameMap?.[site] ?? metadataStore.getSiteName(site),
-  );
-
   switch (decision.reason) {
-    case "local-identical":
-      return [{ key: "local-identical", color: "orange", text: t("SearchEntity.KeepUploadDialog.fingerprint.local.identical"), title: suggestTitle }];
+    case "local-identical": {
+      const tip = t("SearchEntity.KeepUploadDialog.fingerprint.local.identicalTip");
+      return [
+        {
+          key: "local-identical",
+          color: "orange",
+          text: t("SearchEntity.KeepUploadDialog.fingerprint.local.identical"),
+          title: suggestTitle ? `${tip} ${suggestTitle}` : tip,
+        },
+      ];
+    }
     case "same-site-already":
+      // 浮层说的是「为什么这一条不必辅」，不再列站点名 —— 那行站点名本来就画在标题下面，重复一遍等于没解释
       return [
         {
           key: "same-site",
           color: "purple",
           text: t("SearchEntity.KeepUploadDialog.fingerprint.local.sameSite"),
-          title: siteNames.join("、") || suggestTitle,
+          title: t("SearchEntity.KeepUploadDialog.fingerprint.local.sameSiteTip"),
         },
       ];
     case "title-only-candidate":
@@ -1359,7 +1379,7 @@ function localBadges(item: IVerifiedItem): IFingerprintBadge[] {
 /**
  * 这一条就是基准本身 —— 下载器里已经挂着它，不是「要辅种的条目」。
  *
- * 用的不是新判据，是界面上已经画出来给用户看的那一颗「同站已挂」徽标（`localDecision.reason`
+ * 用的不是新判据，是界面上已经画出来给用户看的那一颗「做种中」徽标（`localDecision.reason`
  * 由指纹层按「命中的本地条目已挂在这个站上」判的），外加一条更硬的：infoHash 与所选基准相同。
  * 私有站 announce 里带 passkey，同一份内容两次下载算出的 hash 可以不一样，所以只认 hash 会漏 ——
  * 用户截图那一行写的是「文件清单指纹一致」而不是「infoHash 一致」，走的正是徽标那一条。
@@ -1560,7 +1580,7 @@ async function createKeepUploadTask() {
         v-model:checked="excludeLocalDuplicates"
         class="text-body-small"
       >
-        {{ t("SearchEntity.KeepUploadDialog.fingerprint.localIndex.excludeLocal", [excludedIds.size]) }}
+        {{ t("SearchEntity.KeepUploadDialog.fingerprint.localIndex.excludeLocal", [excludableIds.size]) }}
       </a-checkbox>
     </div>
 

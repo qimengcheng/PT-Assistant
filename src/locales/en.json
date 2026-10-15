@@ -609,11 +609,13 @@
       "fingerprint": {
         "local": {
           "candidate": "Suspicious: title+size only",
-          "identical": "Already local",
-          "sameSite": "Seeding on same site"
+          "identical": "Data is already local",
+          "identicalTip": "The downloader holds this data but not on this site — cross-seeding it needs no re-download.",
+          "sameSite": "Seeding",
+          "sameSiteTip": "The downloader already has this content attached to this site (completed), so this one does not need cross-seeding."
         },
         "localIndex": {
-          "excludeLocal": "Exclude already-local ({0})",
+          "excludeLocal": "Exclude seeding / already-local rows ({0})",
           "loading": "Loading local torrent fingerprint index...",
           "needDownloader": "Pick a downloader to compare against local torrents",
           "ready": "Local index: {0} torrents, {1} comparable by file list",

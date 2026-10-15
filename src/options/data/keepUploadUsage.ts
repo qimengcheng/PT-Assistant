@@ -63,10 +63,10 @@ export const usageZh: IUsageDoc = {
     },
     {
       id: "local",
-      title: "三、本地已有的那些，它不替你决定",
+      title: "三、标了「做种中」「数据已在本地」的那几条，它不替你决定",
       points: [
-        { text: "在「辅种检测」对话框里选上下载器之后，它会读一份本地种子指纹索引，把「本地已有」「同站已挂」「疑似：仅标题+大小匹配」这几类标出来。" },
-        { text: "默认只是标出来，不会悄悄把你本地已经有的那条从任务里拿掉 —— 要排除得自己勾「排除本地已有的」。基准取的是下载器里那条时这颗开关会出现不了：那种任务里每一条都「本地已有」，那正是它成立的前提，照原样排除会把列表清空。" },
+        { text: "在「辅种检测」对话框里选上下载器之后，它会读一份本地种子指纹索引，把「数据已在本地」「做种中」「疑似：仅标题+大小匹配」这几类标出来。前者是说这份数据在你机器上、但这个站还没挂；后者是说这一站已经挂着了，不必再辅。" },
+        { text: "默认只是标出来，不会悄悄把这几条从任务里拿掉 —— 要排除得自己勾索引提示那一行里那颗「排除…」开关。基准取的是下载器里那条时这颗开关会出现不了：那种任务里每一条都属于这两类，那正是它成立的前提，照原样排除会把列表清空。" },
         { text: "「重建本地指纹索引」那颗按钮就在提示文字右边。有些下载器不支持导出文件清单，对话框上方会直接写明「该下载器不支持导出文件清单，只能按标题+大小粗筛」，这时候只能按标题+大小粗筛。" },
       ],
     },
@@ -168,8 +168,8 @@ export const usageEn: IUsageDoc = {
       id: "local",
       title: "3. What you already have is flagged, not decided for you",
       points: [
-        { text: "In the 'Reseed Verification' dialog, once a downloader is selected it reads a local fingerprint index and flags entries as 'Already local', 'Seeding on same site' or 'Suspicious: title+size only'." },
-        { text: "Those are only markers. Nothing is quietly dropped from your task — to exclude them you have to tick 'Exclude already-local' yourself. That checkbox disappears when the base is a downloader entry: every row in that task is 'already local', which is the whole premise, so excluding them would empty the list." },
+        { text: "In the 'Reseed Verification' dialog, once a downloader is selected it reads a local fingerprint index and flags entries as 'Data is already local', 'Seeding' or 'Suspicious: title+size only'. The first means the data is on your machine but not attached to that site; the second means this site already has it." },
+        { text: "Those are only markers. Nothing is quietly dropped from your task — to exclude them you have to tick the 'Exclude ...' checkbox in that status line yourself. That checkbox disappears when the base is a downloader entry: every row in that task falls into those two buckets, which is the whole premise, so excluding them would empty the list." },
         { text: "'Rebuild local fingerprint index' sits right after that status line. Some clients cannot export a file list; then the top of the dialog says so ('This client cannot export a file list; only title+size screening') and only the title-and-size filter is available." },
       ],
     },

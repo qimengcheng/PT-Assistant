@@ -19,6 +19,7 @@ import type { TSiteID } from "@ptd/site";
 
 import { onMessage } from "@/messages.ts";
 import { buildTitleSizeKey, computeFilesFingerprint } from "@/shared/fingerprint/index.ts";
+import { resolveTrackerHostSite } from "@/shared/trackerHost.ts";
 import type { ILocalFingerprintIndex, ILocalTorrentFingerprintEntry } from "@/shared/fingerprint/index.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types.ts";
 
@@ -135,17 +136,45 @@ async function buildHostSiteMap(): Promise<Map<string, TSiteID>> {
 }
 
 /** 主机名 → 站点（一次构建，缓存复用） */
+function sitesOfTrackerHosts(trackerHosts: string[], hostMap: Map<string, TSiteID>): TSiteID[] {
+  const sites = new Set<TSiteID>();
+  for (const host of trackerHosts) {
+    // 不是精确等值就完事：announce 常在站点域名的子域上（PandaPT 首页 pandapt.net、announce 是
+    // tracker.pandapt.net），只按等值反查会让那一份副本认不出站，辅种检测里它那一行就不标「做种中」。
+    // 判据与「认不出 ≠ 认错」那条方向都在 `@/shared/trackerHost`。
+    const site = resolveTrackerHostSite(host, hostMap);
+    if (site) sites.add(site);
+  }
+  return Array.from(sites);
+}
+
 async function matchSitesByTrackerHosts(trackerHosts: string[]): Promise<TSiteID[]> {
   if (trackerHosts.length === 0) {
     return [];
   }
-  const hostMap = await buildHostSiteMap();
-  const sites = new Set<TSiteID>();
-  for (const host of trackerHosts) {
-    const site = hostMap.get(host);
-    if (site) sites.add(site);
+  return sitesOfTrackerHosts(trackerHosts, await buildHostSiteMap());
+}
+
+/**
+ * 命中缓存时按 `trackerHosts` 把 `sites` 重算一遍。
+ *
+ * `sites` 不是下载器报的原值，而是拿主机名查「主机名 → 站点」表算出来的**派生值**，而那张表会随
+ * 版本变（站点定义补了 announce 子域、或反查规则放宽）。不重算的话，修好了也要等这份 30 分钟缓存
+ * 过期才见效，界面上就是「改了还是老样子」。重算很便宜：主机名已经在缓存里，只查表，不再问下载器。
+ */
+async function refreshCachedIndexSites(index: ILocalFingerprintIndex): Promise<ILocalFingerprintIndex> {
+  let hostMap: Map<string, TSiteID>;
+  try {
+    hostMap = await buildHostSiteMap();
+  } catch (e) {
+    // 反查表拿不到就沿用缓存里那份站点：宁可保留旧结论，也不要把一整份可用的索引判成不可用
+    logger({ msg: "本地指纹索引：重算副本所属站点失败，沿用缓存里的站点", level: "warn", data: String(e) });
+    return index;
   }
-  return Array.from(sites);
+  return {
+    ...index,
+    entries: index.entries.map((entry) => ({ ...entry, sites: sitesOfTrackerHosts(entry.trackerHosts ?? [], hostMap) })),
+  };
 }
 
 /** qBittorrent / 其他客户端的 ratio 限制：-2 用全局限制，-1 不限制 */
@@ -189,7 +218,7 @@ export async function getLocalFingerprintIndex(
     const cached = (await (await ptdIndexDb()).get("local_fingerprint", downloaderId)) ?? undefined;
     if (cached && Date.now() - cached.updatedAt < INDEX_TTL) {
       logger({ msg: `本地指纹索引：命中 ${downloaderId} 的缓存`, data: cached.updatedAt });
-      return cached;
+      return await refreshCachedIndexSites(cached);
     }
   }
 

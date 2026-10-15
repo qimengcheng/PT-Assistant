@@ -793,6 +793,32 @@ export default class NexusPHP extends PrivateSite {
     } as Record<keyof ITorrent, string[]>;
   }
 
+  /**
+   * 上面那一轮**一个都没认出来**时，改用表头格子里的文字（含 img 的 alt/title）再认一次。
+   *
+   * 为什么需要：`img.size` 这一族 class 是皮肤的一部分，不少站把标记换成了纯文字表头或只留
+   * `alt`（1PTBar 那一屏：大小/做种/下载/完成/评论/发布于 六列全空，而靠**文字**匹配的
+   * 「分类」列正常 —— 用户 2026-10-15 的截图）。LuckPT 那次是同一族的第三种形状（挪进了
+   * `td[data-col]`），那一站走的是站点级 override。
+   *
+   * 歧义不靠别名顺序压，靠配对规则压：一个格子命中两个以上字段、或一个字段被两个格子命中，
+   * 这一轮就都不指派（见 `transformSearchPage` 里那条互斥判据）。所以最坏情况是「仍然认不出」，
+   * 不会把某一列指派到隔壁那一格。
+   *
+   * 刻意不含 `author`：它的判据是 `a[href*="sort=9"]` 那根链接，文字「发布者/上传」与
+   * 「下载」「上传时间」这几格撞得更凶。
+   */
+  protected guessSearchFieldTextConfig(): Record<string, RegExp> {
+    return {
+      size: /大小|\bsize\b/i,
+      seeders: /做种|种子数|seeders?\b/i,
+      leechers: /下载|leechers?\b/i,
+      completed: /完成|snatched|completed/i,
+      comments: /评论|回复|comments?\b/i,
+      time: /发布|加入时间|上传时间|\btime\b|\badded\b/i,
+    };
+  }
+
   protected get customTagsLocaterSelector(): string {
     return "table.torrentname";
   }
@@ -822,6 +848,8 @@ export default class NexusPHP extends PrivateSite {
       const headSelector =
         legacyTableSelector + (legacyTableHasThead ? " > thead > tr > th" : " > tbody > tr:eq(0) > td");
       const headAnother = Sizzle(headSelector, doc) as HTMLElement[];
+      // 第一轮认上了哪些字段、各认在哪一格：第二轮只补没认上的那些，且不跟已占掉的格子抢
+      const assignedAt = new Map<string, number>();
       headAnother.forEach((element, elementIndex) => {
         // 比较好处理的一些元素，都是可以直接获取的
         let updateSelectorField;
@@ -839,6 +867,7 @@ export default class NexusPHP extends PrivateSite {
         }
 
         if (updateSelectorField) {
+          assignedAt.set(updateSelectorField, elementIndex);
           // @ts-ignore
           searchEntry.selectors[updateSelectorField] = toMerged(
             {
@@ -849,6 +878,50 @@ export default class NexusPHP extends PrivateSite {
           );
         }
       });
+
+      // ── 第二轮：只补第一轮**一列都没认出来**的那几列，改读表头的文字（含 img 的 alt/title）──
+      // 为什么要有这一轮：`img.size` 那一族 class 属于皮肤，皮肤换成纯文字表头或只留 alt 时，
+      // 大小/做种/下载/完成/评论/发布于 六列会一起没被指派（界面上是空白，而靠文字认的「分类」列正常
+      // —— 1PTBar 就是这个形状，用户 2026-10-15）。
+      // 判据是「格子 ↔ 字段」的互斥配对：一格顶两个字段、或一字段被两格顶到，两边都不指派。
+      // 所以最坏情况仍然是「认不出、那一列空着」，不会把隔壁那一列指派错（那才是真会读出错数据的方向）。
+      const pendingFields = Object.entries(this.guessSearchFieldTextConfig()).filter(
+        ([field]) => !assignedAt.has(field),
+      );
+      if (pendingFields.length > 0 && searchEntry?.selectors) {
+        const headTextOf = (element: HTMLElement): string => {
+          const text = element.innerText || element.textContent || "";
+          // 不只查 img：有的皮肤把说明挂在 `<a title>` 或 `<span title>` 上
+          const marks = Array.from(element.querySelectorAll("[alt], [title]"));
+          const alts = marks
+            .map((mark) => `${mark.getAttribute("alt") ?? ""} ${mark.getAttribute("title") ?? ""}`)
+            .join(" ");
+          return `${text} ${alts}`;
+        };
+        const claimedIndexes = new Set<number>(assignedAt.values());
+        const cellHits: { index: number; fields: string[] }[] = [];
+        headAnother.forEach((element, elementIndex) => {
+          if (claimedIndexes.has(elementIndex)) return;
+          const headText = headTextOf(element);
+          const fields = pendingFields.filter(([, pattern]) => pattern.test(headText)).map(([field]) => field);
+          if (fields.length > 0) cellHits.push({ index: elementIndex, fields });
+        });
+
+        const fieldHitCount = new Map<string, number>();
+        for (const hit of cellHits) {
+          for (const field of hit.fields) fieldHitCount.set(field, (fieldHitCount.get(field) ?? 0) + 1);
+        }
+
+        // 动态键（字段名是字符串）在这里收窄一次类型，不用 `@ts-ignore`：
+        // packages 那一档的 warning 按基线只拦回涨，多两条 CI 就红（AGENTS §2.1）
+        const selectors = searchEntry.selectors as Record<string, object>;
+        for (const hit of cellHits) {
+          if (hit.fields.length !== 1) continue;
+          const [field] = hit.fields;
+          if (fieldHitCount.get(field) !== 1) continue;
+          selectors[field] = toMerged({ selector: [`> td:eq(${hit.index})`] }, selectors[field] ?? {});
+        }
+      }
     }
 
     // !!! 其他一些比较难处理的，我们把他 hack 到 parseWholeTorrentFromRow 中 !!!

@@ -21,7 +21,12 @@ export const siteMetadata: ISiteMetadata = {
   type: "private",
   schema: "NexusPHP",
 
-  urls: ["uggcf://cnaqncg.arg/"],
+  /**
+   * 第二条是 announce 那个子域（`https://tracker.pandapt.net/announce.php?passkey=…`）。
+   * 少了它，下载器里那一份副本的 tracker 反解不到本站，辅种检测里本站那一行不会标「做种中」
+   * —— 与 NovaHD 同写法（那条把 `tracker.novahd.top` 也列在这里）。
+   */
+  urls: ["uggcf://cnaqncg.arg/", "uggcf://genpxre.cnaqncg.arg/"],
 
   category: [
     {

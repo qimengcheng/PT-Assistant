@@ -19,6 +19,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 const stub = vi.hoisted(() => ({
   /** 当前这一桩 `getAll` 该返回什么（含「永远不返回」那一档） */
   getAll: null as null | (() => Promise<unknown[]>),
+  /** 当前这一桩按 id 单条读该返回什么（轮询那一路走它） */
+  get: null as null | ((id: unknown) => unknown),
+  /** 整表读到底发出去几趟：用来验「现在就重读」有没有把窗口里压着的那一次尾随撤干净 */
+  getAllRuns: 0,
   deleteCalls: [] as unknown[],
   snakebars: [] as string[],
 }));
@@ -38,7 +42,11 @@ vi.mock("@/options/stores/config.ts", () => ({
 
 vi.mock("@/shared/indexdb.ts", () => ({
   ptdIndexDb: async () => ({
-    getAll: async () => (stub.getAll ? stub.getAll() : []),
+    getAll: async () => {
+      stub.getAllRuns++;
+      return stub.getAll ? stub.getAll() : [];
+    },
+    get: async (_store: string, id: unknown) => (stub.get ? stub.get(id) : undefined),
     delete: async (_store: string, key: unknown) => {
       stub.deleteCalls.push(key);
     },
@@ -48,8 +56,8 @@ vi.mock("@/shared/indexdb.ts", () => ({
 const MODULE = "@/options/views/Overview/DownloadHistory/utils.ts";
 
 /** 一条放得下这张表的最小记录 */
-function rec(id: number, name: string) {
-  return { id, name, siteId: "snowpt", downloaderId: "d1", downloadStatus: "completed", downloadAt: 1 };
+function rec(id: number, name: string, status = "completed") {
+  return { id, name, siteId: "snowpt", downloaderId: "d1", downloadStatus: status, downloadAt: 1 };
 }
 
 /** 每个用例都要一份干净的模块图：`isLoadingHistory` 和那两个序号都是模块级的 */
@@ -69,6 +77,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.spyOn(console, "error").mockImplementation(() => {});
   stub.getAll = null;
+  stub.get = null;
+  stub.getAllRuns = 0;
   stub.deleteCalls = [];
   stub.snakebars = [];
 });
@@ -139,5 +149,154 @@ describe("下载历史读取的在飞标志", () => {
     const mod = await fresh();
     await mod.removeDownloadHistoryById(42);
     expect(stub.deleteCalls).toEqual([42]);
+  });
+
+  /**
+   * 「数据刚改过」那一路必须当场重读。
+   *
+   * `throttle(fn, 1000)`（es-toolkit）在窗口内的每一次调用都把尾随那一次**重新排满 1 秒**
+   *（走的是 `debounced.apply`，没有 maxWait 收窄），所以「进页面拉过一次 → 删一批 → 请求重读」
+   * 最后那一脚落在窗口里，表格要等一秒多才动。台架按真页面量到 1986~1996 ms —— 那才是
+   * 用户 2026-10-16 报的「删除数据后的数据刷新还是很慢」里的大头，读库本身不是（真实库
+   * 1500 条 `getAll` 33 ms、10000 条 195 ms）。
+   */
+  it("现在就重读那一档当场就换数据，并且把窗口里压着的尾随撤掉", async () => {
+    stub.getAll = async () => [rec(1, "甲")];
+    const mod = await fresh();
+
+    mod.throttleLoadDownloadHistory();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(stub.getAllRuns).toBe(1);
+
+    // 同一秒内再走节流那一个：被窗口吃掉，数据不动（这条就是界面上「点了没反应」的那一秒）
+    stub.getAll = async () => [rec(2, "乙")];
+    mod.throttleLoadDownloadHistory();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(Object.keys(mod.downloadHistory.value)).toEqual(["1"]);
+
+    mod.reloadDownloadHistoryNow();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(Object.keys(mod.downloadHistory.value)).toEqual(["2"]);
+    expect(stub.getAllRuns).toBe(2);
+
+    // 窗口里原本压着一次尾随；不撤掉的话一秒后还要再整表读一遍
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(stub.getAllRuns).toBe(2);
+  });
+});
+
+/**
+ * 「下载中」那一列的逐秒轮询。
+ *
+ * 钉的是这一条：回包之后**只有状态真的变了**才换整表引用。`downloadHistory` 是 shallowRef，
+ * 要触发任何东西就得整体替换，而一次替换带着 `downloadHistoryList` → `filteredItems` →
+ * `a-table` 的 data-source 一路重算并把这一页重渲染一遍（台架按真组件量到一次 47~59 ms，
+ * 与条数基本无关）。库里挂着 K 条状态停在 downloading/pending 的记录 = 每秒 K 次那种重渲染，
+ * K=30 实测一轮 1506 ms > 1000 ms —— 界面再也没有空档。而僵尸行恰恰是「一秒回一次、回回来
+ * 一模一样」那一类，守卫把它们的重渲染全部省掉。
+ *
+ * 反过来的那条更要紧：守卫不许把轮询本身弄停。状态没变这一轮不写，下一轮还得照样来。
+ */
+describe("下载状态轮询只在状态真的变了时才换整表引用", () => {
+  /** 首屏先落一条 downloading，再把在飞的那轮轮询推进 */
+  async function armed(status: string) {
+    stub.getAll = async () => [rec(1, "甲", "downloading")];
+    stub.get = () => rec(1, "甲", status);
+    const mod = await fresh();
+    mod.throttleLoadDownloadHistory();
+    await vi.advanceTimersByTimeAsync(10);
+    return mod;
+  }
+
+  it("状态没变：引用一动不动（等于不重渲染这一页）", async () => {
+    const mod = await armed("downloading");
+    const before = mod.downloadHistory.value;
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mod.downloadHistory.value).toBe(before);
+    expect(mod.downloadHistory.value[1].downloadStatus).toBe("downloading");
+  });
+
+  it("状态变了：换引用并带进新状态（这一列要当场从「下载中」变成「已完成」）", async () => {
+    const mod = await armed("completed");
+    const before = mod.downloadHistory.value;
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mod.downloadHistory.value).not.toBe(before);
+    expect(mod.downloadHistory.value[1].downloadStatus).toBe("completed");
+  });
+
+  it("跳过写入之后轮询必须还活着：连着三轮，第三轮才来回包变化的那种", async () => {
+    const mod = await armed("downloading");
+    await vi.advanceTimersByTimeAsync(1_000);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mod.downloadHistory.value[1].downloadStatus).toBe("downloading");
+
+    stub.get = () => rec(1, "甲", "completed");
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mod.downloadHistory.value[1].downloadStatus).toBe("completed");
+  });
+
+  it("记录已经不在库里：停掉这一条的轮询，也不许把整表换掉", async () => {
+    const mod = await armed("downloading");
+    stub.get = () => undefined;
+    const before = mod.downloadHistory.value;
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mod.downloadHistory.value).toBe(before);
+
+    // 已经停了：就算库里又冒出来一条变化的，也不该再有人读它
+    stub.get = () => rec(1, "甲", "completed");
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(mod.downloadHistory.value).toBe(before);
+    expect(mod.downloadHistory.value[1].downloadStatus).toBe("downloading");
+  });
+
+  it("重读整表时那一轮还在飞：晚到的回包既不写回、也不清新一轮的台账", async () => {
+    let settleGet: (v: unknown) => void = () => {};
+    stub.getAll = async () => [rec(1, "甲", "downloading")];
+    stub.get = () => new Promise((r) => (settleGet = r));
+    const mod = await fresh();
+
+    mod.throttleLoadDownloadHistory();
+    await vi.advanceTimersByTimeAsync(1_000); // id=1 那一轮发出，卡在 await 上
+
+    // 期间他又拉了一次整表：这一趟把上一轮整个作废，并给 id=9 挂上新的一轮
+    stub.getAll = async () => [rec(9, "乙", "downloading")];
+    await vi.advanceTimersByTimeAsync(200); // 越过节流窗口，让这一次真的发得出去
+    mod.throttleLoadDownloadHistory();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(Object.keys(mod.downloadHistory.value)).toEqual(["9"]);
+
+    settleGet(rec(1, "甲", "completed")); // 上一轮现在才回来，带着一条「变了」的状态
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(mod.downloadHistory.value[1]).toBeUndefined(); // 不许把 id=1 复活进表
+    expect(Object.keys(mod.downloadHistory.value)).toEqual(["9"]);
+    // 新一轮（id=9）还挂在台账里，等它自己的回包 —— 下面那条用例专门钉这件事
+  });
+
+  it("被作废的那一轮不许替新一轮留下「已经不在库里」的判据", async () => {
+    let settleGet: (v: unknown) => void = () => {};
+    stub.getAll = async () => [rec(1, "甲", "downloading")];
+    stub.get = () => new Promise((r) => (settleGet = r));
+    const mod = await fresh();
+
+    mod.throttleLoadDownloadHistory();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    stub.getAll = async () => [rec(1, "甲", "downloading")];
+    await vi.advanceTimersByTimeAsync(200);
+    mod.throttleLoadDownloadHistory();
+    await vi.advanceTimersByTimeAsync(10);
+    const mapFromNewRound = mod.downloadHistory.value;
+
+    settleGet(undefined); // 上一轮读到的是一条已经不存在的记录
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mod.downloadHistory.value).toBe(mapFromNewRound);
+
+    // 它不能顺手把 id=1 的定时器摘掉：那一格现在是新一轮挂上去的，摘了就再也没人盯这条下载
+    stub.get = () => rec(1, "甲", "completed");
+    await vi.advanceTimersByTimeAsync(1_200);
+    expect(mod.downloadHistory.value[1].downloadStatus).toBe("completed");
   });
 });

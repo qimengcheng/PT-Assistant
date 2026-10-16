@@ -42,7 +42,7 @@ const watchingMap = reactive<Record<TTorrentDownloadKey, number>>({});
 // 已经在飞的那个回调。那个回调 await 完之后会无条件再排一个 1s 定时器 ——
 // 于是组件卸载 / 页面刷新之后，轮询会「复活」并一直每秒读一次 IndexedDB，
 // 而且 clearWatchingMap 里再也清不掉它（它不在 map 里了）。
-// 每次 clearWatchingMap 递增世代，在飞回调回来时发现世代变了就放弃续排。
+// 每次 clearWatchingMap 递增世代，在飞回调回来时发现世代变了就把这一轮整条作废。
 let watchingGeneration = 0;
 function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
   const generation = watchingGeneration;
@@ -56,6 +56,16 @@ function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
       // 打开的 IndexedDB（同一份 store 定义在 @/shared/indexdb，见那里的注释）。
       const history = await (await ptdIndexDb()).get("download_history", downloadHistoryId);
 
+      // ⚠️ 关键判据，而且必须判在**动任何东西之前**：await 期间可能已经 clearWatchingMap() 过
+      //（卸载 / 换页 / 上一条 loadDownloadHistory 自己就调了一次）。世代变了说明这一轮已经被
+      // 作废 —— 新那一轮的整表读才是现场的真数据，所以晚到的这一份既不许续排、不许清台账
+      //（`watchingMap[id]` 那一条此刻属于**新一轮**，清它就是把它刚挂上的定时器摘掉）、
+      // 也不许写回 `downloadHistory`（否则能把新一轮里已经没有的记录复活进表）。
+      // 原先这条判据写在「写回之后、续排之前」，只挡住了续排那一半。
+      if (generation !== watchingGeneration) {
+        return;
+      }
+
       // 记录可能已被用户删掉。原先走消息那条路径，返回值被 handler 里的 `!` 断言蒙成有值，
       // 运行时靠读 undefined.downloadStatus 抛 TypeError 落到下面的 catch 才停轮询 ——
       // 结果一样，但那是在拿异常当控制流，还会在控制台留一条误导性的错误。
@@ -63,15 +73,23 @@ function watchDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
         delete watchingMap[downloadHistoryId];
         return;
       }
-      // 必须整体替换：downloadHistory 是 shallowRef，写 `value[id] = x` 不改变引用、
-      // 不触发任何响应式更新，下载状态会永远停在「下载中」。
-      // 整体替换既触发更新又保持条目不被深度代理（当初选 shallowRef 就是为了这个）。
-      downloadHistory.value = { ...downloadHistory.value, [downloadHistoryId]: history };
-      // ⚠️ 关键判据：await 期间可能已经 clearWatchingMap() 过（卸载 / 刷新 /
-      // 上一条 loadDownloadHistory 自己就调了一次）。世代变了说明这次轮询
-      // 已被作废，绝不能续排 —— 否则就是卸载后仍在每秒读 IndexedDB。
-      if (generation !== watchingGeneration) {
-        return;
+      // ⚠️ 状态没变就不许换整表引用。这条轮询的**唯一**产出是那一列的下载状态标签，
+      // 而 `downloadHistory` 是 shallowRef：写 `value[id] = x` 不触发任何东西，要触发就必须
+      // 整体替换 —— 一次替换带着 `downloadHistoryList`（Object.values 整表）→ `filteredItems`
+      // → `a-table` 的 data-source 一路重算，并把这一页重渲染一遍。台架按真组件实测：
+      // n=1500、渲染 10 行时**一次**是 47~59 ms，且与条数基本无关（大头是那一屏行的组件实例）。
+      // 于是「库里挂着 K 条状态停在 downloading/pending 的记录」= **每秒 K 次 × ~55 ms**：
+      // K=5 占掉 28% 的主线程，K=10 占 59%，K=30 实测一轮 1506 ms > 1000 ms —— 界面从此
+      // 没有空档，点什么都像隔了一层。而库里那些行恰恰是**再也不会变**的僵尸行（下载早就
+      // 结束、只是状态没被写回），它们贡献全部的 K 却一次变化都没有。
+      // 判据只取 `downloadStatus` 一个字段就够：`#bodyCell` 读的是 siteId / torrent /
+      // downloaderId / downloadAt / downloadStatus / trigger / id，除状态以外一条记录落库之后
+      // 不再变（`errorMessage` 只在详情弹窗里，而那份是打开那一刻的快照，整表换引用也刷不动它）。
+      if (downloadHistory.value[downloadHistoryId]?.downloadStatus !== history.downloadStatus) {
+        // 必须整体替换：写 `value[id] = x` 不改变引用、不触发任何响应式更新，
+        // 下载状态会永远停在「下载中」。整体替换既触发更新又保持条目不被深度代理
+        //（当初选 shallowRef 就是为了这个）。
+        downloadHistory.value = { ...downloadHistory.value, [downloadHistoryId]: history };
       }
       if (history.downloadStatus == "downloading" || history.downloadStatus == "pending") {
         watchDownloadHistory(downloadHistoryId);
@@ -182,6 +200,10 @@ async function loadDownloadHistory() {
  * **另一个上下文**手里，紧接着的那次整表读要排在同一张表的锁后面。改成直连之后，读写都只在
  * 这一个上下文里排队（扩展同源共库，见 `@/shared/indexdb` 的跨上下文可见性注释）。
  * offscreen 那份处理器留着 —— 它还在原生通信桥的白名单里，只是这一页不再经过它。
+ *
+ * 还是「一条一个事务」这一型：真实库里量过 100 条逐事务 36.7 ms / 单事务 6.8 ms，
+ * 300 条 101.5 / 32.8（1.2 KB/条的合成数据）。删上千条时这一笔要合进一个事务才省得下来，
+ * 但那要改 `DeleteDialog` 的回调形状（8 个调用点共用的那一个），尚未做。
  */
 export async function removeDownloadHistoryById(downloadHistoryId: TTorrentDownloadKey) {
   await (await ptdIndexDb()).delete("download_history", downloadHistoryId);
@@ -203,6 +225,28 @@ function i18nLoadTimeoutText(): string {
 }
 
 export const throttleLoadDownloadHistory = throttle(loadDownloadHistory, 1e3);
+
+/**
+ * 「数据刚改过，现在就重读」那一路用的入口 —— 删完一批、重下完之后不许走节流那一个。
+ *
+ * `throttle(fn, 1000)`（es-toolkit，默认 `edges: ["leading","trailing"]`）的窗口内每一次调用
+ * 都把那条尾随定时器**重新排满 1 秒**：源码 `dist/function/throttle.js` 里走的那一支是
+ * `debounced.apply(...)`，没有 maxWait 收窄。于是「进页面拉过一次 → 删一批（两三百毫秒）
+ * → 请求重读」这一串里，最后那一脚正落在窗口内，表格要等满一秒多才动。
+ * 台架按真页面量过：从删完那一下到整表引用被换掉是 **1986~1996 ms**（改前改后两档都是这个数，
+ * 因为慢的不是选中集那笔，是这一脚）。用户 2026-10-16 报的「删除数据后的数据刷新还是很慢」，
+ * 慢的九成在这里 —— 读库本身不是问题（真实库 1500 条 `getAll` 33 ms、10 000 条 195 ms）。
+ *
+ * 先 `cancel()` 再把读取直接调一次，而不是 `cancel()` 之后再走去节流的那一个：后者会在
+ * debounce 的前缘立刻跑一趟，同时又重新排上尾随那一趟，等于 1 秒后又整表读一遍。
+ *
+ * 节流本身留着 —— 它的用途是吸收人手连点那颗刷新键，不是给程序化的「刚改过数据」让路；
+ * 而重叠已经有 `loadDownloadHistory` 开头那道在飞闸挡着了。
+ */
+export function reloadDownloadHistoryNow() {
+  throttleLoadDownloadHistory.cancel();
+  void loadDownloadHistory();
+}
 
 export interface IDownloadTagMeta {
   /**

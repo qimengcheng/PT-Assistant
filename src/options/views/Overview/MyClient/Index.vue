@@ -194,11 +194,55 @@ async function loadReseedTasks() {
 /** 展开着哪些组。空集 = 全部折叠（用户 2026-10-13：默认折叠） */
 const expandedGroups = ref<Set<string>>(new Set());
 
+/**
+ * 正在收起、还留在表里演退场的那几组（用户 2026-10-16：「展开的时候能看到动画了，
+ * 但是收起来的时候没有」）。
+ *
+ * 为什么非得留一会儿再摘：组员行是 `collapseGroups` 在折叠时**根本不放出来**的，节点一摘掉，
+ * CSS 动画就没有载体 —— 想要退场，只能「先让它还在列表里演完这 180ms，再真的摘掉」。
+ * 所以这是一份**只影响渲染**的集合：只有 `shownGroups`（展开 ∪ 正在收起）决定组员出不出现在
+ * 列表里；那颗「N 条同内容」标记的文字、勾整组、分页总数这些折叠判据仍然只看 `expandedGroups`，
+ * 所以点下去的**那一帧**界面就认它是收起了。
+ */
+const collapsingGroups = ref<Set<string>>(new Set());
+const collapseTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** 退场时长，必须与样式里那两条 `*-out` 一致 */
+const GROUP_EXIT_MS = 180;
+
+/** 展开 ∪ 正在收起 */
+const shownGroups = computed(() => new Set([...expandedGroups.value, ...collapsingGroups.value]));
+
+/** 系统开了「减少动态效果」就不演退场 —— 那 180ms 的滞留本身就是一档动效，不该留下 */
+const prefersReducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
 function toggleGroup(group: string) {
   const next = new Set(expandedGroups.value);
-  if (next.has(group)) next.delete(group);
-  else next.add(group);
+  const opening = !next.has(group);
+  if (opening) next.add(group);
+  else next.delete(group);
   expandedGroups.value = next;
+
+  // 又点开了：取消那一组的退场滞留。行本来就没被摘走，类一换回入场那一档，动画自然重跑
+  const pending = collapseTimers.get(group);
+  if (pending) {
+    clearTimeout(pending);
+    collapseTimers.delete(group);
+    const rest = new Set(collapsingGroups.value);
+    rest.delete(group);
+    collapsingGroups.value = rest;
+  }
+  if (opening || prefersReducedMotion()) return;
+
+  collapsingGroups.value = new Set(collapsingGroups.value).add(group);
+  collapseTimers.set(
+    group,
+    setTimeout(() => {
+      collapseTimers.delete(group);
+      const rest = new Set(collapsingGroups.value);
+      rest.delete(group);
+      collapsingGroups.value = rest;
+    }, GROUP_EXIT_MS),
+  );
 }
 
 /**
@@ -250,7 +294,7 @@ const grouped = computed(() => {
     row: t,
   }));
   const groupMap = assignGroups(entries, taskByHash);
-  const result = collapseGroups<IGroupEntry>(entries, (e) => groupMap.get(e.key) ?? null, expandedGroups.value);
+  const result = collapseGroups<IGroupEntry>(entries, (e) => groupMap.get(e.key) ?? null, shownGroups.value);
   return {
     rows: result.rows.map((e) => e.row),
     meta: result.meta,
@@ -283,18 +327,27 @@ function toggleGroupFor(record: CTorrent) {
 }
 
 /**
- * 展开着的那一组，行上要挂的两枚 class（用户 2026-10-16：「背景色要和普通的不一样，
- * 这样一眼就能看到这两条是一组的」）。
+ * 展开着 / 正在收起的那一组，行上要挂的 class（用户 2026-10-16：「背景色要和普通的不一样，
+ * 这样一眼就能看到这两条是一组的」，以及同日一句「展开的时候能看到动画了，但是收起来的时候没有」）。
  *
  * - `torrent-group-row`：整组（代表行 + 组员行）共用的底色。**只在展开时挂** —— 折叠态只有
  *   代表行一条露在外面，给它上「这是一组」的颜色等于凭空说「这一行不一样」而说不出哪里不一样，
  *   满屏的组锚行还会把这一页刷成一片蓝。
  * - `torrent-group-member`：只有组员行有，代表行本来就一直摆在表里、DOM 节点不换引用，
  *   给它挂入场动画等于每次展开都让那一行闪一下。组员是展开那一刻才插进来的新节点。
+ * - `torrent-group-exit` / `torrent-group-member-exit`：收起那 180ms 的退场档。前者整组都有
+ *   （只退底色，代表行不能整行淡出 —— 它收完还在原位），后者只有组员，连行一起滑走。
+ *   这两条**不带** `torrent-group-row`：底色那条的收势靠 keyframes 的隐式 100% 帧回到级联自己的值，
+ *   留着它就会变成「从蓝淡到蓝」。
  */
 function torrentRowClass(record: CTorrent) {
   const meta = grouped.value.meta.get(torrentKey(record));
-  if (!meta || !expandedGroups.value.has(meta.group)) return "";
+  if (!meta) return "";
+  // 正在收起：整组（含代表行）先退底色，组员再连行一起滑走
+  if (collapsingGroups.value.has(meta.group)) {
+    return meta.anchor ? "torrent-group-exit" : "torrent-group-exit torrent-group-member-exit";
+  }
+  if (!expandedGroups.value.has(meta.group)) return "";
   return meta.anchor ? "torrent-group-row" : "torrent-group-member torrent-group-row";
 }
 
@@ -514,6 +567,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopAllTimers();
+  // 退场那 180ms 的计时器：页面都走了，留着它只会在下一次挂载之后突然改一次状态
+  for (const t of collapseTimers.values()) clearTimeout(t);
+  collapseTimers.clear();
 });
 
 // ── actions ───────────────────────────────────────────────────────────────
@@ -1266,9 +1322,41 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   background: rgba(22, 119, 255, 0.15);
 }
 
-/* 系统开了「减少动态效果」就不滑、不错开，只留下原本的直接出现（底色那一档与动效无关，照旧） */
+/* 退场那一档（收起）。两半分开挂：
+   - `torrent-group-exit` 落在**整组**的 td 上，只把底色收掉。代表行不能整行淡出 ——
+     它收完还留在原位，淡出再淡回来就是原地闪一下。
+   - `torrent-group-member-exit` 只落在组员行上，连行一起淡出 + 上移，和入场那条反向。
+   底色这条**只写 `from`**：100% 那一帧由级联自己算（奇数行回到条纹、偶数行回到白），
+   所以收尾不会跳一下；这也是为什么退场档不许同时带 `torrent-group-row` —— 带着它，
+   隐式 100% 算出来还是蓝，等于从蓝淡到蓝。 */
+:deep(.ant-table-tbody > tr.ant-table-row.torrent-group-exit > td) {
+  animation: torrent-group-tint-out 180ms linear;
+}
+
+:deep(.ant-table-tbody > tr.ant-table-row.torrent-group-member-exit) {
+  animation: torrent-group-row-out 180ms cubic-bezier(0.4, 0, 0.7, 0.2) both;
+}
+
+@keyframes torrent-group-row-out {
+  to {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes torrent-group-tint-out {
+  from {
+    background: rgba(22, 119, 255, 0.08);
+  }
+}
+
+/* 系统开了「减少动态效果」就不滑、不错开，只留下原本的直接出现（底色那一档与动效无关，照旧）。
+   JS 那一边同步撤掉 180ms 的退场滞留（`prefersReducedMotion`），不然这里只撤动画、
+   那几行却还多留在列表里一瞬 —— 看着像卡了一下。 */
 @media (prefers-reduced-motion: reduce) {
-  :deep(.ant-table-tbody > tr.torrent-group-member) {
+  :deep(.ant-table-tbody > tr.torrent-group-member),
+  :deep(.ant-table-tbody > tr.ant-table-row.torrent-group-exit > td),
+  :deep(.ant-table-tbody > tr.ant-table-row.torrent-group-member-exit) {
     animation: none;
   }
 }

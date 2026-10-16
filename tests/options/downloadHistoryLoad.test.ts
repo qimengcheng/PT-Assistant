@@ -14,7 +14,7 @@
  * - `@ptd/site`：这一页的筛选面板用它解析尺寸/时间，与本次判据无关，而它的根入口在 Node 里
  *   会撞上 sizzle 的顶层 `window`（AGENTS §3.2），所以整条挡掉。
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stub = vi.hoisted(() => ({
   /** 当前这一桩 `getAll` 该返回什么（含「永远不返回」那一档） */
@@ -57,6 +57,13 @@ async function fresh() {
   vi.resetModules();
   return await import(/* @vite-ignore */ MODULE);
 }
+
+beforeAll(async () => {
+  // 第一条用例慢，慢在 vite 现转 `utils.ts` 那张图（实测首转 ~4.8s，之后每条都是毫秒级）——
+  // 整份套件并跑时这一笔会顶到 5s 默认超时，把第一条判成 timeout，再把它没跑完的在飞读取
+  // 漏给下一条（表现是第二条数到 2 条提示）。所以先在这里把转换的钱付掉。
+  await fresh();
+}, 60_000);
 
 beforeEach(() => {
   vi.useFakeTimers();

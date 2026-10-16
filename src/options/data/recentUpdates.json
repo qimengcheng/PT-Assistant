@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-16 22:41:07",
+  "generatedAt": "2026-10-16 23:15:54",
   "headSha": "85992f0",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.106.9",
+      "date": "2026-10-16 23:15:54",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「我的下载器」收起一组同内容时也有动画了：那几条先淡出并滑回代表行下面（180ms），整组的底色一起收掉，而不是直接消失。系统开了「减少动态效果」时仍然瞬间收起、不做这段滞留。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.106.8",
       "date": "2026-10-16 22:41:07",

@@ -11,7 +11,6 @@ import {
 } from "@antdv-next/icons";
 import type { TableColumnsType } from "antdv-next";
 
-import { sendMessage } from "@/messages.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { formatDate } from "@/options/utils.ts";
 import type {
@@ -37,6 +36,7 @@ import {
   tableCustomFilter,
   clearWatchingMap,
   isLoadingHistory,
+  removeDownloadHistoryById,
   throttleLoadDownloadHistory,
   type IDownloadTagMeta,
 } from "./utils.ts"; // <-- 主要方法
@@ -172,7 +172,7 @@ async function deleteDownloadHistory(downloadHistoryIds: TTorrentDownloadKey[]) 
 
 async function confirmDeleteDownloadHistory(downloadHistoryId: TTorrentDownloadKey) {
   tableSelected.value = tableSelected.value.filter((id) => id !== downloadHistoryId);
-  return await sendMessage("deleteDownloadHistoryById", downloadHistoryId);
+  return await removeDownloadHistoryById(downloadHistoryId);
 }
 
 const showDownloadDetailDialog = ref<boolean>(false);

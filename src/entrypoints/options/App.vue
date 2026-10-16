@@ -24,6 +24,7 @@ import {
 
 import { sendMessage } from "@/messages.ts";
 import { showReseedNoticeCard } from "@/options/reseedNoticeCard.ts";
+import HoverTip from "@/options/components/HoverTip.vue";
 import LevelUpCelebration from "@/options/components/LevelUpCelebration.vue";
 import { startPresenceHeartbeat, watchReseedNotice, watchLevelUpGreeting, type ILevelUpGreeting } from "@/shared/reseedPresence.ts";
 import { antdLocaleMap } from "@/options/plugins/antd.ts";
@@ -56,6 +57,16 @@ onMounted(async () => {
     }
     await new Promise((r) => setTimeout(r, 1500));
   }
+});
+
+/**
+ * 侧栏那颗「后台（service worker）有没有起来」的指示。三档的圆点颜色与悬停文案一份 computed 管着，
+ * 模板里不叠三元。`t()` 放在 computed 里而不是常量：切语言要跟着变（AGENTS §3.4 那条）。
+ */
+const backgroundStatus = computed(() => {
+  if (backgroundOk.value === true) return { cls: "ok", text: t("layout.nav.backgroundOk") };
+  if (backgroundOk.value === false) return { cls: "bad", text: t("layout.nav.backgroundFailed") };
+  return { cls: "", text: t("layout.nav.backgroundConnecting") };
 });
 
 /**
@@ -292,9 +303,18 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
           </nav>
 
           <footer class="nav-footer">
-            <span v-if="backgroundOk === true" class="status ok">● {{ t("layout.nav.backgroundOk") }}</span>
-            <span v-else-if="backgroundOk === false" class="status bad">● {{ t("layout.nav.backgroundFailed") }}</span>
-            <span v-else class="status">● {{ t("layout.nav.backgroundConnecting") }}</span>
+            <!-- 后台（service worker）存活指示：原先这一行写着「background 正常」，而普通用户读到它
+                 只会去猜那是什么 —— 这是排查 SW 有没有起来的信号，所以 ① 只在开发模式下出现
+                 （与侧栏那两颗「调试」标记同一个闸），② 只留圆点，三档由颜色分开，
+                 字挪进悬停提示（全站不许原生 title，命中区小所以延迟给 0.2）。 -->
+            <HoverTip
+              v-if="configStore.developerMode"
+              :text="backgroundStatus.text"
+              placement="topLeft"
+              :delay="0.2"
+            >
+              <span class="status-dot" :class="backgroundStatus.cls" />
+            </HoverTip>
             <!-- 没拖过的时候给一句怎么用；拖过之后那句话没意义了，换成唯一的反悔入口
                  （顺序只能在界面上拖，没有别的地方能改，不给这条就等于一次误拖永久生效） -->
             <span v-if="configStore.navOrder.length === 0" class="nav-hint">{{ t("layout.nav.dragHint") }}</span>

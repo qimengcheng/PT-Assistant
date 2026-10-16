@@ -273,17 +273,29 @@ body {
   box-shadow: inset 0 2px 0 var(--pt-color-primary);
 }
 
-.status {
-  color: var(--pt-color-text-secondary);
-  font-size: 12px;
+/* 侧栏那颗后台存活指示（开发模式才有）。只剩圆点，所以命中区要自己撑：可见点 10px，
+   `background-clip: content-box` 让 3px 内衬只算命中范围、不画进圆里 —— 悬停提示够得着，
+   圆点本身不许跟着变大。三档由颜色分开，字在悬停提示里。
+   ⚠️ `box-sizing: content-box` 必须显式写：本文件第 29 行那条把全站设成了 border-box，
+   不写回来的话 10px 会把 3px 内衬算进去，画出来的点只有 4px —— 台架量到 rect 10×10、
+   可见圆 4×4 才发现的（光看 CSS 判不出来）。 */
+.status-dot {
+  box-sizing: content-box;
+  width: 10px;
+  height: 10px;
+  padding: 3px;
+  border-radius: 50%;
+  background-color: var(--pt-color-text-secondary);
+  background-clip: content-box;
+  flex-shrink: 0;
 }
 
-.status.ok {
-  color: var(--pt-color-success);
+.status-dot.ok {
+  background-color: var(--pt-color-success);
 }
 
-.status.bad {
-  color: var(--pt-color-danger);
+.status-dot.bad {
+  background-color: var(--pt-color-danger);
 }
 
 /* 内容区外面还套了一层 a-layout（右侧那一列），它和 .content 一样是横向 flex 里的子项，

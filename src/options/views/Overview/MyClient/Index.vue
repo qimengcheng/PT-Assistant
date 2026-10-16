@@ -283,14 +283,38 @@ function toggleGroupFor(record: CTorrent) {
 }
 
 /**
- * 组员行挂入场动画用的类（用户 2026-10-14：「展开的时候加点动画，现在太突兀了」）。
+ * 展开着的那一组，行上要挂的两枚 class（用户 2026-10-16：「背景色要和普通的不一样，
+ * 这样一眼就能看到这两条是一组的」）。
  *
- * 只给组员，不给代表行：代表行本来就一直摆在表里，DOM 节点不换引用，给它挂 `animation`
- * 等于每次展开都让那一行闪一下。组员是展开那一刻才插进来的新节点，动画正好只在那时跑。
+ * - `torrent-group-row`：整组（代表行 + 组员行）共用的底色。**只在展开时挂** —— 折叠态只有
+ *   代表行一条露在外面，给它上「这是一组」的颜色等于凭空说「这一行不一样」而说不出哪里不一样，
+ *   满屏的组锚行还会把这一页刷成一片蓝。
+ * - `torrent-group-member`：只有组员行有，代表行本来就一直摆在表里、DOM 节点不换引用，
+ *   给它挂入场动画等于每次展开都让那一行闪一下。组员是展开那一刻才插进来的新节点。
  */
 function torrentRowClass(record: CTorrent) {
   const meta = grouped.value.meta.get(torrentKey(record));
-  return meta && !meta.anchor ? "torrent-group-member" : "";
+  if (!meta || !expandedGroups.value.has(meta.group)) return "";
+  return meta.anchor ? "torrent-group-row" : "torrent-group-member torrent-group-row";
+}
+
+/**
+ * 组员逐条错开入场用的序号，挂在行内 CSS 变量上（`--group-in-index`）。
+ *
+ * 一次放出十几条时，「整块同时滑进来」读起来还是一次跳变；一条隔 45ms 排着出来才看得出
+ * 是从代表行下面**长出来的一组**。序号取组内位置（代表行 0，组员从 1 起），并且钉到 6 为止 ——
+ * 再往后只是让最后几条白等，19 条一组时那已经是一秒开外了。
+ *
+ * 走 `on-row` 而不是给每个序号写一条 class：antdv-next 的 Table 声明了 `onRow`
+ * （`dist/table/Table.js`），它返回的 `style` 由 @v-c/table 的 BodyRow 合进 `<tr>`。
+ */
+function torrentRowAttrs(record: CTorrent) {
+  const key = torrentKey(record);
+  const meta = grouped.value.meta.get(key);
+  if (!meta || meta.anchor || !expandedGroups.value.has(meta.group)) return {};
+  const list = grouped.value.members.get(meta.group) ?? [];
+  const index = Math.max(0, list.indexOf(key));
+  return { style: { "--group-in-index": String(Math.min(index, 6)) } };
 }
 
 /**
@@ -834,6 +858,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
       :data-source="grouped.rows"
       :row-key="(record: CTorrent) => torrentKey(record)"
       :row-class-name="torrentRowClass"
+      :on-row="torrentRowAttrs"
       :row-selection="rowSelection"
       :loading="loading"
       :pagination="tablePagination"
@@ -1201,24 +1226,49 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   background: rgba(0, 0, 0, 0.045);
 }
 
-/* 展开一组同内容时，组员行从代表行下面滑出来，而不是整块直接出现在位置上。
-   `<tr>` 由 a-table 内部组件渲染，拿不到本组件的 scope id，所以必须走 :deep ——
-   编译后是 `[data-v-*] .torrent-group-member`，靠本组件模板里那层 `.page-panel` 提供 scope id。
-   时长压到 180ms：再长就开始觉得「等一下」，而 19 条一起动也只有一帧的差别。 */
-:deep(.torrent-group-member) {
-  animation: torrent-group-row-in 180ms ease-out;
+/* ===== 展开一组同内容：入场动画 + 整组底色 =====
+   `<tr>` 由 a-table 内部组件渲染，拿不到本组件的 scope id，所以这几条都必须走 :deep ——
+   编译后是 `[data-v-*] .ant-table-tbody > tr…`，靠本组件模板里那层 `.page-panel` 提供 scope id。
+
+   位移从 4px 加到 12px、时长从 180ms 加到 240ms，再按组内序号每条错开 45ms（`--group-in-index`
+   由 torrentRowAttrs 挂在行内）。原先那 4px 不是空转：台架挂真 a-table 把动画钉在时间轴上量过，
+   `from` 那一帧组员行的盒确实上移 12px（204.80 → 216.80，`getComputedStyle` 给
+   `matrix(1,0,0,1,0,-12)`，Chrome 150）—— 它只是小到读不成「一组长出来」，
+   整块同时挪 4px 只会被看成一次跳变。`both` 是必须的：没有它，被延迟的那几条会在自己
+   那一拍之前先以最终态闪一下。 */
+:deep(.ant-table-tbody > tr.torrent-group-member) {
+  animation: torrent-group-row-in 240ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: calc(var(--group-in-index, 0) * 45ms);
 }
 
 @keyframes torrent-group-row-in {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-12px);
   }
 }
 
-/* 系统开了「减少动态效果」就不滑，只留下原本的直接出现 */
+/* 整组底色。两条判据都是量出来的，不是排着好看：
+   ① 不用灰 —— 全站口径是「灰只能当 8px 缝」，而这一档要说的是「这几条是一组」，
+      跟斑马纹抢同一种颜色就永远说不清。取主色 rgba(22,119,255,…) 两档。
+   ② 特异度必须**高于** style.css 那两条（斑马纹 0,3,2、悬停 0,4,2），否则组行会被条纹
+      或悬停盖掉；编译后带 `[data-v-*]` 这一档属性选择器，基础那条正好 0,5,2、悬停那条 0,6,2。
+   两条都带 `:not(.ant-table-row-selected)`：被勾上的那一行根本不被这两条匹配，
+   所以 antd 自己的选中档一律赢 —— 选中态不需要再跟它比特异度。
+   底色落在 <td> 上，和 style.css 那两条同一个元素（条纹落 <tr> 会被悬停/选中盖掉的教训见那里）。 */
+:deep(.ant-table-tbody > tr.ant-table-row.torrent-group-row:not(.ant-table-row-selected) > td) {
+  background: rgba(22, 119, 255, 0.08);
+  /* 代表行是「一直在那儿」的那一条：它上色时没有入场动画可跟，靠这一条淡入才不会突然变一块蓝 */
+  transition: background-color 180ms linear;
+}
+
+:deep(.ant-table-tbody > tr.ant-table-row.torrent-group-row:not(.ant-table-row-selected):hover > td) {
+  background: rgba(22, 119, 255, 0.15);
+}
+
+/* 系统开了「减少动态效果」就不滑、不错开，只留下原本的直接出现（底色那一档与动效无关，照旧） */
 @media (prefers-reduced-motion: reduce) {
-  :deep(.torrent-group-member) {
+  :deep(.ant-table-tbody > tr.torrent-group-member) {
     animation: none;
   }
 }

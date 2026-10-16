@@ -123,7 +123,6 @@ interface IVerifiedItem {
 
 const verifiedItems = ref<Map<string, IVerifiedItem>>(new Map());
 const verifiedItemsOrder = ref<string[]>([]); // 保持顺序
-const baseTorrent = ref<ITorrentInfoForVerification | null>(null);
 const creating = ref(false);
 /** 「怎么用」说明弹窗的开关（它挂在本弹窗的默认插槽里，见模板那条注释） */
 const showUsageDialog = ref(false);
@@ -375,7 +374,6 @@ function setItemBase(id: string) {
   const order = [...verifiedItemsOrder.value];
   order.unshift(order.splice(index, 1)[0]);
   verifiedItemsOrder.value = order;
-  baseTorrent.value = verifiedItems.value.get(id)?.torrent ?? null;
   localBaseHash.value = "";
   localBaseTouched.value = true;
   recompareAll();
@@ -980,7 +978,6 @@ function startVerification() {
   cancelAllPendingVerifications();
   verifiedItems.value = new Map();
   verifiedItemsOrder.value = [];
-  baseTorrent.value = null;
   localIndex.value = null;
   indexSupported.value = true;
   excludeLocalDuplicates.value = false;
@@ -1086,14 +1083,19 @@ function applyBaseComparison(item: IVerifiedItem) {
     return;
   }
 
-  const base = baseTorrent.value;
-  if (!base || !listItemBase.value?.verified) {
+  // 参照物就是基准那一条自己拿到的种子数据 —— 现场读，不留第二份缓存。
+  // 原先这里读模块级的 `baseTorrent`（由 `setItemBase` / `verification` 各自写），而下面那道
+  // `listItemBase.verified` 闸读的又是**上一轮重算写进那一行的结果**：`recompareAll` 遍历的是
+  // Map 的**加入顺序**、不是 `verifiedItemsOrder`，所以把靠后的一条挪成基准时，先被遍历到的行
+  // 读到的是它「还没通过」→ 整片停在「基准种子未取到」，而循环随后才把基准自己算成「种子信息已下载」——
+  // 两句同时在场，且没有任何人再重算（用户 2026-10-16 报的；v0.106.1 只补了「基准数据后到时重算」
+  // 这个时机，没拆掉这个自指，所以换几次基准还会复现）。
+  const base = listItemBase.value?.torrent ?? null;
+  if (!base) {
     // 走到这里说明这一条的数据是拿到手的，只是没有参照物 —— 不是「比过、不是同一份」
     //
     // ⚠️ 但「基准还在下载种子文件」和「压根没有基准」不是一件事：换基准时新基准那一条的
-    // `.torrent` 常常还没到，那一段等待期报「基准种子未取到」就是把一段过程说成结论，
-    // 界面上会同时出现「基准：种子信息已下载」+「其余全部：基准种子未取到」这句自相矛盾的话
-    // （基准的数据是**后到**的，见 `verification()` 里第一条那一支）。
+    // `.torrent` 常常还没到，那一段等待期报「基准种子未取到」就是把一段过程说成结论。
     item.status = listItemBase.value?.loading ? "waiting" : "noBase";
     applyLocalDecision(item);
     return;
@@ -1176,17 +1178,22 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
   const isFirstItem = verifiedItemsOrder.value[0] === id;
 
   if (isFirstItem) {
-    // 第一个种子作为基准种子
-    if (baseTorrent.value) return;
-    baseTorrent.value = torrent;
+    // 第一个种子作为基准种子。
+    // 原先这一支开头是 `if (baseTorrent.value) return;` —— 那份缓存一旦被 `setItemBase` 填上，
+    // 这一条自己的回包就整个被丢掉，连 `item.loading` 都不清（基准停在「正在下载」，而 `recompareAll`
+    // 开头就跳过 loading 的行）。这一支本身是幂等的，所以不带早退：来了就落数据、重算一遍。
     item.loading = false;
 
     if (torrent) {
       item.torrent = torrent;
       applyBaseComparison(item);
       // 基准的数据是**后到**的（换基准那一刻它自己的种子文件常常还在下载），
-      // 而那些行不会自己醒：它们停在「等待基准/未取到」上，界面上就成了
-      // 「基准已下载 + 其余全部未取到」这句矛盾话。基准一到位就整体重算一遍。
+      // 而那些行不会自己醒 —— 基准一到位就整体重算一遍。
+      recompareAll();
+      return;
+    }
+    if (item.torrent) {
+      // 重下这一回失败了，但手上那份好数据不该被一次失败冲掉：只按现状重算，不改判
       recompareAll();
       return;
     }
@@ -1237,12 +1244,11 @@ function verification(torrent: ITorrentInfoForVerification | null, id: string) {
     item.status = "downloadFailed";
     return;
   }
-  if (!baseItem?.verified) {
-    // 数据是好的，只是场上没有参照物可比 —— 不能报成「验证失败」
-    item.verified = false;
-    item.status = "noBase";
-    return;
-  }
+  // 「场上有没有参照物」不在这里判 —— 交给 `applyBaseComparison` 一处判完。
+  // 原先这里另写了一份 `if (!baseItem?.verified) → noBase`，读的是基准**上一轮的结论**：
+  // 它和 `recompareAll` 的遍历顺序互相赛跑（先算到的行读到「还没通过」就永久停在「未取到」），
+  // 而且基准取自下载器时那条 `verified` 根本不归列表这一路管。两处判据合成一处之后，
+  // 「等待基准」/「未取到」/「与下载器那条比对」三档都由同一个函数按现场数据决定。
   applyBaseComparison(item);
 }
 
@@ -1291,10 +1297,7 @@ function removeVerifiedItem(id: string) {
   verifiedItems.value.delete(id);
   verifiedItemsOrder.value = verifiedItemsOrder.value.filter((itemId) => itemId !== id);
   // 删掉的正是基准时，剩下每一条比的都是「已经不在的那份数据」，必须按新基准重算
-  if (wasBase) {
-    baseTorrent.value = verifiedItems.value.get(verifiedItemsOrder.value[0])?.torrent ?? null;
-    recompareAll();
-  }
+  if (wasBase) recompareAll();
 }
 
 function reDownload(id: string) {
@@ -1838,14 +1841,18 @@ async function createKeepUploadTask() {
           </template>
 
           <template v-else-if="column.key === 'action'">
-            <!-- 「有参照物可比」的两种来路：基准取列表第一条时要求它已经验证通过（所以除它以外的行才比得了，
+            <!-- 「有参照物可比」的两种来路：基准取列表第一条时要求它已经拿到种子文件（除它以外的行才比得了，
                  判据是 id 而不是渲染序 —— 这一列现在能按做种/下载排序）；
                  基准取下载器那条时参照物一直在，第一条也允许人工确认 / 重下。
+                 ⚠️ 这里读的是 `.torrent`（现场数据），不是基准那一行的 `verified`（重算循环写进去的结论）——
+                 拿结论当前提就是自指，换基准时会跟着遍历顺序一起赛跑。
                  那颗「重下」还多放行一种：这一条**自己就是基准而它没拿到种子文件** ——
                  全场都停在「基准种子未取到」上时，唯一的出路就是让它重下一遍，
                  原先那颗键被 `id !== baseId` 挡掉，这一档就成了死路。 -->
             <HoverTip
-              v-if="!record.loading && !record.verified && (useLocalBase || (record.id !== baseId && baseItem?.verified))"
+              v-if="
+                !record.loading && !record.verified && (useLocalBase || (record.id !== baseId && !!baseItem?.torrent))
+              "
               :text="t('SearchEntity.KeepUploadDialog.addToKeepUpload')"
             >
               <a-button type="text" size="small" @click.stop="addToVerified(record.id)">
@@ -1855,7 +1862,7 @@ async function createKeepUploadTask() {
 
             <HoverTip
               v-if="
-                !record.loading && !record.torrent && (useLocalBase || record.id === baseId || baseItem?.verified)
+                !record.loading && !record.torrent && (useLocalBase || record.id === baseId || !!baseItem?.torrent)
               "
               :text="t('SearchEntity.KeepUploadDialog.redownload')"
             >

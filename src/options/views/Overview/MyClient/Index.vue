@@ -901,11 +901,17 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
 
         <!-- progress column -->
         <template v-else-if="column.key === 'progress'">
+          <!-- 36 → 28（用户 2026-10-16：「这个图标大了点，和整体不太和谐」）。同一行里另一颗圆的东西是
+               `.client-avatar` 那颗 22px 的下载器图标，36 比它大 1.6 倍，两枚并排就是一头沉。
+               为什么停在 28 而不是更小的 24 / 22：台架挂真组件按 36/28/24/22 各量一遍，
+               描边四档都是 3px（不随尺寸缩），所以圈内的横向净空 = 尺寸 − 6；而未完成那档圈里是读数，
+               「62%」三个字符的墨迹实测 21.63 / 19.35 / 18.21 / 17.64px —— 对 30 / 22 / 18 / 16 的净空，
+               24 档已经差 0.21px 顶到环上，22 档超 1.64px。28 档留 1.3px 余量，是能保住读数不碰环的下界。 -->
           <a-progress
             v-if="toPercent(record.progress) !== null"
             type="circle"
             :percent="toPercent(record.progress) ?? 0"
-            :size="36"
+            :size="28"
             :stroke-color="record.isCompleted ? '#389e0d' : '#1890ff'"
           />
           <span v-else class="text-grey">-</span>

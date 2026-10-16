@@ -30,6 +30,12 @@ export type TReseedNoticeKind =
 export interface IReseedNoticeItem {
   /** 任务标题（就是基准那一条的种子名） */
   title: string;
+  /**
+   * 基准那一条**所在的站点**（调用方给的显示名，不是站点 id —— 内部标识不进 UI）。
+   * 只有「说的就是基准那一条」的四类给（开始 / 过半 / 停滞 / 下完并推送）；
+   * `allSeeded` 说的是整个任务，条目散在好几个站上，给一个站名就是假话，所以留空。
+   */
+  siteName?: string;
   /** baseHalfway / baseStalled：下载器报的 0~100 */
   progress?: number;
   /** baseHalfway：还要多久（秒）。下载器没报速度时给不出来，那一句就不写 */
@@ -64,11 +70,21 @@ export interface IReseedNoticeBatch {
 /** 界面卡片最多列几条明细，剩下的并成一句「另有 N 个任务」 */
 export const RESEED_NOTICE_DETAIL_MAX = 3;
 
-/** 界面卡片的类型档（浏览器通知没有这个概念，忽略即可） */
-export function reseedNoticeColor(kind: TReseedNoticeKind): "success" | "info" | "warning" {
+/**
+ * 界面卡片的类型档（浏览器通知没有这个概念，忽略即可）。
+ *
+ * 四档按「要不要人管」排，一档一件事，不许两档撞色（撞了就只能靠读字区分颜色本来要一眼说出的东西）：
+ * - `warning` 橙 = **基准开始下全量**：这一条最该被看见的一刻 —— 一整份内容正在往下载器里灌，
+ *   而它压的是那一个站的分享率（他 2026-10-16 指着那张蓝圈卡片说「要换个醒目的颜色」）。
+ * - `error` 红 = **停滞**：唯一一类「不动手就一直卡着」的，原先也占着橙，现在让给上面那条、自己升到红。
+ * - `info` 蓝 = 过半：中间读数，不需要人动。
+ * - `success` 绿 = 已经落地的两件（基准下完并推送 / 全部正常做种）。
+ */
+export function reseedNoticeColor(kind: TReseedNoticeKind): "success" | "info" | "warning" | "error" {
   if (kind === "baseDone" || kind === "allSeeded") return "success";
+  if (kind === "baseStarted") return "warning";
   // 「没有进展」是要人去处理的，不是进度播报 —— 和那几条进展通知一个颜色就会被当成同一类读掉
-  return kind === "baseStalled" ? "warning" : "info";
+  return kind === "baseStalled" ? "error" : "info";
 }
 
 const NOTICE_TITLES: Record<TReseedNoticeKind, { zh: string; en: string }> = {
@@ -82,6 +98,23 @@ const NOTICE_TITLES: Record<TReseedNoticeKind, { zh: string; en: string }> = {
 /** 标题说的是**这件事是哪一类**，与这一轮里有几条无关 —— 所以合并前后用同一句 */
 export function reseedNoticeTitle(kind: TReseedNoticeKind, lang: string | undefined): string {
   return lang === "zh_CN" ? NOTICE_TITLES[kind].zh : NOTICE_TITLES[kind].en;
+}
+
+/** 任务名（带引号）。`siteName` 缺席时（`allSeeded` 那类整任务的事）就只有这一段 */
+function quotedTitle(title: string, zh: boolean): string {
+  return zh ? `「${title}」` : `"${title}"`;
+}
+
+/**
+ * 「这一条说的是哪个站的那一份」—— 站名紧跟在任务名后面。
+ *
+ * 单条正文用的是这一份；合并后的明细行不这么拼（那里已经有读数的括号，再来一层就是
+ * `「X」（NovaHD）（已下载 62%）`），站名并进同一个括号里当第一项，见 `reseedNoticeItemLine`。
+ */
+function quotedWithSite(item: IReseedNoticeItem, zh: boolean): string {
+  const named = quotedTitle(item.title, zh);
+  if (!item.siteName) return named;
+  return zh ? `${named}（${item.siteName}）` : `${named} (${item.siteName})`;
 }
 
 /**
@@ -105,14 +138,16 @@ export function formatDurationSec(sec: number, zh: boolean): string {
 /** 五条文案（单条事件用这一份；合并后的那一条走 `reseedNoticeGroupText`） */
 export function reseedNoticeText(notice: TReseedNotice, lang: string | undefined): { title: string; message: string } {
   const zh = lang === "zh_CN";
-  const { title, kind, progress, etaSec, stalledSec, count } = notice;
+  const { kind, progress, etaSec, stalledSec, count } = notice;
+  // 任务名后面紧跟基准所在的站名（`allSeeded` 没有站名，那一段整个不出现）
+  const named = quotedWithSite(notice, zh);
 
   if (kind === "baseStarted") {
     return zh
-      ? { title: reseedNoticeTitle(kind, lang), message: `「${title}」已提交至下载器，待其下载完成后将自动开始辅种` }
+      ? { title: reseedNoticeTitle(kind, lang), message: `${named}已提交至下载器，待其下载完成后将自动开始辅种` }
       : {
           title: reseedNoticeTitle(kind, lang),
-          message: `"${title}" was submitted to the downloader. Reseeding starts once it finishes.`,
+          message: `${named} was submitted to the downloader. Reseeding starts once it finishes.`,
         };
   }
 
@@ -121,8 +156,8 @@ export function reseedNoticeText(notice: TReseedNotice, lang: string | undefined
     const eta = typeof etaSec === "number" && Number.isFinite(etaSec) ? (zh ? `，预计还需 ${formatDurationSec(etaSec, true)}` : `, about ${formatDurationSec(etaSec, false)} left`) : "";
     const pct = typeof progress === "number" ? Math.round(progress) : 50;
     return zh
-      ? { title: reseedNoticeTitle(kind, lang), message: `「${title}」已下载 ${pct}%${eta}` }
-      : { title: reseedNoticeTitle(kind, lang), message: `"${title}" is ${pct}% downloaded${eta}` };
+      ? { title: reseedNoticeTitle(kind, lang), message: `${named}已下载 ${pct}%${eta}` }
+      : { title: reseedNoticeTitle(kind, lang), message: `${named} is ${pct}% downloaded${eta}` };
   }
 
   if (kind === "baseStalled") {
@@ -143,11 +178,11 @@ export function reseedNoticeText(notice: TReseedNotice, lang: string | undefined
     return zh
       ? {
           title: reseedNoticeTitle(kind, lang),
-          message: `「${title}」的基准${when}${pct}，请检查下载器是否存在可用来源`,
+          message: `${named}的基准${when}${pct}，请检查下载器是否存在可用来源`,
         }
       : {
           title: reseedNoticeTitle(kind, lang),
-          message: `"${title}": the base ${when}${pct}. Check whether the torrent has any peers.`,
+          message: `${named}: the base ${when}${pct}. Check whether the torrent has any peers.`,
         };
   }
 
@@ -155,17 +190,17 @@ export function reseedNoticeText(notice: TReseedNotice, lang: string | undefined
     return zh
       ? {
           title: reseedNoticeTitle(kind, lang),
-          message: `「${title}」已完成下载，已推送 ${count ?? 0} 条辅种种子至下载器`,
+          message: `${named}已完成下载，已推送 ${count ?? 0} 条辅种种子至下载器`,
         }
       : {
           title: reseedNoticeTitle(kind, lang),
-          message: `"${title}" is complete. ${count ?? 0} reseed torrent(s) were sent to the downloader.`,
+          message: `${named} is complete. ${count ?? 0} reseed torrent(s) were sent to the downloader.`,
         };
   }
 
   return zh
-    ? { title: reseedNoticeTitle(kind, lang), message: `「${title}」的全部条目均已正常做种` }
-    : { title: reseedNoticeTitle(kind, lang), message: `"${title}": every torrent is seeding normally.` };
+    ? { title: reseedNoticeTitle(kind, lang), message: `${named}的全部条目均已正常做种` }
+    : { title: reseedNoticeTitle(kind, lang), message: `${named}: every torrent is seeding normally.` };
 }
 
 /** 合并后的正文：说的是「这一轮有 N 条任务走到了这一步」，具体是哪几条由明细行列出 */
@@ -194,15 +229,19 @@ function groupSummary(kind: TReseedNoticeKind, total: number, zh: boolean): stri
 }
 
 /**
- * 一条明细：任务名 + 这一类用得上的那几个读数。
+ * 一条明细：任务名 + 括号里的「是哪一站的那一份」与那几个读数。
  *
- * 括号里只放**数字**，不重复正文那句话 —— 四条并排时读的是「哪几条、各卡在哪」，
- * 每条再来一句完整陈述就没人读了。没有读数的那两类（已开始、全部做种）就只留任务名。
+ * 括号里只放**站名和数字**，不重复正文那句话 —— 四条并排时读的是「哪几条、各在哪个站、各卡在哪」，
+ * 每条再来一句完整陈述就没人读了。没有读数的那两类（已开始、全部做种）里，`baseStarted` 仍有站名，
+ * `allSeeded` 两个都没有，就只留任务名。
  */
 export function reseedNoticeItemLine(kind: TReseedNoticeKind, item: IReseedNoticeItem, lang: string | undefined): string {
   const zh = lang === "zh_CN";
-  const named = zh ? `「${item.title}」` : `"${item.title}"`;
+  const named = quotedTitle(item.title, zh);
   const parts: string[] = [];
+
+  // 站名排在读数前面：先说「哪一站」再说「下到多少」，读的顺序和扫的顺序一致
+  if (item.siteName) parts.push(item.siteName);
 
   if (kind === "baseHalfway") {
     const pct = typeof item.progress === "number" ? Math.round(item.progress) : 50;

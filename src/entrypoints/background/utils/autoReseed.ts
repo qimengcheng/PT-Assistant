@@ -481,6 +481,11 @@ async function autoReseedTick() {
 
         const next = { ...tick.next };
 
+        // 通知正文里要点名「下的是哪一站的那一份」（他 2026-10-16 要求的）：基准永远是 `items[0]`，
+        // 而界面上能认的是站名不是站点 id，所以查的是 metadata 里那份 `siteNameMap`。
+        // 这一层拿不到 store，取名字的活儿只能在后台做完再交给 `reseedNotice*`。
+        const baseSiteName = task.items[0] ? siteNameOf(metadata, task.items[0].site) : undefined;
+
         /**
          * ① 基准下到一半。判据（一条任务只弹一次、下完了不补报、baseLocal 不报）都在
          * `planAutoReseed`，它已经把 `notifiedHalfway` 写进 `next` 了；这里只补它算不出的那半句
@@ -490,6 +495,7 @@ async function autoReseedTick() {
           const entry = index.get(baseHash);
           notices.add("baseHalfway", {
             title: task.title,
+            siteName: baseSiteName,
             progress: base?.progress,
             etaSec: entry ? estimateEtaSec(entry) : undefined,
           });
@@ -504,6 +510,7 @@ async function autoReseedTick() {
           const since = next.baseBytesAt ?? Date.now();
           notices.add("baseStalled", {
             title: task.title,
+            siteName: baseSiteName,
             progress: base?.progress,
             stalledSec: Math.round((Date.now() - since) / 1000),
           });
@@ -521,7 +528,7 @@ async function autoReseedTick() {
             // 判据会把标记清掉，于是重发成功会再报一次 —— 那是又一次真的进展，不是重复轰炸。
             if (next.notifiedBaseStarted === undefined) {
               next.notifiedBaseStarted = Date.now();
-              notices.add("baseStarted", { title: task.title });
+              notices.add("baseStarted", { title: task.title, siteName: baseSiteName });
             }
           } catch (e) {
             next.baseSendFails = (next.baseSendFails ?? 0) + 1;
@@ -578,7 +585,7 @@ async function autoReseedTick() {
             // 用户读到的是同一件事。N 说的是这一轮真的发出去几条，不是这批一共几条。
             if (next.notifiedBaseDone === undefined) {
               next.notifiedBaseDone = Date.now();
-              notices.add("baseDone", { title: task.title, count: sentKeys.length });
+              notices.add("baseDone", { title: task.title, siteName: baseSiteName, count: sentKeys.length });
             }
           }
           acted = true;

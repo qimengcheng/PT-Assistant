@@ -3,8 +3,9 @@
  *
  * 达标判据一律用 packages/site 那一份（`getNextLevelUnMet` → `levelRequirementUnMet`），
  * 这里只做两件它不管的事：
- * 1) 把「未达标的那几项」归一成能相除的两个数（当前值 / 要求值）—— 字节、毫秒、点数各自成比，
- *    跨字段不作加减；
+ * 1) 把「未达标的那几项」归一成两个可减的数（当前值 / 要求值）—— 字节按字节、秒按秒、点数按点数，
+ *    每一项各自算出自己的缺口；**跨字段不再相除也不再换算**（用户 2026-10-17 定：排序按差的绝对数量，
+ *    不按完成度百分比，代价见 `@/shared/levelProgress.ts` 文件头那条）；
  * 2) 把站点数据里那些「压根排不进进度条」的情况分档（没等级表 / 认不出等级 / 贵宾 / 已到顶）。
  * 排序规则本身在 `@/shared/levelProgress.ts`（纯函数，Node 断言直接跑它）。
  */
@@ -25,6 +26,7 @@ import {
 import {
   classifyLevelProgress,
   rankLevelProgress,
+  type ILevelGap,
   type IProgressField,
   type IUnmetGroup,
   type TLevelProgressState,
@@ -34,8 +36,42 @@ import { isCompositeLevelScore } from "@/shared/levelScoreSites.ts";
 /** `getNextLevelUnMet` 的返回里这几项是算出来的副产物，不是一种「要求」，不能计入差几项 */
 const DERIVED_KEYS = new Set(["level", "passTime", "bonusNeededInterval", "seedingBonusNeededInterval", "alternative"]);
 
-/** 要求是「不得超过」的字段：完成度不能按 当前 ÷ 要求 算 */
+/** 要求是「不得超过」的字段：缺口是 当前 − 要求，不是 要求 − 当前 */
 const LT_KEYS = new Set(["hnrUnsatisfied", "hnrPreWarning"]);
+
+/**
+ * 「还差多少」那一串能画出来的字段 —— 逐条对着 `UserLevelShowSpan.vue` 模板里那些
+ * `v-if="levelRequirement.<key>"` 抄下来的。**加了新的要求字段要两边一起加**，
+ * 只加一边的表现是：排序按它的缺口排了，界面上那句「还差」却是空的（弹窗那边会因为这个键
+ * 不在集合里而不画「还差」，顺序与可见依据就对不上了）。
+ *
+ * 站点定义里另外这些字段没有画法（`download` / `specialSeedingSize` / `hnrUnsatisfied` /
+ * `hnrPreWarning` / `perfectFlacs` / `uniqueGroups` / `groups` / `percentile` / `donation` /
+ * `seedingBonusPerHour`）：它们在展开的等级表里本来就一直是空白的（同一个原因，不是本次改出来的），
+ * 所以这里也不画 —— 要补应该补在 `UserLevelShowSpan`，而不是在弹窗里再写一份格式化。
+ */
+export const GAP_RENDERABLE_KEYS = new Set([
+  "interval",
+  "totalTraffic",
+  "downloaded",
+  "trueDownloaded",
+  "uploaded",
+  "trueUploaded",
+  "ratio",
+  "trueRatio",
+  "seeding",
+  "seedingSize",
+  "seedingTime",
+  "averageSeedingTime",
+  "bonus",
+  "seedingBonus",
+  "bonusPerHour",
+  "uploads",
+  "leeching",
+  "snatches",
+  "posts",
+  "adoptions",
+]);
 
 /**
  * 等级定义上不是「要求」的字段。`id` / `name` 两边都有但含义完全不同（等级序列 vs 用户 ID、
@@ -101,8 +137,8 @@ export interface ILevelProgressRow {
   siteName: string;
   state: TLevelProgressState;
   unmetCount: number;
-  /** 最卡那一档的完成度 0~1；null = 一项都算不出数字 */
-  bottleneck: number | null;
+  /** 这一行最得补的那一项还差多少；null = 一项都算不出数字 */
+  gap: ILevelGap | null;
 
   /** 该站的等级表，按 id 升序（圆点阶梯与展开的纵向阶梯都吃这一份） */
   ladder: ILevelRequirement[];
@@ -141,7 +177,7 @@ function ratioRequired(value: unknown): number | null {
 }
 
 /**
- * 一组要求（主要求，或可选要求里的某一条）归一成「差几项 + 各项完成度」。
+ * 一组要求（主要求，或可选要求里的某一条）归一成「差几项 + 各项还差多少」。
  * 项数按未达标明细的键数（去掉副产物），不认能不能算出数字 —— 「差 3 项」里有 1 项站点没报数，
  * 用户也该看到 3，只是那一项不参与比谁更近。
  */
@@ -179,7 +215,7 @@ function buildUnmetGroup(
       current,
       required,
       direction: LT_KEYS.has(key) ? "lt" : "gt",
-      // 这一站的 seedingBonus 存的是等级积分（四项加权和），完成度不能跟别的站的单一维度比
+      // 这一站的 seedingBonus 存的是等级积分（四项加权和），它那一个数不能跟别的站的单一维度比大小
       comparable: isCompositeLevelScore(userInfo.site, key) ? false : undefined,
     });
   }
@@ -228,7 +264,7 @@ export function buildLevelProgressRow(
     siteName,
     state: rank.state,
     unmetCount: rank.unmetCount,
-    bottleneck: rank.bottleneck,
+    gap: rank.gap,
     ladder,
     currentIndex,
     nextLevel,

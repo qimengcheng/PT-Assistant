@@ -462,7 +462,7 @@
       "nextLevel": "Next: {name}",
       "alreadyMet": "All requirements for the next level are met, waiting for the site to promote the account",
       "unmetCount": "{n} requirement(s) not met",
-      "bottleneck": "Bottleneck at {pct}% complete",
+      "gap": "short by",
       "expandLadder": "Levels",
       "collapseLadder": "Hide levels",
       "currentValues": "Current"

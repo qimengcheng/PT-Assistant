@@ -22,7 +22,7 @@ import { compareLevelProgress, type TLevelProgressState } from "@/shared/levelPr
 
 import { tableData } from "./utils/lastUserData.ts";
 import { allAddedSiteMetadata } from "./utils/siteMetadata.ts";
-import { buildLevelProgressRow, buildCurrentValues, type ILevelProgressRow } from "./utils/levelProgressData.ts";
+import { buildLevelProgressRow, buildCurrentValues, GAP_RENDERABLE_KEYS, type ILevelProgressRow } from "./utils/levelProgressData.ts";
 import UserLevelsComponent from "./UserLevelsComponent.vue";
 import UserNextLevelUnMet from "./UserNextLevelUnMet.vue";
 
@@ -186,14 +186,26 @@ watch(
   },
 );
 
-/** 差几项与最卡那一档的完成度；完成度算不出来时不写百分比，不替数据源编一个数 */
+/** 这一行还差几项。差多少（绝对量）由模板里那串 `gapOf` 直接画出来，不在这句里重复一个数 */
 function rankText(row: ILevelProgressRow): string {
   if (row.unmetCount === 0) return t("MyData.levelProgress.alreadyMet");
-  const parts = [t("MyData.levelProgress.unmetCount", { n: row.unmetCount })];
-  if (row.bottleneck !== null) {
-    parts.push(t("MyData.levelProgress.bottleneck", { pct: Math.round(row.bottleneck * 100) }));
-  }
-  return parts.join(" · ");
+  return t("MyData.levelProgress.unmetCount", { n: row.unmetCount });
+}
+
+/**
+ * 「还差多少」那一串：把这一行的缺口摆成 `{ 字段: 缺口 }` 那种「要求」形状，交给
+ * `UserLevelsComponent` 画 —— 图标、单位、千分位、时长折成 `30D`、分享率走 `formatRatioText`
+ * 全在那一份里，这里不再写第二套格式化（判据与画法的单一来源）。
+ *
+ * 三种情况整段不出现，因为「还差」后面跟一个空串比不跟更糟：
+ * 算不出缺口（该行的项全是站点没报数的）、缺口落在那个组件画不出来的字段上
+ * （`download` / H&R 那几档，见 `GAP_RENDERABLE_KEYS` 的注释）、缺口是 0
+ * （`UserLevelShowSpan` 每一格都是 `v-if="levelRequirement.<key>"`，0 一律不画，
+ * 而这一档的含义「只差临门一脚」已经由「未达标 1 项」说过了）。
+ */
+function gapOf(row: ILevelProgressRow): Omit<ILevelRequirement, "id" | "name"> | null {
+  if (!row.gap || row.gap.value <= 0 || !GAP_RENDERABLE_KEYS.has(row.gap.key)) return null;
+  return { [row.gap.key]: row.gap.value } as Omit<ILevelRequirement, "id" | "name">;
 }
 </script>
 
@@ -234,7 +246,17 @@ function rankText(row: ILevelProgressRow): string {
             <a-tag v-if="row.state !== 'rankable'" :color="STATE_COLOR[row.state]">
               {{ stateText(row.state) }}
             </a-tag>
-            <span v-else class="lp-rank">{{ rankText(row) }}</span>
+            <span v-else class="lp-rank">
+              {{ rankText(row) }}
+              <template v-if="gapOf(row)">
+                · {{ t("MyData.levelProgress.gap") }}
+                <!-- 这层 span 不能省：`UserLevelsComponent` 往下到 `UserLevelShowSpan` 是多根
+                     fragment（图标 / 数值 / 字面量 `;` 全是平级根节点），包起来才留在行内流里。 -->
+                <span class="lp-rank-gap">
+                  <UserLevelsComponent :user-info="row.userInfo" :level-requirement="gapOf(row)!" :use-join-time-as-ref="false" />
+                </span>
+              </template>
+            </span>
 
             <span v-if="row.currentIndex >= 0" class="lp-position">
               {{

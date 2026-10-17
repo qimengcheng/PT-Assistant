@@ -462,7 +462,7 @@
       "nextLevel": "下一级：{name}",
       "alreadyMet": "下一级要求已全部达成，等待站点升级",
       "unmetCount": "未达标 {n} 项",
-      "bottleneck": "瓶颈项完成度 {pct}%",
+      "gap": "还差",
       "expandLadder": "等级表",
       "collapseLadder": "收起等级表",
       "currentValues": "当前值"

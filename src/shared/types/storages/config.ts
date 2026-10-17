@@ -291,7 +291,7 @@ export interface IConfigPiniaStorageSchema {
      * v0.106.13 之前它是死字段（没有任何读取点），自动备份只有每台服务器自己的
      * `enabled` + `backupInterval` 两道条件，于是「配了间隔就一直在后台往外发」。
      * 现在闸门接在 `entrypoints/background/utils/alarms.ts` 的 `autoBackup()` 开头，
-     * 开关在「常规设置 → 数据备份」那一节。
+     * 开关在「常规设置 → 备份与数据迁移」那一节（不是左侧那一页「数据备份」—— 那页管的是备份服务器本身）。
      *
      * 接闸的代价（当时注释里警告过、用户仍选了这条）：**存量用户的自动备份会停** ——
      * 这个字段落盘过的一直是 false，默认值也是 false，所以升级上去之后没人是开着的，

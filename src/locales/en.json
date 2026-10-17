@@ -1105,7 +1105,7 @@
       "descAccount": "How each site's bonus points, traffic and class are refreshed, how the login is kept alive, and which sites show up in 'My data'. The site list itself is on the 'Sites' page in the sidebar.",
       "descAppearance": "This plugin's own interface: the language, and whether tables remember the sort and rows-per-page you last picked.",
       "descSocial": "Where the Douban / IMDb / Bangumi / AniDB cards in search results get their data, plus site credentials and how long results are cached.",
-      "descBackup": "The encryption key for backup files, and importing data from PT-Plugin-Plus. Backup servers and scheduled backups are not here - they live on the 'Backup' page in the sidebar.",
+      "descBackup": "The automatic backup switch, the encryption key for backup files, and importing data from PT-Plugin-Plus. Backup servers and their per-server intervals are not here - they live on the 'Backup' page in the sidebar.",
       "descUpdate": "Check the repository once a day for a new release and decide whether to notify. You can also check here right now.",
       "descAdvanced": "The two things you don't touch normally: developer mode (which reveals the 'Site definitions' and 'Debugger' pages) and the native bridge to the local ptd CLI."
     },

@@ -1,4 +1,4 @@
-import { computed, ref } from "vue";
+import { computed, nextTick, ref, shallowRef, toRaw, watch } from "vue";
 import { computedAsync } from "@vueuse/core";
 import { differenceInDays } from "date-fns";
 import { type ISiteUserConfig, type IUserInfo, type TSiteID } from "@ptd/site";
@@ -61,11 +61,65 @@ export const addedSiteIds = computedAsync<string[]>(
 export const isTableLoading = computed<boolean>(() => isLoadingSiteMetadata.value);
 
 /**
- * 行集合：纯同步派生。
+ * 表格读的是这份快照，**不是** `metadataStore.lastUserInfo` 本体。
  *
- * 依赖三处 —— sites（增删站点）、allAddedSiteMetadata（定义与图标到位）、lastUserInfo（刷新结果），
- * 任一变化都只重算这一个数组；rc-table 按 rowKey diff，实际只有内容变了的那几行重渲染。
- * 这就是「回调能改几行就改几行」——不需要 perSiteLastUserData 那份平行副本。
+ * 为什么要隔一层（用户 2026-10-17 报「我的数据在加载的时候点别的标签没有响应」）：
+ * 一轮刷新是**逐站**写回的，而且每一站写两次 —— 本页 `.then` 写一次镜像，offscreen 落库后
+ * `storage.onChanged` 又 `$patch` 一次（pinia 的 mergeReactiveObjects 对数组是按标识整体替换，
+ * `levelRequirements` 每条都是新数组，所以那一趟一定触发）。`tableData` 直接读 `lastUserInfo`
+ * 的话，这些写入每一条都要「整表重算 + 整表重渲染」，而重渲染不按行省钱。
+ * 实测（`.tmp-build/bench-mydata`：vite build 之后的**产物级**、真组件、合成数据，40 站 40 行可见）：
+ * 单条写入造成的一次 pass = **314 ms 中位 / 345 ms 最大**，12 次写入触发 12 次 pass；
+ * 把这 40 条一次写完只要 **506 ms**（1 次 pass）—— 钱全花在 pass 的条数上。
+ * 同一天量到「数据刚到的那一拍点导航」要 **246~306 ms** 才落地，这就是用户读到的「没响应」。
+ *
+ * 接上快照之后（同一台架、同一档，改后实测）：写入当场不再触发整表 pass（12 次写入合计 1 次），
+ * 一次写完 40 条 **16 ms**，那一拍点导航 **12~31 ms** 落地。
+ * 节拍从「上一轮画完」起算，所以两次 pass 之间一定留得出空档给输入事件。
+ */
+const TABLE_TICK_MS = 250;
+
+const userInfoSnapshot = shallowRef<typeof metadataStore.lastUserInfo>({});
+let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
+/** 上一轮快照「画完」的时刻。初值 0 让水合那第一次变化立刻收敛，不等窗口 */
+let snapshotTakenAt = 0;
+
+function copyUserInfoSnapshot() {
+  // 换引用而不是就地改：tableData 只认这个 ref 的新对象
+  userInfoSnapshot.value = { ...toRaw(metadataStore.lastUserInfo) };
+}
+
+function takeUserInfoSnapshot() {
+  snapshotTimer = null;
+  copyUserInfoSnapshot();
+  // 从「这一轮渲染落地」起算，不是从「数据换掉」起算：40 行那一档一次 pass 要 314 ms，
+  // 从换数据起算的话这 314 ms 算在等待里，下一次立刻又收敛 —— 空档一分钟都不剩，等于没改。
+  void nextTick(() => {
+    snapshotTakenAt = Date.now();
+  });
+}
+
+function scheduleUserInfoSnapshot() {
+  if (snapshotTimer) return;
+  snapshotTimer = setTimeout(takeUserInfoSnapshot, Math.max(0, TABLE_TICK_MS - (Date.now() - snapshotTakenAt)));
+}
+
+// 首屏：store 里已经水合到了就直接拿，别空着一轮
+copyUserInfoSnapshot();
+
+// deep：`$patch` 那条路是把叶子逐个赋回原对象（对象标识不变），只看键的浅监听会漏掉它
+watch(() => metadataStore.lastUserInfo, scheduleUserInfoSnapshot, { deep: true, flush: "post" });
+
+/**
+ * 行集合。
+ *
+ * 依赖三处 —— sites（增删站点）、allAddedSiteMetadata（定义与图标到位）、userInfoSnapshot（刷新结果），
+ * 任一变化都只重算这一个数组。
+ *
+ * ⚠️ 「只有内容变了的那几行重渲染」这句原先写在这里，是**没实测的断言**：行对象每轮全部新建，
+ * rc-table 拿到的 dataSource 是全新数组、每条 record 是全新对象，于是整张表逐行重渲染 ——
+ * 上面那 314 ms/条 就是这件事的价。要改成「按行复用」得让 record 标识稳定下来，
+ * 那是另一件事（要动 a-table 的插槽结构），本次先用收敛把 pass 的条数压住。
  */
 export const tableData = computed<IUserInfoItem[]>(() => {
   // 显式依赖异步加载结果：定义没到位时不过滤条件算不出来（siteMeta.type / isDead 来自站点定义）
@@ -98,7 +152,7 @@ export const tableData = computed<IUserInfoItem[]>(() => {
       continue;
     }
 
-    const siteUserInfoData = metadataStore.lastUserInfo[siteId] ?? {};
+    const siteUserInfoData = userInfoSnapshot.value[siteId] ?? {};
 
     rows.push({
       ...fixUserInfo(siteUserInfoData),
@@ -122,9 +176,9 @@ export const tableData = computed<IUserInfoItem[]>(() => {
  * 把刷新结果写回唯一真源。
  *
  * 只改 store 镜像、不调 $save：offscreen 侧的 setSiteLastUserInfo 已经把同一份数据落进
- * chrome.storage（storage.ts 的 metadata 键），这里写镜像只是为了让本行立刻更新，
- * 不必等 onChanged → $patch 那一趟往返。metadata store 用的是 persistWebExt: true 的布尔形态，
- * autoSaveType 为 false，所以这次赋值不会触发任何持久化写入。
+ * chrome.storage（storage.ts 的 metadata 键），这里写镜像是为了不等 onChanged → $patch
+ * 那一趟往返就把数落到真源上（什么时候进界面由上面那份快照的节拍决定）。metadata store 用的是
+ * persistWebExt: true 的布尔形态，autoSaveType 为 false，所以这次赋值不会触发任何持久化写入。
  */
 function applyRefreshedUserInfo(siteId: TSiteID, userInfo: IUserInfo) {
   metadataStore.lastUserInfo[siteId] = userInfo;

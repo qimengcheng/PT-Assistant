@@ -33,7 +33,6 @@ const visible = ref(false);
 const entered = ref(false);
 
 let fireworks: IFireworksHandle | null = null;
-let dismissTimer: number | undefined;
 
 const items = computed<ILevelUpItem[]>(() => props.greeting?.items ?? []);
 const title = computed(() => levelUpTitle(props.lang));
@@ -51,10 +50,6 @@ function prefersReducedMotion(): boolean {
 function stopShow(): void {
   fireworks?.stop();
   fireworks = null;
-  if (dismissTimer !== undefined) {
-    window.clearTimeout(dismissTimer);
-    dismissTimer = undefined;
-  }
 }
 
 function closeNow(): void {
@@ -64,19 +59,21 @@ function closeNow(): void {
   emit("close");
 }
 
+/**
+ * 烟花**循环放**、卡片**不自己消失**（用户 2026-10-17：「升级时的烟花要循环播放，弹窗也不要自己消失，
+ * 用户手动关闭后才停止烟花」）。所以这里没有任何定时器：收场只有 `closeNow` 这一个入口，
+ * 它先 `stop()` 把 rAF 与 resize 监听摘掉，再把卡片收掉。
+ * 减动效那一档同样等手动关：那条只该决定「放不放烟花」，不该顺手把「卡会不会自己走」也改掉。
+ */
 function startShow(): void {
   stopShow();
   visible.value = true;
   void nextTick(() => {
     entered.value = true;
-    if (prefersReducedMotion()) {
-      // 没有动画就靠时刻收：8 秒够读完两行字，又不至于赖在屏幕上
-      dismissTimer = window.setTimeout(closeNow, 8000);
-      return;
-    }
+    if (prefersReducedMotion()) return;
     const canvas = canvasEl.value;
     if (!canvas) return;
-    fireworks = playFireworks(canvas, { durationMs: 6000, onEnd: closeNow });
+    fireworks = playFireworks(canvas, { loop: true });
   });
 }
 

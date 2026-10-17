@@ -58,8 +58,14 @@ interface IFlash {
 }
 
 export interface IFireworksOptions {
-  /** 整场时长（ms）；到点后等最后一批粒子散尽再收 */
+  /** 整场时长（ms）；到点后等最后一批粒子散尽再收。`loop` 为真时这一项不起作用 */
   durationMs?: number;
+  /**
+   * 循环放：按同一个节奏一直发射，直到调用 `stop()`（用户 2026-10-17 要的形状 ——
+   * 祝贺卡不自己消失，烟花就得陪着它，不能放完六秒自己收）。
+   * 这一档没有自然结束，所以 `onEnd` 永远不会被调到。
+   */
+  loop?: boolean;
   /** 自然放完（不是被 stop 掉）时的回调 */
   onEnd?: () => void;
 }
@@ -77,8 +83,9 @@ export function playFireworks(canvas: HTMLCanvasElement, options: IFireworksOpti
   if (!ctx) return { stop: () => {} };
 
   const durationMs = options.durationMs ?? 6000;
-  /** 发射段占前六成时间：后面那段只留余烬散开，整场才不会显得一直不停 */
-  const launchUntilMs = durationMs * 0.62;
+  const loop = options.loop === true;
+  /** 发射段占前六成时间：后面那段只留余烬散开，整场才不会显得一直不停（loop 档不收敛这一段） */
+  const launchUntilMs = loop ? Number.POSITIVE_INFINITY : durationMs * 0.62;
 
   const shells: IShell[] = [];
   const particles: IParticle[] = [];
@@ -204,8 +211,9 @@ export function playFireworks(canvas: HTMLCanvasElement, options: IFireworksOpti
       ctx.fill();
     }
 
-    // 收场：时间到了、天上没东西了才停 —— 到点硬切的观感是「烟花被人生生掐掉」
-    if (elapsed >= durationMs && shells.length === 0 && particles.length === 0 && flashes.length === 0) {
+    // 收场：时间到了、天上没东西了才停 —— 到点硬切的观感是「烟花被人生生掐掉」。
+    // loop 档没有自然收场（只有 stop()），所以这两条一律不参与判定。
+    if (!loop && elapsed >= durationMs && shells.length === 0 && particles.length === 0 && flashes.length === 0) {
       ended = true;
       ctx.globalCompositeOperation = "destination-out";
       ctx.clearRect(0, 0, width, height);
@@ -213,7 +221,7 @@ export function playFireworks(canvas: HTMLCanvasElement, options: IFireworksOpti
       return;
     }
     // 兜底：隐藏标签里 rAF 不跑，回来时时间戳已经跳过去一大截，别在那一帧还继续补发射
-    if (elapsed > durationMs + 8000) {
+    if (!loop && elapsed > durationMs + 8000) {
       ended = true;
       options.onEnd?.();
       return;

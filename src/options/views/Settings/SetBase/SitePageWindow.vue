@@ -29,7 +29,6 @@ const contentScriptToggles = computed(
     [
       { key: "allowExceptionSites", label: t("SetBase.UiWindow.allowExceptionSites") },
       { key: "enabledAtSocialSite", label: t("SetBase.UiWindow.enabledAtSocialSite") },
-      { key: "applyTheme", label: t("SetBase.UiWindow.applyTheme") },
       { key: "defaultOpenSpeedDial", label: t("SetBase.UiWindow.defaultOpenSpeedDial") },
       { key: "stackedButtons", label: t("SetBase.UiWindow.stackedButtons") },
       { key: "fadeEnterStyle", label: t("SetBase.UiWindow.fadeEnterStyle") },

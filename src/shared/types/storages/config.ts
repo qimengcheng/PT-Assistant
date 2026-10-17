@@ -26,16 +26,11 @@ export interface IConfigPiniaStorageSchema {
   version: string; // 插件版本，格式为 v0.0.5.1147+23f758f7 ，如果为空则表示第一次安装
   lang: TLangCode;
   theme: supportThemeType;
-  isNavBarOpen: boolean;
-  // 窗口大小变化（display 断点变化）时，是否自动展开/收起 Navigation 侧边栏
-  autoToggleNavBarOnDisplayChange: boolean;
   /**
    * 左侧导航的用户自定义顺序（存的是一串 path，见 `src/options/navOrder.ts` 为什么不用下标）。
    * 空数组 = 从没拖过，界面按代码里那份默认顺序走；新加的页面永远补在后面，不会因为这个存档而消失。
    */
   navOrder: string[];
-
-  ignoreWrongPixelRatio: boolean;
 
   saveTableBehavior: boolean;
   enableTableMultiSort: boolean; // 是否启用表格多列排序
@@ -78,7 +73,6 @@ export interface IConfigPiniaStorageSchema {
 
     position: { x: number; y: number }; // 图标位置（运行时配置，用户不可以直接编辑）
 
-    applyTheme: boolean; // 是否响应主题样式
     defaultOpenSpeedDial: boolean; // 是否默认打开按钮
     stackedButtons: boolean; // 是否使用堆叠按钮
     fadeEnterStyle: boolean; // 是否启用淡入效果（即默认半透明，当鼠标移入时不透明）
@@ -255,8 +249,6 @@ export interface IConfigPiniaStorageSchema {
      */
     searchPageCount: number;
 
-    // 是否允许单站点搜索
-    allowSingleSiteSearch: boolean;
     // 是否将 tt\d{7,8} 的搜索词视为 IMDb 搜索
     treatTTQueryAsImdbSearch: boolean;
 
@@ -294,14 +286,16 @@ export interface IConfigPiniaStorageSchema {
     encryptionKey: string;
 
     /**
-     * @deprecated 死字段，**没有任何读取点**，别再拿它当自动备份的开关。
+     * 自动备份的全局总闸，**默认关**（用户 2026-10-17：「没用的都清掉，自动备份默认关闭」）。
      *
-     * 自动备份早就在跑了（background/utils/alarms.ts 每 10 分钟一次调度），
-     * 真正的闸门是**每个备份服务器自己**的 `metadata.backupServers[].enabled`
-     * 与 `backupInterval`（见 SetBackup/Index.vue 的开关列）。
+     * v0.106.13 之前它是死字段（没有任何读取点），自动备份只有每台服务器自己的
+     * `enabled` + `backupInterval` 两道条件，于是「配了间隔就一直在后台往外发」。
+     * 现在闸门接在 `entrypoints/background/utils/alarms.ts` 的 `autoBackup()` 开头，
+     * 开关在「常规设置 → 数据备份」那一节。
      *
-     * 别在这上面接闸门：默认值是 false，存量用户的持久化数据里也是 false，
-     * 一接就等于给所有用户静默关掉自动备份。
+     * 接闸的代价（当时注释里警告过、用户仍选了这条）：**存量用户的自动备份会停** ——
+     * 这个字段落盘过的一直是 false，默认值也是 false，所以升级上去之后没人是开着的，
+     * 要用的人得自己去那一节开一次。
      */
     enabledAutoBackup: boolean;
   };

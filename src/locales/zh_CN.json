@@ -1019,7 +1019,6 @@
       "useQuickSendToClient": "默认使用快速推送"
     },
     "searchEntity": {
-      "allowSingleSiteSearch": "是否允许单一站点搜索",
       "autoDetectOfficialGroupFromTitle": "自动识别种子标题中的官方组信息，并形成标签",
       "autoLoadInitialMediaWall": "自动加载首屏媒体墙",
       "autoLoadMoreMediaOnScroll": "当滚动到页面底部时，自动加载新的媒体墙",
@@ -1045,8 +1044,6 @@
     "ui": {
       "allowDragLink": "允许拖拽链接到侧边栏按钮",
       "allowExceptionSites": "允许设置不启用侧边栏的例外站点（启用后需在站点设置中对应关闭）",
-      "autoToggleNavBarOnDisplayChange": "窗口大小变化时自动展开/收起侧边栏",
-      "autoToggleNavBarOnDisplayChangeNote": "关闭后，调整窗口大小不会自动改变侧边栏的展开状态，需要手动通过顶栏按钮控制。",
       "basicSettings": "基本设置",
       "changeLanguage": "切换语言",
       "confirmTwoStep": "对种子列表页批量复制、本地下载等操作需要二步确认",
@@ -1127,7 +1124,6 @@
       "enableContextMenu": "启用浏览器右键菜单扩展项",
       "allowExceptionSites": "允许配置不显示助手的站点",
       "enabledAtSocialSite": "在社交站点启用助手",
-      "applyTheme": "跟随扩展主题样式",
       "defaultOpenSpeedDial": "默认展开快捷按钮（SpeedDial）",
       "stackedButtons": "使用堆叠按钮",
       "fadeEnterStyle": "默认半透明，移入不透明",
@@ -1159,7 +1155,6 @@
       "queueConcurrency": "同时搜索站点数",
       "searchPageCount": "搜索结果取前几页",
       "searchPageCountHint": "只对已经知道怎么翻页的站点生效（目前只有 NexusPHP 那一族），其余站点照旧只取第一页。每多要一页就多一次请求，站点自己的请求间隔仍会等，整轮搜索会更久。",
-      "allowSingleSiteSearch": "允许只搜索选中的单个站点",
       "saveLastFilter": "记住上次使用的筛选条件",
       "quickSiteFilter": "启用快捷站点筛选",
       "autoDetectOfficialGroupFromTitle": "从标题自动识别官方制作组",
@@ -1202,6 +1197,9 @@
       "randomKey": "随机生成",
       "undoKeyTooltip": "撤销到上一个密钥",
       "undo": "撤销",
+      "groupAutoBackup": "自动备份",
+      "enabledAutoBackup": "启用自动备份",
+      "enabledAutoBackupHint": "关闭时后台不会自动发送任何备份。打开之后，每台备份服务器仍需自己启用并设置备份间隔，到点才会发送。",
       "groupImportPtpp": "导入 PT-Plugin-Plus 用户数据",
       "importPtppMessage": "将 PT-Plugin-Plus 导出的备份中的用户数据导入到本扩展（站点需在 340 个内置定义中）。",
       "importPtppStepsLead": "在导入之前，请先做好以下准备：",

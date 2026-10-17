@@ -22,8 +22,9 @@ const langOptions = definedLangMetaData.map((meta) => ({ value: meta.value, labe
 // 「显示模式（浅色/深色/跟随系统）」选项已移除：全局写死 color-scheme: only light
 // （entrypoints/options/style.css），App.vue 也未接 dark algorithm，切换没有任何效果。
 // 等真正实现深色主题后再加回（configStore.theme 字段保留，不动存量数据）。
-// 「小屏设备下自动折叠导航栏」同理：侧栏目前没有任何折叠实现，开关先移除
-// （configStore.autoToggleNavBarOnDisplayChange 字段保留）。
+// 「小屏设备下自动折叠导航栏」同理：侧栏（App.vue 的 a-layout-sider）没有任何折叠实现，
+// 开关先移除；v0.106.13 起连字段一起清掉了（isNavBarOpen / autoToggleNavBarOnDisplayChange，
+// 存量残留由 config store 的 deprecatedConfigKeys 抹）。真要做折叠再重新加字段，不要留一份没人读的。
 </script>
 
 <template>

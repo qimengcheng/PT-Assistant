@@ -1,7 +1,7 @@
 /**
  * 后台定时任务（平移自 PT-depiler background/utils/alarms.ts）。
  * - 自动刷新用户站点数据（支持每日时段、间隔与失败重试）
- * - 备份服务器按 backupInterval 自动备份
+ * - 备份服务器按 backupInterval 自动备份（v0.106.13 起还要先过全局开关 `backup.enabledAutoBackup`，默认关）
  * - 下载冷却结束后的种子重新推送：等多久、走哪条路压在哪一层，判据在 @/shared/reDownloadWait.ts；
  *   长等待按「到点时刻」排一次闹钟，并把这条等待写进 pendingReDownload 存档，
  *   由本文件末尾的 recoverPendingReDownload 在每次 SW 启动时认领回来
@@ -17,6 +17,7 @@ import { extStore } from "@/storage.ts";
 import { onMessage, sendMessage } from "@/messages.ts";
 import { planReDownload, splitPendingReDownload } from "@/shared/reDownloadWait.ts";
 import type {
+  IConfigPiniaStorageSchema,
   IDownloadTorrentOption,
   IMetadataPiniaStorageSchema,
   IPendingReDownload,
@@ -177,10 +178,19 @@ jobs.scheduleJob({
 });
 
 /**
- * 自动备份：检查所有已启用且设置了备份间隔的备份服务器，在满足条件时触发备份
+ * 自动备份：两道闸都要过才发 —— 全局的 `config.backup.enabledAutoBackup`
+ * （v0.106.13 起接上，默认关，用户 2026-10-17 定的），以及每台备份服务器自己的
+ * `enabled` + `backupInterval`（界面在 SetBackup/Index.vue 的开关列）。
+ *
+ * 全局闸排在 whenOffscreenReady 之前：关着的时候没必要为一次什么都不做的检查把 offscreen 叫醒。
  */
 function autoBackup() {
   return async () => {
+    const configStore = (await extStore.getItem("config")) as IConfigPiniaStorageSchema | undefined;
+    if (!configStore?.backup?.enabledAutoBackup) {
+      return;
+    }
+
     await whenOffscreenReady();
 
     const metadataStore = (await extStore.getItem("metadata")) as IMetadataPiniaStorageSchema | undefined;

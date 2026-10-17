@@ -17,6 +17,14 @@ import { useMetadataStore } from "./metadata.ts";
 const deprecatedConfigKeys = [
   "myDataTableControl.tableFontSize", // v0.0.4.961 废弃
   "myDataTableControl.joinTimeWeekOnly", // 已废弃，使用 joinTimeFormat 替代
+  // v0.106.13 清掉的五个：字段、类型、默认值、界面开关一并删了，这里只负责把存量存档里的残留抹掉。
+  // 前两个是「侧栏折叠」那一族 —— 我们的侧栏（App.vue 的 a-layout-sider）压根没有折叠实现，
+  // 开关早在常规设置「外观」那节移除过，字段一直留着没人读。
+  "isNavBarOpen",
+  "autoToggleNavBarOnDisplayChange",
+  "ignoreWrongPixelRatio", // 上游 options/App.vue:50 用它挡「像素比异常」那条提示条；本插件没有那条提示
+  "contentScript.applyTheme", // 上游 content App.vue:230 拿它喂 v-theme-provider；我们全局写死浅色
+  "searchEntity.allowSingleSiteSearch", // 上游 Topbar.vue:186 用它挡「单个站点搜索方案」子菜单；我们删了 Topbar
 ];
 
 /**
@@ -174,12 +182,8 @@ export const useConfigStore = defineStore("config", {
     version: "",
     lang: "zh_CN",
     theme: "light",
-    isNavBarOpen: true,
-    autoToggleNavBarOnDisplayChange: true,
     // 空 = 从没拖过导航。存量用户拿的就是这一份默认值（persistWebExt 的 $patch 只覆盖存档里有的键）
     navOrder: [],
-
-    ignoreWrongPixelRatio: false,
 
     saveTableBehavior: true,
     enableTableMultiSort: false,
@@ -202,7 +206,6 @@ export const useConfigStore = defineStore("config", {
 
       position: { x: 0, y: 0 },
 
-      applyTheme: false,
       defaultOpenSpeedDial: false,
       stackedButtons: false,
       fadeEnterStyle: false,
@@ -406,7 +409,6 @@ export const useConfigStore = defineStore("config", {
       // 老用户拿的就是这一份默认值（$patch 只覆盖存档里已有的键），所以行为不变
       searchPageCount: 1,
 
-      allowSingleSiteSearch: false,
       treatTTQueryAsImdbSearch: true,
 
       saveLastFilter: true,

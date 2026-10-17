@@ -33,10 +33,6 @@ const configStore = useConfigStore();
         </a-row>
         <div class="switch-grid">
           <div class="switch-item">
-            <a-switch v-model:checked="configStore.searchEntity.allowSingleSiteSearch" size="small" />
-            <span class="label">{{ t("SetBase.SearchEntityWindow.allowSingleSiteSearch") }}</span>
-          </div>
-          <div class="switch-item">
             <a-switch v-model:checked="configStore.searchEntity.saveLastFilter" size="small" />
             <span class="label">{{ t("SetBase.SearchEntityWindow.saveLastFilter") }}</span>
           </div>

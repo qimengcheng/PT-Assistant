@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 备份基础设置：备份加密密钥 + PT-Plugin-Plus 旧数据导入入口。
+ * 备份基础设置：自动备份总闸 + 备份加密密钥 + PT-Plugin-Plus 旧数据导入入口。
  */
 import JSZip from "jszip";
 import { nanoid } from "nanoid";
@@ -131,6 +131,17 @@ function pickPtppFile(file: File) {
       </div>
 
       <div class="group">
+        <div class="group-title">{{ t("SetBase.BackupWindow.groupAutoBackup") }}</div>
+        <!-- 这是自动备份的总闸（v0.106.13 起）：关上之后后台那一轮定时检查直接不干活，
+             每台服务器自己的 enabled + backupInterval 只在它开着时才起作用。 -->
+        <div class="switch-item">
+          <a-switch v-model:checked="configStore.backup.enabledAutoBackup" size="small" />
+          <span class="label">{{ t("SetBase.BackupWindow.enabledAutoBackup") }}</span>
+        </div>
+        <div class="auto-backup-hint">{{ t("SetBase.BackupWindow.enabledAutoBackupHint") }}</div>
+      </div>
+
+      <div class="group">
         <div class="group-title">{{ t("SetBase.BackupWindow.groupImportPtpp") }}</div>
         <a-alert class="import-alert" type="info" show-icon>
           <template #message>{{ t("SetBase.BackupWindow.importPtppMessage") }}</template>
@@ -174,6 +185,12 @@ function pickPtppFile(file: File) {
 
 .import-alert {
   margin-bottom: 12px;
+}
+
+.auto-backup-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .steps-lead {

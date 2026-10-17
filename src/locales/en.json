@@ -1019,7 +1019,6 @@
       "useQuickSendToClient": "Use quick push by default"
     },
     "searchEntity": {
-      "allowSingleSiteSearch": "Allow single-site search",
       "autoDetectOfficialGroupFromTitle": "Auto Detect Official Tag From Torrent Title",
       "autoLoadInitialMediaWall": "Automatically load the initial media wall",
       "autoLoadMoreMediaOnScroll": "Automatically load more media when scrolling to the bottom of the page",
@@ -1045,8 +1044,6 @@
     "ui": {
       "allowDragLink": "Allow dragging links to the sidebar button",
       "allowExceptionSites": "Allow setting exception sites without sidebar (enable in site settings)",
-      "autoToggleNavBarOnDisplayChange": "Auto expand/collapse the sidebar when the window size changes",
-      "autoToggleNavBarOnDisplayChangeNote": "When disabled, resizing the window will not change the sidebar state automatically; control it manually via the top bar button.",
       "basicSettings": "Basic Settings",
       "changeLanguage": "Switch Language",
       "confirmTwoStep": "Require two-step confirmation for batch copy, local download, etc. on torrent list pages",
@@ -1127,7 +1124,6 @@
       "enableContextMenu": "Enable extension items in the browser context menu",
       "allowExceptionSites": "Allow configuring sites that hide the helper",
       "enabledAtSocialSite": "Enable the helper on social sites",
-      "applyTheme": "Follow the extension theme",
       "defaultOpenSpeedDial": "Expand the speed dial by default",
       "stackedButtons": "Use stacked buttons",
       "fadeEnterStyle": "Translucent by default, opaque on hover",
@@ -1159,7 +1155,6 @@
       "queueConcurrency": "Sites searched concurrently",
       "searchPageCount": "Pages of results to fetch",
       "searchPageCountHint": "Only applies to sites whose paging rule is known (currently the NexusPHP family); other sites still return the first page only. Each extra page is one more request and the site's own request delay still applies, so a round takes longer.",
-      "allowSingleSiteSearch": "Allow searching only the selected site",
       "saveLastFilter": "Remember the last filter used",
       "quickSiteFilter": "Enable quick site filter",
       "autoDetectOfficialGroupFromTitle": "Detect the official group from the title",
@@ -1202,6 +1197,9 @@
       "randomKey": "Random",
       "undoKeyTooltip": "Undo to the previous key",
       "undo": "Undo",
+      "groupAutoBackup": "Automatic backup",
+      "enabledAutoBackup": "Enable automatic backup",
+      "enabledAutoBackupHint": "While this is off, the background job sends no automatic backup at all. When it is on, each backup server still has to be enabled and given a backup interval before it runs.",
       "groupImportPtpp": "Import PT-Plugin-Plus user data",
       "importPtppMessage": "Imports the user data from a PT-Plugin-Plus backup into this extension (the site must be one of the 340 built-in definitions).",
       "importPtppStepsLead": "Before importing, please do the following:",

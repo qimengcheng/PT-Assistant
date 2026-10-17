@@ -2,12 +2,16 @@
  * 「升级进度」弹窗每一行的数据来源。
  *
  * 达标判据一律用 packages/site 那一份（`getNextLevelUnMet` → `levelRequirementUnMet`），
- * 这里只做两件它不管的事：
- * 1) 把「未达标的那几项」归一成两个可减的数（当前值 / 要求值）—— 字节按字节、秒按秒、点数按点数，
- *    每一项各自算出自己的缺口；**跨字段不再相除也不再换算**（用户 2026-10-17 定：排序按差的绝对数量，
- *    不按完成度百分比，代价见 `@/shared/levelProgress.ts` 文件头那条）；
- * 2) 把站点数据里那些「压根排不进进度条」的情况分档（没等级表 / 认不出等级 / 贵宾 / 已到顶）。
- * 排序规则本身在 `@/shared/levelProgress.ts`（纯函数，Node 断言直接跑它）。
+ * 这里只做三件它不管的事：
+ * 1) **把「未达标的那几项」交出去时，缺口优先用它折好的差额**，不是自己按「等级要求 − 当前值」重减。
+ *    这一条是实的：分享率不足时 packages 会按 `neededUpload = max(当前下载, 要求下载) × 要求分享率`
+ *    把代价折进 `unmet.uploaded`（实测：上传 200 GiB、下载 150 GiB、要求「≥100 GiB 且 分享率 ≥ 2」
+ *    那一档写进来的是 100 GiB，而自己重算得到 0 —— v0.106.11 就漏了这一层）。
+ * 2) 按字段语义给每一项标「折成上传代价的权重」（见 `GAP_WEIGHTS`）：上传最难、下载容易，
+ *    所以下载类打折；没有兑换率的那些（点数、帖子、时长）不折算，只计入「差几项」。
+ * 3) 把站点数据里那些「压根排不进进度条」的情况分档（没等级表 / 认不出等级 / 贵宾 / 已到顶）。
+ * 排序规则本身在 `@/shared/levelProgress.ts`（纯函数，Node 断言直接跑它；它不认识字段名，
+ * 字段名 → 权重的这张表只住在这里）。
  */
 import {
   convertIsoDurationToDate,
@@ -31,18 +35,41 @@ import {
   type IUnmetGroup,
   type TLevelProgressState,
 } from "@/shared/levelProgress.ts";
-import { isCompositeLevelScore } from "@/shared/levelScoreSites.ts";
 
 /** `getNextLevelUnMet` 的返回里这几项是算出来的副产物，不是一种「要求」，不能计入差几项 */
 const DERIVED_KEYS = new Set(["level", "passTime", "bonusNeededInterval", "seedingBonusNeededInterval", "alternative"]);
 
-/** 要求是「不得超过」的字段：缺口是 当前 − 要求，不是 要求 − 当前 */
+/** 要求是「不得超过」的字段：达标判据没给差额时，回退算法是 当前 − 要求 */
 const LT_KEYS = new Set(["hnrUnsatisfied", "hnrPreWarning"]);
 
 /**
+ * 各类差额折成「上传代价」的权重（用户 2026-10-17 的取向：「下载很容易，上传是最难的，
+ * 所以当然是主要按照上传的差值来排，下载的权重明显要低很多」）。
+ *
+ * 权重表在这里改一个数就行，**它不是判据而是取向**：0.1 的意思是「1 GiB 下载只当 0.1 GiB 上传」，
+ * 取值没有任何站点公布的汇率作依据 —— 界面那一行画的是**原始缺口**（折过权重的数不上界面），
+ * 所以改这个数只会动顺序，不会让界面上的数字变得对不上。
+ *
+ * 归到「下载档」的理由逐条写：`downloaded` / `trueDownloaded` 本身就是下载；
+ * `totalTraffic`（上 + 下）与 `seedingSize`（挂出去的总量）都能靠下载补，所以同档。
+ * **不在这张表里的项不进综合分**：魔力点数、帖子数、发布/做种数、做种时长（秒）、
+ * 海胆那类等级积分（四项加权和）都没有公布的兑换率，硬编一个就是替数据源编数 ——
+ * 它们仍然计入「差几项」，只是不比远近。`ratio` / `trueRatio` 也不进：
+ * 它们的代价已经被达标判据折进上面的 `uploaded` 了，再算一遍就是重复计费。
+ */
+const GAP_WEIGHTS: Record<string, number> = {
+  uploaded: 1,
+  trueUploaded: 1,
+  downloaded: 0.1,
+  trueDownloaded: 0.1,
+  totalTraffic: 0.1,
+  seedingSize: 0.1,
+};
+
+/**
  * 「还差多少」那一串能画出来的字段 —— 逐条对着 `UserLevelShowSpan.vue` 模板里那些
- * `v-if="levelRequirement.<key>"` 抄下来的。**加了新的要求字段要两边一起加**，
- * 只加一边的表现是：排序按它的缺口排了，界面上那句「还差」却是空的（弹窗那边会因为这个键
+ * `v-if="levelRequirement.<key>"` 抄下来的。**往 `GAP_WEIGHTS` 加字段要这里一起加**，
+ * 只加一边的表现是：排序按它的代价排了，界面上那句「还差」却是空的（弹窗那边会因为这个键
  * 不在集合里而不画「还差」，顺序与可见依据就对不上了）。
  *
  * 站点定义里另外这些字段没有画法（`download` / `specialSeedingSize` / `hnrUnsatisfied` /
@@ -137,7 +164,9 @@ export interface ILevelProgressRow {
   siteName: string;
   state: TLevelProgressState;
   unmetCount: number;
-  /** 这一行最得补的那一项还差多少；null = 一项都算不出数字 */
+  /** 折成上传代价的总分（排序键）；null = 这一行没有可折算的项 */
+  cost: number | null;
+  /** 界面那句「还差」：这一行加权代价最大那一项的原始缺口；null = 算不出或画不出来 */
   gap: ILevelGap | null;
 
   /** 该站的等级表，按 id 升序（圆点阶梯与展开的纵向阶梯都吃这一份） */
@@ -177,7 +206,7 @@ function ratioRequired(value: unknown): number | null {
 }
 
 /**
- * 一组要求（主要求，或可选要求里的某一条）归一成「差几项 + 各项还差多少」。
+ * 一组要求（主要求，或可选要求里的某一条）归一成「差几项 + 各项还差多少 + 各项权重」。
  * 项数按未达标明细的键数（去掉副产物），不认能不能算出数字 —— 「差 3 项」里有 1 项站点没报数，
  * 用户也该看到 3，只是那一项不参与比谁更近。
  */
@@ -196,6 +225,8 @@ function buildUnmetGroup(
   for (const key of keys) {
     let required: number | null;
     let current: number | null;
+    /** 达标判据折好的差额；null = 这一档它给的不是差额（或压根不是数） */
+    let converted: number | null = null;
 
     if (key === "interval") {
       // 入站时间的要求值在 packages 那边已经折成绝对达标时刻（passTime）。用它减入站时刻才是
@@ -204,19 +235,29 @@ function buildUnmetGroup(
       if (passTime === null) continue;
       required = passTime - joinTime;
       current = now - joinTime;
-    } else {
-      required = RATIO_KEYS.has(key) ? ratioRequired(reqDict[key]) : toNumber(reqDict[key], key, now);
+      // `unmet.interval` 是 "P1M15D" 那种只到「天」的串，passTime 才是精确时刻
+      converted = passTime - now;
+    } else if (RATIO_KEYS.has(key)) {
+      // 这一档 `unmet` 里存的是**卡住的那个阈值**，不是差额；它的代价已经折进 uploaded 了
+      required = ratioRequired(reqDict[key]);
       current = toNumber(userDict[key] ?? 0, key, now);
+    } else {
+      required = toNumber(reqDict[key], key, now);
+      current = toNumber(userDict[key] ?? 0, key, now);
+      converted = toNumber(unmet[key], key, now);
     }
 
-    if (required === null || current === null) continue;
+    // 三者里有一个拿得出来就留着这一项。上一版只认「当前值 + 要求值都在」，于是
+    // 「差额折好了、当前值取不到」那种（Gazelle 魔力报 "N/A" 而站点确实说你还差 1000 点）会被整条丢掉
+    if (required === null && current === null && converted === null) continue;
+
     fields.push({
       key,
-      current,
-      required,
+      gap: converted ?? undefined,
+      current: current ?? undefined,
+      required: required ?? undefined,
       direction: LT_KEYS.has(key) ? "lt" : "gt",
-      // 这一站的 seedingBonus 存的是等级积分（四项加权和），它那一个数不能跟别的站的单一维度比大小
-      comparable: isCompositeLevelScore(userInfo.site, key) ? false : undefined,
+      weight: GAP_WEIGHTS[key],
     });
   }
 
@@ -264,6 +305,7 @@ export function buildLevelProgressRow(
     siteName,
     state: rank.state,
     unmetCount: rank.unmetCount,
+    cost: rank.cost,
     gap: rank.gap,
     ladder,
     currentIndex,

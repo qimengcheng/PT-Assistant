@@ -424,7 +424,13 @@
       "emptyScope": "No torrents to scan in this range",
       "noSite": "No usable site: add sites in Site Management, or turn off Offline",
       "noDownloader": "The list has no torrents yet; choose a downloader first",
-      "startFailed": "Could not start the scan"
+      "startFailed": "Could not start the scan",
+      "reseed": "Reseed found ({count})",
+      "reseedTip": "Creates one reseed task per title whose verdict is \"Published there\": the base is the completed copy already in your downloader, and the save path is the folder that copy actually lives in. New tasks are then handed to the background auto-reseed. Entries reading \"Title matches, files unchecked\" are not included.",
+      "reseedConfirm": "This creates {count} reseed task(s) covering {sites} site entries and hands them to the background auto-reseed. Continue?",
+      "reseedDone": "Created {count} reseed task(s); the background will send them in turn.",
+      "reseedSkipped": "{dup} were already covered by existing tasks, and {noBase} had no completed local base, so no task was created for them.",
+      "reseedFailed": "Failed to create the reseed tasks"
     },
     "table": {
       "addedAt": "Added At",

@@ -128,6 +128,26 @@ describe("isReseedScanFresh", () => {
     expect(isReseedScanFresh(result("siteA", at), at + ttl, ttl)).toBe(false);
     expect(isReseedScanFresh(undefined, at, ttl)).toBe(false);
   });
+
+  it("「这次没查成」不按结论的新鲜期冻：它没产出任何结论", () => {
+    const at = 1_000_000_000_000;
+    const day = 24 * 60 * 60 * 1000;
+    // 同一时刻、同一个七天 ttl：has-it 跳过，failed 不跳过
+    expect(isReseedScanFresh(result("siteA", at, "has-it"), at + day, 7 * day)).toBe(true);
+    expect(isReseedScanFresh(result("siteA", at, "failed"), at + day, 7 * day)).toBe(false);
+  });
+
+  it("但也不是每轮都重撞：重试间隔之内仍然跳过", () => {
+    const at = 1_000_000_000_000;
+    const minute = 60 * 1000;
+    expect(isReseedScanFresh(result("siteA", at, "failed"), at + 29 * minute, 7 * 24 * 60 * minute)).toBe(true);
+    expect(isReseedScanFresh(result("siteA", at, "failed"), at + 31 * minute, 7 * 24 * 60 * minute)).toBe(false);
+  });
+
+  it("调用方给的更短 ttl 对 failed 仍然有效（只许收紧，不许放宽）", () => {
+    const at = 1_000_000_000_000;
+    expect(isReseedScanFresh(result("siteA", at, "failed"), at + 6 * 60 * 1000, 5 * 60 * 1000)).toBe(false);
+  });
 });
 
 describe("reseedScanLocalGroup：把同一份内容的全部副本收齐", () => {

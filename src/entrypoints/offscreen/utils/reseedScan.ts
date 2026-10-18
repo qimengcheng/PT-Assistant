@@ -102,6 +102,31 @@ const SEARCH_STATUS_TEXT: Partial<Record<EResultParseStatus, string>> = {
   [EResultParseStatus.unknownError]: "未知错误",
 };
 
+/**
+ * 站上那条 → 够拿去建辅种任务的最小形状。
+ *
+ * 为什么在这一步就存下来而不是点辅种时再搜一遍：`id` 少存一个，那 7 个靠 id 换下载链接的站
+ * （yemapt / mteam 那批）发送会失败且只回一句不带原因的 `success:false`；`hash` 更是只有
+ * 验文件清单那一步下过 .torrent 才拿得到。这两样现场都已经有，不存就是让下一次白下一遍。
+ * ⚠️ `link` 在 NexusPHP 那一族带 passkey：它只落本机 IndexedDB，不进日志、不上界面。
+ */
+function toSiteRef(item: ITorrent, hash?: string): IReseedScanResult["site"] {
+  const title = typeof item?.title === "string" ? item.title : "";
+  if (!title) return undefined;
+  return {
+    id: item.id,
+    title,
+    subTitle: item.subTitle,
+    category: item.category,
+    url: item.url ?? "",
+    link: item.link ?? "",
+    size: typeof item.size === "number" ? item.size : 0,
+    seeders: item.seeders,
+    leechers: item.leechers,
+    hash,
+  };
+}
+
 /** 一次「内容 × 站点」的查询：搜（两档词）→ 粗筛候选 → 候选下 .torrent 比文件清单 */
 async function scanOnePair(input: {
   contentKey: string;
@@ -123,6 +148,7 @@ async function scanOnePair(input: {
   let filesCompared = false;
   let filesMatched = false;
   let hit: ITorrent | undefined;
+  let hitHash: string | undefined;
   let note: string | undefined;
 
   try {
@@ -162,6 +188,9 @@ async function scanOnePair(input: {
           hit = candidate.item;
           const fp = info?.filesFingerprint?.fingerprint;
           filesMatched = fp !== undefined && localFingerprints.has(fp);
+          // 只有比上了的那一条才把 infoHash 记下来：没比上的那条不是这一份内容，
+          // 存了就会有一行「该站有这条」指向错的那颗种子
+          hitHash = filesMatched ? info?.infoHash : undefined;
         } catch (error) {
           note = `候选那条的种子文件没取下来：${error instanceof Error ? error.message : String(error)}`;
           continue;
@@ -188,12 +217,17 @@ async function scanOnePair(input: {
     note,
   });
 
+  // `no-match` 那一档不带上 site：那时 `hit` 是「验过文件、确认不是这一份」的那条，
+  // 把它一起存下来就等于让界面上那行「没搜到相符条目」指向一颗无关的种子
+  const reportable = verdict.verdict === "has-it" || verdict.verdict === "suspect";
+
   return {
     ...base,
     verdict: verdict.verdict,
     note: verdict.note,
-    siteTitle: hit?.title,
-    siteSize: hit?.size,
+    siteTitle: reportable ? hit?.title : undefined,
+    siteSize: reportable ? hit?.size : undefined,
+    site: reportable && hit ? toSiteRef(hit, hitHash) : undefined,
   };
 }
 

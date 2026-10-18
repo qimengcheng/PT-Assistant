@@ -12,7 +12,7 @@
  */
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ClearOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined } from "@antdv-next/icons";
+import { ClearOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, BranchesOutlined } from "@antdv-next/icons";
 import type { TableColumnsType } from "antdv-next";
 
 import { sendMessage } from "@/messages.ts";
@@ -22,6 +22,8 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import HoverTip from "@/options/components/HoverTip.vue";
 import { planReseedScan } from "@/shared/reseedScanPlan.ts";
+import { planReseedHandoff, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
+import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import {
   RESEED_SCAN_MAX_PAIRS,
   type IReseedScanJob,
@@ -39,6 +41,8 @@ const props = defineProps<{
   downloaderIds: string[];
   /** 目标站点：已添加、没标离线 */
   usableSites: string[];
+  /** 下载器里那些已下完的副本 = 一键辅种时的基准来源（按内容键对得上扫描那一侧） */
+  bases: IReseedHandoffBase[];
 }>();
 
 const { t } = useI18n();
@@ -53,6 +57,9 @@ const job = ref<IReseedScanJob | null>(null);
 const results = ref<IReseedScanResult[]>([]);
 const starting = ref(false);
 const reloading = ref(false);
+/** 场上已有的辅种任务：一键辅种前拿它过一遍重复闸 */
+const existingTasks = ref<IKeepUploadTask[]>([]);
+const handoffBusy = ref(false);
 
 const POLL_MS = 1500;
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -276,9 +283,69 @@ async function clearCache() {
   await loadResults();
 }
 
+/**
+ * 一键辅种：把结论是「该站有这条」的那些对子，按内容各折成一条辅种任务。
+ *
+ * 只喂 `has-it` 那一档 —— `suspect`（标题相符、未验文件）说的是「大概有」，
+ * 把它一起发出去就是替人赌一次。判据本体在 `@/shared/reseedScanHandoff.ts`（能被 Node 断言），
+ * 这里只做「取现场那份范围 + 落库 + 催一轮后台」。
+ */
+const handoff = computed(() => {
+  const keys = new Set(activeTargets.value.map((target) => target.contentKey));
+  return planReseedHandoff({
+    results: results.value.filter((item) => keys.has(item.contentKey)),
+    targets: activeTargets.value,
+    bases: props.bases,
+    existingTasks: existingTasks.value,
+  });
+});
+
+async function loadExistingTasks() {
+  // 拿不到就当没有重复：不能把「查不了」变成「建不了」（与弹窗那条同一口径）
+  existingTasks.value = await sendMessage("getKeepUploadTasks", undefined).catch(() => [] as IKeepUploadTask[]);
+}
+
+async function reseedNow() {
+  const tasks = handoff.value.tasks;
+  if (tasks.length === 0) return;
+  const sites = tasks.reduce((sum, task) => sum + (task.items?.length ?? 0), 0);
+  const ok = await confirmDanger(
+    t("MyClient.reseedScan.reseedConfirm", { count: tasks.length, sites }),
+    "primary",
+    t("MyClient.reseedScan.reseed"),
+  );
+  if (!ok) return;
+
+  handoffBusy.value = true;
+  let created = 0;
+  try {
+    for (const task of tasks) {
+      await sendMessage("createKeepUploadTask", task);
+      created += 1;
+    }
+    // 催后台立刻走一轮：不催的话这批新任务要等下一次定时（最多 1 分钟）才被看到
+    if (created > 0) void sendMessage("runAutoReseedTick", undefined).catch(() => {});
+    await loadExistingTasks();
+    const { duplicated, skipped } = handoff.value;
+    const parts = [t("MyClient.reseedScan.reseedDone", { count: created })];
+    // 跳过的那两类只在真有的时候说：一句「另有 0 条…」看着像坏了
+    if (duplicated.length + skipped.length > 0) {
+      parts.push(t("MyClient.reseedScan.reseedSkipped", { dup: duplicated.length, noBase: skipped.length }));
+    }
+    runtimeStore.showSnakebar(parts.join(""), { color: created > 0 ? "success" : "warning" });
+  } catch (error) {
+    runtimeStore.showSnakebar(
+      `${t("MyClient.reseedScan.reseedFailed")}：${error instanceof Error ? error.message : String(error)}`,
+      { color: "error" },
+    );
+  } finally {
+    handoffBusy.value = false;
+  }
+}
+
 /** 打开时读一次现场；在跑就接着轮询（扫描可能是上一次没关完的那一轮，进度是落在存储里的） */
 async function onOpen() {
-  await Promise.all([loadJob(), loadResults()]);
+  await Promise.all([loadJob(), loadResults(), loadExistingTasks()]);
   if (running.value) startPolling();
 }
 
@@ -333,6 +400,15 @@ onUnmounted(stopPolling);
           <template #icon><ReloadOutlined /></template>
           {{ t("MyClient.reseedScan.reload") }}
         </a-button>
+        <!-- 一键辅种：只吃「该站有这条」那一档，基准取下载器里那一份、目录取它所在目录。
+             它不绕过那张「辅种检测」弹窗，只是把这一屏已经问出来的信息直接送进去 ——
+             要逐条挑目录/标签，仍然走搜索页那颗。 -->
+        <HoverTip :text="t('MyClient.reseedScan.reseedTip')" placement="top" :delay="0.4">
+          <a-button type="primary" :disabled="handoff.tasks.length === 0" :loading="handoffBusy" @click="reseedNow">
+            <template #icon><BranchesOutlined /></template>
+            {{ t("MyClient.reseedScan.reseed", { count: handoff.tasks.length }) }}
+          </a-button>
+        </HoverTip>
         <HoverTip :text="t('MyClient.reseedScan.clearTip')">
           <a-button type="primary" danger @click="clearCache">
             <template #icon><ClearOutlined /></template>

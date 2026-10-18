@@ -10,6 +10,7 @@
 import { judgeReseedCandidate, type TReseedCandidateVerdict } from "@/shared/reseedCandidate.ts";
 import { resolveTrackerHostSite, trackerFieldToHost } from "@/shared/trackerHost.ts";
 import { reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
+import type { IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
 import type { IReseedScanTarget } from "@/shared/types/storages/reseedScan.ts";
 
 import { assignGroups, buildTaskGroups, type IReseedTaskForGroup, type IRowForGroup } from "./reseedGroups.ts";
@@ -142,4 +143,36 @@ export function buildReseedScanScope(
   }
 
   return [...byKey.values()];
+}
+
+/**
+ * 表里的行 → 「一键辅种」要的本地基准清单。
+ *
+ * 内容键与 `buildReseedScanScope` **同一条算式**（同一个 `reseedScanContentKey` + 同样 round 过的大小），
+ * 两边各折一套就会「扫描说查到了 23 条，一键时又说找不到基准」。
+ * 同一份内容在下载器里有几份副本时取**第一条报得出 infoHash 的**：它们内容相同，
+ * 差别只在挂过哪个站 —— 而基准要的正是「数据在哪、有多少」，不是「它是哪一颗种子」。
+ * 没下完的行照旧不进（与扫描范围同一条：数据不全不能拿去辅）。
+ */
+export function buildReseedLocalBases(
+  rows: IReseedRow[],
+  downloaderNames: Record<string, string | undefined>,
+): IReseedHandoffBase[] {
+  const out = new Map<string, IReseedHandoffBase>();
+  for (const row of rows) {
+    if (!row.completed) continue;
+    const size = Math.max(0, Math.round(row.totalSize ?? 0));
+    const contentKey = reseedScanContentKey(row.name, size);
+    const existing = out.get(contentKey);
+    if (existing && (existing.hash || !row.infoHash)) continue;
+    out.set(contentKey, {
+      contentKey,
+      downloaderId: row.clientId,
+      downloaderName: downloaderNames[row.clientId],
+      hash: row.infoHash,
+      name: row.name,
+      savePath: row.savePath,
+    });
+  }
+  return [...out.values()];
 }

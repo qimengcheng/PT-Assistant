@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildReseedFacts,
+  buildReseedLocalBases,
   buildReseedScanScope,
   type IReseedRow,
 } from "@/options/views/Overview/MyClient/reseedCandidateView.ts";
@@ -107,6 +108,32 @@ describe("完成态按行独立", () => {
     ];
     const facts = buildReseedFacts(rows, hostSiteEntries, usable, []);
     for (const key of ["a", "b", "c"]) expect(facts.get(key)).toEqual({ kind: "all-covered", covered: 3 });
+  });
+});
+
+describe("一键辅种的基准来源（buildReseedLocalBases）", () => {
+  it("内容键与扫描范围同一条算式：两边对不上号就会「查到了却说找不到基准」", () => {
+    const rows: IReseedRow[] = [{ key: "k1", clientId: "qb1", name: "Some.Movie.2024.1080p", totalSize: 8e9, savePath: "/data/movies", infoHash: "aaaa", completed: true }];
+    const scope = buildReseedScanScope(rows, hostSiteEntries, []);
+    const bases = buildReseedLocalBases(rows, { qb1: "家里的 qB" });
+    expect(bases.map((base) => base.contentKey)).toEqual(scope.map((item) => item.contentKey));
+    expect(bases[0]).toEqual({ contentKey: scope[0].contentKey, downloaderId: "qb1", downloaderName: "家里的 qB", hash: "aaaa", name: "Some.Movie.2024.1080p", savePath: "/data/movies" });
+  });
+
+  it("没下完的那份不进基准清单（与扫描范围同一条：数据不全不能拿去辅）", () => {
+    const rows: IReseedRow[] = [{ key: "k1", clientId: "qb1", name: "X", totalSize: 1, savePath: "/s", infoHash: "h", completed: false }];
+    expect(buildReseedLocalBases(rows, {})).toEqual([]);
+  });
+
+  it("同一份内容有几份副本时，取第一条报得出 infoHash 的（baseLocal.hash 是必填的）", () => {
+    const rows: IReseedRow[] = [
+      { key: "k1", clientId: "qb1", name: "X", totalSize: 1, savePath: "/a", completed: true },
+      { key: "k2", clientId: "qb1", name: "X", totalSize: 1, savePath: "/b", infoHash: "h2", completed: true },
+      { key: "k3", clientId: "tr1", name: "X", totalSize: 1, savePath: "/c", infoHash: "h3", completed: true },
+    ];
+    const bases = buildReseedLocalBases(rows, {});
+    expect(bases).toHaveLength(1);
+    expect(bases[0]).toMatchObject({ hash: "h2", savePath: "/b", downloaderId: "qb1" });
   });
 });
 

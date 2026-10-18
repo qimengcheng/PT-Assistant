@@ -53,7 +53,7 @@ import {
   type IGroupMeta,
   type IRowForGroup,
 } from "./reseedGroups.ts";
-import { buildReseedFacts, buildReseedScanScope, type IReseedRow, type IReseedScanScope } from "./reseedCandidateView.ts";
+import { buildReseedFacts, buildReseedLocalBases, buildReseedScanScope, type IReseedRow, type IReseedScanScope } from "./reseedCandidateView.ts";
 import ReseedScanDialog from "./ReseedScanDialog.vue";
 import TorrentStateTd from "./TorrentStateTd.vue";
 import ClientStatusDialog from "./ClientStatusDialog.vue";
@@ -382,6 +382,17 @@ const visibleTorrents = computed(() => (reseedOnly.value ? reseedCandidateRows.v
  * 「标记说有 3 站、面板却排出 5 站」这种同一屏互相打脸的数。
  */
 const reseedScanItems = computed(() => buildReseedScanScope(reseedRows.value, hostSiteEntries.value, reseedTasks.value));
+
+/**
+ * 一键辅种时的基准来源：同一份 `reseedRows` 按**与上面同一个内容键**折一遍，
+ * 于是「扫描说查到了」与「一键说找不到基准」不会各说一套。
+ */
+const reseedLocalBases = computed(() =>
+  buildReseedLocalBases(
+    reseedRows.value,
+    Object.fromEntries(Object.entries(metadataStore.downloaders).map(([id, item]) => [id, item?.name])),
+  ),
+);
 
 /** 「还差站点」的那几条的行键：判据就是标记那一条，这里不另判一套 */
 const pendingRowKeys = computed(
@@ -1337,6 +1348,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
     :scopes="reseedScanScopes"
     :downloader-ids="reseedScanDownloaderIds"
     :usable-sites="usableReseedSites"
+    :bases="reseedLocalBases"
   />
 
   <ClientStatusDialog v-model="showClientStatusDialog" />

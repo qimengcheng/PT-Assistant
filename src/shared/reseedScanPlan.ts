@@ -14,7 +14,7 @@
 import { buildTitleSizeKey, normalizeTitle } from "./fingerprint/title.ts";
 import { toSizeBytes } from "./torrentSize.ts";
 import type { ILocalTorrentFingerprintEntry } from "./fingerprint/types.ts";
-import { RESEED_SCAN_TTL_MS, type IReseedScanResult, type IReseedScanTarget, type TReseedScanVerdict } from "./types/storages/reseedScan.ts";
+import { RESEED_SCAN_FAILED_RETRY_MS, RESEED_SCAN_TTL_MS, type IReseedScanResult, type IReseedScanTarget, type TReseedScanVerdict } from "./types/storages/reseedScan.ts";
 
 /** 一次要查的一对：某条内容 × 某个站 */
 export interface IReseedScanPair {
@@ -66,10 +66,17 @@ export function reseedScanResultId(contentKey: string, siteId: string): string {
   return `${contentKey}\u0000${siteId}`;
 }
 
-/** 上次查过的结论还在新鲜期里吗 */
+/**
+ * 上次查过的结论还在新鲜期里吗。
+ *
+ * `failed` 那一档单独用一条短得多的间隔（`RESEED_SCAN_FAILED_RETRY_MS`）：它没有产出任何结论，
+ * 拿七天那份新鲜期冻住 = 一个站今天坏了，这批条目在它那儿七天都不会再被问一次。
+ * 调用方给的 `ttlMs` 只用来**收紧**（取 min），不许把它放宽成比七天更长。
+ */
 export function isReseedScanFresh(result: IReseedScanResult | undefined, now: number, ttlMs = RESEED_SCAN_TTL_MS): boolean {
   if (!result) return false;
-  return now - result.at < ttlMs;
+  const limit = result.verdict === "failed" ? Math.min(ttlMs, RESEED_SCAN_FAILED_RETRY_MS) : ttlMs;
+  return now - result.at < limit;
 }
 
 /**

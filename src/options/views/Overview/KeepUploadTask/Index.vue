@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { debounce } from "es-toolkit";
 import { type TableColumnsType } from "antdv-next";
 import {
   CopyOutlined,
@@ -468,7 +469,7 @@ onMounted(() => {
    * 存储里已经是新值，这一趟拉回来就是最终状态，不是又读到一份旧的。
    */
   stopNoticeWatch = watchReseedNotice(() => {
-    void refreshTasksFromStorage();
+    refreshFromNotice();
   });
 });
 
@@ -489,6 +490,21 @@ async function refreshTasksFromStorage() {
     // 静默：这一轮没拿到就下一轮再拿，用户随时能手动刷新
   }
 }
+
+/**
+ * 后台进展通知吃这一份，不吃上面那个原函数。
+ *
+ * 一次「重读整表 + 重画」在这张表上是**实测 140~180ms 的主线程阻塞**（台架
+ * `.tmp-build/bench-taskexpand`：11 行任务、每次 `refreshTasksFromStorage` 量到 140 / 180 / 179ms）。
+ * 一趟自动辅种是**逐条**推进逐条通知的（v0.90.x 那条口径），而「一键辅种」一次就能建 20 来条任务、
+ * 每条 2~3 个站点条目 —— 几十条通知连着进来就是几十趟重画，连续占住主线程好几秒，
+ * 界面表现为「点什么都没反应」（用户 2026-10-18 在点完一键辅种之后撞上）。
+ *
+ * 所以：前缘立刻跑一次（第一条进展要当场看到，那条「状态贴着动作当场兑现」的口径不动），
+ * 窗口内的其余通知并成末尾一次 —— es-toolkit 的 `debounce` 默认只有尾随那一半，得显式给两缘。
+ * 60 秒那一轮定时与用户主动点的刷新都仍走原函数，不经过这里。
+ */
+const refreshFromNotice = debounce(() => void refreshTasksFromStorage(), 1200, { edges: ["leading", "trailing"] });
 
 /**
  * 催后台立刻跑一轮自动辅种，跑完再把这张表拉回来。
@@ -746,6 +762,8 @@ onUnmounted(() => {
   autoRecheckTimers.forEach((id) => window.clearTimeout(id));
   autoRecheckTimers.clear();
   if (autoRefreshTimer !== undefined) window.clearInterval(autoRefreshTimer);
+  // 窗口里那条还没落地的尾随重读要撤掉：页面已经不在了，那一趟只会读到一份没人看的表
+  refreshFromNotice.cancel();
   stopNoticeWatch?.();
 });
 

@@ -12,6 +12,7 @@ import type {
   TSiteMessageReadStorageSchema,
   TPendingReDownloadStorageSchema,
   IUpdateCheckState,
+  IReseedScanJob,
 } from "@/shared/types.ts";
 
 export interface IExtensionStorageSchema {
@@ -45,6 +46,13 @@ export interface IExtensionStorageSchema {
 
   /** 「检查更新」的结果缓存，见 shared/types/storages/other.ts 的说明 */
   updateCheck: IUpdateCheckState;
+
+  /**
+   * 「可辅种扫描」这一轮的进度。只存进度不存结论 —— 结论在 IndexedDB 的 `reseed_scan` 表里
+   * （那是按「内容 × 站点」一条一条的，用 chrome.storage 整块读写会随扫描次数越写越慢，
+   * 与 `user_info` 当年从 storage 搬进 IndexedDB 的理由同一族）。
+   */
+  reseedScan: IReseedScanJob;
 }
 
 export type TExtensionStorageKey = keyof IExtensionStorageSchema;
@@ -76,6 +84,7 @@ const items = {
   siteMessageRead: storage.defineItem<TSiteMessageReadStorageSchema | null>("local:siteMessageRead"),
   pendingReDownload: storage.defineItem<TPendingReDownloadStorageSchema | null>("local:pendingReDownload"),
   updateCheck: storage.defineItem<IUpdateCheckState | null>("local:updateCheck"),
+  reseedScan: storage.defineItem<IReseedScanJob | null>("local:reseedScan"),
 };
 
 /**

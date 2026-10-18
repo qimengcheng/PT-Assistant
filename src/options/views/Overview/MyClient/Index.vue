@@ -53,7 +53,8 @@ import {
   type IGroupMeta,
   type IRowForGroup,
 } from "./reseedGroups.ts";
-import { buildReseedFacts } from "./reseedCandidateView.ts";
+import { buildReseedFacts, buildReseedScanScope, type IReseedRow, type IReseedScanScope } from "./reseedCandidateView.ts";
+import ReseedScanDialog from "./ReseedScanDialog.vue";
 import TorrentStateTd from "./TorrentStateTd.vue";
 import ClientStatusDialog from "./ClientStatusDialog.vue";
 import TorrentDetailDialog from "./TorrentDetailDialog.vue";
@@ -131,6 +132,9 @@ const toRecheckTorrents = ref<CTorrent[]>([]);
 
 // client status dialog
 const showClientStatusDialog = ref(false);
+
+/** 「可辅种扫描」面板（逐站到站点上真查一遍这条种子在不在） */
+const showReseedScanDialog = ref(false);
 
 const totalUpSpeed = computed(() => allTorrents.value.reduce((acc, t) => acc + (t.uploadSpeed ?? 0), 0));
 const totalDlSpeed = computed(() => allTorrents.value.reduce((acc, t) => acc + (t.downloadSpeed ?? 0), 0));
@@ -322,22 +326,29 @@ const usableReseedSites = computed(() =>
   Object.keys(metadataStore.sites).filter((siteId) => metadataStore.sites[siteId]?.isOffline !== true),
 );
 
+/**
+ * 参与「可辅种」两条路（行上那枚标记、扫描面板的范围清单）的行。
+ *
+ * 只有一份：这两件产品必须吃同一批字段拼出来的同一份行，不然标记说有 N 站、扫描却按另一套
+ * 已挂集合排计划，界面上就是同一屏两句互相打脸（v0.106.2 那条「同一圈里既写又读的字段」同族）。
+ */
+const reseedRows = computed<IReseedRow[]>(() =>
+  allTorrents.value.map((row) => ({
+    key: torrentKey(row),
+    clientId: row.clientId,
+    name: row.name,
+    totalSize: row.totalSize,
+    savePath: row.savePath,
+    infoHash: row.infoHash,
+    tracker: row.tracker,
+    completed: row.isCompleted === true,
+  })),
+);
+
+const hostSiteEntries = computed(() => Object.entries(metadataStore.siteHostMap));
+
 const reseedFacts = computed(() =>
-  buildReseedFacts(
-    allTorrents.value.map((row) => ({
-      key: torrentKey(row),
-      clientId: row.clientId,
-      name: row.name,
-      totalSize: row.totalSize,
-      savePath: row.savePath,
-      infoHash: row.infoHash,
-      tracker: row.tracker,
-      completed: row.isCompleted === true,
-    })),
-    Object.entries(metadataStore.siteHostMap),
-    usableReseedSites.value,
-    reseedTasks.value,
-  ),
+  buildReseedFacts(reseedRows.value, hostSiteEntries.value, usableReseedSites.value, reseedTasks.value),
 );
 
 /** 行上那枚「待辅 N 站」：只有值得去搜的那几条出标记，其余三档（没下完 / 认不出站 / 已挂满）都安静 */
@@ -362,8 +373,45 @@ function reseedBadgeTip(record: CTorrent): string {
 /** 当前列表里可辅种的那几条：开关上那个数与勾上之后剩下的行共用这一份，不许各算一遍 */
 const reseedCandidateRows = computed(() => filteredTorrents.value.filter((row) => reseedBadgeOf(row)));
 
-/** 表格真正要吃的那一列行（`filteredTorrents` 只管状态与搜索，这一层再管「只看可辅种」） */
+/** 表格真正要吃的那一列行（`filteredTorrents` 只管状态与搜索，这一层再管「只看待查」） */
 const visibleTorrents = computed(() => (reseedOnly.value ? reseedCandidateRows.value : filteredTorrents.value));
+
+/**
+ * 扫描面板的范围清单：一条内容一项，`knownSites` 是整组副本反查出来的并集。
+ * 取数与行上那枚标记同源（同一份 `reseedRows` + 同一份分组判据），所以不会出现
+ * 「标记说有 3 站、面板却排出 5 站」这种同一屏互相打脸的数。
+ */
+const reseedScanItems = computed(() => buildReseedScanScope(reseedRows.value, hostSiteEntries.value, reseedTasks.value));
+
+/** 「还差站点」的那几条的行键：判据就是标记那一条，这里不另判一套 */
+const pendingRowKeys = computed(
+  () => new Set(reseedRows.value.filter((row) => reseedFacts.value.get(row.key)?.kind === "candidate").map((row) => row.key)),
+);
+
+/**
+ * 扫描面板上的三档范围。
+ *
+ * 条数按**整片表**算，不跟着搜索框与状态筛选走：那两样只影响看得见的行，
+ * 而「这次要查多少条」是发请求的预算，跟着筛选漂会让人以为少发了。
+ */
+const reseedScanScopes = computed<IReseedScanScope[]>(() => {
+  const items = reseedScanItems.value;
+  const selectedKeys = new Set(tableSelected.value.map((row) => torrentKey(row)));
+  const hits = (item: (typeof items)[number], keys: Set<string>) => item.memberKeys.some((key) => keys.has(key));
+  const pending = items.filter((item) => hits(item, pendingRowKeys.value));
+  const picked = items.filter((item) => hits(item, selectedKeys));
+  return [
+    { key: "pending", label: t("MyClient.reseedScan.scope.pending", { count: pending.length }), targets: pending },
+    { key: "completed", label: t("MyClient.reseedScan.scope.completed", { count: items.length }), targets: items },
+    { key: "selected", label: t("MyClient.reseedScan.scope.selected", { count: picked.length }), targets: picked },
+  ];
+});
+
+/**
+ * 扫描要读哪几台下载器的本地指纹：表里出现过的全给它。
+ * 多给的那几台只会多建一次 30 分钟的索引缓存，不影响结论 —— 比对是按内容键找的。
+ */
+const reseedScanDownloaderIds = computed(() => [...new Set(reseedRows.value.map((row) => row.clientId))]);
 
 /**
  * 名称那一格那颗折叠标记要的三个数。
@@ -932,7 +980,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           </a-radio-button>
         </a-radio-group>
 
-        <!-- 「只看可辅种」：与行上那枚标记同一份判据（reseedBadgeOf），括号里的数就是勾上会剩下几条 -->
+        <!-- 「只看待查」：与行上那枚标记同一份判据（reseedBadgeOf），括号里的数就是勾上会剩下几条 -->
         <a-checkbox v-model:checked="reseedOnly">
           {{ t("MyClient.reseedCandidate.filterLabel", { count: reseedCandidateRows.length }) }}
         </a-checkbox>
@@ -1049,8 +1097,13 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
                 placement="topLeft"
                 :delay="0.4"
               >
-                <!-- 用 a-tag 而不是自绘 chip：底色与前景由 antd 的 token 算，深浅色主题与对比度都不用手写十六进制赌 -->
-                <a-tag color="blue" class="reseed-candidate-tag">{{ reseedBadgeText(record) }}</a-tag>
+                <!-- 用 a-tag 而不是自绘 chip：底色与前景由 antd 的 token 算，深浅色主题与对比度都不用手写十六进制赌。
+                     这颗标记同时是「可辅种扫描」的入口（点它打开面板）：工具条那一排在用户那一栏宽（实测 1609）
+                     已经放不下了 —— 台架量到带那颗勾的自然宽 1713 > 1609，再加任何控件都要把搜索框压到 120 以下。
+                     所以入口挂在「正好说出这件事的那枚标记」上，而不是再造一颗按钮。 -->
+                <a-tag color="blue" class="reseed-candidate-tag" @click="showReseedScanDialog = true">
+                  {{ reseedBadgeText(record) }}
+                </a-tag>
               </HoverTip>
             </div>
           </div>
@@ -1264,6 +1317,15 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
 
   <PushToDownloaderDialog v-model="showPushToDownloaderDialog" />
 
+  <!-- 「可辅种扫描」：入口是名称下面那枚「待查 N 站」标记（工具条那一排已经放不下新控件，见标记处注释）。
+       范围三档与本地指纹要读的下载器都在这里算好传进去，面板自己不再判第二遍。 -->
+  <ReseedScanDialog
+    v-model="showReseedScanDialog"
+    :scopes="reseedScanScopes"
+    :downloader-ids="reseedScanDownloaderIds"
+    :usable-sites="usableReseedSites"
+  />
+
   <ClientStatusDialog v-model="showClientStatusDialog" />
 
   <TorrentDetailDialog v-model="showDetailDialog" :torrent="detailTorrent" />
@@ -1363,10 +1425,12 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   background: rgba(0, 0, 0, 0.045);
 }
 
-/* 「待辅 N 站」那枚。a-tag 自带 8px 右外边距与一档 line-height，而这一行已经用 flex gap 排、
+/* 「待查 N 站」那枚。a-tag 自带 8px 右外边距与一档 line-height，而这一行已经用 flex gap 排、
    行高由 useAutoFitPageSize 实测（撑高一分就少摆一条）—— 所以把这两样压回这一行的档，
-   底色与前景仍交给 antd 的 token（不手写十六进制，深浅色主题都跟着走）。 */
+   底色与前景仍交给 antd 的 token（不手写十六进制，深浅色主题都跟着走）。
+   它同时是「可辅种扫描」的入口，所以给 pointer：不给就看不出这一枚可点。 */
 .reseed-candidate-tag {
+  cursor: pointer;
   margin-inline-end: 0;
   font-size: inherit;
   line-height: 16px;

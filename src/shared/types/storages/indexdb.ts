@@ -10,6 +10,7 @@ import type { TSiteID as TSiteKey } from "@ptd/site";
 
 import type { ITorrentDownloadMetadata, TTorrentDownloadKey } from "../common/download.ts";
 import type { ILocalFingerprintIndex } from "../../fingerprint/index.ts";
+import type { IReseedScanResult } from "./reseedScan.ts";
 import type { IStoredUserInfo } from "./metadata.ts";
 
 export interface IPtdDBSchemaV1 extends DBSchema {
@@ -57,5 +58,19 @@ export interface IPtdDBSchema extends IPtdDBSchemaV2 {
   user_info: {
     key: [TSiteKey, string];
     value: IStoredUserInfo & { date: string };
+  };
+  /**
+   * 「可辅种扫描」的结果缓存：一条 = 「某个内容 × 某个站点」上次真查过的结论。
+   *
+   * 为什么值得存：这一条结论是**发过一次站点请求**换来的（一次扫描动辄上百次请求，还受站点
+   * 频率限制），不复用就等于每开一次面板就把同一批站再打一遍。新鲜期 7 天见
+   * `reseedScan.ts` 的 `RESEED_SCAN_TTL_MS`（那条注释写了为什么不能永久复用）。
+   *
+   * 键是 `contentKey + siteId` 拼出来的字符串，不需要额外 index：读的时候要么按整批键
+   * `getAll` 一次（面板就几十到几百条），要么按精确键取一条。
+   */
+  reseed_scan: {
+    key: string;
+    value: IReseedScanResult;
   };
 }

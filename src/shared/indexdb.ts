@@ -39,7 +39,7 @@ let opening: Promise<IDBPDatabase<IPtdDBSchema>> | null = null;
 export async function ptdIndexDb(): Promise<IDBPDatabase<IPtdDBSchema>> {
   if (opening) return opening;
 
-  const pending = openDB<IPtdDBSchema>("ptd", 5, {
+  const pending = openDB<IPtdDBSchema>("ptd", 6, {
     upgrade(db, oldVersion) {
       if (oldVersion < 1) {
         const dbV1 = db as unknown as IDBPDatabase<IPtdDBSchemaV1>;
@@ -58,6 +58,10 @@ export async function ptdIndexDb(): Promise<IDBPDatabase<IPtdDBSchema>> {
       if (oldVersion < 5) {
         // 站点用户信息按天存档（取代 chrome.storage.local 的 `userInfo` 键，见类型定义处注释）
         db.createObjectStore("user_info", { keyPath: ["site", "date"] });
+      }
+      if (oldVersion < 6) {
+        // 「可辅种扫描」的结果缓存：一条 = 某个内容 × 某个站点上次真查过的结论
+        db.createObjectStore("reseed_scan", { keyPath: "id" });
       }
     },
   });

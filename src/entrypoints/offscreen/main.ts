@@ -19,6 +19,7 @@ import "./utils/socialInformation.ts";
 import "./utils/socialRecommendations.ts";
 import "./utils/keepUploadTask.ts";
 import "./utils/fingerprint.ts";
+import "./utils/reseedScan.ts";
 import "./utils/backup.ts";
 
 import { installConsoleLogGate } from "@/shared/consoleLog.ts";

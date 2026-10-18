@@ -9,6 +9,8 @@
  */
 import { judgeReseedCandidate, type TReseedCandidateVerdict } from "@/shared/reseedCandidate.ts";
 import { resolveTrackerHostSite, trackerFieldToHost } from "@/shared/trackerHost.ts";
+import { reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
+import type { IReseedScanTarget } from "@/shared/types/storages/reseedScan.ts";
 
 import { assignGroups, buildTaskGroups, type IReseedTaskForGroup, type IRowForGroup } from "./reseedGroups.ts";
 
@@ -20,15 +22,48 @@ export interface IReseedRow extends IRowForGroup {
   completed: boolean;
 }
 
+/** 行 key → 组键。没进组（或组里只有一条）的行拿自己当组键 */
+type TGroupKeyOf = (row: IReseedRow) => string;
+
+/**
+ * 每一组「已经挂在哪些站上」。
+ *
+ * 两条对外函数都用它，不许各拼一遍（拼歪一次就是那枚标记与扫描范围两边各说一套）：
+ * ① 一份副本挂在哪个站，拿**表里 Tracker 那一列同一份数据**（`row.tracker`）反查，
+ *    raw 里那整串 announce 列表不参与；
+ * ② 同内容的几份副本并成一个集合，用的是**折叠那套同一份判据**（`assignGroups` + 辅种台账），
+ *    所以被折叠起来、这一屏看不见的那些副本也算已挂，缺口不会虚报。
+ * 没进组的行拿自己当组键：一份都认不出站时并集是空的，判据据此退到 `no-site`，
+ * 而不是把「不知道」读成「已挂满」或「还差全部站点」。
+ */
+function coverOfGroups(
+  rows: IReseedRow[],
+  hostSiteEntries: Iterable<readonly [string, string]>,
+  tasks: IReseedTaskForGroup[],
+): { groupKeyOf: TGroupKeyOf; covered: Map<string, Set<string>> } {
+  const groupOf = assignGroups(rows, buildTaskGroups(tasks));
+  const groupKeyOf: TGroupKeyOf = (row) => groupOf.get(row.key) ?? row.key;
+  const entries = hostSiteEntries instanceof Map ? hostSiteEntries : new Map(hostSiteEntries);
+
+  const covered = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const group = groupKeyOf(row);
+    let sites = covered.get(group);
+    if (!sites) {
+      sites = new Set<string>();
+      covered.set(group, sites);
+    }
+    const host = trackerFieldToHost(row.tracker);
+    const site = host ? resolveTrackerHostSite(host, entries) : null;
+    if (site) sites.add(site);
+  }
+  return { groupKeyOf, covered };
+}
+
 /**
  * 行 key → 判据结果。
  *
- * 三条取数口径（都要和界面上看得见的那半同源，不然标记会和列对不上账）：
- * ① 一份副本挂在哪个站，拿**表里 Tracker 那一列同一份数据**（`row.tracker`）反查，
- *    raw 里那整串 announce 列表不参与；
- * ② 同内容的几份副本并成一个「已挂集合」，用的是**折叠那套同一份判据**（`assignGroups` + 辅种台账），
- *    所以被折叠起来、这一屏看不见的那些副本也算已挂，缺口不会虚报；
- * ③ 可辅目标就是调用方给的那批站点（已添加、没标离线），这一层不再自己筛。
+ * 第三条取数口径：可辅目标就是调用方给的那批站点（已添加、没标离线），这一层不再自己筛。
  */
 export function buildReseedFacts(
   rows: IReseedRow[],
@@ -36,23 +71,7 @@ export function buildReseedFacts(
   usableSites: readonly string[],
   tasks: IReseedTaskForGroup[],
 ): Map<string, TReseedCandidateVerdict> {
-  const groupOf = assignGroups(rows, buildTaskGroups(tasks));
-  // 没进组的行拿自己当组键：一份都认不出站时并集是空的，判据据此退到 no-site，
-  // 而不是把「不知道」读成「已挂满」或「还差全部站点」。
-  const groupKeyOf = (row: IReseedRow) => groupOf.get(row.key) ?? row.key;
-
-  const coveredByGroup = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const group = groupKeyOf(row);
-    let covered = coveredByGroup.get(group);
-    if (!covered) {
-      covered = new Set<string>();
-      coveredByGroup.set(group, covered);
-    }
-    const host = trackerFieldToHost(row.tracker);
-    const site = host ? resolveTrackerHostSite(host, hostSiteEntries) : null;
-    if (site) covered.add(site);
-  }
+  const { groupKeyOf, covered } = coverOfGroups(rows, hostSiteEntries, tasks);
 
   const out = new Map<string, TReseedCandidateVerdict>();
   for (const row of rows) {
@@ -60,10 +79,67 @@ export function buildReseedFacts(
       row.key,
       judgeReseedCandidate({
         completed: row.completed,
-        coveredSites: [...(coveredByGroup.get(groupKeyOf(row)) ?? [])],
+        coveredSites: [...(covered.get(groupKeyOf(row)) ?? [])],
         usableSites,
       }),
     );
   }
   return out;
+}
+
+/** 一条待扫内容 + 它在表里对应的那几行（`memberKeys` 供调用方回查判据，这一层不判第②遍） */
+export interface IReseedScanScopeItem extends IReseedScanTarget {
+  memberKeys: string[];
+}
+
+/**
+ * 扫描面板上的一个范围档。
+ *
+ * 形状住这一份而不是住在那个 `.vue` 里：`<script setup>` 不许 `export`，
+ * 而页面与弹窗两头都要这个类型。
+ */
+export interface IReseedScanScope {
+  key: string;
+  /** 已按当前语言算好的那一档标签（带条数） */
+  label: string;
+  targets: IReseedScanScopeItem[];
+}
+
+/**
+ * 把表里那些**已下完**的内容折成「可辅种扫描」的范围清单。
+ *
+ * 三条取数口径：
+ * - 未下完的一律不进：数据不全，查到那个站上有也不能拿去辅（与 `pickLocalBaseCandidates` 同一条）；
+ * - `knownSites` 取的是**整组副本**的并集（`coverOfGroups` 那一遍），被折叠藏起来的副本也算；
+ *   那些站不排进计划 —— 已经挂在上面的站再查一遍，只会得到一个「该站有这条」的废话结论；
+ * - 内容键用 `reseedScanContentKey`，与 offscreen 那侧本地指纹索引的第 1 层同一个算法，
+ *   两边各折一套就会「查了却对不上号」。同一内容在不同下载器/不同路径里有好几行时，
+ *   这些行会算出**同一个** contentKey，这里并成一条（否则一次扫描要重复发同样的查询）。
+ *
+ * 字节数取 `totalSize` 并 `Math.round`：下载器索引那侧也是这么取的（`offscreen/utils/fingerprint.ts`），
+ * 一处不round就会两边 key 不相等。
+ */
+export function buildReseedScanScope(
+  rows: IReseedRow[],
+  hostSiteEntries: Iterable<readonly [string, string]>,
+  tasks: IReseedTaskForGroup[],
+): IReseedScanScopeItem[] {
+  const { groupKeyOf, covered } = coverOfGroups(rows, hostSiteEntries, tasks);
+  const byKey = new Map<string, IReseedScanScopeItem>();
+
+  for (const row of rows) {
+    if (!row.completed) continue;
+    const size = Math.max(0, Math.round(row.totalSize ?? 0));
+    const contentKey = reseedScanContentKey(row.name, size);
+    const knownSites = [...(covered.get(groupKeyOf(row)) ?? [])];
+    const hit = byKey.get(contentKey);
+    if (hit) {
+      hit.memberKeys.push(row.key);
+      for (const site of knownSites) if (!hit.knownSites.includes(site)) hit.knownSites.push(site);
+      continue;
+    }
+    byKey.set(contentKey, { contentKey, name: row.name, size, knownSites, memberKeys: [row.key] });
+  }
+
+  return [...byKey.values()];
 }

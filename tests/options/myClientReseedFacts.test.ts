@@ -9,7 +9,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildReseedFacts, type IReseedRow } from "@/options/views/Overview/MyClient/reseedCandidateView.ts";
+import {
+  buildReseedFacts,
+  buildReseedScanScope,
+  type IReseedRow,
+} from "@/options/views/Overview/MyClient/reseedCandidateView.ts";
+import { reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
 
 const hostSiteEntries: [string, string][] = [
   ["pandapt.net", "pandapt"],
@@ -102,5 +107,55 @@ describe("完成态按行独立", () => {
     ];
     const facts = buildReseedFacts(rows, hostSiteEntries, usable, []);
     for (const key of ["a", "b", "c"]) expect(facts.get(key)).toEqual({ kind: "all-covered", covered: 3 });
+  });
+});
+
+/**
+ * 「可辅种扫描」的范围清单（同一份文件的 `buildReseedScanScope`）。
+ *
+ * 这一份要钉的是**扫描会不会白跑或漏跑**：
+ * ① `knownSites` 少并一条 → 已挂在的那个站也被查一遍，得到一个「该站有这条」的废话结论；
+ * ② 内容键与 offscreen 那侧本地指纹索引不同算法 → 查回来的结论对不上任何条目；
+ * ③ 未下完的进来了 → 查到了也不能拿去辅，白烧一次站点请求。
+ */
+describe("buildReseedScanScope：扫描要吃的那批内容", () => {
+  const key = (name: string, size: number) => reseedScanContentKey(name, size);
+
+  it("同内容的两条副本并成一条待扫项，已挂站点取并集", () => {
+    const items = buildReseedScanScope(copies("https://tracker.pandapt.net/announce", "https://novahd.top/announce"), hostSiteEntries, []);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.knownSites.sort()).toEqual(["novahd", "pandapt"]);
+    expect(items[0]!.memberKeys.sort()).toEqual(["qb1:1", "qb1:2"]);
+    // 只取第一条副本的站，就会把还挂在 novahd 的那一条漏掉（v0.105.4 同族）
+    expect(items[0]!.knownSites).not.toEqual(["pandapt"]);
+  });
+
+  it("内容键与 offscreen 那侧同一个算法，且字节数取整（两处都 round 才对得上）", () => {
+    const rows: IReseedRow[] = [
+      { key: "one", clientId: "qb1", name: "Some.Movie.2024", totalSize: 8_000_000_000.6, savePath: "/s", infoHash: "h", tracker: "", completed: true },
+    ];
+    const items = buildReseedScanScope(rows, hostSiteEntries, []);
+    expect(items[0]!.contentKey).toBe(key("Some.Movie.2024", Math.round(8_000_000_000.6)));
+    expect(items[0]!.size).toBe(Math.round(8_000_000_000.6));
+  });
+
+  it("跨下载器的同一份内容也只排一次（否则同一条查询要发两遍）", () => {
+    const rows: IReseedRow[] = [
+      { key: "qb1:9", clientId: "qb1", name: "Same 2024", totalSize: 5e9, savePath: "/a", infoHash: "h1", tracker: "novahd.top", completed: true },
+      { key: "tr1:9", clientId: "tr1", name: "Same 2024", totalSize: 5e9, savePath: "/b", infoHash: "h2", tracker: "m-team.io", completed: true },
+    ];
+    const items = buildReseedScanScope(rows, hostSiteEntries, []);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.memberKeys.sort()).toEqual(["qb1:9", "tr1:9"]);
+    expect(items[0]!.knownSites.sort()).toEqual(["mteam", "novahd"]);
+  });
+
+  it("没下完的不进清单；同组里那条已下完的照常进，且已挂集合仍含未下完那条报的站", () => {
+    const rows = copies("https://tracker.pandapt.net/announce", "https://novahd.top/announce");
+    rows[1].completed = false;
+    const items = buildReseedScanScope(rows, hostSiteEntries, []);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.memberKeys).toEqual(["qb1:1"]);
+    expect(items[0]!.knownSites.sort()).toEqual(["novahd", "pandapt"]);
   });
 });

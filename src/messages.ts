@@ -58,6 +58,9 @@ import type {
   TBackupFields,
   BridgeStatus,
   IUpdateCheckState,
+  IReseedScanJob,
+  IReseedScanRequest,
+  IReseedScanResult,
 } from "@/shared/types.ts";
 import { isDebug } from "~/helper.ts";
 
@@ -304,6 +307,19 @@ export interface ProtocolMap {
    */
   getLocalFingerprintIndex(data: { downloaderId: string; refresh?: boolean }): ILocalFingerprintIndex | null;
   clearLocalFingerprintIndex(data?: { downloaderId?: string }): void;
+
+  // ===== 2.5.2 offscreen：可辅种扫描 ( utils/reseedScan ) =====
+  /**
+   * 发起一轮「挨个站到站点上查这条种子在不在」。
+   *
+   * 不等它跑完就返回（一次扫描是几十到几百次站点请求），进度靠 `getReseedScanJob` 轮询，
+   * 结论落在 IndexedDB 的 `reseed_scan` 表、由 `getReseedScanResults` 读。
+   */
+  startReseedScan(data: IReseedScanRequest): IReseedScanJob;
+  getReseedScanJob(): IReseedScanJob | null;
+  stopReseedScan(): IReseedScanJob | null;
+  getReseedScanResults(data?: { contentKeys?: string[] }): IReseedScanResult[];
+  clearReseedScanCache(): void;
 
   // ===== 1.2 background：打开扩展选项页（content-script 搜索跳转等使用）=====
   openOptionsPage(data?: string | { path: string; query?: Record<string, unknown> }): void;

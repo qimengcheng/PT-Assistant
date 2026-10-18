@@ -378,9 +378,53 @@
     },
     "stateFilterAll": "全部",
     "reseedCandidate": {
-      "badge": "待辅 {pending} 站",
-      "badgeTip": "这份内容已挂在 {covered} 个站。已添加的站点里还有 {pending} 个没挂上它 —— 那 {pending} 个站上到底有没有发布过这条种子，要进辅种检测搜一遍才知道。",
-      "filterLabel": "只看可辅种（{count}）"
+      "badge": "待查 {pending} 站",
+      "badgeTip": "这份内容已挂在 {covered} 个站点，已添加的站点里还有 {pending} 个未挂上它。那 {pending} 个站点是否发布过这条种子，需要逐站查询才能确定；点击本标记可打开「可辅种扫描」。",
+      "filterLabel": "只看待查（{count}）"
+    },
+    "reseedScan": {
+      "title": "可辅种扫描",
+      "scope": {
+        "pending": "待查的 {count} 条",
+        "completed": "已下完的 {count} 条",
+        "selected": "已勾选的 {count} 条"
+      },
+      "refreshAll": "忽略上次结论，全部重查",
+      "plan": "本轮要查 {pairs} 组「内容 × 站点」（{items} 条内容、{sites} 个站点，跳过 7 天内查过的 {skipped} 组）；单次上限 {max} 组，本轮未排 {remaining} 组。",
+      "start": "开始扫描",
+      "stop": "停止",
+      "reload": "刷新进度",
+      "clear": "清除结果",
+      "clearTip": "删除这些条目上一次的查询结论，下一次扫描会重新向站点发请求",
+      "clearConfirm": "要清除当前范围内 {count} 组查询结果吗？下一次扫描会重新向站点发请求。",
+      "progress": "已查 {done} / {total}",
+      "current": "正在查：{site} · {name}",
+      "filterAll": "全部结论",
+      "counts": "查到 {has} · 相符未验 {suspect} · 未搜到 {none} · 查询失败 {failed}",
+      "status": {
+        "idle": "尚未扫描",
+        "preparing": "正在排查询计划",
+        "running": "扫描中",
+        "stopped": "已停止",
+        "done": "本轮已完成"
+      },
+      "col": {
+        "name": "本地种子",
+        "site": "站点",
+        "verdict": "结论",
+        "hit": "站上那条",
+        "at": "查询时间"
+      },
+      "verdict": {
+        "hasIt": "该站有这条",
+        "suspect": "标题相符，未验文件",
+        "noMatch": "未搜到相符条目",
+        "failed": "本次查询未成功"
+      },
+      "emptyScope": "该范围内没有可扫描的种子",
+      "noSite": "没有可用站点：请先在站点管理添加站点，或取消该站点的「已离线」",
+      "noDownloader": "列表里还没有种子，请先选择下载器",
+      "startFailed": "扫描未能发起"
     },
     "table": {
       "addedAt": "添加时间",

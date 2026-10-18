@@ -378,9 +378,53 @@
     },
     "stateFilterAll": "All",
     "reseedCandidate": {
-      "badge": "{pending} more sites",
-      "badgeTip": "This content is already on {covered} site(s). {pending} of your added sites don't carry it yet — whether those sites have published this torrent only shows up after a Reseed Detection search.",
-      "filterLabel": "Reseedable only ({count})"
+      "badge": "{pending} sites to check",
+      "badgeTip": "This content is already seeded on {covered} site(s); {pending} of your added sites don't carry it yet. Whether those sites have published this torrent can only be confirmed by checking each one — click this tag to open Reseed Scan.",
+      "filterLabel": "Pending check only ({count})"
+    },
+    "reseedScan": {
+      "title": "Reseed Scan",
+      "scope": {
+        "pending": "{count} pending",
+        "completed": "{count} completed",
+        "selected": "{count} selected"
+      },
+      "refreshAll": "Ignore previous results, re-check everything",
+      "plan": "This run queues {pairs} content × site checks ({items} torrents across {sites} sites, {skipped} skipped as checked within 7 days). Limit per run: {max}; {remaining} not queued.",
+      "start": "Start Scan",
+      "stop": "Stop",
+      "reload": "Refresh Progress",
+      "clear": "Clear Results",
+      "clearTip": "Delete the stored results for these torrents; the next scan sends new requests to the sites",
+      "clearConfirm": "Clear {count} stored results in the current range? The next scan will send new requests to the sites.",
+      "progress": "Checked {done} / {total}",
+      "current": "Checking: {site} · {name}",
+      "filterAll": "All results",
+      "counts": "Found {has} · Title match {suspect} · Not found {none} · Failed {failed}",
+      "status": {
+        "idle": "Not scanned yet",
+        "preparing": "Building the query plan",
+        "running": "Scanning",
+        "stopped": "Stopped",
+        "done": "Run finished"
+      },
+      "col": {
+        "name": "Local torrent",
+        "site": "Site",
+        "verdict": "Result",
+        "hit": "Match on site",
+        "at": "Checked at"
+      },
+      "verdict": {
+        "hasIt": "Published there",
+        "suspect": "Title matches, files unchecked",
+        "noMatch": "No matching entry found",
+        "failed": "Query failed"
+      },
+      "emptyScope": "No torrents to scan in this range",
+      "noSite": "No usable site: add sites in Site Management, or turn off Offline",
+      "noDownloader": "The list has no torrents yet; choose a downloader first",
+      "startFailed": "Could not start the scan"
     },
     "table": {
       "addedAt": "Added At",

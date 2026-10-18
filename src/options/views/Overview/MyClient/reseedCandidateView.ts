@@ -225,10 +225,15 @@ export function buildReseedScanScope(
  * 同一份内容在下载器里有几份副本时取**第一条报得出 infoHash 的**：它们内容相同，
  * 差别只在挂过哪个站 —— 而基准要的正是「数据在哪、有多少」，不是「它是哪一颗种子」。
  * 没下完的行照旧不进（与扫描范围同一条：数据不全不能拿去辅）。
+ *
+ * `labelOf` 按**这颗下载器**给要带的标签（口径在 `reseedHandoffLabelOf`，与手动那颗弹窗同一份）。
+ * 不传就是空串 —— 少带一个标签比凭空编一个安全，但**页面里必须传**：v0.110.1 之前这里没接，
+ * 一键辅种建出来的任务 `addTorrentOptions` 整个是缺的，推下去的种子一条标签都没有。
  */
 export function buildReseedLocalBases(
   rows: IReseedRow[],
   downloaderNames: Record<string, string | undefined>,
+  labelOf?: (downloaderId: string) => string,
 ): IReseedHandoffBase[] {
   const out = new Map<string, IReseedHandoffBase>();
   for (const row of rows) {
@@ -243,6 +248,7 @@ export function buildReseedLocalBases(
       hash: row.infoHash,
       name: row.name,
       savePath: row.savePath,
+      label: labelOf?.(row.clientId) ?? "",
     });
   }
   return [...out.values()];

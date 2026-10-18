@@ -11,7 +11,9 @@
  * - 「验证通过的全是基准本身 → 拒建」也不在这里：能进任务的只有结论是「该站有这条」的那些对子，
  *   而扫描的计划本来就**跳过**了已经挂在的那个站（`planReseedScan` 的 `knownSites` 那一档）；
  * - **重复任务**这一闸是真的要，所以直接复用现成那份 `findDuplicateTasks`，不自己另写一套比法。
- * 界面上那张弹窗该走的路没被绕过：想逐条挑目录/标签，仍然去搜索页那颗「辅种检测」。
+ * - 目录取基准实际所在目录（不猜），标签取 `reseedHandoffLabelOf` 那一份默认值 —— v0.110.2 之前这里
+ *   压根不写 `addTorrentOptions`，于是同一份内容走两条路建出来的任务，推下去的种子一个有标签一个没有。
+ * 界面上那张弹窗该走的路没被绕过：想**逐条**挑目录/标签，仍然去搜索页那颗「辅种检测」。
  */
 import { findDuplicateTasks } from "./reseedTaskDup.ts";
 import type { IKeepUploadTask, IKeepUploadTaskItem } from "./types/storages/keepUploadTask.ts";
@@ -28,6 +30,39 @@ export interface IReseedHandoffBase {
   name: string;
   /** 基准实际所在目录。任务目录取它，于是「目录不一致」那一种卡法从结构上不会出现 */
   savePath?: string;
+  /**
+   * 这一条要带给新副本的**种子标签**（任务页那格「种子标签」同一个字段）。
+   *
+   * 为什么必须由调用方折好传进来（而不是这里去读 store）：这一层不碰存储，判据才能在 Node 里断言。
+   * 取数口径照 `reseedHandoffLabelOf`，与手动那颗「辅种检测」弹窗的默认值同一份 ——
+   * 少写这一项时，同一份内容走两条路建出来的任务，推下去的种子一个有标签一个没有
+   * （用户 2026-10-18：「现在的一键辅种没有把标签带上，标签还是要有的」）。
+   */
+  label?: string;
+}
+
+/**
+ * 一键辅种那一批任务该打的标签，口径与手动弹窗的**默认值**一致（两处不许各说一套）：
+ * 勾了「记住上次下载器」且记住的那颗就是这一条基准所在的下载器时，用上次记下的标签；
+ * 否则用「默认下载服务器设置 → 标签」里那一栏。
+ *
+ * `remembered` 由调用方按 `configStore.download.saveLastDownloader` 决定传不传（弹窗那一步就是这么取的），
+ * 这里不再判那颗开关，免得同一道开关被读两遍、以后改档位时漏一处。
+ *
+ * 刻意**没有**沿用「基准那条种子自己在下载器里挂着的标签」：读回来的那一格与发送时的那一格
+ * 不是同一个概念（qBittorrent 发送时把 `label` 写进 `tags`，见 `packages/downloader/entity/qBittorrent.ts:558`，
+ * 而读列表时把 `category` 折成 `label`，同文件 `:674`）。照抄会把**分类**打成**标签**，
+ * 那是往用户数据上写一个原本不存在的东西，比少打一个标签更坏。
+ */
+export function reseedHandoffLabelOf(input: {
+  downloaderId: string;
+  remembered?: { downloaderId?: string; label?: string };
+  defaultTags?: string;
+}): string {
+  if (input.remembered?.downloaderId && input.remembered.downloaderId === input.downloaderId) {
+    return input.remembered.label || "";
+  }
+  return input.defaultTags || "";
 }
 
 /** 一条内容没能建出任务的原因 */
@@ -90,7 +125,8 @@ function toItem(siteId: string, site: NonNullable<IReseedScanResult["site"]>): I
  * 三条口径：
  * ① **一条内容 = 一个任务**，它在几个站上命中就几条 items（后台那套是按任务逐条发的，
  *    拆成 N 个任务会让同一份本地数据被 N 条任务各自当基准管）；
- * ② 基准 = 下载器里那一份，任务目录 = 它实际所在目录（见 `IReseedHandoffBase.savePath`）；
+ * ② 基准 = 下载器里那一份，任务目录 = 它实际所在目录（见 `IReseedHandoffBase.savePath`），
+ *    标签 = 它实际所在那颗下载器该打的那一份（见 `IReseedHandoffBase.label`）；
  * ③ 撞上已有任务的不建（只认 `sameItem` / `sameHash` 那两种硬证据 —— 标题+大小相同而站点条目不同
  *    是「同一份内容分两批站去辅」的正常形状，把它跳掉就违背了这一屏的用途）。
  */
@@ -146,6 +182,11 @@ export function planReseedHandoff(input: {
         downloaderId: base.downloaderId,
         savePath: base.savePath || undefined,
         clientName: base.downloaderName || base.downloaderId,
+        // 发送那一圈是 `...task.downloadOptions.addTorrentOptions` 原样铺开（`KeepUploadTask/autoReseed.ts`
+        // 的 `buildReseedAddTorrentOptions`），这里不写就等于推下去的种子什么标签都没有。
+        // 只在真有标签时写这一项：空串会被下载器当成一次「把标签清空」的指令，而空对象 `{}`
+        // 落进任务里与「压根没有」在界面上看不出区别，存量任务恰好都没有这一项。
+        ...(base.label ? { addTorrentOptions: { label: base.label } } : {}),
       },
       // 建完就交给后台那一路（判据在 `KeepUploadTask/autoReseed.ts`）。显式写值，不留 undefined：
       // 任务页与后台判的都是 `=== true`

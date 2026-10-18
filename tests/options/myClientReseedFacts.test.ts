@@ -118,7 +118,18 @@ describe("一键辅种的基准来源（buildReseedLocalBases）", () => {
     const scope = buildReseedScanScope(rows, hostSiteEntries, []);
     const bases = buildReseedLocalBases(rows, { qb1: "家里的 qB" });
     expect(bases.map((base) => base.contentKey)).toEqual(scope.map((item) => item.contentKey));
-    expect(bases[0]).toEqual({ contentKey: scope[0].contentKey, downloaderId: "qb1", downloaderName: "家里的 qB", hash: "aaaa", name: "Some.Movie.2024.1080p", savePath: "/data/movies" });
+    expect(bases[0]).toEqual({ contentKey: scope[0].contentKey, downloaderId: "qb1", downloaderName: "家里的 qB", hash: "aaaa", name: "Some.Movie.2024.1080p", savePath: "/data/movies", label: "" });
+  });
+
+  it("标签按**这条基准所在那颗下载器**现折并带进基准（不传第三参就是空串，不是漏字段）", () => {
+    const rows: IReseedRow[] = [
+      { key: "k1", clientId: "qb1", name: "A", totalSize: 1, savePath: "/a", infoHash: "h1", completed: true },
+      { key: "k2", clientId: "tr1", name: "B", totalSize: 2, savePath: "/b", infoHash: "h2", completed: true },
+    ];
+    const labels: Record<string, string> = { qb1: "qb 的标签", tr1: "tr 的标签" };
+    const bases = buildReseedLocalBases(rows, {}, (id) => labels[id] ?? "");
+    expect(bases.map((base) => base.label)).toEqual(["qb 的标签", "tr 的标签"]);
+    expect(buildReseedLocalBases(rows, {})[0].label).toBe("");
   });
 
   it("没下完的那份不进基准清单（与扫描范围同一条：数据不全不能拿去辅）", () => {

@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { handoffBlocksOf, planReseedHandoff, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
+import { handoffBlocksOf, planReseedHandoff, reseedHandoffLabelOf, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
 import { findDuplicateTasks } from "@/shared/reseedTaskDup.ts";
 import type { IKeepUploadTask, IKeepUploadTaskItem } from "@/shared/types/storages/keepUploadTask.ts";
 import type { IReseedScanResult, TReseedScanVerdict } from "@/shared/types/storages/reseedScan.ts";
@@ -237,5 +237,72 @@ describe("handoffBlocksOf：点不动时要能点名是哪一类", () => {
       { reason: "legacy", count: 1 },
       { reason: "no-base", count: 1 },
     ]);
+  });
+});
+
+/**
+ * 标签这一族坏了不报错：任务照样建、种子照样推，只是落到下载器里一条标签都没有，
+ * 而他正是靠标签在客户端里筛这批的（用户 2026-10-18：「现在的一键辅种没有把标签带上，标签还是要有的」）。
+ */
+describe("一键辅种的任务要带上标签", () => {
+  it("基准折出标签 → 任务的 addTorrentOptions.label 就是它", () => {
+    const out = plan([hit("siteA")], { bases: [{ ...base, label: "电影" }] });
+    expect(out.tasks[0].downloadOptions.addTorrentOptions?.label).toBe("电影");
+  });
+
+  it("拿不到标签时这一项整个不写：空串会被当成一次「清空标签」的指令，而 `{}` 与「没有」在任务页看不出来", () => {
+    const out = plan([hit("siteA")]);
+    expect(out.tasks[0].downloadOptions.addTorrentOptions).toBeUndefined();
+  });
+
+  it("同一批里各条按**自己那颗下载器**取标签，第一条不许盖住后面的", () => {
+    const otherKey = "other|1";
+    const out = planReseedHandoff({
+      results: [hit("siteA"), { ...hit("siteB"), contentKey: otherKey, id: `${otherKey}\u0000siteB` }],
+      targets: [...targets, { contentKey: otherKey, name: "Other" }],
+      bases: [
+        { ...base, label: "qb 的标签" },
+        { ...base, contentKey: otherKey, downloaderId: "tr1", hash: "OTHERHASH", name: "Other", label: "tr 的标签" },
+      ],
+      existingTasks: [],
+      makeId: fixedIds,
+      now: 1000,
+    });
+    expect(out.tasks.map((task) => task.downloadOptions.addTorrentOptions?.label)).toEqual(["qb 的标签", "tr 的标签"]);
+  });
+});
+
+/** 两条路（手动弹窗 / 一键）共用这一份默认值口径，所以它单独钉一遍 */
+describe("reseedHandoffLabelOf：记住的上次 → 否则默认标签", () => {
+  it("记住的那颗下载器正是这一条所在的 → 用上次记下的标签", () => {
+    const got = reseedHandoffLabelOf({
+      downloaderId: "qb1",
+      remembered: { downloaderId: "qb1", label: "上次挑的" },
+      defaultTags: "默认",
+    });
+    expect(got).toBe("上次挑的");
+  });
+
+  it("记住的是别的下载器 → 退回默认标签（不把别处挑的那一枚盖到这一条上）", () => {
+    const got = reseedHandoffLabelOf({
+      downloaderId: "qb1",
+      remembered: { downloaderId: "tr1", label: "上次挑的" },
+      defaultTags: "默认",
+    });
+    expect(got).toBe("默认");
+  });
+
+  it("没勾「记住上次」时不传 remembered → 用默认标签；两样都没配 → 空串", () => {
+    expect(reseedHandoffLabelOf({ downloaderId: "qb1", defaultTags: "默认" })).toBe("默认");
+    expect(reseedHandoffLabelOf({ downloaderId: "qb1" })).toBe("");
+  });
+
+  it("记住的标签本身是空的 → 照空，不拿默认去补（弹窗那一步就是这么取的）", () => {
+    const got = reseedHandoffLabelOf({
+      downloaderId: "qb1",
+      remembered: { downloaderId: "qb1", label: "" },
+      defaultTags: "默认",
+    });
+    expect(got).toBe("");
   });
 });

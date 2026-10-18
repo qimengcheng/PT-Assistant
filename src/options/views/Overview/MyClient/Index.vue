@@ -42,6 +42,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import { buildSortOrderMap, makeSorter, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import type { IReseedScanResult } from "@/shared/types/storages/reseedScan.ts";
+import { reseedHandoffLabelOf } from "@/shared/reseedScanHandoff.ts";
 import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
@@ -440,13 +441,20 @@ const reseedScanItems = computed(() => buildReseedScanScope(reseedRows.value, ho
 /**
  * 一键辅种时的基准来源：同一份 `reseedRows` 按**与上面同一个内容键**折一遍，
  * 于是「扫描说查到了」与「一键说找不到基准」不会各说一套。
+ *
+ * 标签按**这颗基准所在下载器**现算（口径 `reseedHandoffLabelOf`，与搜索页那颗「辅种检测」弹窗的
+ * 默认值同一份）：那一屏的下载器是按内容各定的，不能拿「当前选中的下载器」去套。
  */
-const reseedLocalBases = computed(() =>
-  buildReseedLocalBases(
+const reseedLocalBases = computed(() => {
+  // 「记住上次下载器」那颗开关关着时不传 remembered（与弹窗那一步的取法一致，一道开关只读一遍）
+  const remembered = configStore.download.saveLastDownloader ? metadataStore.lastKeepUpload : undefined;
+  const defaultTags = metadataStore.defaultDownloader?.tags;
+  return buildReseedLocalBases(
     reseedRows.value,
     Object.fromEntries(Object.entries(metadataStore.downloaders).map(([id, item]) => [id, item?.name])),
-  ),
-);
+    (downloaderId) => reseedHandoffLabelOf({ downloaderId, remembered, defaultTags }),
+  );
+});
 
 /** 「还差站点」的那几条的行键：判据就是标记那一条，这里不另判一套 */
 const pendingRowKeys = computed(

@@ -39,8 +39,19 @@ function entry(patch: Partial<ILocalTorrentFingerprintEntry> & Pick<ILocalTorren
   } as ILocalTorrentFingerprintEntry;
 }
 
-function result(siteId: string, at: number, verdict: IReseedScanResult["verdict"] = "no-match"): IReseedScanResult {
-  return { id: reseedScanResultId("k", siteId), contentKey: "k", siteId, verdict, at };
+function result(siteId: string, at: number, verdict: IReseedScanResult["verdict"] = "no-match", withSite = true): IReseedScanResult {
+  const out: IReseedScanResult = { id: reseedScanResultId("k", siteId), contentKey: "k", siteId, verdict, at };
+  // v0.109.0 起「该站有这条」/「标题相符」带着可发送的那一半；`withSite: false` 复现老记录的形状
+  if (withSite && (verdict === "has-it" || verdict === "suspect")) {
+    out.site = {
+      id: `t-${siteId}`,
+      title: `Movie 2024 on ${siteId}`,
+      url: `https://${siteId}/details.php?id=t-${siteId}`,
+      link: `https://${siteId}/download.php?id=t-${siteId}`,
+      size: SIZE,
+    };
+  }
+  return out;
 }
 
 describe("reseedScanKeywords：最多两档，且不烧重复的请求", () => {
@@ -97,6 +108,16 @@ describe("planReseedScan：哪几对要发出去", () => {
     expect(plan.pairs.map((pair) => pair.siteId)).toEqual(["siteC"]);
   });
 
+  it("缓存里那条「该站有这条」是升级之前的形状（没存可发送的那一半）⇒ 重新排进计划", () => {
+    const now = 1_000_000_000_000;
+    const cache = new Map([
+      [reseedScanResultId(reseedScanContentKey("Movie 2024", SIZE), "siteB"), result("siteB", now - 1000, "has-it", false)],
+    ]);
+    const plan = planReseedScan({ targets: [target({ name: "Movie 2024" })], usableSites: ["siteB"], cache, now });
+    expect(plan.cached).toBe(0);
+    expect(plan.pairs.map((pair) => pair.siteId)).toEqual(["siteB"]);
+  });
+
   it("一条都没添加可用站点 → 空计划，不是一堆失败", () => {
     const plan = planReseedScan({ targets: [target({ name: "Movie 2024" })], usableSites: [], cache: new Map() });
     expect(plan.pairs).toEqual([]);
@@ -142,6 +163,15 @@ describe("isReseedScanFresh", () => {
     const minute = 60 * 1000;
     expect(isReseedScanFresh(result("siteA", at, "failed"), at + 29 * minute, 7 * 24 * 60 * minute)).toBe(true);
     expect(isReseedScanFresh(result("siteA", at, "failed"), at + 31 * minute, 7 * 24 * 60 * minute)).toBe(false);
+  });
+
+  it("「该站有这条」没存可发送的那一半（升级之前查的）⇒ 不算新鲜，否则一键辅种会被冻成点不动", () => {
+    const at = 1_000_000_000_000;
+    const day = 24 * 60 * 60 * 1000;
+    expect(isReseedScanFresh(result("siteA", at, "has-it", false), at + day, 7 * day)).toBe(false);
+    expect(isReseedScanFresh(result("siteA", at, "suspect", false), at + day, 7 * day)).toBe(false);
+    // 同一时刻、同一档结论，带着那一半的仍然按七天算新鲜（不许把重查变成每轮都重查）
+    expect(isReseedScanFresh(result("siteA", at, "has-it"), at + day, 7 * day)).toBe(true);
   });
 
   it("调用方给的更短 ttl 对 failed 仍然有效（只许收紧，不许放宽）", () => {

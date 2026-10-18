@@ -72,9 +72,14 @@ export function reseedScanResultId(contentKey: string, siteId: string): string {
  * `failed` 那一档单独用一条短得多的间隔（`RESEED_SCAN_FAILED_RETRY_MS`）：它没有产出任何结论，
  * 拿七天那份新鲜期冻住 = 一个站今天坏了，这批条目在它那儿七天都不会再被问一次。
  * 调用方给的 `ttlMs` 只用来**收紧**（取 min），不许把它放宽成比七天更长。
+ *
+ * 另外两档「该站有这条」/「标题相符」**必须带着可发送的那一半才算新鲜**：v0.109.0 之前的记录
+ * 只存了标题与大小，拿它建不出任务（缺站点条目号与下载链接）。判成新鲜就会留下一屏查得到、
+ * 却点不动的「一键辅种」—— 让它不新鲜，下一次扫描就自动重查那几对、把缺的那半补上。
  */
 export function isReseedScanFresh(result: IReseedScanResult | undefined, now: number, ttlMs = RESEED_SCAN_TTL_MS): boolean {
   if (!result) return false;
+  if ((result.verdict === "has-it" || result.verdict === "suspect") && !result.site?.title) return false;
   const limit = result.verdict === "failed" ? Math.min(ttlMs, RESEED_SCAN_FAILED_RETRY_MS) : ttlMs;
   return now - result.at < limit;
 }

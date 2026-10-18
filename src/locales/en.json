@@ -429,8 +429,15 @@
       "reseedTip": "Creates one reseed task per title whose verdict is \"Published there\": the base is the completed copy already in your downloader, and the save path is the folder that copy actually lives in. New tasks are then handed to the background auto-reseed. Entries reading \"Title matches, files unchecked\" are not included.",
       "reseedConfirm": "This creates {count} reseed task(s) covering {sites} site entries and hands them to the background auto-reseed. Continue?",
       "reseedDone": "Created {count} reseed task(s); the background will send them in turn.",
-      "reseedSkipped": "{dup} were already covered by existing tasks, and {noBase} had no completed local base, so no task was created for them.",
-      "reseedFailed": "Failed to create the reseed tasks"
+      "reseedSkipDup": "Another {count} contents were already covered by existing reseed tasks, so nothing was created again.",
+      "reseedSkipNoBase": "Another {count} contents had no completed copy in the downloader, so no task was created.",
+      "reseedFailed": "Failed to create the reseed tasks",
+      "reseedWhy": {
+        "noHit": "No entry reads \"Published there\" in this round, so there is nothing to reseed.",
+        "legacy": "{count} contents were found by an earlier build, which did not store the sendable half (site entry id and download link). Press \"Start Scan\" to re-check them, then reseed.",
+        "noBase": "{count} contents have no completed copy in the downloader (deleted or still downloading), so there is no torrent to use as the base.",
+        "duplicated": "{count} contents are already covered by existing reseed tasks, so nothing was created again."
+      }
     },
     "table": {
       "addedAt": "Added At",

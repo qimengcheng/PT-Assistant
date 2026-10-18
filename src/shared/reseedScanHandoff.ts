@@ -167,3 +167,45 @@ export function planReseedHandoff(input: {
 
   return { tasks, duplicated, skipped };
 }
+
+/** 一键辅种点不动时的几种原因。每一种都得给一句人话，不许留一颗灰着什么都不说的键 */
+export type TReseedHandoffBlock =
+  /** 这一轮压根还没有「该站有这条」的结论 */
+  | "no-hit"
+  /** 结论是本次之前那次扫描留下的，没存可发送的那一半 */
+  | "legacy"
+  /** 下载器里找不到已下完的那一份，没有基准 */
+  | "no-base"
+  /** 已有任务在管同一颗种子 */
+  | "duplicated";
+
+export interface IReseedHandoffBlock {
+  reason: TReseedHandoffBlock;
+  count: number;
+}
+
+/**
+ * 一条键为什么是 (0)：把计划里那三类「没建成」拆成可点名的几档。
+ *
+ * 判据住在这一份而不是那个 `.vue` 里，为的是「灰键到底为什么灰」这件事能被断言 ——
+ * 用户 2026-10-18 报的正是这个：屏幕上 23 条「该站有这条」，那颗键却是 (0) 且点不动，
+ * 而原因（老记录没存可发送的那一半）只有读源码的人才知道。
+ * 有任务可建时返回空表：那时候不需要解释。
+ */
+export function handoffBlocksOf(
+  plan: Pick<IReseedHandoffPlan, "tasks" | "duplicated" | "skipped">,
+  hasItCount: number,
+): IReseedHandoffBlock[] {
+  if (plan.tasks.length > 0) return [];
+  const countOf = (reason: TReseedHandoffSkip) => plan.skipped.filter((item) => item.reason === reason).length;
+
+  const out: IReseedHandoffBlock[] = [];
+  const legacy = countOf("no-site-ref");
+  const noBase = countOf("no-base");
+  if (legacy) out.push({ reason: "legacy", count: legacy });
+  if (noBase) out.push({ reason: "no-base", count: noBase });
+  if (plan.duplicated.length) out.push({ reason: "duplicated", count: plan.duplicated.length });
+  // 三类都没有、键却还是 0 ⇒ 唯一剩下的解释就是「这一轮没有命中的结论」
+  if (out.length === 0) out.push({ reason: "no-hit", count: hasItCount });
+  return out;
+}

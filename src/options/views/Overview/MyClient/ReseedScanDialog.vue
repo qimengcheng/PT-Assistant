@@ -22,7 +22,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import HoverTip from "@/options/components/HoverTip.vue";
 import { planReseedScan } from "@/shared/reseedScanPlan.ts";
-import { planReseedHandoff, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
+import { planReseedHandoff, handoffBlocksOf, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import {
   RESEED_SCAN_MAX_PAIRS,
@@ -300,6 +300,24 @@ const handoff = computed(() => {
   });
 });
 
+/**
+ * 那颗键点不动时，把原因写在按钮下面那一行。
+ *
+ * 不能只写进悬停提示：`<button disabled>` 不发鼠标事件，灰着的时候那层浮层根本不出来
+ * —— 用户 2026-10-18 报的就是这个（屏上 23 条「该站有这条」，键却是 (0)）。
+ */
+const handoffWhy = computed(() =>
+  handoffBlocksOf(handoff.value, verdictCounts.value["has-it"])
+    .map((block) => {
+      // 四个键全部写成字面量：动态拼出来的那条防线③看不见（AGENTS §3.4 同一族）
+      if (block.reason === "no-hit") return t("MyClient.reseedScan.reseedWhy.noHit");
+      if (block.reason === "legacy") return t("MyClient.reseedScan.reseedWhy.legacy", { count: block.count });
+      if (block.reason === "no-base") return t("MyClient.reseedScan.reseedWhy.noBase", { count: block.count });
+      return t("MyClient.reseedScan.reseedWhy.duplicated", { count: block.count });
+    })
+    .join(" "),
+);
+
 async function loadExistingTasks() {
   // 拿不到就当没有重复：不能把「查不了」变成「建不了」（与弹窗那条同一口径）
   existingTasks.value = await sendMessage("getKeepUploadTasks", undefined).catch(() => [] as IKeepUploadTask[]);
@@ -327,11 +345,14 @@ async function reseedNow() {
     if (created > 0) void sendMessage("runAutoReseedTick", undefined).catch(() => {});
     await loadExistingTasks();
     const { duplicated, skipped } = handoff.value;
+    const noBase = skipped.filter((item) => item.reason === "no-base").length;
+    const legacy = skipped.filter((item) => item.reason === "no-site-ref").length;
+    // 每一类各一句、且只在真有的时候说：一句「另有 0 条…」看着像坏了，
+    // 把两类并成一句报数更会把「老记录没存下那一半」说成「下载器里找不到基准」
     const parts = [t("MyClient.reseedScan.reseedDone", { count: created })];
-    // 跳过的那两类只在真有的时候说：一句「另有 0 条…」看着像坏了
-    if (duplicated.length + skipped.length > 0) {
-      parts.push(t("MyClient.reseedScan.reseedSkipped", { dup: duplicated.length, noBase: skipped.length }));
-    }
+    if (duplicated.length) parts.push(t("MyClient.reseedScan.reseedSkipDup", { count: duplicated.length }));
+    if (noBase) parts.push(t("MyClient.reseedScan.reseedSkipNoBase", { count: noBase }));
+    if (legacy) parts.push(t("MyClient.reseedScan.reseedWhy.legacy", { count: legacy }));
     runtimeStore.showSnakebar(parts.join(""), { color: created > 0 ? "success" : "warning" });
   } catch (error) {
     runtimeStore.showSnakebar(
@@ -415,6 +436,8 @@ onUnmounted(stopPolling);
             {{ t("MyClient.reseedScan.clear") }}
           </a-button>
         </HoverTip>
+        <!-- 点不动的原因写在按钮下面（灰键悬停不出浮层，见 handoffWhy 那条注释） -->
+        <span v-if="handoffWhy" class="reseed-scan__hint text-grey">{{ handoffWhy }}</span>
       </div>
 
       <div class="reseed-scan__progress">
@@ -538,6 +561,11 @@ onUnmounted(stopPolling);
 
 .reseed-scan__counts {
   font-size: 13px;
+}
+
+.reseed-scan__hint {
+  /* 按钮那一排里换到第二行：这一句是「为什么那颗键是 (0)」，跟在按钮后面会被当成按钮的一部分 */
+  flex: 1 0 100%;
 }
 
 .reseed-scan__tag {

@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { planReseedHandoff, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
+import { handoffBlocksOf, planReseedHandoff, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
 import { findDuplicateTasks } from "@/shared/reseedTaskDup.ts";
 import type { IKeepUploadTask, IKeepUploadTaskItem } from "@/shared/types/storages/keepUploadTask.ts";
 import type { IReseedScanResult, TReseedScanVerdict } from "@/shared/types/storages/reseedScan.ts";
@@ -47,6 +47,26 @@ const base: IReseedHandoffBase = {
 
 const targets = [{ contentKey: KEY, name: "Movie.2024.1080p" }];
 const fixedIds = (contentKey: string, index: number) => `task-${index}`;
+
+/**
+ * 场上一条已有的辅种任务。`title` 是**任务级**标题：`findDuplicateTasks` 那一档软证据比的是
+ * `task.title` 与 `task.size`，不是 item 的标题。第一版夹具只改了 item 标题，于是
+ * `sameTitleSize` 从头到尾没命中过，「把最软那一档也当成重复」这种改法抓不住
+ * （反证报「改坏了却全绿」才暴露）。
+ */
+function existing(items: IKeepUploadTask["items"], title = "Whatever"): IKeepUploadTask[] {
+  return [
+    {
+      id: "old",
+      time: 1,
+      title,
+      size: 8_000_000_000,
+      downloadOptions: { downloaderId: "qb1" },
+      autoReseed: false,
+      items,
+    },
+  ];
+}
 
 function plan(results: IReseedScanResult[], extra: Partial<Parameters<typeof planReseedHandoff>[0]> = {}) {
   return planReseedHandoff({
@@ -119,25 +139,6 @@ describe("搬进任务的那一条，字段口径要和「辅种检测」建出�
 });
 
 describe("重复闸只认硬证据", () => {
-  /**
-   * `title` 是**任务级**标题：`findDuplicateTasks` 那一档软证据比的是 `task.title` 与 `task.size`，
-   * 不是 item 的标题。第一版夹具只改了 item 标题，于是 `sameTitleSize` 从头到尾没命中过，
-   * 「把最软那一档也当成重复」这种改法抓不住（反证报「改坏了却全绿」才暴露）。
-   */
-  function existing(items: IKeepUploadTask["items"], title = "Whatever"): IKeepUploadTask[] {
-    return [
-      {
-        id: "old",
-        time: 1,
-        title,
-        size: 8_000_000_000,
-        downloadOptions: { downloaderId: "qb1" },
-        autoReseed: false,
-        items,
-      },
-    ];
-  }
-
   it("同一颗站点种子已被别的任务管着 → 不重复建，按内容报数", () => {
     const out = plan([hit("siteA")], { existingTasks: existing([{ site: "siteA", title: "旧任务里那条", link: "https://siteA/details.php?id=tsiteA", url: "", size: 8e9 }]) });
     expect(out.tasks).toEqual([]);
@@ -173,5 +174,68 @@ describe("重复闸只认硬证据", () => {
     });
     expect(out.tasks).toHaveLength(1);
     expect(out.duplicated).toEqual([otherKey]);
+  });
+});
+
+/**
+ * 那颗键为什么是 (0)（用户 2026-10-18 报的正是这个：屏上 23 条「该站有这条」，键却点不动）。
+ *
+ * 灰着的 `<button>` 不发鼠标事件 ⇒ 悬停浮层在这条路上是空的，原因只能写成屏幕上的一行字。
+ * 这一份判据住在 shared 里，为的就是那句原因**说得出口也被断得住**。
+ */
+describe("handoffBlocksOf：点不动时要能点名是哪一类", () => {
+  it("有任务可建 → 不解释", () => {
+    expect(handoffBlocksOf(plan([hit("siteA")]), 1)).toEqual([]);
+  });
+
+  it("升级之前查的那批（没存可发送的那一半）→ legacy，条数按**内容**报（一条内容 = 一个任务）", () => {
+    const otherKey = "other|1";
+    const a = hit("siteA");
+    delete a.site;
+    const b = { ...hit("siteB"), contentKey: otherKey, id: `${otherKey}\u0000siteB` };
+    delete b.site;
+    const out = planReseedHandoff({
+      results: [a, b],
+      targets: [...targets, { contentKey: otherKey, name: "Other" }],
+      bases: [base, { ...base, contentKey: otherKey }],
+      existingTasks: [],
+      makeId: fixedIds,
+      now: 1000,
+    });
+    expect(handoffBlocksOf(out, 2)).toEqual([{ reason: "legacy", count: 2 }]);
+  });
+
+  it("下载器里没有已下完的那一份 → no-base", () => {
+    expect(handoffBlocksOf(plan([hit("siteA")], { bases: [] }), 1)).toEqual([{ reason: "no-base", count: 1 }]);
+  });
+
+  it("已被现有任务管着 → duplicated", () => {
+    const out = plan([hit("siteA")], {
+      existingTasks: existing([{ site: "siteA", title: "旧", link: "https://siteA/details.php?id=tsiteA", url: "", size: 8e9 }]),
+    });
+    expect(handoffBlocksOf(out, 1)).toEqual([{ reason: "duplicated", count: 1 }]);
+  });
+
+  it("三类都没有、也没有命中的结论 → no-hit（这一档说的是「还没查」，不是「查了没有」）", () => {
+    expect(handoffBlocksOf(plan([]), 0)).toEqual([{ reason: "no-hit", count: 0 }]);
+  });
+
+  it("混着来的那一批：每一档各报自己的数，不许只报第一条", () => {
+    const legacy = hit("siteA");
+    delete legacy.site;
+    const otherKey = "other|1";
+    const noBase = { ...hit("siteB"), contentKey: otherKey, id: `${otherKey}\u0000siteB` };
+    const out = planReseedHandoff({
+      results: [legacy, noBase],
+      targets: [...targets, { contentKey: otherKey, name: "Other" }],
+      bases: [base],
+      existingTasks: [],
+      makeId: fixedIds,
+      now: 1000,
+    });
+    expect(handoffBlocksOf(out, 2)).toEqual([
+      { reason: "legacy", count: 1 },
+      { reason: "no-base", count: 1 },
+    ]);
   });
 });

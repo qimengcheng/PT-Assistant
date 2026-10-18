@@ -330,7 +330,9 @@ async function reseedNow() {
   const ok = await confirmDanger(
     t("MyClient.reseedScan.reseedConfirm", { count: tasks.length, sites }),
     "primary",
-    t("MyClient.reseedScan.reseed"),
+    // 那一份文案与背景按钮共用（同一个动作，两处数字不许各说一套），所以 count 必须传：
+    // 不传时 vue-i18n 把 `{count}` 插成空串，界面上就是「一键辅种（）」（用户 2026-10-18 报的）
+    t("MyClient.reseedScan.reseed", { count: tasks.length }),
   );
   if (!ok) return;
 

@@ -16,6 +16,7 @@ import {
   type IReseedRow,
 } from "@/options/views/Overview/MyClient/reseedCandidateView.ts";
 import { reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
+import type { IReseedScanResult, TReseedScanVerdict } from "@/shared/types/storages/reseedScan.ts";
 
 const hostSiteEntries: [string, string][] = [
   ["pandapt.net", "pandapt"],
@@ -134,6 +135,99 @@ describe("一键辅种的基准来源（buildReseedLocalBases）", () => {
     const bases = buildReseedLocalBases(rows, {});
     expect(bases).toHaveLength(1);
     expect(bases[0]).toMatchObject({ hash: "h2", savePath: "/b", downloaderId: "qb1" });
+  });
+});
+
+/**
+ * 扫描结论 → 行上那枚标记（v0.109.8）。
+ *
+ * 用户 2026-10-18：「已经查过的在下载器里要标记出来，不再显示有多少站待查了」。
+ * 这一族钉的是**拼法**而不是判据（判据在 `tests/shared/reseedCandidate.test.ts`）：
+ * ① 结论按**整组副本**的内容键并起来 —— 同一份内容在下载器里标题写法不一致时各有 contentKey，
+ *   只看其中一行就会「一半查过、仍报待查」，而那正是这一档要撤掉的东西；
+ * ② 新鲜期沿用扫描那侧同一个判据（`isReseedScanFresh`）：过期的结论下一轮会被重查，
+ *   这时候还标「已查」就是替人把门关上；`failed` 那一档只有 30 分钟；
+ * ③ 不传扫描事实时判据与 v0.109.7 一字不差（结论还没读到 ≠ 已经查过）。
+ */
+describe("扫描结论要盖掉待查数", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = 1_800_000_000_000;
+
+  /** 造一条结论：`has-it` 那两档必须带 `site.title`，否则判据按「老记录」判它不新鲜 */
+  function result(contentKey: string, siteId: string, verdict: TReseedScanVerdict, at = now - 60_000): IReseedScanResult {
+    return {
+      id: `${contentKey}\u0000${siteId}`,
+      contentKey,
+      siteId,
+      verdict,
+      at,
+      ...((verdict === "has-it" || verdict === "suspect") && { site: { title: "站上那条", url: "https://x/t", link: "https://x/d", size: 8e9 } }),
+    } as IReseedScanResult;
+  }
+
+  /**
+   * 同一份内容的两条副本：标题、大小、下载器、路径全不一样（⇒ **各有自己的内容键**），
+   * 只有一条辅种台账能把它们并成一组 —— 上面第 51 行那条用例立的形状。
+   * 为什么非要这样造：并组这一层只有「同组内内容键不止一个」时才看得出来，
+   * 用同名同大小的两条副本，两条算式（并组 / 并内容键）会退化成同一件事，断言就空转了。
+   */
+  function twinRows(): IReseedRow[] {
+    return [
+      { key: "r1", clientId: "qb1", name: "Some.Movie.2024.1080p", totalSize: 1e9, savePath: "/a", infoHash: "hash1", tracker: "https://tracker.pandapt.net/announce", completed: true },
+      { key: "r2", clientId: "tr1", name: "Some Movie (2024) 1080p", totalSize: 2e9, savePath: "/b", infoHash: "hash2", tracker: "https://novahd.top/announce", completed: true },
+    ];
+  }
+  /** 把上面那两条并成一组的那条台账（`pandapt` + `novahd` 已挂，`mteam` 是唯一的待查格） */
+  const twinTasks = [{ id: 7, items: [{ hash: "HASH1" }, { hash: "hash2" }] }];
+
+  const keyOf = (row: IReseedRow) => reseedScanContentKey(row.name, Math.round(row.totalSize ?? 0));
+  const stillPending = { kind: "candidate", pending: 1, covered: 2 };
+
+  it("结论只记在其中一条副本的内容键上 → 并组之后两行都报「已查」", () => {
+    const rows = twinRows();
+    const facts = buildReseedFacts(rows, hostSiteEntries, usable, twinTasks, { results: [result(keyOf(rows[0]!), "mteam", "no-match")], now });
+    const scanned = { kind: "scanned", scanned: 1, covered: 2, tally: { hasIt: 0, suspect: 0, noMatch: 1, failed: 0 } };
+    expect(facts.get("r1")).toEqual(scanned);
+    // 第二条副本自己的内容键上压根没有这条结论 —— 不并组它就会继续报「待查 1 站」
+    expect(facts.get("r2")).toEqual(scanned);
+  });
+
+  it("结论落在两个内容键之外 → 两行都退回待查（上一条不是靠「怎么都算已查」蒙过去的）", () => {
+    const rows = twinRows();
+    const facts = buildReseedFacts(rows, hostSiteEntries, usable, twinTasks, { results: [result("别的键", "mteam", "no-match")], now });
+    expect(facts.get("r1")).toEqual(stillPending);
+    expect(facts.get("r2")).toEqual(stillPending);
+  });
+
+  it("结论过了七天就不再算查过：标记要退回「待查」，让人有机会重查", () => {
+    const rows = twinRows();
+    const stale = [result(keyOf(rows[0]!), "mteam", "no-match", now - 8 * DAY), result(keyOf(rows[1]!), "mteam", "no-match", now - 8 * DAY)];
+    expect(buildReseedFacts(rows, hostSiteEntries, usable, twinTasks, { results: stale, now }).get("r1")).toEqual(stillPending);
+  });
+
+  it("「这次没查成」只压 30 分钟：八小时前的失败要重新变成待查", () => {
+    const rows = twinRows();
+    const longAgo = rows.map((row) => result(keyOf(row), "mteam", "failed", now - 8 * 60 * 60 * 1000));
+    expect(buildReseedFacts(rows, hostSiteEntries, usable, twinTasks, { results: longAgo, now }).get("r1")).toEqual(stillPending);
+    // 对照：同一条失败放在 10 分钟前，就确实算「查过了」—— 且**记在 failed 那一档**，
+    // 不许被折进「没搜到」（把「这次没查成」说成「那个站没有」是假阴性，见 reseedScanPlan 文件头）
+    const fresh = rows.map((row) => result(keyOf(row), "mteam", "failed", now - 10 * 60 * 1000));
+    expect(buildReseedFacts(rows, hostSiteEntries, usable, twinTasks, { results: fresh, now }).get("r1")).toEqual({
+      kind: "scanned",
+      scanned: 1,
+      covered: 2,
+      tally: { hasIt: 0, suspect: 0, noMatch: 0, failed: 1 },
+    });
+  });
+
+  it("升级之前那批查到的记录（没存可发送的那一半）不算查过 —— 与「一键辅种」那条同一口径", () => {
+    const rows = twinRows();
+    const legacy = rows.map((row) => ({ ...result(keyOf(row), "mteam", "has-it"), site: undefined }));
+    expect(buildReseedFacts(rows, hostSiteEntries, usable, twinTasks, { results: legacy, now }).get("r1")).toEqual(stillPending);
+  });
+
+  it("不传扫描事实时与 v0.109.7 一字不差（结论没读到不许把人挡在门外）", () => {
+    expect(buildReseedFacts(twinRows(), hostSiteEntries, usable, twinTasks).get("r1")).toEqual(stillPending);
   });
 });
 

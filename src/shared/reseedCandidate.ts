@@ -16,11 +16,32 @@
  * 而那 N 个站上到底**有没有发布过**这条种子，只有逐站搜过才知道 —— 辅种流程本来就是
  * 先在搜索页把各站的同一条搜出来，才能建任务。所以这个数回答的是「值不值得去搜」，
  * 不是「这 N 个站点了就能成」。
+ *
+ * ## 「查过了」要盖掉「待查」（v0.109.8）
+ *
+ * 上面那段话在有了「可辅种扫描」之后只说对一半：那 N 个站里，有些已经真发过请求、
+ * 结论就躺在结果表里。这时候界面对一条查完的种子还说「待查 20 站」，是把已经做完的事
+ * 又摆回人面前（用户 2026-10-18：「已经查过的在下载器里要标记出来，不再显示有多少站待查了」）。
+ * 所以 `scannedSites` 参与判据，**缺口只数还没查过的那些站**；一个都不剩时改出 `scanned` 那一档。
+ *
+ * `scanned` 档为什么还要带四档计数：「查过了」不等于「那个站没有」。把 `failed`
+ * （要登录 / 超时 / 解析歪了）折进「没有」，人就再也不去那个站辅了 —— 那是假阴性，
+ * 与 `reseedScanPlan.ts` 文件头「四档不许并成两档」是同一条纪律。
  */
 
+/** 一条内容在各站上查到的结论分布。四档分开数，界面要哪个都从这里取 */
+export interface IReseedScanTally {
+  hasIt: number;
+  suspect: number;
+  noMatch: number;
+  failed: number;
+}
+
 export type TReseedCandidateVerdict =
-  /** 值得辅：内容完整，且还有站点没挂上这份内容 */
+  /** 值得辅：内容完整，且还有**没查过**的站点没挂上这份内容 */
   | { kind: "candidate"; pending: number; covered: number }
+  /** 没挂上的站点已经全部逐站查过一遍：界面上改标「已查」，不再报待查数 */
+  | { kind: "scanned"; scanned: number; covered: number; tally: IReseedScanTally }
   /** 添加的站点已经全挂上了这份内容（没有可辅的目标） */
   | { kind: "all-covered"; covered: number }
   /** 数据还没下完：推过去也做不了种 */
@@ -38,12 +59,32 @@ export interface IReseedCandidateInput {
   coveredSites: readonly string[];
   /** 用户添加的站点里可以当作辅种目标的那些（已离线的那几站由调用方剔除） */
   usableSites: readonly string[];
+  /**
+   * 其中**已经逐站查过、结论还在新鲜期里**的那些站（调用方按同内容全部副本的内容键并好）。
+   * 不给 = 当作一条都没查过（退回 v0.109.7 之前的行为，扫描结论还没读到时就是这样）。
+   */
+  scannedSites?: readonly string[];
+  /** 查过的那些站各自的结论档，用来把「已查」那一档的浮层说全 */
+  scannedVerdicts?: readonly { siteId: string; verdict: keyof IReseedScanTally }[];
+}
+
+/** 四档计数：`siteId` 去重后按档数，同站两条结论（脏数据）只数第一次 */
+function tallyOf(scannedVerdicts: readonly { siteId: string; verdict: keyof IReseedScanTally }[], open: Set<string>): IReseedScanTally {
+  const tally: IReseedScanTally = { hasIt: 0, suspect: 0, noMatch: 0, failed: 0 };
+  const seen = new Set<string>();
+  for (const item of scannedVerdicts) {
+    if (!open.has(item.siteId) || seen.has(item.siteId)) continue;
+    seen.add(item.siteId);
+    tally[item.verdict] += 1;
+  }
+  return tally;
 }
 
 /**
- * 四档的顺序是判据的一部分：
+ * 五档的顺序是判据的一部分：
  * 没下完排第一 —— 它压掉其余一切（认不出站也好、挂满也好，都不该给一条下完的种子标「可辅」）；
- * 认不出站排在算缺口之前 —— 没有「已挂」这份事实，缺口那个数会是整片站点数，那是假话。
+ * 认不出站排在算缺口之前 —— 没有「已挂」这份事实，缺口那个数会是整片站点数，那是假话；
+ * 「查过了」排在「待查」之后 —— 只要还剩一个站没查，那一档就还当值不值得去搜来说。
  */
 export function judgeReseedCandidate(input: IReseedCandidateInput): TReseedCandidateVerdict {
   if (!input.completed) return { kind: "incomplete" };
@@ -51,7 +92,12 @@ export function judgeReseedCandidate(input: IReseedCandidateInput): TReseedCandi
   const covered = new Set(input.coveredSites.filter((siteId) => !!siteId));
   if (covered.size === 0) return { kind: "no-site" };
 
-  const pending = input.usableSites.filter((siteId) => siteId && !covered.has(siteId));
-  if (pending.length === 0) return { kind: "all-covered", covered: covered.size };
-  return { kind: "candidate", pending: pending.length, covered: covered.size };
+  const open = new Set(input.usableSites.filter((siteId) => siteId && !covered.has(siteId)));
+  if (open.size === 0) return { kind: "all-covered", covered: covered.size };
+
+  const scanned = new Set((input.scannedSites ?? []).filter((siteId) => siteId && open.has(siteId)));
+  const pending = open.size - scanned.size;
+  if (pending > 0) return { kind: "candidate", pending, covered: covered.size };
+
+  return { kind: "scanned", scanned: scanned.size, covered: covered.size, tally: tallyOf(input.scannedVerdicts ?? [], scanned) };
 }

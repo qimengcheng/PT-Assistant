@@ -379,7 +379,10 @@
     "stateFilterAll": "全部",
     "reseedCandidate": {
       "badge": "待查 {pending} 站",
-      "badgeTip": "这份内容已挂在 {covered} 个站点，已添加的站点里还有 {pending} 个未挂上它。那 {pending} 个站点是否发布过这条种子，需要逐站查询才能确定；点击本标记可打开「可辅种扫描」。",
+      "badgeTip": "这份内容已挂在 {covered} 个站点，已添加的站点里还有 {pending} 个没挂上它、也还没查过。那 {pending} 个站点是否发布过这条种子，需要逐站查询才能确定；点击本标记可打开「可辅种扫描」。",
+      "scannedBadge": "已查 {count} 站",
+      "foundBadge": "查到 {count} 站有这条",
+      "scannedBadgeTip": "这份内容已挂在 {covered} 个站点；其余 {scanned} 个站点都已逐站查过：{hasIt} 个查到确有这条、{suspect} 个标题相符但没验成文件、{noMatch} 个没搜到相符条目、{failed} 个这次没查成。点击本标记可重新扫描，或把查到的那几站一键辅种。",
       "filterLabel": "只看待查（{count}）"
     },
     "reseedScan": {

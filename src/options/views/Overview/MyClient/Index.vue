@@ -41,6 +41,7 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { buildSortOrderMap, makeSorter, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
+import type { IReseedScanResult } from "@/shared/types/storages/reseedScan.ts";
 import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
@@ -135,6 +136,25 @@ const showClientStatusDialog = ref(false);
 
 /** 「可辅种扫描」面板（逐站到站点上真查一遍这条种子在不在） */
 const showReseedScanDialog = ref(false);
+
+/**
+ * 扫描结论整表。行上那枚标记要按「这条内容已经查过哪些站」决定说「待查」还是「已查」，
+ * 所以这份事实得住在**页面**里，不能只住在弹窗里 —— 弹窗一关就把标记打回「待查」，
+ * 那正是用户 2026-10-18 要撤掉的形状。
+ *
+ * 只在进这一页、以及关掉扫描面板时各读一次，不挂定时器：一次扫描是几十到几百次站点请求，
+ * 结论也就这个量级，为它轮询等于给一屏表格加一条没人要的整表重画（v0.109.2 那条同族）。
+ */
+const scanResults = ref<IReseedScanResult[]>([]);
+
+async function loadScanResults() {
+  scanResults.value = await sendMessage("getReseedScanResults", undefined).catch(() => [] as IReseedScanResult[]);
+}
+
+/** 关掉扫描面板就重读一次：人在那一屏查完，行上那枚标记要当场跟着变，不等下一次进这一页 */
+watch(showReseedScanDialog, (open) => {
+  if (!open) void loadScanResults();
+});
 
 const totalUpSpeed = computed(() => allTorrents.value.reduce((acc, t) => acc + (t.uploadSpeed ?? 0), 0));
 const totalDlSpeed = computed(() => allTorrents.value.reduce((acc, t) => acc + (t.downloadSpeed ?? 0), 0));
@@ -348,30 +368,64 @@ const reseedRows = computed<IReseedRow[]>(() =>
 const hostSiteEntries = computed(() => Object.entries(metadataStore.siteHostMap));
 
 const reseedFacts = computed(() =>
-  buildReseedFacts(reseedRows.value, hostSiteEntries.value, usableReseedSites.value, reseedTasks.value),
+  buildReseedFacts(reseedRows.value, hostSiteEntries.value, usableReseedSites.value, reseedTasks.value, {
+    results: scanResults.value,
+    now: Date.now(),
+  }),
 );
 
-/** 行上那枚「待辅 N 站」：只有值得去搜的那几条出标记，其余三档（没下完 / 认不出站 / 已挂满）都安静 */
+/**
+ * 行上那枚标记吃两档：`candidate` 说「还差 N 站没查」，`scanned` 说「没挂的那些站都查过了」。
+ * 其余三档（没下完 / 认不出站 / 已挂满）都安静。
+ */
 function reseedBadgeOf(record: CTorrent) {
   const verdict = reseedFacts.value.get(torrentKey(record));
-  return verdict?.kind === "candidate" ? verdict : undefined;
+  return verdict?.kind === "candidate" || verdict?.kind === "scanned" ? verdict : undefined;
 }
 
 /** 标记文字与浮层各算一次判据 —— 模板里不许为非空写感叹号 */
 function reseedBadgeText(record: CTorrent): string {
   const verdict = reseedBadgeOf(record);
-  return verdict ? t("MyClient.reseedCandidate.badge", { pending: verdict.pending }) : "";
+  if (!verdict) return "";
+  if (verdict.kind === "scanned") {
+    // 查到有的那一档单独说：它是「现在就能去辅」的那一句，比「已查 N 站」更能让人接着往下做
+    return verdict.tally.hasIt > 0
+      ? t("MyClient.reseedCandidate.foundBadge", { count: verdict.tally.hasIt })
+      : t("MyClient.reseedCandidate.scannedBadge", { count: verdict.scanned });
+  }
+  return t("MyClient.reseedCandidate.badge", { pending: verdict.pending });
 }
 
 function reseedBadgeTip(record: CTorrent): string {
   const verdict = reseedBadgeOf(record);
-  return verdict
-    ? t("MyClient.reseedCandidate.badgeTip", { covered: verdict.covered, pending: verdict.pending })
-    : "";
+  if (!verdict) return "";
+  if (verdict.kind === "scanned") {
+    // 四档各报一个数、不并档：把「这次没查成」折进「那个站没有」会让人从此不去辅那个站
+    return t("MyClient.reseedCandidate.scannedBadgeTip", {
+      covered: verdict.covered,
+      scanned: verdict.scanned,
+      hasIt: verdict.tally.hasIt,
+      suspect: verdict.tally.suspect,
+      noMatch: verdict.tally.noMatch,
+      failed: verdict.tally.failed,
+    });
+  }
+  return t("MyClient.reseedCandidate.badgeTip", { covered: verdict.covered, pending: verdict.pending });
 }
 
-/** 当前列表里可辅种的那几条：开关上那个数与勾上之后剩下的行共用这一份，不许各算一遍 */
-const reseedCandidateRows = computed(() => filteredTorrents.value.filter((row) => reseedBadgeOf(row)));
+/** 查到有的那一枚标绿，其余照旧蓝 —— 两枚都是「可辅种扫描」面板的入口，颜色只分「有没有结果」 */
+function reseedBadgeColor(record: CTorrent): string {
+  const verdict = reseedBadgeOf(record);
+  return verdict?.kind === "scanned" && verdict.tally.hasIt > 0 ? "success" : "blue";
+}
+
+/**
+ * 当前列表里还**有待查站点**的那几条：开关上那个数与勾上之后剩下的行共用这一份，不许各算一遍。
+ * 查完的那些不在这一档里 —— 它们已经不需要「只看」就能被那枚「已查」标记认出来。
+ */
+const reseedCandidateRows = computed(() =>
+  filteredTorrents.value.filter((row) => reseedFacts.value.get(torrentKey(row))?.kind === "candidate"),
+);
 
 /** 表格真正要吃的那一列行（`filteredTorrents` 只管状态与搜索，这一层再管「只看待查」） */
 const visibleTorrents = computed(() => (reseedOnly.value ? reseedCandidateRows.value : filteredTorrents.value));
@@ -669,6 +723,9 @@ onMounted(async () => {
   // `download.initDownloaderTorrentOnEnter` 决定进来要不要自动拉种子列表。
   // 不等水合就是：从「下载器管理」页跳过来时预选丢失、自动加载按默认值走 —— 都是静默的。
   await Promise.all([metadataStore.$onReady(), configStore.$onReady()]);
+
+  // 扫描结论与种子列表互不依赖：它只喂行上那枚「待查 / 已查」标记，不等下载器回包
+  void loadScanResults();
 
   // 支持从 SetDownloader 等页面通过 ?downloader=<id> 预选单个下载服务器
   const queryDownloaderId = route.query.downloader as string | undefined;
@@ -1121,7 +1178,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
                      这颗标记同时是「可辅种扫描」的入口（点它打开面板）：工具条那一排在用户那一栏宽（实测 1609）
                      已经放不下了 —— 台架量到带那颗勾的自然宽 1713 > 1609，再加任何控件都要把搜索框压到 120 以下。
                      所以入口挂在「正好说出这件事的那枚标记」上，而不是再造一颗按钮。 -->
-                <a-tag color="blue" class="reseed-candidate-tag" @click="showReseedScanDialog = true">
+                <a-tag :color="reseedBadgeColor(record)" class="reseed-candidate-tag" @click="showReseedScanDialog = true">
                   {{ reseedBadgeText(record) }}
                 </a-tag>
               </HoverTip>

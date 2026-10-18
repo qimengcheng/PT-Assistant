@@ -86,3 +86,94 @@ describe("judgeReseedCandidate：四档各管一件事", () => {
     });
   });
 });
+
+/**
+ * 「查过了」这一档（v0.109.8）。
+ *
+ * 用户 2026-10-18 那句话是这一族的来由：「已经查过的在下载器里要标记出来，不再显示有多少站待查了」。
+ * 两条方向都要钉：查过一半的**不许再算进待查数**（否则那个数永远不减），
+ * 一条都没查过的**不许被当成查过**（否则扫描还没跑就把人挡在门外）。
+ */
+describe("judgeReseedCandidate：查过的站不再算待查", () => {
+  it("没给扫描事实时照旧按「未挂的全部站点」报缺口（结论还没读到 ≠ 已经查过）", () => {
+    expect(judgeReseedCandidate(oneCovered)).toEqual({ kind: "candidate", pending: 2, covered: 1 });
+  });
+
+  it("两站里查过一站 → 待查只剩一站", () => {
+    expect(judgeReseedCandidate({ ...oneCovered, scannedSites: ["siteB"] })).toEqual({ kind: "candidate", pending: 1, covered: 1 });
+  });
+
+  it("没挂的那两站都查过 → 出 scanned 档，不再报待查", () => {
+    const verdict = judgeReseedCandidate({
+      ...oneCovered,
+      scannedSites: ["siteB", "siteC"],
+      scannedVerdicts: [
+        { siteId: "siteB", verdict: "noMatch" },
+        { siteId: "siteC", verdict: "hasIt" },
+      ],
+    });
+    expect(verdict).toEqual({
+      kind: "scanned",
+      scanned: 2,
+      covered: 1,
+      tally: { hasIt: 1, suspect: 0, noMatch: 1, failed: 0 },
+    });
+  });
+
+  it("已经挂在的那个站即使出现在扫描结论里，也不占「已查」那一格", () => {
+    // 那些站本来就不该被排进查询计划（查了也是白查），但结论表里可能留着旧记录
+    expect(judgeReseedCandidate({ ...oneCovered, scannedSites: ["siteA", "siteB"] })).toEqual({ kind: "candidate", pending: 1, covered: 1 });
+  });
+
+  it("「这次没查成」与「没搜到」不许并档：前者过一会儿还要再查", () => {
+    const verdict = judgeReseedCandidate({
+      completed: true,
+      coveredSites: ["siteA"],
+      usableSites: ["siteA", "siteB", "siteC"],
+      scannedSites: ["siteB", "siteC"],
+      scannedVerdicts: [
+        { siteId: "siteB", verdict: "failed" },
+        { siteId: "siteC", verdict: "noMatch" },
+      ],
+    });
+    expect(verdict.kind === "scanned" && verdict.tally).toEqual({ hasIt: 0, suspect: 0, noMatch: 1, failed: 1 });
+  });
+
+  it("结论表里没有的站不算查过：只有 scannedSites 报了、四档没记，也不许凭空造一档", () => {
+    const verdict = judgeReseedCandidate({
+      completed: true,
+      coveredSites: ["siteA"],
+      usableSites: ["siteA", "siteB"],
+      scannedSites: ["siteB"],
+    });
+    expect(verdict).toEqual({ kind: "scanned", scanned: 1, covered: 1, tally: { hasIt: 0, suspect: 0, noMatch: 0, failed: 0 } });
+  });
+
+  it("同一个站被记了两次结论，只数一次", () => {
+    const verdict = judgeReseedCandidate({
+      completed: true,
+      coveredSites: ["siteA"],
+      usableSites: ["siteA", "siteB"],
+      scannedSites: ["siteB", "siteB"],
+      scannedVerdicts: [
+        { siteId: "siteB", verdict: "hasIt" },
+        { siteId: "siteB", verdict: "noMatch" },
+      ],
+    });
+    expect(verdict.kind === "scanned" && verdict.scanned).toBe(1);
+    expect(verdict.kind === "scanned" && verdict.tally.hasIt).toBe(1);
+    expect(verdict.kind === "scanned" && verdict.tally.noMatch).toBe(0);
+  });
+
+  it("没下完的那条压住一切：站点全查过了也照样只报「没下完」", () => {
+    expect(
+      judgeReseedCandidate({
+        completed: false,
+        coveredSites: ["siteA"],
+        usableSites: ["siteA", "siteB"],
+        scannedSites: ["siteB"],
+      }).kind,
+    ).toBe("incomplete");
+  });
+});
+

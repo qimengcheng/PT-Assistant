@@ -379,7 +379,10 @@
     "stateFilterAll": "All",
     "reseedCandidate": {
       "badge": "{pending} sites to check",
-      "badgeTip": "This content is already seeded on {covered} site(s); {pending} of your added sites don't carry it yet. Whether those sites have published this torrent can only be confirmed by checking each one — click this tag to open Reseed Scan.",
+      "badgeTip": "This content is already seeded on {covered} site(s); {pending} of your added sites don't carry it yet and haven't been checked. Whether those sites have published this torrent can only be confirmed by checking each one — click this tag to open Reseed Scan.",
+      "scannedBadge": "{count} sites checked",
+      "foundBadge": "Found on {count} sites",
+      "scannedBadgeTip": "This content is already seeded on {covered} site(s); the other {scanned} have all been checked one by one: {hasIt} really carry this torrent, {suspect} match by title but files weren't verified, {noMatch} returned no matching entry, {failed} couldn't be checked this time. Click this tag to scan again, or reseed the sites that have it.",
       "filterLabel": "Pending check only ({count})"
     },
     "reseedScan": {

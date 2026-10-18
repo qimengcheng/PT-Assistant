@@ -2,16 +2,16 @@
  * 「下载器里每一条还可以往几个站辅」这份事实怎么拼出来。
  *
  * 为什么单独成一个模块（跟 `reseedGroups.ts`、`columnText.ts` 同一先例）：这一层是**取数拼判据**，
- * 出错不会报错，只会让界面上那枚「待辅 N 站」安静地不出现、或者把数字算大。
- * 判据本体在 `@/shared/reseedCandidate`（那文件头写清了两件事：为什么这条路不看分享率、
- * 以及那个数字为什么只代表「还没挂上」而不代表「那站上确有这条种子」）；
- * 这里负责把它和「同内容分组」「tracker 反查」拼起来，并且能在 Node 里被断言。
+ * 出错不会报错，只会让界面上那枚「待查 N 站」/「已查 N 站」安静地不出现、或者把数字算大。
+ * 判据本体在 `@/shared/reseedCandidate`（那文件头写清了三件事：为什么这条路不看分享率、
+ * 那个数字为什么只代表「还没挂上」而不代表「那站上确有这条种子」、以及查过的站为什么不再算待查）；
+ * 这里负责把它和「同内容分组」「tracker 反查」「扫描结论」拼起来，并且能在 Node 里被断言。
  */
-import { judgeReseedCandidate, type TReseedCandidateVerdict } from "@/shared/reseedCandidate.ts";
+import { judgeReseedCandidate, type IReseedScanTally, type TReseedCandidateVerdict } from "@/shared/reseedCandidate.ts";
 import { resolveTrackerHostSite, trackerFieldToHost } from "@/shared/trackerHost.ts";
-import { reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
+import { isReseedScanFresh, reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
 import type { IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
-import type { IReseedScanTarget } from "@/shared/types/storages/reseedScan.ts";
+import type { IReseedScanResult, IReseedScanTarget, TReseedScanVerdict } from "@/shared/types/storages/reseedScan.ts";
 
 import { assignGroups, buildTaskGroups, type IReseedTaskForGroup, type IRowForGroup } from "./reseedGroups.ts";
 
@@ -25,6 +25,52 @@ export interface IReseedRow extends IRowForGroup {
 
 /** 行 key → 组键。没进组（或组里只有一条）的行拿自己当组键 */
 type TGroupKeyOf = (row: IReseedRow) => string;
+
+/**
+ * 一行属于哪份「内容」：与扫描那一侧、一键辅种基准那一侧**同一条算式**（同一个 `reseedScanContentKey`
+ * + 同样 round 过的大小）。三处各折一套就会「查回来的结论对不上任何一行」。
+ */
+function rowContentKey(row: IReseedRow): string {
+  return reseedScanContentKey(row.name, Math.max(0, Math.round(row.totalSize ?? 0)));
+}
+
+/** 「这条内容查过哪些站、各查到哪一档」 */
+interface IContentScanFacts {
+  scanned: Set<string>;
+  verdicts: { siteId: string; verdict: keyof IReseedScanTally }[];
+}
+
+/** 结论档 → 判据那一侧的四档键。`failed` 与 `no-match` 不许并，见 `reseedCandidate.ts` 文件头 */
+const TALLY_KEY: Record<TReseedScanVerdict, keyof IReseedScanTally> = {
+  "has-it": "hasIt",
+  suspect: "suspect",
+  "no-match": "noMatch",
+  failed: "failed",
+};
+
+/**
+ * 扫描结论 → 「内容键 → 查过的站与各档计数」。
+ *
+ * 只收**还在新鲜期里**的那些（`isReseedScanFresh`，与排查询计划用的是同一个判据）：
+ * 过期的结论下一轮会被重查，这时候还标「已查」就是把人挡在门外。
+ * `failed` 那一档的新鲜期短得多（30 分钟），所以「某个站今天坏了」只会让那一档短暂地算已查，
+ * 过了就重新变回待查 —— 这是要的，不是漏的。
+ */
+function scanFactsByContent(results: IReseedScanResult[], now: number): Map<string, IContentScanFacts> {
+  const out = new Map<string, IContentScanFacts>();
+  for (const item of results) {
+    if (!isReseedScanFresh(item, now)) continue;
+    let facts = out.get(item.contentKey);
+    if (!facts) {
+      facts = { scanned: new Set(), verdicts: [] };
+      out.set(item.contentKey, facts);
+    }
+    if (facts.scanned.has(item.siteId)) continue;
+    facts.scanned.add(item.siteId);
+    facts.verdicts.push({ siteId: item.siteId, verdict: TALLY_KEY[item.verdict] });
+  }
+  return out;
+}
 
 /**
  * 每一组「已经挂在哪些站上」。
@@ -65,23 +111,49 @@ function coverOfGroups(
  * 行 key → 判据结果。
  *
  * 第三条取数口径：可辅目标就是调用方给的那批站点（已添加、没标离线），这一层不再自己筛。
+ * 第四条（v0.109.8）：`scan` 给的是**已经逐站查过**的那些结论，按**整组副本**的内容键并起来 ——
+ * 同一份内容在下载器里往往有好几行、标题写法还不一致（各自一个 contentKey），
+ * 只看其中一行的结论就会「查过了却仍报待查」，而那正是这一档要盖掉的东西。
  */
 export function buildReseedFacts(
   rows: IReseedRow[],
   hostSiteEntries: Iterable<readonly [string, string]>,
   usableSites: readonly string[],
   tasks: IReseedTaskForGroup[],
+  scan?: { results: IReseedScanResult[]; now: number },
 ): Map<string, TReseedCandidateVerdict> {
   const { groupKeyOf, covered } = coverOfGroups(rows, hostSiteEntries, tasks);
+  const byContent = scan ? scanFactsByContent(scan.results, scan.now) : null;
+
+  const scannedOfGroup = new Map<string, IContentScanFacts>();
+  if (byContent) {
+    for (const row of rows) {
+      const facts = byContent.get(rowContentKey(row));
+      if (!facts) continue;
+      const group = groupKeyOf(row);
+      let merged = scannedOfGroup.get(group);
+      if (!merged) {
+        merged = { scanned: new Set(), verdicts: [] };
+        scannedOfGroup.set(group, merged);
+      }
+      for (const siteId of facts.scanned) {
+        if (merged.scanned.has(siteId)) continue;
+        merged.scanned.add(siteId);
+        merged.verdicts.push(...facts.verdicts.filter((item) => item.siteId === siteId));
+      }
+    }
+  }
 
   const out = new Map<string, TReseedCandidateVerdict>();
   for (const row of rows) {
+    const scanned = scannedOfGroup.get(groupKeyOf(row));
     out.set(
       row.key,
       judgeReseedCandidate({
         completed: row.completed,
         coveredSites: [...(covered.get(groupKeyOf(row)) ?? [])],
         usableSites,
+        ...(scanned ? { scannedSites: [...scanned.scanned], scannedVerdicts: scanned.verdicts } : {}),
       }),
     );
   }
@@ -131,7 +203,7 @@ export function buildReseedScanScope(
   for (const row of rows) {
     if (!row.completed) continue;
     const size = Math.max(0, Math.round(row.totalSize ?? 0));
-    const contentKey = reseedScanContentKey(row.name, size);
+    const contentKey = rowContentKey(row);
     const knownSites = [...(covered.get(groupKeyOf(row)) ?? [])];
     const hit = byKey.get(contentKey);
     if (hit) {
@@ -161,8 +233,7 @@ export function buildReseedLocalBases(
   const out = new Map<string, IReseedHandoffBase>();
   for (const row of rows) {
     if (!row.completed) continue;
-    const size = Math.max(0, Math.round(row.totalSize ?? 0));
-    const contentKey = reseedScanContentKey(row.name, size);
+    const contentKey = rowContentKey(row);
     const existing = out.get(contentKey);
     if (existing && (existing.hash || !row.infoHash)) continue;
     out.set(contentKey, {

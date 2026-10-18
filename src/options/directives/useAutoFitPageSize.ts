@@ -27,22 +27,21 @@
  * 往回退过一次，那个值就记成本轮上限（`ceiling`），同一轮里不再往上涨回去。没有这条会成环：
  * 退掉一行后按平均高算「缝隙又够放一行了」→ 加回来一个高行 → 又超高 → 又退，实测就在
  * 12 ↔ 13 之间跳。**加行**要「这一页是满页」才做（末页只剩三行时缝隙恒常很大，不加这条会一路
- * 加到把整份数据并成一页），**退行**不看满不满：渲染出来的这几行已经超了可用高，滚动条就在
- * 眼前，而调用方那一档可能比这一屏容量小（他在这一页之内挑过一条小档）—— 那种页面永远
- * 不满，照满页判就再也退不动。
+ * 加到把整份数据并成一页），**退行**不看满不满：渲染出来的记录行总高已经超了可用高、滚动条就在
+ * 眼前，「这一页满不满」不该挡住退路。
  *
  * 一轮（epoch）= 面板高 + 数据条数 + 表头单元格数 + 「可用高相对上一轮变了多少」；
  * 面板变高、筛选换数据、切语言改字号、显示列增删、面板里那条说明条出现/消失都落在这些上。
  * 翻页不算换轮，但换页会改 tbody 的高度，那边另有一个 ResizeObserver 负责把 ② 再跑一次。
  *
- * ## 「行」和「条」是两个单位（v0.109.3 那起 OOM 的根因）
- * 树形数据（辅种任务把条目挂在任务行下面）时，子行和父行排在同一个 `<tbody>` 里，
- * 所以「渲染出来的行数」比「这一页有几条记录」多出子行那一截。两个单位混用会出事故：
- * 退行那一支原先写的是 `渲染行数 − 1`，展开两条子行时它等于「比当前档还多一条」——
- * 于是每退一次其实都在**往上涨**，涨完又超了可用高，再退、再涨，界面上表现为
- * 「点一下展开就整页卡死，直到标签页报 Out of Memory」（用户 2026-10-18）。
- * 现在：占竖向空间的判据（超没超、缝隙够不够）照旧数**全部行**，而写回界面和记上限
- * 那两处一律数**记录行**。
+ * ## 展开出来的子行不参与「这一屏放得下几条」的判据（v0.109.6）
+ * 树形数据（辅种任务把条目挂在任务行下面）时，子行与父行排在同一个 `<tbody>` 里。
+ * v0.109.3 把两种行分开数之后，仍然让**子行参与**「超没超、缝隙够不够」的判定 —— 于是
+ * 他每展开一条，这一页就少排一条任务（展开两条退两档，界面上是列表自己往上缩一行）。
+ * 用户 2026-10-18 撤掉了这一半：「如果是因为展开造成的高度变化出现的滚动条也不用管」。
+ * 所以现在只剩一个用途上的区分：**只有记录行进入算式**，展开把整屏撑超就让它出滚动条。
+ * 顺带这一圈少吃一个外部输入（子行数是他点出来的、原先又反过来决定写回值），
+ * 「行」与「条」混单位那一族从结构上没有了 —— 剩下的收敛问题只有「同一页里记录行不等高」。
  *
  * ## avail 不许当「换轮」的等值判据
  * 上一段那个来回还有一条放大器：avail 里减掉了横向滚动条厚度，而那个厚度随渲染行数
@@ -98,9 +97,10 @@ const SUB_ROW_CLASS = /ant-table-row-level-[1-9]/;
 const EPOCH_AVAIL_STEP = 24;
 
 export interface IAutoFitSample {
-  /** 渲染出来的每一行的高度。子行也真占竖向空间，所以超没超、缝隙够不够都按这一列判。 */
-  heights: number[];
-  /** 其中属于「一页记录」的那些行：写回界面和记上限用的是这一列的条数。 */
+  /**
+   * 属于「一页记录」的那些行的高度。**展开出来的子行不在这一列里，也不参与任何判定**
+   * （用户 2026-10-18：「如果是因为展开造成的高度变化出现的滚动条也不用管」，见文件头）。
+   */
   recordHeights: number[];
 }
 
@@ -114,10 +114,6 @@ export interface IAutoFitInput {
   seeded: boolean;
   /** 本轮往回退到过这个值就不再往上涨回去 */
   ceiling: number;
-  /**
-   * 上一轮看到的「(fitted, 子行数)」对，用来判**这一档行形是不是我们自己弄变的**。首轮不传。
-   */
-  seen?: { fitted: number; subs: number } | null;
   /** 行数下限 */
   min: number;
 }
@@ -127,53 +123,39 @@ export interface IAutoFitOutput {
   next: number | null;
   seeded: boolean;
   ceiling: number;
-  /** 原样带回这一轮看到的 (fitted, subs)，给下一轮当 `seen` */
-  seen: { fitted: number; subs: number };
 }
 
 /**
  * 两步收敛的那半截算术，单独摆出来是为了能被 Node 直接断言（DOM 那半截只有台架量得到）。
  * 判据与理由见文件头，边界都不在这里解释。
  */
-export function nextAutoFitOf({ avail, sample, fitted, seeded, ceiling, seen, min }: IAutoFitInput): IAutoFitOutput {
-  const { heights, recordHeights } = sample;
+export function nextAutoFitOf({ avail, sample, fitted, seeded, ceiling, min }: IAutoFitInput): IAutoFitOutput {
+  const { recordHeights } = sample;
   const records = recordHeights.length;
-  const subs = heights.length - records;
-  const now = { fitted, subs };
-  if (avail <= 0 || heights.length === 0 || records === 0) {
-    return { next: null, seeded, ceiling, seen: now };
-  }
+  if (avail <= 0 || records === 0) return { next: null, seeded, ceiling };
 
-  /**
-   * 同一档条数下子行变少了 ⇒ 是人把某一行收起来了，不是我们上一脚退行退出来的（退行必然同时改 fitted）。
-   * 这时「退过一次就不再涨回去」那道上限已经过期 —— 它是照**带着子行**的那一屏量出来的。
-   * 不认这一条，收起子行之后容量会永久钉在那一档，界面上就是「下面空一大片，而手动挑的档被它一路压着」
-   * （用户 2026-10-18 报的「选每页条数没效果」）。
-   */
-  if (seen && seen.fitted === fitted && subs < seen.subs) ceiling = Number.POSITIVE_INFINITY;
-
-  const sum = heights.reduce((acc, h) => acc + h, 0);
-  const max = Math.max(...heights);
+  const sum = recordHeights.reduce((acc, h) => acc + h, 0);
+  const max = Math.max(...recordHeights);
   const fullPage = fitted > 0 && records >= fitted;
   let next: number;
 
   if (!seeded) {
-    // ①：初值按**记录行**的平均高，能把这一屏铺到只剩几像素
-    next = Math.floor(avail / (recordHeights.reduce((acc, h) => acc + h, 0) / records));
-    return withNext(next, { seeded: true, ceiling }, min, fitted, now);
+    // ①：初值按记录行的平均高，能把这一屏铺到只剩几像素
+    next = Math.floor(avail / (sum / records));
+    return withNext(next, { seeded: true, ceiling }, min, fitted);
   }
   if (sum > avail) {
-    // ②a：这一页真正占掉的行高超了可用高 → 往回退一条记录，并把这个值记成上限。
-    // 基准取**渲染出来的记录数**而不是 fitted：他挑的那一档被 toPagination 压到
-    // min(挑的, 容量) 时渲染记录数比 fitted 小，照 fitted 退要空转好几轮才落到放得下的那一档。
-    return withNext(records - 1, { seeded: true, ceiling: records - 1 }, min, fitted, now);
+    // ②a：这一页记录行的总高已经超了可用高 → 往回退一条记录，并把这个值记成上限。
+    // 基准取**渲染出来的记录数**而不是 fitted：fitted 只是上一轮的读数，画了几条由「数据条数」
+    // 与当前档谁小说了算，照 fitted 退要空转好几轮才落到放得下的那一档。
+    return withNext(records - 1, { seeded: true, ceiling: records - 1 }, min, fitted);
   }
-  if (!fullPage) return { next: null, seeded, ceiling, seen: now }; // 不满的一页没有「还能不能再塞一行」可判，见文件头
+  if (!fullPage) return { next: null, seeded, ceiling }; // 不满的一页没有「还能不能再塞一行」可判，见文件头
   if (fitted < ceiling && avail - sum >= max) {
-    // ②b：缝隙还放得下**最高**那一行（含子行），才敢再加一条记录
-    return withNext(fitted + 1, { seeded, ceiling }, min, fitted, now);
+    // ②b：缝隙还放得下**最高**那一行记录，才敢再加一条
+    return withNext(fitted + 1, { seeded, ceiling }, min, fitted);
   }
-  return { next: null, seeded, ceiling, seen: now }; // 收敛
+  return { next: null, seeded, ceiling }; // 收敛
 }
 
 function withNext(
@@ -181,10 +163,9 @@ function withNext(
   state: Pick<IAutoFitOutput, "seeded" | "ceiling">,
   min: number,
   fitted: number,
-  seen: IAutoFitOutput["seen"],
 ): IAutoFitOutput {
   const next = Math.max(min, raw);
-  return { next: next === fitted ? null : next, ...state, seen };
+  return { next: next === fitted ? null : next, ...state };
 }
 
 /**
@@ -205,8 +186,6 @@ export function useAutoFitPageSize({ container, rows, min = 1 }: IAutoFitPageSiz
   let epoch = "";
   /** 本轮开头量到的 avail，换轮判据拿它比差值（见 EPOCH_AVAIL_STEP） */
   let epochAvail = Number.NaN;
-  /** 上一轮看到的 (fitted, 子行数)，给 `nextAutoFitOf` 认「是人收的行，不是我们退的档」 */
-  let seen: { fitted: number; subs: number } | null = null;
   let observer: ResizeObserver | null = null;
   let mutator: MutationObserver | null = null;
   let observedBody: HTMLElement | null = null;
@@ -268,30 +247,25 @@ export function useAutoFitPageSize({ container, rows, min = 1 }: IAutoFitPageSiz
       epochAvail = avail;
       ceiling = Number.POSITIVE_INFINITY;
       seeded = false;
-      seen = null;
     }
 
-    const rowsOfTable = Array.from(el.querySelectorAll<HTMLElement>(ROW_SELECTOR), (tr) => ({
-      height: tr.getBoundingClientRect().height,
-      isRecord: !SUB_ROW_CLASS.test(tr.className),
-    }));
-    if (rowsOfTable.length === 0) return; // 空表没有行可量，撑满那件事归 style.css 那条全站规则
+    // 只认记录行：展开出来的子行整个不进算式（文件头那一节），所以点开一条条目
+    // 不会让这一页少排一条，撑超了就直接出滚动条。
+    const recordHeights = Array.from(el.querySelectorAll<HTMLElement>(ROW_SELECTOR))
+      .filter((tr) => !SUB_ROW_CLASS.test(tr.className))
+      .map((tr) => tr.getBoundingClientRect().height);
+    if (recordHeights.length === 0) return; // 空表没有行可量，撑满那件事归 style.css 那条全站规则
 
     const out = nextAutoFitOf({
       avail,
-      sample: {
-        heights: rowsOfTable.map((r) => r.height),
-        recordHeights: rowsOfTable.filter((r) => r.isRecord).map((r) => r.height),
-      },
+      sample: { recordHeights },
       fitted: fitted.value,
       seeded,
       ceiling,
-      seen,
       min,
     });
     seeded = out.seeded;
     ceiling = out.ceiling;
-    seen = out.seen;
     if (out.next !== null) fitted.value = out.next;
   }
 

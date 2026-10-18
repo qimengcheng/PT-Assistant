@@ -377,6 +377,11 @@
       "unknown": "Unknown"
     },
     "stateFilterAll": "All",
+    "reseedCandidate": {
+      "badge": "{pending} more sites",
+      "badgeTip": "This content is already on {covered} site(s). {pending} of your added sites don't carry it yet — whether those sites have published this torrent only shows up after a Reseed Detection search.",
+      "filterLabel": "Reseedable only ({count})"
+    },
     "table": {
       "addedAt": "Added At",
       "client": "Client",

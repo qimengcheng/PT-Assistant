@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { isSameSiteHostRelation, resolveTrackerHostSite } from "@/shared/trackerHost.ts";
+import { isSameSiteHostRelation, resolveTrackerHostSite, trackerFieldToHost } from "@/shared/trackerHost.ts";
 
 describe("isSameSiteHostRelation：按 label 边界的父子域", () => {
   it("announce 在站点域名的子域上算同一个域（这次那条就是这一档）", () => {
@@ -66,5 +66,36 @@ describe("resolveTrackerHostSite：认不出可以，认错不行", () => {
 
   it("表里的空地址不参与", () => {
     expect(resolveTrackerHostSite("anything.net", [["", "broken"] as [string, string]])).toBeNull();
+  });
+});
+
+/**
+ * 各家 `CTorrent.tracker` 那一格的形态不统一（qBittorrent 给 announce 全串、Deluge 给裸主机名、
+ * Transmission / Flood 给 `udp://…/announce`），所以「折成主机名」这一步要单独钉住：
+ * 折错了不报错，只是那一行**悄悄不标**「待辅 N 站」—— 认不出站就等于不知道它挂在哪个站。
+ */
+describe("trackerFieldToHost：三种形态都折成同一个主机名", () => {
+  it("完整 announce 地址脱掉方案、路径与端口", () => {
+    expect(trackerFieldToHost("https://Tracker.Example.NET:2710/announce")).toBe("tracker.example.net");
+    expect(trackerFieldToHost("udp://tracker.example.net/announce")).toBe("tracker.example.net");
+  });
+
+  it("裸主机名原样能用（Deluge 的 tracker_host 就是这一档，不该走 new URL 报错那条路）", () => {
+    expect(trackerFieldToHost("tracker.example.net")).toBe("tracker.example.net");
+    expect(trackerFieldToHost("tracker.example.net:80")).toBe("tracker.example.net");
+  });
+
+  it("www. 前缀与末尾的点都去掉：反查表里存的是不带这两样的主机名", () => {
+    expect(trackerFieldToHost("www.pandapt.net.")).toBe("pandapt.net");
+  });
+
+  it("空 / 缺省给空串，不抛（这一格压根没报的下载器真实存在）", () => {
+    expect(trackerFieldToHost(undefined)).toBe("");
+    expect(trackerFieldToHost("   ")).toBe("");
+  });
+
+  it("折出来的主机名能直接喂给反查（两步之间不许再各自补一次规整）", () => {
+    const entries: [string, string][] = [["pandapt.net", "pandapt"]];
+    expect(resolveTrackerHostSite(trackerFieldToHost("http://tracker.pandapt.net/announce"), entries)).toBe("pandapt");
   });
 });

@@ -377,6 +377,11 @@
       "unknown": "未知"
     },
     "stateFilterAll": "全部",
+    "reseedCandidate": {
+      "badge": "待辅 {pending} 站",
+      "badgeTip": "这份内容已挂在 {covered} 个站。已添加的站点里还有 {pending} 个没挂上它 —— 那 {pending} 个站上到底有没有发布过这条种子，要进辅种检测搜一遍才知道。",
+      "filterLabel": "只看可辅种（{count}）"
+    },
     "table": {
       "addedAt": "添加时间",
       "client": "下载器",

@@ -53,6 +53,7 @@ import {
   type IGroupMeta,
   type IRowForGroup,
 } from "./reseedGroups.ts";
+import { buildReseedFacts } from "./reseedCandidateView.ts";
 import TorrentStateTd from "./TorrentStateTd.vue";
 import ClientStatusDialog from "./ClientStatusDialog.vue";
 import TorrentDetailDialog from "./TorrentDetailDialog.vue";
@@ -100,6 +101,12 @@ type AllOrState = "all" | CTorrentState;
  * 与搜索框是叠加关系；不持久化 —— 这一页的搜索框、下载器筛选都不存，单独把这一档存下来反而不一致。
  */
 const stateFilter = ref<AllOrState>("all");
+
+/**
+ * 「只看可辅种」那颗勾（用户 2026-10-18：「能不能增加一个检测下载器中还有哪些种子可以辅种的功能」）。
+ * 判据与行上那枚「待辅 N 站」标记同一条，不另开一套；与状态筛选、搜索框是叠加关系。
+ */
+const reseedOnly = ref(false);
 
 // delete dialog
 const showDeleteDialog = ref(false);
@@ -262,9 +269,9 @@ function toggleGroup(group: string) {
 const byAddedAt = makeSorter<CTorrent>("dateAdded");
 const sortedTorrents = computed<CTorrent[]>(() => {
   const sortBy = configStore.tableBehavior["MyClient"]?.sortBy ?? [];
-  if (sortBy.length === 0) return [...filteredTorrents.value].sort(byAddedAt);
+  if (sortBy.length === 0) return [...visibleTorrents.value].sort(byAddedAt);
   const sorters = sortBy.map((s) => ({ compare: makeSorter<CTorrent>(s.key), desc: s.order === "desc" }));
-  return [...filteredTorrents.value].sort((a, b) => {
+  return [...visibleTorrents.value].sort((a, b) => {
     for (const s of sorters) {
       const r = s.compare(a, b);
       if (r !== 0) return s.desc ? -r : r;
@@ -301,6 +308,62 @@ const grouped = computed(() => {
     members: result.members,
   };
 });
+
+/**
+ * 「这一条还可以往几个站辅」——行 key → 判据结果。拼法全在 `reseedCandidateView.ts`
+ * （那文件头写清了三条取数口径与「不看分享率」的理由），这里只把界面上看得见的那几列递进去：
+ * Tracker 那一列的同一份 `record.tracker`、折叠用的同一套分组判据（台账 + 内容指纹）、
+ * 以及「已添加且没标离线」的站点。
+ *
+ * `isDead`（站点定义里那档「已停服」）刻意没算进来：它只在异步的合并元数据里，
+ * 为一枚标记去 import 整片定义不划算，而那几站通常已被用户自己标成离线。
+ */
+const usableReseedSites = computed(() =>
+  Object.keys(metadataStore.sites).filter((siteId) => metadataStore.sites[siteId]?.isOffline !== true),
+);
+
+const reseedFacts = computed(() =>
+  buildReseedFacts(
+    allTorrents.value.map((row) => ({
+      key: torrentKey(row),
+      clientId: row.clientId,
+      name: row.name,
+      totalSize: row.totalSize,
+      savePath: row.savePath,
+      infoHash: row.infoHash,
+      tracker: row.tracker,
+      completed: row.isCompleted === true,
+    })),
+    Object.entries(metadataStore.siteHostMap),
+    usableReseedSites.value,
+    reseedTasks.value,
+  ),
+);
+
+/** 行上那枚「待辅 N 站」：只有值得去搜的那几条出标记，其余三档（没下完 / 认不出站 / 已挂满）都安静 */
+function reseedBadgeOf(record: CTorrent) {
+  const verdict = reseedFacts.value.get(torrentKey(record));
+  return verdict?.kind === "candidate" ? verdict : undefined;
+}
+
+/** 标记文字与浮层各算一次判据 —— 模板里不许为非空写感叹号 */
+function reseedBadgeText(record: CTorrent): string {
+  const verdict = reseedBadgeOf(record);
+  return verdict ? t("MyClient.reseedCandidate.badge", { pending: verdict.pending }) : "";
+}
+
+function reseedBadgeTip(record: CTorrent): string {
+  const verdict = reseedBadgeOf(record);
+  return verdict
+    ? t("MyClient.reseedCandidate.badgeTip", { covered: verdict.covered, pending: verdict.pending })
+    : "";
+}
+
+/** 当前列表里可辅种的那几条：开关上那个数与勾上之后剩下的行共用这一份，不许各算一遍 */
+const reseedCandidateRows = computed(() => filteredTorrents.value.filter((row) => reseedBadgeOf(row)));
+
+/** 表格真正要吃的那一列行（`filteredTorrents` 只管状态与搜索，这一层再管「只看可辅种」） */
+const visibleTorrents = computed(() => (reseedOnly.value ? reseedCandidateRows.value : filteredTorrents.value));
 
 /**
  * 名称那一格那颗折叠标记要的三个数。
@@ -716,7 +779,7 @@ const rowSelection = computed<TableRowSelection<CTorrent>>(() => ({
 const tablePage = ref(1);
 // 换筛选条件要回到第 1 页：分页是受控的（tablePage 只由翻页回调写），
 // 停在第 5 页时筛到只剩两行，切出来的那一页是空的 —— 看着像筛坏了而不是筛窄了。
-watch([searchText, stateFilter], () => (tablePage.value = 1));
+watch([searchText, stateFilter, reseedOnly], () => (tablePage.value = 1));
 const pageSize = computed(() => configStore.tableBehavior["MyClient"]?.itemsPerPage ?? 25);
 
 // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
@@ -869,6 +932,11 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           </a-radio-button>
         </a-radio-group>
 
+        <!-- 「只看可辅种」：与行上那枚标记同一份判据（reseedBadgeOf），括号里的数就是勾上会剩下几条 -->
+        <a-checkbox v-model:checked="reseedOnly">
+          {{ t("MyClient.reseedCandidate.filterLabel", { count: reseedCandidateRows.length }) }}
+        </a-checkbox>
+
         <a-tag v-if="selectedDownloaderIds.length === 1" color="blue" closable @close="clearDownloaderFilter">
           <template #icon><img class="client-tag-icon" :src="clientIcon(selectedDownloaderIds[0])" alt="" /></template>
           {{ clientName(selectedDownloaderIds[0]) }}
@@ -962,15 +1030,28 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
             </div>
             <!-- 分类（qBittorrent 的 category / 各家的主标签）与全部标签一起摆出来：
                  原先只有 record.label 一个值，用户 2026-10-13 指着这行说「只显示了分类，
-                 要把标签也显示出来」。判据在 columnText.ts 的 labelChips（去重 + 丢空）。 -->
+                 要把标签也显示出来」。判据在 columnText.ts 的 labelChips（去重 + 丢空）。
+                 「待辅 N 站」那枚也排在这一行：单独占一行就等于把名称那一行的高度预算还回去
+                 （这一页每页条数是按实测行高算的）。 -->
             <div
-              v-if="labelChips(record.label, record.tags).length"
+              v-if="labelChips(record.label, record.tags).length || reseedBadgeText(record)"
               class="torrent-labels text-body-small text-grey"
             >
-              <TagsOutlined class="torrent-labels__icon" />
-              <span v-for="chip in labelChips(record.label, record.tags)" :key="chip" class="torrent-labels__chip">
-                {{ chip }}
-              </span>
+              <template v-if="labelChips(record.label, record.tags).length">
+                <TagsOutlined class="torrent-labels__icon" />
+                <span v-for="chip in labelChips(record.label, record.tags)" :key="chip" class="torrent-labels__chip">
+                  {{ chip }}
+                </span>
+              </template>
+              <HoverTip
+                v-if="reseedBadgeText(record)"
+                :text="reseedBadgeTip(record)"
+                placement="topLeft"
+                :delay="0.4"
+              >
+                <!-- 用 a-tag 而不是自绘 chip：底色与前景由 antd 的 token 算，深浅色主题与对比度都不用手写十六进制赌 -->
+                <a-tag color="blue" class="reseed-candidate-tag">{{ reseedBadgeText(record) }}</a-tag>
+              </HoverTip>
             </div>
           </div>
         </template>
@@ -1280,6 +1361,15 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   padding: 0 5px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.045);
+}
+
+/* 「待辅 N 站」那枚。a-tag 自带 8px 右外边距与一档 line-height，而这一行已经用 flex gap 排、
+   行高由 useAutoFitPageSize 实测（撑高一分就少摆一条）—— 所以把这两样压回这一行的档，
+   底色与前景仍交给 antd 的 token（不手写十六进制，深浅色主题都跟着走）。 */
+.reseed-candidate-tag {
+  margin-inline-end: 0;
+  font-size: inherit;
+  line-height: 16px;
 }
 
 /* ===== 展开一组同内容：入场动画 + 整组底色 =====

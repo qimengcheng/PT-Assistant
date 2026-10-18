@@ -50,3 +50,21 @@ export function resolveTrackerHostSite<TSiteId>(
   if (direct !== undefined) return direct;
   return parents.size === 1 ? [...parents][0] : null;
 }
+
+/**
+ * 把下载器报的 `tracker` 那一格折成主机名（小写、去方案、去端口、去末尾点、去 `www.`）。
+ *
+ * 为什么不复用 `@ptd/site` 的 `getHostFromUrl`：那个走 `new URL()`，只认完整 URL，而各家
+ * `CTorrent.tracker` 的形态不统一（qBittorrent 给 announce 全串 `http://…/announce`、
+ * Deluge 给 `tracker_host` 裸主机名、Transmission/Flood 给 `udp://host/announce`）。
+ * `getHostFromUrl` 撞到裸主机名会 console.error 再把原串当 host 返回，那是量具在报错不是判据。
+ * 这一条不报错也不日志：认不出就是空串，调用方按「这一条不知道挂在哪个站」处理。
+ */
+export function trackerFieldToHost(tracker?: string | null): string {
+  const raw = (tracker ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  // 只脱掉「方案://」这一段；`file:` 之类没有 // 的残余形态不必特判，下面按 / 切已经盖住
+  const withoutScheme = raw.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
+  const host = withoutScheme.split("/")[0].split("?")[0].split("#")[0];
+  return host.replace(/:\d+$/, "").replace(/^www\./, "").replace(/\.$/, "");
+}

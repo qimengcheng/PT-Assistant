@@ -27,7 +27,7 @@ import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate } from "@/options/utils.ts";
-import { isPageSizePicked, toPagination } from "@/options/components/tableSorters.ts";
+import { toPagination } from "@/options/components/tableSorters.ts";
 import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 import type { ISearchSolutionMetadata, TSolutionKey } from "@/shared/types.ts";
 
@@ -221,11 +221,8 @@ const columns = computed(() => [
 
 // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
-/** 他挑过一档之后仍要量：那一档以实测容量为上限 */
-const pickedSize = computed(() => {
-  const behavior = configStore.tableBehavior.SetSearchSolution;
-  return isPageSizePicked(behavior?.itemsPerPage, 10, behavior?.pageSizePicked);
-});
+/** 本次进入这一页之内他挑的那一档：挑过就照他挑的（容量不再压），不持久 —— 重新进来回到实测那档 */
+const sessionSize = ref<number | null>(null);
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,
   rows: () => tableData.value,
@@ -236,12 +233,12 @@ const pagination = computed(() =>
   // config 默认值，而 antd Table 是前端分页，pageSize=-1 会让 slice(0,-1) 吃掉最后一行、
   // 页数算成负数（SetSite 已经踩过同一个坑）。
   // 另外不能写 current:1 —— 受控值写死会锁死在第 1 页，页码交给 a-table 内部管理。
-  toPagination(configStore.tableBehavior.SetSearchSolution.itemsPerPage, 10, {
+  toPagination(sessionSize.value ?? configStore.tableBehavior.SetSearchSolution.itemsPerPage, 10, {
     showTotal: (total: number) => t("common.totalItems", { total }),
     // 一页放得下就不出分页条（用户 2026-10-07：条数少的时候不要启用分页）
     totalRows: tableData.value.length,
     fitSize: fitPageSize.value,
-    picked: pickedSize.value,
+    picked: sessionSize.value !== null,
   }),
 );
 
@@ -249,9 +246,8 @@ function onTableChange(pag: TablePaginationConfig) {
   // 只有「报回来的档 ≠ 界面上正在显示的那一档」才算他改了尺寸：翻页与排序也带着当前档回来
   const displayed = pagination.value === false ? 0 : pagination.value?.pageSize ?? 0;
   if (pag.pageSize && displayed && pag.pageSize !== displayed) {
-    configStore.updateTableBehavior("SetSearchSolution", "itemsPerPage", pag.pageSize);
-    // 挑档 = 明确意图，从此不再被实测条数盖掉
-    configStore.updateTableBehavior("SetSearchSolution", "pageSizePicked", true);
+    // 挑档只活在本次进入里：不写 store（写了也没人读），重新进来又是实测那一档
+    sessionSize.value = pag.pageSize;
   }
 }
 

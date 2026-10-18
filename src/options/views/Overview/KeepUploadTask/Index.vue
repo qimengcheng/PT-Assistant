@@ -72,8 +72,8 @@ const sending = ref<Record<string, TSendKind | undefined>>({});
 const sendingOf = (id: string) => sending.value[id];
 
 const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("KeepUploadTask", {
-  // 这一档必须等于 config.ts 里 tableBehavior.KeepUploadTask.itemsPerPage，
-  // 否则「他挑过一档没有」判错（见 AGENTS.md §3.4 那条）
+  // 持久化档缺失或非法（Vuetify 遗留的 -1/0）时的兜底。这一页开了 autoFit，
+  // 所以「他挑过一档没有」不再从这一档里猜，而由页内那份 sessionSize 给（用户 2026-10-18）
   defaultPageSize: 25,
   size: "small",
   // 一页放得下就不出分页条（用户 2026-10-07 的全站口径）

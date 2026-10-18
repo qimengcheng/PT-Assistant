@@ -141,13 +141,12 @@ export function buildSortOrderMap(
  * 一起消失，就再也切不回小档了（这条取舍最早在 SetSite 上定下）。
  *
  * **extras.fitSize 一传就启用「按面板高度实测每页条数」**（useAutoFitPageSize，用户
- * 2026-10-08）。它和「挑过一档」的关系是**上限**而不是替代：
- * 没挑过档 → 这一档就等于实测容量（否则高屏下面板下半截空着）；
- * 挑过档 → 照他那一档，但**超过容量时压到容量**（「有分页条的时候不要出现滚动条」，
- * 用户 2026-10-08 补的口径；挑得比容量小是他觉得好读，那是他的选择，不动）。
- * 传了 fitSize 就**同时传 picked**：只靠「存的正数 != 默认档」判会漏
- * （他挑的正好是默认档时又会被实测值盖回去），那一档现在由 handleTableChange 另写一个
- * pageSizePicked 标记。
+ * 2026-10-08）。它和「挑过一档」的关系是（用户 2026-10-18 改的口径）：
+ * 没挑过档 → 这一档就等于实测容量（一进这一页就是「铺满、不出滚动条」那一档）；
+ * 挑过档 → **照他那一档，容量压不住它**（挑 50 就画 50 条，那一屏放不下就出滚动条 ——
+ * 手动挑过之后是他的明确意图，比「不许出滚动条」优先）。
+ * 「挑过档」现在是**本次进入这一页之内**的事，不持久：重新进来又回到实测铺满那一档。
+ * 所以传 fitSize 就要同时传 picked（由调用方那份页内状态给），不再从存下来的档里猜。
  */
 export function toPagination(
   itemsPerPage: unknown,
@@ -174,7 +173,7 @@ export function toPagination(
   const stored = usable ? raw : fallback;
   const pickedASize = extras.picked ?? (usable && raw !== fallback);
   const fit = typeof extras.fitSize === "number" && extras.fitSize > 0 ? extras.fitSize : 0;
-  const pageSize = fit ? (pickedASize ? Math.min(stored, fit) : fit) : stored;
+  const pageSize = fit ? (pickedASize ? stored : fit) : stored;
   if (extras.totalRows !== undefined && !pickedASize) {
     if (extras.maxSinglePage && extras.totalRows <= extras.maxSinglePage) {
       return false;
@@ -190,16 +189,4 @@ export function toPagination(
     ...(extras.showTotal ? { showTotal: extras.showTotal } : {}),
     ...(extras.extraConfig ?? {}),
   };
-}
-
-/**
- * 「用户在尺寸选择器里挑过一档」的统一判据，给 toPagination 的 picked 用。
- * 新标记 `tableBehavior[key].pageSizePicked` 由 handleTableChange 在用户改档那一次写下；
- * 老用户存的东西里没有它，所以退回原口径「存下来的正数不等于本页默认档」。
- * 两条都要：少了后者的话，升级之后第一次改档以前所有老用户的自选档都会被判成"没挑过"，
- * 实测条数当场盖掉他挑的那一档。
- */
-export function isPageSizePicked(stored: unknown, fallback: number, flag?: unknown) {
-  const usable = typeof stored === "number" && Number.isFinite(stored) && stored > 0;
-  return flag === true || (usable && stored !== fallback);
 }

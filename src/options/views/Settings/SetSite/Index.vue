@@ -33,7 +33,7 @@ import RebuildMapDialog from "./RebuildMapDialog.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import { flushSiteFavicon } from "@/options/components/SiteFavicon/utils.ts";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
-import { isPageSizePicked, toPagination } from "@/options/components/tableSorters.ts";
+import { toPagination } from "@/options/components/tableSorters.ts";
 import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 // 数据来源
@@ -290,11 +290,8 @@ const tableSelected = ref<TSiteID[]>([]);
 
 // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
-/** 他挑过一档之后仍要量：那一档以实测容量为上限 */
-const pickedSize = computed(() => {
-  const behavior = configStore.tableBehavior.SetSite;
-  return isPageSizePicked(behavior?.itemsPerPage, 50, behavior?.pageSizePicked);
-});
+/** 本次进入这一页之内他挑的那一档：挑过就照他挑的（容量不再压），不持久 —— 重新进来回到实测那档 */
+const sessionSize = ref<number | null>(null);
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,
   rows: () => filteredItems.value,
@@ -304,12 +301,12 @@ const pagination = computed<TablePaginationConfig | false>(() =>
   // 本页默认档是 -1（`config.ts` 里存的就是它）：旧版 Vuetify 用 -1 表示「不分页、一次全展示」。
   // 这个约定由 toPagination 兜底换算成 50（原样交给 antd 会 slice(0,-1) 吃掉最后一行）。
   // 用户 2026-10-06 定的口径也在那条公共实现里：默认档下条目全放得下就不出分页条，
-  // 一旦他在尺寸选择器里挑过一档（存的是不等于默认档的正数）分页条就常驻。
-  toPagination(configStore.tableBehavior.SetSite?.itemsPerPage, 50, {
+  // 一旦他在尺寸选择器里挑过一档（本次进入之内）分页条就常驻。
+  toPagination(sessionSize.value ?? configStore.tableBehavior.SetSite?.itemsPerPage, 50, {
     size: "small",
     totalRows: filteredItems.value.length,
     fitSize: fitPageSize.value,
-    picked: pickedSize.value,
+    picked: sessionSize.value !== null,
     // 用户 2026-10-08：「这个页面大于 50 条时才启用分页」——50 个站以内整页放完，由面板自己滚
     maxSinglePage: 50,
   }),
@@ -323,9 +320,8 @@ function handleTableChange(
   // 只有「报回来的档 ≠ 界面上正在显示的那一档」才算他改了尺寸：翻页与排序也带着当前档回来
   const displayed = pagination.value === false ? 0 : pagination.value?.pageSize ?? 0;
   if (page.pageSize && displayed && page.pageSize !== displayed) {
-    configStore.updateTableBehavior("SetSite", "itemsPerPage", page.pageSize);
-    // 挑档 = 明确意图，从此不再被实测条数盖掉
-    configStore.updateTableBehavior("SetSite", "pageSizePicked", true);
+    // 挑档只活在本次进入里：不写 store（写了也没人读），重新进来又是实测那一档
+    sessionSize.value = page.pageSize;
   }
   const single = Array.isArray(sorter) ? sorter[0] : sorter;
   if (single?.order && single.columnKey) {

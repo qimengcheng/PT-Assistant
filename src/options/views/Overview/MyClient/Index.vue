@@ -39,7 +39,7 @@ import { formatSize, formatDate } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
-import { buildSortOrderMap, isPageSizePicked, makeSorter, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
+import { buildSortOrderMap, makeSorter, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
@@ -843,11 +843,8 @@ const pageSize = computed(() => configStore.tableBehavior["MyClient"]?.itemsPerP
 
 // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
-/** 他挑过一档之后仍要量：那一档以实测容量为上限 */
-const pickedSize = computed(() => {
-  const behavior = configStore.tableBehavior["MyClient"];
-  return isPageSizePicked(behavior?.itemsPerPage, 25, behavior?.pageSizePicked);
-});
+/** 本次进入这一页之内他挑的那一档：挑过就照他挑的（容量不再压），不持久 —— 重新进来回到实测那档 */
+const sessionSize = ref<number | null>(null);
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,
   // 量的是**折叠后真正出现**的那些行：每页条数要按看得见的行数铺满，不是按台账条数
@@ -858,11 +855,11 @@ const { fitted: fitPageSize } = useAutoFitPageSize({
 // 会让 slice(0,-1) 吃掉最后一行），并带上「一页放得下就不出分页条」（用户 2026-10-07）。
 // 总数用折叠后的行数 —— 折叠的意义就是「一屏放得下的条目变多了」，还按 523 条算会白切页。
 const tablePagination = computed(() =>
-  toPagination(pageSize.value, 25, {
+  toPagination(sessionSize.value ?? pageSize.value, 25, {
     size: "small",
     totalRows: grouped.value.rows.length,
     fitSize: fitPageSize.value,
-    picked: pickedSize.value,
+    picked: sessionSize.value !== null,
     extraConfig: { current: tablePage.value, total: grouped.value.rows.length },
   }),
 );
@@ -885,9 +882,8 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   // 当前那一档回来，照 `if (pagination?.pageSize)` 判会把他第一次翻页就误判成挑档。
   const displayed = tablePagination.value === false ? 0 : tablePagination.value?.pageSize ?? 0;
   if (pagination?.pageSize && displayed && pagination.pageSize !== displayed) {
-    configStore.updateTableBehavior("MyClient", "itemsPerPage", pagination.pageSize);
-    // 挑档 = 明确意图，从此不再被实测条数盖掉
-    configStore.updateTableBehavior("MyClient", "pageSizePicked", true);
+    // 挑档只活在本次进入里：不写 store（写了也没人读），重新进来又是实测那一档
+    sessionSize.value = pagination.pageSize;
   }
   tablePage.value = pagination?.current ?? 1;
 }

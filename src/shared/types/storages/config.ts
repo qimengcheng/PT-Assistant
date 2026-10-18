@@ -12,12 +12,6 @@ export type supportThemeType = (typeof supportTheme)[number];
 export type UiTableBehaviorKey = "SetSite" | "SearchEntity" | "MyData" | "DownloadHistory" | "MyClient" | string;
 export interface UiTableBehaviorItem<T = string> {
   itemsPerPage?: number;
-  /**
-   * 用户在尺寸选择器里主动挑过一档（由 handleTableChange 在那一次写下）。
-   * 判「挑没挑过」光靠「存的正数 != 本页默认档」会漏：他挑的正好是默认档时，
-   * 按面板实高算出的容量又会盖回去（口径见 tableSorters.isPageSizePicked）。
-   */
-  pageSizePicked?: boolean;
   columns?: T[];
   sortBy?: { key: T; order: "asc" | "desc" }[];
 }

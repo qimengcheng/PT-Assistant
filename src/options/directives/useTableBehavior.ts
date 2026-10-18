@@ -12,11 +12,11 @@
  *   // column.sortOrder = sortOrderOf("downloadAt")
  *   // <a-table :pagination="pagination" @change="handleTableChange" />
  */
-import { computed, toValue, type ComputedRef, type MaybeRefOrGetter } from "vue";
+import { computed, ref, toValue, type ComputedRef, type MaybeRefOrGetter } from "vue";
 import type { TablePaginationConfig, TableSorterResult } from "antdv-next";
 
 import { useConfigStore } from "@/options/stores/config.ts";
-import { isPageSizePicked, toPagination } from "@/options/components/tableSorters.ts";
+import { toPagination } from "@/options/components/tableSorters.ts";
 import { useAutoFitPageSize } from "./useAutoFitPageSize.ts";
 
 type TSortOrder = "asc" | "desc";
@@ -76,7 +76,6 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
 
   const behavior: ComputedRef<{
     itemsPerPage?: number;
-    pageSizePicked?: boolean;
     columns?: string[];
     sortBy?: ISortBy[];
   }> = computed(() => configStore.tableBehavior[tableKey] ?? {});
@@ -89,12 +88,15 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
 
   const sortBy = computed<ISortBy[]>(() => behavior.value.sortBy ?? []);
 
-  /** 他有没有挑过一档 —— 挑过就用那一档，但实测容量仍是上限（见 toPagination 的 fitSize） */
-  const pickedSize = computed(() =>
-    isPageSizePicked(behavior.value.itemsPerPage, defaultPageSize, behavior.value.pageSizePicked),
-  );
+  /**
+   * 本次进入这一页之内他挑的那一档。开了 autoFit 的页**只认这一份**，不读存下来的档 ——
+   * 所以重新进来又回到「实测铺满、不出滚动条」那一档（用户 2026-10-18 定的两头）。
+   * 没开 autoFit 的页仍走持久化那条（下面 handleTableChange 里分岔）。
+   */
+  const sessionSize = ref<number | null>(null);
 
-  // 挑过档也要继续量：那一档得拿实测容量当上限，不然他挑的 20 在一屏只放得下 15 时就把面板撑出滚动条
+  // 没挑过档时这一档就是每页条数；挑过之后它不再参与（那一档照他挑的，容量压不住）。
+  // 仍然一直量着：他挑档之前是靠它铺满的，而挑完再收起行、窗口变高，重进这一页还得用它。
   const fitted = autoFit ? useAutoFitPageSize(autoFit).fitted : computed(() => 0);
 
   /** configStore 里某列的排序状态 → antd 的受控 sortOrder */
@@ -106,12 +108,12 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
 
   // 分页统一走 tableSorters.toPagination（含 Vuetify -1/0 非法值守卫与 size/showTotal 透传）
   const pagination = computed<TablePaginationConfig | false>(() =>
-    toPagination(itemsPerPage.value, defaultPageSize, {
+    toPagination(autoFit ? (sessionSize.value ?? itemsPerPage.value) : itemsPerPage.value, defaultPageSize, {
       ...(size ? { size } : {}),
       ...(showTotal ? { showTotal } : {}),
       ...(totalRows === undefined ? {} : { totalRows: toValue(totalRows) }),
       // fitSize 没启用时这两个键都不带，toPagination 走它原来那条判据，老页面一字不变
-      ...(autoFit ? { fitSize: fitted.value, picked: pickedSize.value } : {}),
+      ...(autoFit ? { fitSize: fitted.value, picked: sessionSize.value !== null } : {}),
       ...(maxSinglePage ? { maxSinglePage } : {}),
     }),
   );
@@ -128,10 +130,13 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
     // 「他挑了实测那一档」，从此永久锁死。分页条没出（false）时不可能改尺寸，一并跳过。
     const displayed = pagination.value === false ? 0 : pagination.value?.pageSize ?? 0;
     if (page.pageSize && displayed && page.pageSize !== displayed) {
-      configStore.updateTableBehavior(tableKey, "itemsPerPage", page.pageSize);
-      // 挑档 = 明确意图，从此不再被实测条数盖掉。只有开了 autoFit 的页才写这个标记，
-      // 免得给没这功能的页面凭空多存一个键。
-      if (autoFit) configStore.updateTableBehavior(tableKey, "pageSizePicked", true);
+      if (autoFit) {
+        // 开了实测容量的那几页：挑档只活在本页这一次进入里（重新进来回到实测铺满那一档），
+        // 所以**不再往 configStore 写** —— 写了也没人读，留着就是一条死配置（用户 2026-10-18）。
+        sessionSize.value = page.pageSize;
+      } else {
+        configStore.updateTableBehavior(tableKey, "itemsPerPage", page.pageSize);
+      }
     }
 
     const sorters = (Array.isArray(sorter) ? sorter : [sorter]).filter(

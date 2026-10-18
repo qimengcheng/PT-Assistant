@@ -886,7 +886,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   <!-- 顶部那条 a-alert 去掉了：左侧导航已经标出当前页。它 #action 里的两件事没丢 ——
        下载器筛选标签与状态按钮一起并进工具条右端。骨架见 style.css 的 .page。 -->
   <div class="page">
-    <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
+    <a-flex align="center" gap="small" wrap class="page-bar">
       <a-flex align="center" gap="small" wrap>
       <!-- 这一排（含右端那一组）一律 size="small"：2026-10-18 用户看了 v0.108.0 的截图说
            「宽度又不够了，要不这个页面用 size 为 small 的组件吧」。台架量的省幅与阈值见下面
@@ -972,8 +972,12 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
       </a-dropdown>
       </a-flex>
 
-      <!-- 工具条右端：状态筛选 + 下载器筛选标签 + 状态按钮（原 a-alert 的 #action）、自定义列、搜索框 -->
-      <a-flex align="center" gap="small" wrap class="page-bar-extra">
+      <!-- 工具条右端：状态筛选 + 下载器筛选标签 + 状态按钮（原 a-alert 的 #action）、自定义列、搜索框。
+           这一组**不**靠右钉住（`.bar-group` 把 `.page-bar-extra` 的 `margin-left: auto` 关掉）：
+           整排降到 small 档之后中间空出 ~180px，靠右钉住会把那段空白整个留在左组与这一组之间，
+           用户 2026-10-18 指着那道缝说「这里还有空间，可以把按钮往这边挪一挪」⇒ 改成跟着左组顺排，
+           空白落到整条工具条的右端。窄窗口下两组仍然一起 wrap 换行（`.page-bar-extra` 的 `min-width: 0` 留着）。 -->
+      <a-flex align="center" gap="small" wrap class="page-bar-extra bar-group">
         <!-- 固定几选一一律 a-radio-group + button-style="solid"（选中实心蓝底白字），不用 a-segmented：
              segmented 的选中态是灰底轨道上一块白浮标，落在那条浅灰栏里几乎看不出选的是哪个（AGENTS §3.4）。
              `size="small"` 只管到这一排的外观，不改判据。注意 `a-checkbox` 与 `a-tag` **没有** size 这个
@@ -1361,6 +1365,12 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   width: 14px;
   height: 14px;
   margin-right: 4px;
+}
+
+/* 关掉全站那条「工具条右端那一组靠右钉住」（style.css 的 .page-bar-extra）。
+   scoped 选择器自带 (0,2,0)，压得过全局那条 (0,1,0)，不用 !important。 */
+.bar-group {
+  margin-left: 0;
 }
 
 /**

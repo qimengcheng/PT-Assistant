@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-18 10:53:03",
+  "generatedAt": "2026-10-18 12:14:07",
   "headSha": "b99a173",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.108.1",
+      "date": "2026-10-18 12:14:07",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「我的下载器」那条工具条改用紧凑档（small）控件：状态筛选那一组、统计那颗、自定义列与搜索框一排降到 24px，右端那一组不再被挤到第二行，工具条与下面的表体也同档了。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.108.0",
       "date": "2026-10-18 10:53:03",

@@ -888,8 +888,11 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   <div class="page">
     <a-flex align="center" gap="small" wrap justify="space-between" class="page-bar">
       <a-flex align="center" gap="small" wrap>
+      <!-- 这一排（含右端那一组）一律 size="small"：2026-10-18 用户看了 v0.108.0 的截图说
+           「宽度又不够了，要不这个页面用 size 为 small 的组件吧」。台架量的省幅与阈值见下面
+           搜索框那段注释；这一页的表体本来就是 `size="small"`，工具条降档反而与它齐平。 -->
       <a-tooltip :title="t('MyClient.pushToDownloader.navBtn')">
-        <a-button type="text" @click="showPushToDownloaderDialog = true">
+        <a-button size="small" type="text" @click="showPushToDownloaderDialog = true">
           <template #icon><CloudUploadOutlined /></template>
         </a-button>
       </a-tooltip>
@@ -897,32 +900,32 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
       <a-divider type="vertical" />
 
       <a-tooltip :title="t('MyClient.resumeSelected')">
-        <a-button type="text" :disabled="tableSelected.length === 0" @click="() => resumeTorrents(tableSelected)">
+        <a-button size="small" type="text" :disabled="tableSelected.length === 0" @click="() => resumeTorrents(tableSelected)">
           <template #icon><PlayCircleOutlined /></template>
         </a-button>
       </a-tooltip>
       <a-tooltip :title="t('MyClient.pauseSelected')">
-        <a-button type="text" :disabled="tableSelected.length === 0" @click="() => pauseTorrents(tableSelected)">
+        <a-button size="small" type="text" :disabled="tableSelected.length === 0" @click="() => pauseTorrents(tableSelected)">
           <template #icon><PauseOutlined /></template>
         </a-button>
       </a-tooltip>
       <a-tooltip :title="t('MyClient.deleteSelected')">
-        <a-button type="primary" danger :disabled="tableSelected.length === 0" @click="() => openDeleteDialog(tableSelected)">
+        <a-button size="small" type="primary" danger :disabled="tableSelected.length === 0" @click="() => openDeleteDialog(tableSelected)">
           <template #icon><DeleteOutlined /></template>
         </a-button>
       </a-tooltip>
       <a-tooltip :title="t('MyClient.recheckSelected')">
-        <a-button type="text" :disabled="tableSelected.length === 0" @click="() => openRecheckDialog(tableSelected)">
+        <a-button size="small" type="text" :disabled="tableSelected.length === 0" @click="() => openRecheckDialog(tableSelected)">
           <template #icon><ReloadOutlined /></template>
         </a-button>
       </a-tooltip>
       <a-tooltip :title="t('MyClient.speedLimit.batchBtn')">
-        <a-button type="text" :disabled="tableSelected.length === 0" @click="showSpeedLimitDialog = true">
+        <a-button size="small" type="text" :disabled="tableSelected.length === 0" @click="showSpeedLimitDialog = true">
           <template #icon><FieldTimeOutlined /></template>
         </a-button>
       </a-tooltip>
       <a-tooltip :title="t('MyClient.label.batchBtn')">
-        <a-button type="text" :disabled="tableSelected.length === 0" @click="showLabelDialog = true">
+        <a-button size="small" type="text" :disabled="tableSelected.length === 0" @click="showLabelDialog = true">
           <template #icon><TagsOutlined /></template>
         </a-button>
       </a-tooltip>
@@ -930,7 +933,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
       <a-divider type="vertical" />
 
       <a-tooltip :title="t('MyClient.refresh')">
-        <a-button type="text" @click="loadTorrents">
+        <a-button size="small" type="text" @click="loadTorrents">
           <template #icon><ReloadOutlined /></template>
         </a-button>
       </a-tooltip>
@@ -938,7 +941,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
       <!-- auto-refresh controls -->
       <a-dropdown trigger="click">
         <a-tooltip :title="t('MyClient.autoRefresh.btnTitle')">
-          <a-button type="text">
+          <a-button size="small" type="text">
             <template #icon><ClockCircleOutlined /></template>
           </a-button>
         </a-tooltip>
@@ -973,8 +976,9 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
       <a-flex align="center" gap="small" wrap class="page-bar-extra">
         <!-- 固定几选一一律 a-radio-group + button-style="solid"（选中实心蓝底白字），不用 a-segmented：
              segmented 的选中态是灰底轨道上一块白浮标，落在那条浅灰栏里几乎看不出选的是哪个（AGENTS §3.4）。
-             工具条里的控件不写 size —— 这一排是 32px 档，跟同栏那几颗按钮齐平。 -->
-        <a-radio-group v-model:value="stateFilter" name="my-client-state-filter" button-style="solid">
+             `size="small"` 只管到这一排的外观，不改判据。注意 `a-checkbox` 与 `a-tag` **没有** size 这个
+             prop（实测注册表 props），所以那一勾和那颗标签仍按默认档画 —— 这一排是**部分**降档。 -->
+        <a-radio-group v-model:value="stateFilter" name="my-client-state-filter" button-style="solid" size="small">
           <a-radio-button v-for="opt in stateFilterOptions" :key="opt.value" :value="opt.value">
             {{ opt.label }}
           </a-radio-button>
@@ -991,7 +995,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
         </a-tag>
 
         <HoverTip :text="t('MyClient.clientStatusDialog.openBtn')">
-          <a-button type="primary" @click="showClientStatusDialog = true">
+          <a-button size="small" type="primary" @click="showClientStatusDialog = true">
             <template #icon><ThunderboltOutlined /></template>
             {{ allTorrents.length }}
             <ArrowUpOutlined style="color: #389e0d" />
@@ -1001,23 +1005,28 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           </a-button>
         </HoverTip>
 
-        <a-button @click="showColumnDialog = true">
+        <a-button size="small" @click="showColumnDialog = true">
           <template #icon><ColumnWidthOutlined /></template>
           <span>{{ t("MyClient.columnSelector") }}</span>
         </a-button>
 
         <!--
-          200px 是量出来的，不是目测的。`.page` 把工具条那一行钉在 `minmax(48px, auto)`（style.css:312），
-          而这一排的自然宽（左组 401.6 + 缝 8 + 右端那一组）超过容器时，`wrap` 会把右端整组
-          甩到第二行 —— 界面表现就是用户报的「排版错位」。
-          台架（`.tmp-build/bench-myclientbar`，真组件 + 真文案 + token fontSize 13）在他那一栏的
-          实宽 1609 CSS px 下逐档扫过：搜索框 300 / 260 / 220 都还在两行（220 只差 1.6px），
-          200 起条高回到 48.0 一行。那一趟**是带着**那颗「只选了一个下载器」才出现的标签量的
-          （+72），所以 200 已经含了最坏一档，余量 18px；没有标签时余量 90px。
-          代价说清：占位文案「搜索种子名称、Hash、标签、路径」实测 260 完整、220 起被截断，
-          所以这一档那行提示语会缺尾巴（原生 placeholder 只裁、不加省略号）。
+          200px 是量出来的，不是目测的。`.page` 把工具条那一行钉在 `minmax(48px, auto)`（style.css 的 .page），
+          而这一排的自然宽（左组 + 缝 8 + 右端那一组）超过容器内容宽（栏宽 − 左右内衬 8+8 − 边框 1+1）时，
+          `wrap` 会把右端整组甩到第二行 —— 界面表现就是用户报的「排版错位」。
+
+          台架（`.tmp-build/bench-myclientbar`，真组件 + 真文案 + token fontSize 13）两档并排量到：
+            默认档 自然宽 1643.2（中文，当下没有下载器标签）/ 1714.8（带上那颗标签）/ 1772.2（英文）
+            small 档 1411.2 / 1482.8 / 1540.2            —— 也就是这一排降档省 232.0 px
+          他那一栏 `.page` 实宽 1609（本轮又从他这张截图二次核对：面板高 99 设备 px ÷ 1.375 = 72 CSS，
+          同一张图里那颗实心蓝按钮盒高 44 ÷ 1.375 = 32 ⇒ 条高正是台架那两行的一档 73.6）。
+          内容宽 1591，所以默认档怎么都放不下，small + 200 一行、余量 179.8。
+
+          为什么仍留 200 而不是放回 260：small 省出来的宽度够把搜索框抬到 260（中文那一档 1471.2 还是一行，
+          占位文案「搜索种子名称、Hash、标签、路径」实测 260 起才完整），但**英文**那一档 260 是 1600.2 > 1591，
+          会掉回两行 —— 于是这一档那行提示语照旧缺尾巴（原生 placeholder 只裁、不加省略号）。
         -->
-        <a-input v-model:value="searchText" name="my-client-torrent-search" :placeholder="t('MyClient.searchPlaceholder')" allow-clear style="width: 200px">
+        <a-input v-model:value="searchText" name="my-client-torrent-search" size="small" :placeholder="t('MyClient.searchPlaceholder')" allow-clear style="width: 200px">
           <template #prefix><SearchOutlined /></template>
         </a-input>
       </a-flex>

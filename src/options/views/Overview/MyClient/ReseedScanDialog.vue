@@ -156,7 +156,7 @@ const columns = computed<TableColumnsType<IReseedScanResult>>(() => [
   { key: "name", title: t("MyClient.reseedScan.col.name"), width: 240 },
   { key: "site", title: t("MyClient.reseedScan.col.site"), width: 140 },
   { key: "verdict", title: t("MyClient.reseedScan.col.verdict"), width: 150 },
-  { key: "hit", title: t("MyClient.reseedScan.col.hit") },
+  { key: "hit", title: t("MyClient.reseedScan.col.hit"), width: 260 },
   { key: "at", title: t("MyClient.reseedScan.col.at"), width: 150 },
 ]);
 
@@ -381,7 +381,7 @@ onUnmounted(stopPolling);
 </script>
 
 <template>
-  <a-modal v-model:open="showDialog" :title="t('MyClient.reseedScan.title')" :width="920" :mask-closable="false">
+  <a-modal v-model:open="showDialog" :title="t('MyClient.reseedScan.title')" :width="1080" :mask-closable="false">
     <div class="reseed-scan">
       <div class="reseed-scan__row">
         <a-radio-group v-model:value="scopeKey" name="reseed-scan-scope" button-style="solid">
@@ -485,7 +485,7 @@ onUnmounted(stopPolling);
               <template #content>
                 <div class="reveal-text">{{ nameOf(record) }}</div>
               </template>
-              <div class="text-truncate">{{ nameOf(record) }}</div>
+              <div class="text-truncate cell-name">{{ nameOf(record) }}</div>
             </a-popover>
           </template>
 
@@ -508,7 +508,7 @@ onUnmounted(stopPolling);
               <template #content>
                 <div class="reveal-text">{{ hitOf(record) }}</div>
               </template>
-              <div class="text-truncate">{{ hitOf(record) }}</div>
+              <div class="text-truncate cell-hit">{{ hitOf(record) }}</div>
             </a-popover>
             <span v-else class="text-grey">-</span>
           </template>
@@ -563,6 +563,28 @@ onUnmounted(stopPolling);
 
 .reseed-scan__counts {
   font-size: 13px;
+}
+
+/**
+ * 结果表里两格长文字的**绝对**上限。
+ *
+ * 为什么必须给绝对值而不是只挂 `.text-truncate`：这张表没有 `scroll.y`、没有固定列、没有
+ * `ellipsis` 列 ⇒ rc-table 走 **auto** 布局，`<table>` 的宽是 `max-content` —— 列上写的 `width`
+ * 只是建议值，内容长就把格子撑开（台架量到：标题列写了 240，实宽 578），于是右边「站上那条」
+ * 与「查询时间」两列被挤出弹窗（用户 2026-10-18 那句「内容显示不全」就是这个形状）。
+ * 不给绝对上限，`.text-truncate` 从头到尾没截过任何东西。
+ *
+ * 320 / 260 与弹窗那 1080 是一起量出来的（`.tmp-build/bench-reseedlg`，真 a-table + 真 style.css
+ * + fontSize 13，中英两语 × 四档容器宽）：这两格封到 320/260 之后，内宽 ≥ 1000 时
+ * 五列全部可见、表头回到单行（59 → 38）；而**只加宽不截断**要加到内宽 ≥ 1252 才勉强，
+ * 且再长一点的标题还会把右边挤出去 —— 加宽只是把崩溃点推后。1080 = 1000 + 余量。
+ */
+.cell-name {
+  max-width: 320px;
+}
+
+.cell-hit {
+  max-width: 260px;
 }
 
 .reseed-scan__hint {

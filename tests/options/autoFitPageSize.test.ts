@@ -14,6 +14,11 @@
  * - **换轮判据**：原先把 avail 本身摆进轮次身份做等值比较，而 avail 里减掉了横向滚动条
  *   厚度、那个厚度随行数取整，实测晃 1px 就把「退过一次就不再涨回去」的上限清空。
  *   现在改成比差值，阈值 24px 卡在「1px 抖动」与「分页器 56px」之间。
+ * - **上限要能过期**（v0.109.4）：那条「退过一次就不再涨回去」的上限是照**带着子行**的那一屏
+ *   量出来的。人把条目收起来之后它已经作废，不放开就会永久钉在退下去的那一档 ——
+ *   界面上是「下面空一大片」，而手动挑的每页条数被它一路压着（用户 2026-10-18 报的
+ *   「现在手动选择每页的条数没有效果了」）。放开的判据必须只认**我们自己没动 fitted 而子行变少**，
+ *   否则就会把上一轮那个 11 ↔ 12 的来回放回去，所以两向各有一条断言。
  *
  * DOM 那半截（量 rect、挂观察者）Node 里造不出来，归台架 `.tmp-build/bench-taskexpand`；
  * 这里只测纯算术，所以夹具用的是台架量到的真实数（行高 59、可用高 672）。
@@ -68,7 +73,7 @@ describe("① 定初值", () => {
 
   it("空表 / 算不出可用高时什么都不写，也不把本轮标成已量过", () => {
     const empty = nextAutoFitOf({ avail: AVAIL, sample: { heights: [], recordHeights: [] }, fitted: 0, seeded: false, ceiling: Infinity, min: 1 });
-    expect(empty).toEqual({ next: null, seeded: false, ceiling: Infinity });
+    expect(empty).toEqual({ next: null, seeded: false, ceiling: Infinity, seen: { fitted: 0, subs: 0 } });
     const noAvail = nextAutoFitOf({ avail: 0, sample: sample(11), fitted: 0, seeded: false, ceiling: Infinity, min: 1 });
     expect(noAvail.seeded).toBe(false);
   });
@@ -130,6 +135,68 @@ describe("②b 往上加", () => {
   it("退到过的那一档就是本轮上限，同一轮不再涨回去", () => {
     const out = nextAutoFitOf({ avail: AVAIL, sample: sample(10), fitted: 10, seeded: true, ceiling: 10, min: 1 });
     expect(out.next).toBeNull(); // 缝隙够，但 10 已经是本轮退到的位置
+  });
+
+  it("同一档条数下子行变少 = 人把那一行收起来了 → 过期的上限要放开", () => {
+    // 刚才带着 2 条子行退到 9，现在子行没了：9 条记录只占 531px，缝隙 141px 放得下两条。
+    // 上限不放开就会永久钉在 9 —— 界面上是「下面空一大片」，而手动挑的档被它一路压着。
+    const out = nextAutoFitOf({
+      avail: AVAIL,
+      sample: sample(9, 0),
+      fitted: 9,
+      seeded: true,
+      ceiling: 9,
+      seen: { fitted: 9, subs: 2 },
+      min: 1,
+    });
+    expect(out.next).toBe(10);
+    expect(out.ceiling).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("但「子行变少」不能是我们自己退行退出来的 —— 那种情况不许涨回去", () => {
+    // 上一轮是 12 条带 2 子行（超了）→ 退到 11。这一轮 11 条、子行 0（那条被挤出页了）。
+    // 这不是人收的行，fitted 也同时变了，所以上限仍然按住。
+    // 可用高取 720 而不是 672：那样缝隙 71px 放得下一条 59px 的行，误放开就会真的涨回去。
+    const out = nextAutoFitOf({
+      avail: 720,
+      sample: sample(11, 0),
+      fitted: 11,
+      seeded: true,
+      ceiling: 11,
+      seen: { fitted: 12, subs: 2 },
+      min: 1,
+    });
+    expect(out.next).toBeNull();
+    // 同一批数换成人收行（fitted 没变过）就该放开 —— 两条只差 seen.fitted，方向相反
+    const byHand = nextAutoFitOf({
+      avail: 720,
+      sample: sample(11, 0),
+      fitted: 11,
+      seeded: true,
+      ceiling: 11,
+      seen: { fitted: 11, subs: 2 },
+      min: 1,
+    });
+    expect(byHand.next).toBe(12);
+  });
+
+  it("展开→收起走完整一趟：退下去的容量要自己涨回来，且回来之后停在原位不抖", () => {
+    const s = { fitted: 11, seeded: true, ceiling: Number.POSITIVE_INFINITY, seen: undefined as { fitted: number; subs: number } | undefined };
+    const push = (sam: ReturnType<typeof sample>) => {
+      const out = nextAutoFitOf({ avail: AVAIL, sample: sam, fitted: s.fitted, seeded: s.seeded, ceiling: s.ceiling, seen: s.seen, min: 1 });
+      s.seeded = out.seeded;
+      s.ceiling = out.ceiling;
+      s.seen = out.seen;
+      if (out.next !== null) s.fitted = out.next;
+      return out.next;
+    };
+    expect(push(sample(11, 2))).toBe(10); // 展开：13 行超了 → 退
+    expect(push(sample(10, 2))).toBe(9);
+    expect(push(sample(9, 2))).toBeNull(); // 11 行 = 649 ≤ 672，停住
+    expect(push(sample(9, 0))).toBe(10); // 人收起来 → 上限放开，涨回去
+    expect(push(sample(10, 0))).toBe(11);
+    expect(push(sample(11, 0))).toBeNull(); // 649 + 缝隙 23 < 59 → 停在 11，不再来回
+    expect(s.fitted).toBe(11);
   });
 
   it("缝隙要装得下**含子行**的最高那一行才加", () => {

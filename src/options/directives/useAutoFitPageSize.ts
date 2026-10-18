@@ -113,6 +113,10 @@ export interface IAutoFitInput {
   seeded: boolean;
   /** 本轮往回退到过这个值就不再往上涨回去 */
   ceiling: number;
+  /**
+   * 上一轮看到的「(fitted, 子行数)」对，用来判**这一档行形是不是我们自己弄变的**。首轮不传。
+   */
+  seen?: { fitted: number; subs: number } | null;
   /** 行数下限 */
   min: number;
 }
@@ -122,46 +126,64 @@ export interface IAutoFitOutput {
   next: number | null;
   seeded: boolean;
   ceiling: number;
+  /** 原样带回这一轮看到的 (fitted, subs)，给下一轮当 `seen` */
+  seen: { fitted: number; subs: number };
 }
 
 /**
  * 两步收敛的那半截算术，单独摆出来是为了能被 Node 直接断言（DOM 那半截只有台架量得到）。
  * 判据与理由见文件头，边界都不在这里解释。
  */
-export function nextAutoFitOf({ avail, sample, fitted, seeded, ceiling, min }: IAutoFitInput): IAutoFitOutput {
+export function nextAutoFitOf({ avail, sample, fitted, seeded, ceiling, seen, min }: IAutoFitInput): IAutoFitOutput {
   const { heights, recordHeights } = sample;
-  if (avail <= 0 || heights.length === 0 || recordHeights.length === 0) {
-    return { next: null, seeded, ceiling };
+  const records = recordHeights.length;
+  const subs = heights.length - records;
+  const now = { fitted, subs };
+  if (avail <= 0 || heights.length === 0 || records === 0) {
+    return { next: null, seeded, ceiling, seen: now };
   }
+
+  /**
+   * 同一档条数下子行变少了 ⇒ 是人把某一行收起来了，不是我们上一脚退行退出来的（退行必然同时改 fitted）。
+   * 这时「退过一次就不再涨回去」那道上限已经过期 —— 它是照**带着子行**的那一屏量出来的。
+   * 不认这一条，收起子行之后容量会永久钉在那一档，界面上就是「下面空一大片，而手动挑的档被它一路压着」
+   * （用户 2026-10-18 报的「选每页条数没效果」）。
+   */
+  if (seen && seen.fitted === fitted && subs < seen.subs) ceiling = Number.POSITIVE_INFINITY;
 
   const sum = heights.reduce((acc, h) => acc + h, 0);
   const max = Math.max(...heights);
-  const records = recordHeights.length;
   const fullPage = fitted > 0 && records >= fitted;
   let next: number;
 
   if (!seeded) {
     // ①：初值按**记录行**的平均高，能把这一屏铺到只剩几像素
     next = Math.floor(avail / (recordHeights.reduce((acc, h) => acc + h, 0) / records));
-    return withNext(next, { seeded: true, ceiling }, min, fitted);
+    return withNext(next, { seeded: true, ceiling }, min, fitted, now);
   }
   if (sum > avail) {
     // ②a：这一页真正占掉的行高超了可用高 → 往回退一条记录，并把这个值记成上限。
     // 基准取**渲染出来的记录数**而不是 fitted：他挑的那一档被 toPagination 压到
     // min(挑的, 容量) 时渲染记录数比 fitted 小，照 fitted 退要空转好几轮才落到放得下的那一档。
-    return withNext(records - 1, { seeded: true, ceiling: records - 1 }, min, fitted);
+    return withNext(records - 1, { seeded: true, ceiling: records - 1 }, min, fitted, now);
   }
-  if (!fullPage) return { next: null, seeded, ceiling }; // 不满的一页没有「还能不能再塞一行」可判，见文件头
+  if (!fullPage) return { next: null, seeded, ceiling, seen: now }; // 不满的一页没有「还能不能再塞一行」可判，见文件头
   if (fitted < ceiling && avail - sum >= max) {
     // ②b：缝隙还放得下**最高**那一行（含子行），才敢再加一条记录
-    return withNext(fitted + 1, { seeded, ceiling }, min, fitted);
+    return withNext(fitted + 1, { seeded, ceiling }, min, fitted, now);
   }
-  return { next: null, seeded, ceiling }; // 收敛
+  return { next: null, seeded, ceiling, seen: now }; // 收敛
 }
 
-function withNext(raw: number, state: Pick<IAutoFitOutput, "seeded" | "ceiling">, min: number, fitted: number): IAutoFitOutput {
+function withNext(
+  raw: number,
+  state: Pick<IAutoFitOutput, "seeded" | "ceiling">,
+  min: number,
+  fitted: number,
+  seen: IAutoFitOutput["seen"],
+): IAutoFitOutput {
   const next = Math.max(min, raw);
-  return { next: next === fitted ? null : next, ...state };
+  return { next: next === fitted ? null : next, ...state, seen };
 }
 
 /**
@@ -182,6 +204,8 @@ export function useAutoFitPageSize({ container, rows, min = 1 }: IAutoFitPageSiz
   let epoch = "";
   /** 本轮开头量到的 avail，换轮判据拿它比差值（见 EPOCH_AVAIL_STEP） */
   let epochAvail = Number.NaN;
+  /** 上一轮看到的 (fitted, 子行数)，给 `nextAutoFitOf` 认「是人收的行，不是我们退的档」 */
+  let seen: { fitted: number; subs: number } | null = null;
   let observer: ResizeObserver | null = null;
   let mutator: MutationObserver | null = null;
   let observedBody: HTMLElement | null = null;
@@ -243,6 +267,7 @@ export function useAutoFitPageSize({ container, rows, min = 1 }: IAutoFitPageSiz
       epochAvail = avail;
       ceiling = Number.POSITIVE_INFINITY;
       seeded = false;
+      seen = null;
     }
 
     const rowsOfTable = Array.from(el.querySelectorAll<HTMLElement>(ROW_SELECTOR), (tr) => ({
@@ -260,10 +285,12 @@ export function useAutoFitPageSize({ container, rows, min = 1 }: IAutoFitPageSiz
       fitted: fitted.value,
       seeded,
       ceiling,
+      seen,
       min,
     });
     seeded = out.seeded;
     ceiling = out.ceiling;
+    seen = out.seen;
     if (out.next !== null) fitted.value = out.next;
   }
 

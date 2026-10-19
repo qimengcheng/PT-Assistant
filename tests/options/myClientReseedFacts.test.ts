@@ -13,6 +13,7 @@ import {
   buildReseedFacts,
   buildReseedLocalBases,
   buildReseedScanScope,
+  sortReseedScanRows,
   type IReseedRow,
 } from "@/options/views/Overview/MyClient/reseedCandidateView.ts";
 import { reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
@@ -289,5 +290,58 @@ describe("buildReseedScanScope：扫描要吃的那批内容", () => {
     expect(items).toHaveLength(1);
     expect(items[0]!.memberKeys).toEqual(["qb1:1"]);
     expect(items[0]!.knownSites.sort()).toEqual(["novahd", "pandapt"]);
+  });
+});
+
+/**
+ * 扫描结果那张表的默认序（`sortReseedScanRows`）。
+ *
+ * 用户 2026-10-19 报的是「查询时间为什么是乱的」：原先第二键是内容键，那一列压根不参与排序，
+ * 于是屏上 20:55:32 / 20:55:29 / 16:25:33 / 20:55:04 这样跳。站点名一律合成。
+ */
+describe("sortReseedScanRows · 结论档 → 查询时间（新→旧）", () => {
+  const NAMES: Record<string, string> = { s1: "Alpha", s2: "Bravo", s3: "Charlie" };
+  const nameOf = (siteId?: string) => NAMES[siteId ?? ""] ?? siteId ?? "";
+  const row = (siteId: string, verdict: TReseedScanVerdict, at: number): IReseedScanResult =>
+    ({ id: `${verdict}-${siteId}-${at}`, contentKey: "k", siteId, verdict, at }) as IReseedScanResult;
+  const order = (rows: IReseedScanResult[]) => sortReseedScanRows(rows, nameOf).map((item) => item.id);
+
+  it("同档内按时间倒序：那一列读下来就是先后", () => {
+    expect(
+      order([row("s1", "has-it", 30), row("s2", "has-it", 10), row("s3", "has-it", 20)]),
+    ).toEqual(["has-it-s1-30", "has-it-s3-20", "has-it-s2-10"]);
+  });
+
+  it("结论档仍是第一键：最旧的「该站有这条」也排在最新的「没搜到」之前", () => {
+    expect(
+      order([row("s1", "no-match", 999), row("s2", "has-it", 1)]),
+    ).toEqual(["has-it-s2-1", "no-match-s1-999"]);
+  });
+
+  it("四档的先后照界面那一圈的说法，不许把 failed 并进 no-match", () => {
+    expect(
+      order([
+        row("s1", "no-match", 40),
+        row("s1", "failed", 40),
+        row("s1", "suspect", 40),
+        row("s1", "has-it", 40),
+      ]),
+    ).toEqual(["has-it-s1-40", "suspect-s1-40", "failed-s1-40", "no-match-s1-40"]);
+  });
+
+  it("时间相同再按站点名，且两次渲染顺序一致（并发 2，同秒很常见）", () => {
+    const rows = [row("s3", "has-it", 7), row("s1", "has-it", 7), row("s2", "has-it", 7)];
+    const once = sortReseedScanRows(rows, nameOf);
+    expect(once.map((item) => item.id)).toEqual(["has-it-s1-7", "has-it-s2-7", "has-it-s3-7"]);
+    expect(sortReseedScanRows(once, nameOf).map((item) => item.id)).toEqual(once.map((item) => item.id));
+  });
+
+  it("排的是副本，不许就地改传进来那一份（它是界面里那份响应式结果）", () => {
+    // 夹具必须**排完会变序**：第一版给的是 30 在前、10 在后，倒序排完一字不动，
+    // 于是「就地 sort」这种改坏全绿（同一份输入本来就已经是排好的样子）。
+    const rows = [row("s1", "has-it", 10), row("s2", "has-it", 30)];
+    const before = rows.map((item) => item.id);
+    expect(sortReseedScanRows(rows, nameOf).map((item) => item.id)).toEqual([...before].reverse());
+    expect(rows.map((item) => item.id)).toEqual(before);
   });
 });

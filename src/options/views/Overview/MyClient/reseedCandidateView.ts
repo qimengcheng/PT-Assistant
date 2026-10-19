@@ -259,3 +259,28 @@ export function buildReseedLocalBases(
   }
   return [...out.values()];
 }
+
+/** 结论档的先后：查到的在最前，「这次没查成」排在「没搜到」之前（四档不许并，理由见文件头那一族） */
+const SCAN_ROW_RANK: Record<TReseedScanVerdict, number> = { "has-it": 0, suspect: 1, failed: 2, "no-match": 3 };
+
+/**
+ * 扫描结果那张表的默认序：**结论档 → 查询时间（新→旧）→ 站点名**。
+ *
+ * 第一键是结论档：这一屏是给人挑「接下来去哪辅」用的，`has-it` 得整体在最前面。
+ * 第二键原先是「内容键 → 站点名」（想让同一份内容的几站相邻），代价是那一列的
+ * 「查询时间」在屏上跳来跳去 —— 用户 2026-10-19：「查询时间为什么是乱的，按理说肯定是有先后顺序的啊」。
+ * 相邻这点好处不在这条链上承重（要按内容看有结论档筛着、要按时间看那一列自己可点排序），
+ * 所以换成时间倒序：同一档内一眼读得出「这批是刚查的还是上次查的」。
+ * 时间相同（并发 2，同一批里常见）再按站点名定序，保证两次渲染顺序一致。
+ */
+export function sortReseedScanRows<T extends { verdict: TReseedScanVerdict; at: number; siteId: string }>(
+  rows: readonly T[],
+  siteNameOf: (siteId: T["siteId"]) => string,
+): T[] {
+  return [...rows].sort(
+    (a, b) =>
+      SCAN_ROW_RANK[a.verdict] - SCAN_ROW_RANK[b.verdict] ||
+      b.at - a.at ||
+      siteNameOf(a.siteId).localeCompare(siteNameOf(b.siteId)),
+  );
+}

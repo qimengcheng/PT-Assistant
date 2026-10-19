@@ -34,7 +34,7 @@ import {
   type TReseedScanVerdict,
 } from "@/shared/types/storages/reseedScan.ts";
 
-import type { IReseedScanScope } from "./reseedCandidateView.ts";
+import { sortReseedScanRows, type IReseedScanScope } from "./reseedCandidateView.ts";
 
 const showDialog = defineModel<boolean>();
 const props = defineProps<{
@@ -121,8 +121,20 @@ const VERDICT_COLORS: Record<TReseedScanVerdict, string> = {
   failed: "error",
 };
 
-/** 查到的排前面、没查成的排在没搜到之前：这一屏是给人挑「接下来去哪辅」用的 */
-const VERDICT_RANK: Record<TReseedScanVerdict, number> = { "has-it": 0, suspect: 1, failed: 2, "no-match": 3 };
+/**
+ * 默认序（结论档 → 查询时间新→旧 → 站点名）住在 `reseedCandidateView.ts`，与那一屏其余判据放一起，
+ * 能被 Node 断言（改坏一次会红的用例见 `tests/options/myClientReseedFacts.test.ts`）。
+ * 那一列自己也可点排序，所以这里不抢用户挑的那一档。
+ */
+const shownResults = computed(() => {
+  const keys = new Set(activeTargets.value.map((target) => target.contentKey));
+  return sortReseedScanRows(
+    results.value.filter(
+      (item) => keys.has(item.contentKey) && (verdictFilter.value === "all" || item.verdict === verdictFilter.value),
+    ),
+    siteNameOf,
+  );
+});
 
 const verdictCounts = computed(() => {
   const keys = new Set(activeTargets.value.map((target) => target.contentKey));
@@ -131,19 +143,6 @@ const verdictCounts = computed(() => {
     if (keys.has(item.contentKey)) counts[item.verdict] += 1;
   }
   return counts;
-});
-
-const shownResults = computed(() => {
-  const keys = new Set(activeTargets.value.map((target) => target.contentKey));
-  return results.value
-    .filter((item) => keys.has(item.contentKey))
-    .filter((item) => verdictFilter.value === "all" || item.verdict === verdictFilter.value)
-    .sort(
-      (a, b) =>
-        VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict] ||
-        a.contentKey.localeCompare(b.contentKey) ||
-        siteNameOf(a.siteId).localeCompare(siteNameOf(b.siteId)),
-    );
 });
 
 const verdictFilterOptions = computed(() => [
@@ -159,7 +158,7 @@ const columns = computed<TableColumnsType<IReseedScanResult>>(() => [
   { key: "site", title: t("MyClient.reseedScan.col.site"), width: 140 },
   { key: "verdict", title: t("MyClient.reseedScan.col.verdict"), width: 150 },
   { key: "hit", title: t("MyClient.reseedScan.col.hit"), width: 260 },
-  { key: "at", title: t("MyClient.reseedScan.col.at"), width: 150 },
+  { key: "at", title: t("MyClient.reseedScan.col.at"), width: 150, sorter: (a: IReseedScanResult, b: IReseedScanResult) => a.at - b.at },
 ]);
 
 /** 表格里 `record` 是 any（antd 的 bodyCell 插槽不给类型），所以要经这两条取档：模板直接下标会漏进 TS7053 */

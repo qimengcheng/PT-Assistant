@@ -435,6 +435,7 @@
       "reseed": "Reseed found ({count})",
       "reseedTip": "Creates one reseed task per title whose verdict is \"Published there\": the base is the completed copy already in your downloader, and the save path is the folder that copy actually lives in. New tasks are then handed to the background auto-reseed. Entries reading \"Title matches, files unchecked\" are not included.",
       "reseedConfirm": "This creates {count} reseed task(s) covering {sites} site entries and hands them to the background auto-reseed. Continue?",
+      "reseedConfirmCaption": "Local torrent → sites to attach",
       "reseedDone": "Created {count} reseed task(s); the background will send them in turn.",
       "reseedSkipDup": "Another {count} contents were already covered by existing reseed tasks, so nothing was created again.",
       "reseedSkipNoBase": "Another {count} contents had no completed copy in the downloader, so no task was created.",

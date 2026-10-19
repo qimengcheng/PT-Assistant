@@ -10,7 +10,7 @@
  * 四档不许并成两档：「没查成」（要登录 / 超时 / 解析歪了）与「没搜到相符条目」是两种事实，
  * 说成一句会让人以为那个站确实没有这条，从此不去辅 —— 那是假阴性，比不报更糟。
  */
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, h, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ClearOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, BranchesOutlined } from "@antdv-next/icons";
 import type { TableColumnsType } from "antdv-next";
@@ -21,6 +21,7 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import HoverTip from "@/options/components/HoverTip.vue";
+import ReseedHandoffConfirm from "./ReseedHandoffConfirm.vue";
 import { planReseedScan } from "@/shared/reseedScanPlan.ts";
 import { planReseedHandoff, handoffBlocksOf, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
 import { applyReseedTargetDir, reseedTargetDirOf, type IReseedTargetDir } from "@/shared/reseedTargetDir.ts";
@@ -361,11 +362,24 @@ async function reseedNow() {
   if (tasks.length === 0) return;
   const sites = tasks.reduce((sum, task) => sum + (task.items?.length ?? 0), 0);
   const ok = await confirmDanger(
-    t("MyClient.reseedScan.reseedConfirm", { count: tasks.length, sites }),
+    // 只报两个数的确认框等于让人批一次看不见内容的条（用户 2026-10-19：「这个弹窗里能把具体
+    // 哪些种子列出来吗?」）—— 这一批是自动折出来的（基准取下载器里那一份、目录取它所在那一层），
+    // 人没有别处逐条过目，所以那一份清单就摆在这颗键底下。560 是默认 416 装不下一条种子名。
+    h(ReseedHandoffConfirm, {
+      summary: t("MyClient.reseedScan.reseedConfirm", { count: tasks.length, sites }),
+      caption: t("MyClient.reseedScan.reseedConfirmCaption"),
+      // 一行 = 一条要建的任务：本地那一条的名字（建完之后任务页「基准」那一格读的就是它）
+      // + 这一条要挂上去的站点（与上面那张表的「站点」同一份 siteNameOf，不许各折一套）
+      rows: tasks.map((task) => ({
+        name: task.baseLocal?.name || task.title || "",
+        sites: (task.items ?? []).map((item) => siteNameOf(item.site)),
+      })),
+    }),
     "primary",
     // 那一份文案与背景按钮共用（同一个动作，两处数字不许各说一套），所以 count 必须传：
     // 不传时 vue-i18n 把 `{count}` 插成空串，界面上就是「一键辅种（）」（用户 2026-10-18 报的）
     t("MyClient.reseedScan.reseed", { count: tasks.length }),
+    560,
   );
   if (!ok) return;
 

@@ -56,17 +56,26 @@ export type TPromptInDialog = (
  * 有它就是在用坏掉的那条入口。判据在 ESLint（v0.90.5 起；原 `check-confirm-danger.mjs` 已撤）：
  * 脚本侧 `no-restricted-syntax` 选 `Property[key.name='okType']`，模板侧
  * `vue/no-restricted-static-attribute` + `vue/no-restricted-v-bind`。
+ *
+ * `content` 也收 VNode（不只是字符串）：确认框有时要把**将要发生什么**逐条摆出来给人看，
+ * 只给一句总结等于让人在没看到内容的情况下批一次条（一键辅种一次就是几十条任务）。
+ * 传 VNode 时给的那份必须是**组件**而不是页面里 `h()` 拼的一堆节点 —— `modal.confirm` 在另一棵
+ * 组件树里渲染，页面里的 scoped 样式选不到它（只有组件自己的 scoped 样式跟着走）。
+ * `width` 是给这种清单留的：确认框默认 416（`ConfirmDialog.js` 的 `width = 416`），
+ * 装得下一句话，装不下一条上百字符的种子名。
  */
 export function makeConfirmDanger(modal: IDialogModalApi, t: TTranslate) {
   return function confirmDanger(
-    content: string,
+    content: string | VNode,
     tone: "danger" | "primary" = "danger",
     okText: string = t("common.dialog.ok"),
+    width?: number,
   ): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       modal.confirm({
         title: t("common.dialog.title.confirmAction"),
         content,
+        width,
         okButtonProps: tone === "danger" ? { type: "primary", danger: true } : { type: "primary" },
         okText,
         cancelText: t("common.dialog.cancel"),

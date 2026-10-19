@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { debounce } from "es-toolkit";
-import { type TableColumnsType } from "antdv-next";
+import { type TableColumnsType, type TablePaginationConfig, type TableSorterResult } from "antdv-next";
 import {
   CopyOutlined,
   DeleteOutlined,
@@ -11,6 +11,7 @@ import {
   LinkOutlined,
   NumberOutlined,
   QuestionCircleOutlined,
+  SearchOutlined,
   SyncOutlined,
 } from "@antdv-next/icons";
 
@@ -34,6 +35,8 @@ import {
   type IClientCategory,
 } from "@/shared/reseedPath.ts";
 import { pickRelocateCohort, type IRelocateCohort } from "@/shared/reseedMoveCohort.ts";
+import { categoryKindChoices, filterKeepUploadTasks, type TSiteCategoryMapOf } from "@/shared/keepUploadTaskFilter.ts";
+import { categoryKindLabelKey, type TCategoryKind } from "@/shared/category.ts";
 import { watchReseedNotice } from "@/shared/reseedPresence.ts";
 import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
 import { moveReseedCohort } from "@/options/utils/reseedMove.ts";
@@ -71,17 +74,83 @@ type TSendKind = "base" | "other" | "all" | `one:${number}`;
 const sending = ref<Record<string, TSendKind | undefined>>({});
 const sendingOf = (id: string) => sending.value[id];
 
-const { sortOrderOf, pagination, handleTableChange } = useTableBehavior("KeepUploadTask", {
+const {
+  sortOrderOf,
+  pagination: fittedPagination,
+  handleTableChange,
+} = useTableBehavior("KeepUploadTask", {
   // 持久化档缺失或非法（Vuetify 遗留的 -1/0）时的兜底。这一页开了 autoFit，
   // 所以「他挑过一档没有」不再从这一档里猜，而由页内那份 sessionSize 给（用户 2026-10-18）
   defaultPageSize: 25,
   size: "small",
   // 一页放得下就不出分页条（用户 2026-10-07 的全站口径）
-  totalRows: () => tasks.value.length,
+  totalRows: () => visibleTasks.value.length,
   // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
-  autoFit: { container: () => pagePanel.value, rows: () => tasks.value },
+  autoFit: { container: () => pagePanel.value, rows: () => visibleTasks.value },
   // 这页没有默认排序档，所以「点第三下取消」要真能取消，否则存的档会把箭头按回去
   clearOnEmpty: true,
+});
+
+/**
+ * 名称搜索 + 分类筛选（用户 2026-10-19：「这个界面要支持名称搜索和分类筛选」）。
+ * 判据本体在 `@/shared/keepUploadTaskFilter.ts`（能被 Node 断言），这里只做取数与接线。
+ */
+const searchWord = ref("");
+/** 空串 = 不按分类筛。用空串而不是 null 是因为 `a-select` 的清除态给的就是空 */
+const categoryFilter = ref<TCategoryKind | "">("");
+
+/**
+ * 站点 → 该站的用户覆盖表（设置页「其他设置 → 分类映射」那一栏）。
+ * 派生成 computed，不在挂载钩子里命令式读 —— 那是异步水合的 store，首屏会静默空（AGENTS §3.4 第五条）。
+ * 与搜索页「分类」那一列同一份来源，两处不许各读一套。
+ */
+const siteCategoryMaps = computed(() => {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [id, cfg] of Object.entries(metadataStore.sites ?? {})) {
+    const map = cfg.categoryMap;
+    if (map && Object.keys(map).length) out[id] = map;
+  }
+  return out;
+});
+const siteMapOf: TSiteCategoryMapOf = (siteId) => siteCategoryMaps.value[siteId];
+
+const kindFilter = computed<TCategoryKind | null>(() => (categoryFilter.value === "" ? null : categoryFilter.value));
+
+/** 只按名称筛过的那一份：分类下拉的候选由它算，见 `categoryKindChoices` 上那段「不能拿筛完的算」 */
+const wordMatched = computed(() =>
+  filterKeepUploadTasks(tasks.value, { word: searchWord.value, kind: null, siteMapOf }),
+);
+
+const visibleTasks = computed(() =>
+  filterKeepUploadTasks(tasks.value, { word: searchWord.value, kind: kindFilter.value, siteMapOf }),
+);
+
+/** 标签集合必须 computed：里面有 t()，setup 里求值一次的话切语言不重算（AGENTS §3.4） */
+const categoryOptions = computed(() => [
+  { value: "" as const, label: t("KeepUploadTask.filter.categoryAll") },
+  ...categoryKindChoices(wordMatched.value, siteMapOf).map((kind) => ({
+    value: kind,
+    label: t(categoryKindLabelKey(kind)),
+  })),
+]);
+
+/**
+ * 分页在这页是受控的：筛选一变就要回到第 1 页。
+ * 原先不控 `current`，改了筛选会停在「第 3 页」那个位置上，而筛完只剩几条时那一页是空的 ——
+ * 表现就是「搜完什么也没有」，其实数据在上一页（全站那条口径见 AGENTS §3.4 的分页那两行）。
+ */
+const tablePage = ref(1);
+const pagination = computed<TablePaginationConfig | false>(() =>
+  fittedPagination.value === false ? false : { ...fittedPagination.value, current: tablePage.value },
+);
+
+function onTableChange(page: TablePaginationConfig, filters: unknown, sorter: TableSorterResult | TableSorterResult[]) {
+  if (typeof page?.current === "number") tablePage.value = page.current;
+  handleTableChange(page, filters, sorter);
+}
+
+watch([searchWord, categoryFilter], () => {
+  tablePage.value = 1;
 });
 
 /** 没存过排序时整条 sortOrder 都不带：显式给 null 会被 antd 判成受控，点了不排 */
@@ -198,9 +267,12 @@ type TTableRow = ITaskRow | IItemRow;
  * 每次重新映射出新行对象，**不把 `children` 写回任务本身**：那些对象是要经
  * `updateKeepUploadTask` 落进 IDB 的，塞进去就是往用户数据里多存一份派生字段。
  * 所以模板里取任务一律走 `record.task`（条目行也带 `.task`，两种行同一个写法）。
+ *
+ * 数据源是 `visibleTasks`（筛过的那一份），不是 `tasks` —— 「做种状态」那一列的排序发生在
+ * 顶层行上，而分页/实测容量吃的也是这一份（见 `totalRows` / `autoFit.rows`）。
  */
 const tableRows = computed<ITaskRow[]>(() =>
-  tasks.value.map((task) => ({
+  visibleTasks.value.map((task) => ({
     id: task.id,
     kind: "task" as const,
     task,
@@ -1337,6 +1409,25 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           <span class="ml-1">{{ t("common.howToUse") }}</span>
         </a-button>
       </a-flex>
+
+      <!-- 右端那一组：名称搜索 + 分类筛选（用户 2026-10-19：「这个界面要支持名称搜索和分类筛选」）。
+           两个控件共用一层 .page-bar-extra（全站口径：右端只有一个控件时 class 直接挂控件上，
+           多个才包一层，见 style.css 那条注释）。
+           宽度给行内 style 而不是 scoped class —— Select 是多根 / 带 portal，根元素拿不到本组件的
+           data-v-*，`.xxx { width }` 挂上去一条都不生效（AGENTS §3.4）。 -->
+      <a-flex align="center" gap="small" wrap class="page-bar-extra">
+        <a-input
+          v-model:value="searchWord"
+          allow-clear
+          :placeholder="t('common.search')"
+          style="width: 220px; min-width: 120px"
+        >
+          <template #prefix>
+            <SearchOutlined />
+          </template>
+        </a-input>
+        <a-select v-model:value="categoryFilter" :options="categoryOptions" style="width: 140px" />
+      </a-flex>
     </a-flex>
 
     <!-- 面板只负责给表格一块白底表面；这页的表格没有 scroll.y，内部滚动就由面板接管。
@@ -1360,7 +1451,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
       }"
       row-key="id"
       size="small"
-      @change="handleTableChange"
+      @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'site'">

@@ -87,6 +87,9 @@
   "KeepUploadTask": {
     "sendPartiallyFailed": "已发送 {succeeded} 条，{failed} 条失败（{firstReason}）",
     "clearAll": "清空全部",
+    "filter": {
+      "categoryAll": "全部分类"
+    },
     "usage": {
       "title": "辅种怎么用"
     },

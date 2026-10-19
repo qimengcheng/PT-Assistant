@@ -87,6 +87,9 @@
   "KeepUploadTask": {
     "sendPartiallyFailed": "{succeeded} sent, {failed} failed ({firstReason})",
     "clearAll": "Clear All",
+    "filter": {
+      "categoryAll": "All categories"
+    },
     "usage": {
       "title": "How reseeding works"
     },

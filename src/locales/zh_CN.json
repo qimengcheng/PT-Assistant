@@ -391,6 +391,7 @@
     },
     "reseedScan": {
       "title": "可辅种扫描",
+      "openBtn": "可辅种扫描",
       "scope": {
         "pending": "待查的 {count} 条",
         "completed": "已下完的 {count} 条",

@@ -391,6 +391,7 @@
     },
     "reseedScan": {
       "title": "Reseed Scan",
+      "openBtn": "Reseed Scan",
       "scope": {
         "pending": "{count} pending",
         "completed": "{count} completed",

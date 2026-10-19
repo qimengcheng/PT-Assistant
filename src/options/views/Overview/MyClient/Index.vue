@@ -16,6 +16,7 @@ import {
   PlayCircleOutlined,
   ReloadOutlined,
   RightOutlined,
+  ScanOutlined,
   SearchOutlined,
   StopOutlined,
   SwapOutlined,
@@ -1043,6 +1044,19 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           </a-card>
         </template>
       </a-dropdown>
+
+      <!-- 「可辅种扫描」的独立入口（用户 2026-10-19：「这个界面加一个辅种扫描的独立按钮」）。
+           原先这一屏唯一的入口是名称下面那枚「待查 N 站」标记，它要先扫到候选才画得出来 —— 一条都没扫过
+           的时候界面上没有第二处能打开面板的地方。这一档只放图标、不带文字：台架按用户那一栏实宽
+           （容器 1609 / 内容 1591，small 档、搜索框 200）量过，图标档自然宽 1411.2 → 1443.2 仍是一行，
+           而带上「可辅种扫描」四个字是 1520.8，再加上那颗下载器标签就 1592.4 掉到两行（条高 57.6）；
+           英文那一趟图标档 1540.2 → 1572.2 还在一行，文字档 1656.2 已经出界。所以文字档两种语言里
+           只能选一种保一行，不替他重排那一排。 -->
+      <a-tooltip :title="t('MyClient.reseedScan.openBtn')">
+        <a-button size="small" type="text" @click="showReseedScanDialog = true">
+          <template #icon><ScanOutlined /></template>
+        </a-button>
+      </a-tooltip>
       </a-flex>
 
       <!-- 工具条右端：状态筛选 + 下载器筛选标签 + 状态按钮（原 a-alert 的 #action）、自定义列、搜索框。
@@ -1184,9 +1198,11 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
                 :delay="0.4"
               >
                 <!-- 用 a-tag 而不是自绘 chip：底色与前景由 antd 的 token 算，深浅色主题与对比度都不用手写十六进制赌。
-                     这颗标记同时是「可辅种扫描」的入口（点它打开面板）：工具条那一排在用户那一栏宽（实测 1609）
-                     已经放不下了 —— 台架量到带那颗勾的自然宽 1713 > 1609，再加任何控件都要把搜索框压到 120 以下。
-                     所以入口挂在「正好说出这件事的那枚标记」上，而不是再造一颗按钮。 -->
+                     这颗标记也是「可辅种扫描」的入口（点它打开面板），v0.114.4 起不再是唯一的那一个 —— 工具条
+                     添了独立按钮。当时把它挂在这枚标记上的理由是「那一排放不下新控件」（台架量到带那颗勾的自然宽
+                     1713 > 用户那一栏的 1609），那次量的是**默认档 + 带文字**；整排降到 small 之后余量其实只够
+                     **图标档**（1411.2 → 1443.2 仍一行；带「可辅种扫描」四个字 1520.8，再加一颗下载器标签
+                     1592.4 就掉两行）。标记留着不撤：这一行没有可辅缺口时它画不出来，两处的用处不同。 -->
                 <a-tag :color="reseedBadgeColor(record)" class="reseed-candidate-tag" @click="showReseedScanDialog = true">
                   {{ reseedBadgeText(record) }}
                 </a-tag>
@@ -1403,7 +1419,7 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
 
   <PushToDownloaderDialog v-model="showPushToDownloaderDialog" />
 
-  <!-- 「可辅种扫描」：入口是名称下面那枚「待查 N 站」标记（工具条那一排已经放不下新控件，见标记处注释）。
+  <!-- 「可辅种扫描」：两处入口 —— 工具条左端末尾那颗图标按钮，与名称下面那枚可辅种标记（见标记处注释）。
        范围三档与本地指纹要读的下载器都在这里算好传进去，面板自己不再判第二遍。 -->
   <ReseedScanDialog
     v-model="showReseedScanDialog"

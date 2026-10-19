@@ -198,6 +198,27 @@ function splitTags(raw: string | undefined): string[] | undefined {
   return list.length ? list : undefined;
 }
 
+/**
+ * 这条种子的**整条数据**是不是都在本地。
+ *
+ * 不能只看 `progress === 1`：qBittorrent 那一栏是「选定大小」的完成度 —— 官方 WebAPI 写得很明确，
+ * `size` = "Total size of files selected for download"、`total_size` = "Total size of all files
+ * in this torrent (including unselected ones)"，所以**只勾了一部分文件**的种子会把没选的那些整个跳过、
+ * 直接报 progress = 1。这种种子在辅种那条路上不是"已下完"：别的站要的是整条种子的数据，
+ * 推过去就是 0% 下不动（用户 2026-10-19 那张截图：选定 13.93 GiB / 整条 679.51 GiB / 进度 100% /
+ * 可用性 16.1%，而它被当成了辅种基准，推出十几条 0% 已停止的副本）。
+ *
+ * ⚠️ 两个数**报不出来时一律放行**（旧版 WebAPI 没有 `total_size`，未取到元数据时它是 0）：
+ * 这一档是"能不能辅种"的硬闸，误拦会把用户**本地真有数据**的那些一起挡掉 —— 那比少判一条严重得多。
+ */
+export function isFullyDownloaded(torrent: Partial<Pick<rawTorrent, "progress" | "size" | "total_size">>): boolean {
+  if (torrent.progress !== 1) return false;
+  const selected = torrent.size;
+  const whole = torrent.total_size;
+  if (typeof selected !== "number" || typeof whole !== "number" || whole <= 0) return true;
+  return selected >= whole;
+}
+
 interface QbittorrentTorrent extends CTorrent<rawTorrent> {
   id: string;
 }
@@ -661,7 +682,7 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
           break;
       }
 
-      const isCompleted = torrent.progress === 1;
+      const isCompleted = isFullyDownloaded(torrent);
 
       return {
         id: hash,

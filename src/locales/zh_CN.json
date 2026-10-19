@@ -394,9 +394,11 @@
     "reseedCandidate": {
       "badge": "待查 {pending} 站",
       "badgeTip": "这份内容已挂在 {covered} 个站点，已添加的站点里还有 {pending} 个没挂上它、也还没查过。那 {pending} 个站点是否发布过这条种子，需要逐站查询才能确定；点击本标记可打开「可辅种扫描」。",
+      "badgeTipUnknownSite": "这条种子的 Tracker 认不出属于你添加的哪个站点，所以「已挂在几个站点」那一格报不出；{pending} 个已添加的站点都还没查过它。那 {pending} 个站点是否发布过这条种子，需要逐站查询才能确定；点击本标记可打开「可辅种扫描」。",
       "scannedBadge": "已查 {count} 站",
       "foundBadge": "查到 {count} 站有这条",
       "scannedBadgeTip": "这份内容已挂在 {covered} 个站点；其余 {scanned} 个站点都已逐站查过：{hasIt} 个查到确有这条、{suspect} 个标题相符但没验成文件、{noMatch} 个没搜到相符条目、{failed} 个这次没查成。点击本标记可重新扫描，或把查到的那几站一键辅种。",
+      "scannedBadgeTipUnknownSite": "这条种子的 Tracker 认不出属于你添加的哪个站点；{scanned} 个已添加的站点都已逐站查过：{hasIt} 个查到确有这条、{suspect} 个标题相符但没验成文件、{noMatch} 个没搜到相符条目、{failed} 个这次没查成。点击本标记可重新扫描，或把查到的那几站一键辅种。",
       "partialBadge": "只下载了部分文件",
       "partialTip": "进度那一格显示 100%，但这条种子只勾选下载了其中一部分文件，整条数据不在本地。辅种要的是整条，所以它没进「可辅种扫描」的范围，也不会标待查或已查。要让它参与，先在下载器里把剩下的文件勾上下载完。",
       "filterLabel": "只看待查（{count}）"

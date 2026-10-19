@@ -87,8 +87,9 @@ function scanFactsByContent(results: IReseedScanResult[], now: number): Map<stri
  *    raw 里那整串 announce 列表不参与；
  * ② 同内容的几份副本并成一个集合，用的是**折叠那套同一份判据**（`assignGroups` + 辅种台账），
  *    所以被折叠起来、这一屏看不见的那些副本也算已挂，缺口不会虚报。
- * 没进组的行拿自己当组键：一份都认不出站时并集是空的，判据据此退到 `no-site`，
- * 而不是把「不知道」读成「已挂满」或「还差全部站点」。
+ * 没进组的行拿自己当组键：一份都认不出站时并集是空的，判据据此报 `covered: 0` ——
+ * 缺口照算（那条内容仍然值得去查），但界面上「已挂哪些站」那一句要换成「认不出来源站点」
+ * （v0.117.1；把这一档做成提前返回的静默档，代价是它连扫描范围都进不去）。
  */
 function coverOfGroups(
   rows: IReseedRow[],

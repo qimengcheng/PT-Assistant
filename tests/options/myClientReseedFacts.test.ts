@@ -73,16 +73,14 @@ describe("tracker 那一格的各家形态", () => {
     }
   });
 
-  it("整组一条都认不出站 → no-site，那个数不许变成「还差全部站点」", () => {
+  it("整组一条都认不出站 → 照报缺口、covered 0（v0.117.1：这一档不再静默，也不许被挡在扫描范围外）", () => {
     const facts = buildReseedFacts(copies("udp://tracker.unrelated.org/announce", "udp://tracker.unrelated.org/announce"), hostSiteEntries, usable, []);
-    expect(facts.get("qb1:1")?.kind).toBe("no-site");
-    // 对照：真去算缺口会虚报成 usable.length
-    expect(facts.get("qb1:1")).not.toEqual({ kind: "candidate", pending: 3, covered: 0 });
+    for (const key of ["qb1:1", "qb1:2"]) expect(facts.get(key)).toEqual({ kind: "candidate", pending: 3, covered: 0 });
   });
 
-  it("这一格压根没报（undefined / 空串）也走 no-site，不抛", () => {
+  it("这一格压根没报（undefined / 空串）也照算缺口，不抛", () => {
     const facts = buildReseedFacts(copies(undefined, ""), hostSiteEntries, usable, []);
-    expect(facts.get("qb1:1")?.kind).toBe("no-site");
+    expect(facts.get("qb1:1")).toEqual({ kind: "candidate", pending: 3, covered: 0 });
   });
 });
 

@@ -2,8 +2,8 @@
  * 「下载器里这一条值不值得拿去辅种」的判据（`src/shared/reseedCandidate.ts`）。
  *
  * 为什么这一条要进 Vitest：它给界面上那枚「待辅 N 站」供货，而那个 N 是一句**看起来像事实**的话。
- * 判错的方向有两种，都得钉住：把「不知道挂在哪个站」读成「还差一整片站」（虚报缺口），
- * 以及把「已经挂满」读成「还能辅」（让人白搜一遍）。
+ * 判错的两种方向都得钉住：把「已经挂满」读成「还能辅」（让人白搜一遍），以及反过来把一条
+ * 明明能查的内容判成「说不了」而整行静默（v0.117.1 改掉的那一档，见判据文件头）。
  * 站点 id 与数字一律合成，不写真实账号的流量。
  */
 import { describe, expect, it } from "vitest";
@@ -56,14 +56,32 @@ describe("judgeReseedCandidate：四档各管一件事", () => {
     });
   });
 
-  it("一份都认不出站 → no-site，不许读成「还差全部站点」", () => {
-    const verdict = judgeReseedCandidate({ completed: true, coveredSites: [], usableSites: ["siteA", "siteB"] });
-    expect(verdict.kind).toBe("no-site");
-    // 对照：真去算缺口会虚报成 2 —— 那是把「不知道」说成了事实
-    expect(verdict).not.toEqual({ kind: "candidate", pending: 2, covered: 0 });
+  it("一份都认不出站 → 照算缺口、covered 报 0（v0.117.1：这一档不再静默）", () => {
+    // 原先这一档提前返回 `no-site`、界面上什么都不画。代价不只是「少一枚标记」：
+    // `pendingRowKeys` 只认 candidate，于是那一类行连「待查的 N 条」扫描范围都进不去 = 永久看不见。
+    // 「待查 N 站」在这一档是真话（N 个站确实一个都没查过），假话只有「已挂 0 站」那半 —— 交给界面换掉。
+    expect(judgeReseedCandidate({ completed: true, coveredSites: [], usableSites: ["siteA", "siteB"] })).toEqual({
+      kind: "candidate",
+      pending: 2,
+      covered: 0,
+    });
   });
 
-  it("认不出站这一档压在下完之后：没下完就报没下完，不报认不出", () => {
+  it("认不出站的那一条查完全部站点 → 出 scanned，那份结论不许在缺口那一步之前就被丢掉", () => {
+    const verdict = judgeReseedCandidate({
+      completed: true,
+      coveredSites: [],
+      usableSites: ["siteA", "siteB"],
+      scannedSites: ["siteA", "siteB"],
+      scannedVerdicts: [
+        { siteId: "siteA", verdict: "hasIt" },
+        { siteId: "siteB", verdict: "noMatch" },
+      ],
+    });
+    expect(verdict).toEqual({ kind: "scanned", scanned: 2, covered: 0, tally: { hasIt: 1, suspect: 0, noMatch: 1, failed: 0 } });
+  });
+
+  it("认不出站这一档压在下完之后：没下完就报没下完，不报缺口", () => {
     expect(judgeReseedCandidate({ completed: false, coveredSites: [], usableSites: ["siteA"] })).toEqual({ kind: "incomplete", partial: false });
   });
 
@@ -102,6 +120,11 @@ describe("judgeReseedCandidate：四档各管一件事", () => {
     expect(judgeReseedCandidate({ completed: true, coveredSites: ["siteA"], usableSites: [] })).toEqual({
       kind: "all-covered",
       covered: 1,
+    });
+    // 认不出站 + 一个站都没添加：走的是同一条「没有可辅目标」，不许退成「待查 0 站」
+    expect(judgeReseedCandidate({ completed: true, coveredSites: [], usableSites: [] })).toEqual({
+      kind: "all-covered",
+      covered: 0,
     });
   });
 });

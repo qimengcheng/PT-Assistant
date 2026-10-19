@@ -27,6 +27,19 @@
  * `scanned` 档为什么还要带四档计数：「查过了」不等于「那个站没有」。把 `failed`
  * （要登录 / 超时 / 解析歪了）折进「没有」，人就再也不去那个站辅了 —— 那是假阴性，
  * 与 `reseedScanPlan.ts` 文件头「四档不许并成两档」是同一条纪律。
+ *
+ * ## 认不出来源站点的那一条也要报缺口（v0.117.1）
+ *
+ * 这一档原先单独叫 `no-site` 并且**什么都不说**：理由是「没有『已挂』这份事实，缺口那个数
+ * 会是整片站点数，那是假话」。前半句到现在都对，后半句把两件事混成了一件 ——
+ * 「还差 N 站没挂」是假话，「N 站还没查过」是真话，而那枚标记上写的本来就是「待查」。
+ * 沉默换来的代价是现场的三次驳回（用户 2026-10-18 / 10-19 连着三句「这一行为什么没有标记」），
+ * 以及一条更实在的：`pendingRowKeys` 只认 `candidate`，所以那一档**连「待查的 N 条」扫描范围都进不去**
+ * —— 界面上没有标记、扫描又不查，它就成了永久看不见的那一类。
+ *
+ * 所以现在的形状是：`covered` 报 0，缺口按全部站点算，**由界面把那一句假话换成真话**
+ * （浮层改成「Tracker 认不出属于哪个站点，所以已挂这一格报不出」，见 `Index.vue` 的 `reseedBadgeTip`）。
+ * 判据这一层不许为了省事而闭嘴 —— 闭嘴在这里不是保守，是把一条能查的内容永久藏起来。
  */
 
 /** 一条内容在各站上查到的结论分布。四档分开数，界面要哪个都从这里取 */
@@ -38,16 +51,14 @@ export interface IReseedScanTally {
 }
 
 export type TReseedCandidateVerdict =
-  /** 值得辅：内容完整，且还有**没查过**的站点没挂上这份内容 */
+  /** 值得辅：内容完整，且还有**没查过**的站点没挂上这份内容。`covered === 0` = 来源站点认不出，界面要换一句说法 */
   | { kind: "candidate"; pending: number; covered: number }
   /** 没挂上的站点已经全部逐站查过一遍：界面上改标「已查」，不再报待查数 */
   | { kind: "scanned"; scanned: number; covered: number; tally: IReseedScanTally }
   /** 添加的站点已经全挂上了这份内容（没有可辅的目标） */
   | { kind: "all-covered"; covered: number }
   /** 数据还没下完：推过去也做不了种。`partial` = 进度那一格报满、整条数据却不在本地（只勾了部分文件） */
-  | { kind: "incomplete"; partial: boolean }
-  /** 这份内容挂在哪个站一条都认不出来，谈不上「还差哪些站」 */
-  | { kind: "no-site" };
+  | { kind: "incomplete"; partial: boolean };
 
 export interface IReseedCandidateInput {
   /** 这一条（或同内容任一份副本）数据是否已下完 */
@@ -56,7 +67,7 @@ export interface IReseedCandidateInput {
   progress?: number;
   /**
    * 这份内容**已经挂着**的站点，来自同内容全部副本的 tracker 反查并集。
-   * 空数组 = 一份都认不出站（界面上退回「-」而不是「已挂满」）。
+   * 空数组 = 一份都认不出站（这一格报不出，界面上要换成「认不出来源站点」那一句，不许照抄「已挂在 0 个站点」）。
    */
   coveredSites: readonly string[];
   /** 用户添加的站点里可以当作辅种目标的那些（已离线的那几站由调用方剔除） */
@@ -83,16 +94,18 @@ function tallyOf(scannedVerdicts: readonly { siteId: string; verdict: keyof IRes
 }
 
 /**
- * 五档的顺序是判据的一部分：
- * 没下完排第一 —— 它压掉其余一切（认不出站也好、挂满也好，都不该给一条下完的种子标「可辅」）；
- * 认不出站排在算缺口之前 —— 没有「已挂」这份事实，缺口那个数会是整片站点数，那是假话；
+ * 四档的顺序是判据的一部分：
+ * 没下完排第一 —— 它压掉其余一切（认不出站也好、挂满也好，都不该给一条数据不全的种子标「可辅」）；
  * 「查过了」排在「待查」之后 —— 只要还剩一个站没查，那一档就还当值不值得去搜来说。
+ *
+ * `covered` 空**不再是提前返回的一档**（v0.117.1，理由见文件头那一节）：它照旧往下走算缺口，
+ * 于是这一条会进「待查」那枚标记、也进扫描范围。它只影响 `covered` 那个数报 0，
+ * 而 0 该被说成什么，是界面那一层的事。
  */
 export function judgeReseedCandidate(input: IReseedCandidateInput): TReseedCandidateVerdict {
   if (!input.completed) return { kind: "incomplete", partial: (input.progress ?? 0) >= 100 };
 
   const covered = new Set(input.coveredSites.filter((siteId) => !!siteId));
-  if (covered.size === 0) return { kind: "no-site" };
 
   const open = new Set(input.usableSites.filter((siteId) => siteId && !covered.has(siteId)));
   if (open.size === 0) return { kind: "all-covered", covered: covered.size };

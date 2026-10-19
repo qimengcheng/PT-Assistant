@@ -409,9 +409,11 @@ const autoTagSkipped = computed(() => countAutoTagSkips(autoTagPlan.value.skippe
  * 行上那枚标记吃三档：`candidate` 说「还差 N 站没查」，`scanned` 说「没挂的那些站都查过了」，
  * `incomplete` 且进度报满的那一档说「这条只下载了部分文件，压根没进扫描范围」。
  *
- * 另外两档继续安静，是刻意的：`all-covered`（添加的站全挂上了）是个好结果，标出来只会让
- * 人以为出了岔子；`no-site` 的命中面是「所有 tracker 认不出站点的种子」—— 公网种、非 PT 种
- * 全在里面，给他 778 条里那一大片各挂一枚灰标记，是把噪声铺满列表而不是解释。
+ * 只有 `all-covered`（添加的站全挂上了）继续安静，是刻意的：那是个好结果，标出来只会让人以为出了岔子。
+ * 原先还有一档也安静 —— Tracker 认不出属于哪个站（v0.117.0 之前的 `no-site`）。用户 2026-10-19
+ * 第三次指着两行问「这两个还是没有待查的标记」之后判掉了：那一档的沉默不是保守，它让那条内容
+ * **既没有标记、又进不了「待查」的扫描范围**（`pendingRowKeys` 只认 candidate），等于永久看不见。
+ * 现在它照旧报缺口，只把浮层第一句换成「认不出来源站点」，见下面两处 `covered === 0` 分支。
  */
 function reseedBadgeOf(record: CTorrent) {
   const verdict = reseedFacts.value.get(torrentKey(record));
@@ -440,16 +442,22 @@ function reseedBadgeTip(record: CTorrent): string {
   if (verdict.kind === "incomplete") return t("MyClient.reseedCandidate.partialTip");
   if (verdict.kind === "scanned") {
     // 四档各报一个数、不并档：把「这次没查成」折进「那个站没有」会让人从此不去辅那个站
-    return t("MyClient.reseedCandidate.scannedBadgeTip", {
+    const tally = {
       covered: verdict.covered,
       scanned: verdict.scanned,
       hasIt: verdict.tally.hasIt,
       suspect: verdict.tally.suspect,
       noMatch: verdict.tally.noMatch,
       failed: verdict.tally.failed,
-    });
+    };
+    // 「已挂在 0 个站点」不是事实，「Tracker 认不出属于哪个站」才是 —— 这两句只在 covered 为 0 时分岔
+    return verdict.covered === 0
+      ? t("MyClient.reseedCandidate.scannedBadgeTipUnknownSite", tally)
+      : t("MyClient.reseedCandidate.scannedBadgeTip", tally);
   }
-  return t("MyClient.reseedCandidate.badgeTip", { covered: verdict.covered, pending: verdict.pending });
+  return verdict.covered === 0
+    ? t("MyClient.reseedCandidate.badgeTipUnknownSite", { pending: verdict.pending })
+    : t("MyClient.reseedCandidate.badgeTip", { covered: verdict.covered, pending: verdict.pending });
 }
 
 /** 查到有的那一枚标绿，「只下了部分文件」那枚标灰（它说的是排除，不是结果），其余照旧蓝 */

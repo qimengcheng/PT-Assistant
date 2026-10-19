@@ -394,9 +394,11 @@
     "reseedCandidate": {
       "badge": "{pending} sites to check",
       "badgeTip": "This content is already seeded on {covered} site(s); {pending} of your added sites don't carry it yet and haven't been checked. Whether those sites have published this torrent can only be confirmed by checking each one — click this tag to open Reseed Scan.",
+      "badgeTipUnknownSite": "This torrent's tracker doesn't match any site you added, so the \"already seeded on N sites\" figure can't be reported; none of the {pending} added sites has been checked for it yet. Whether those sites have published this torrent can only be confirmed by checking each one — click this tag to open Reseed Scan.",
       "scannedBadge": "{count} sites checked",
       "foundBadge": "Found on {count} sites",
       "scannedBadgeTip": "This content is already seeded on {covered} site(s); the other {scanned} have all been checked one by one: {hasIt} really carry this torrent, {suspect} match by title but files weren't verified, {noMatch} returned no matching entry, {failed} couldn't be checked this time. Click this tag to scan again, or reseed the sites that have it.",
+      "scannedBadgeTipUnknownSite": "This torrent's tracker doesn't match any site you added; all {scanned} added sites have been checked one by one: {hasIt} really carry this torrent, {suspect} match by title but files weren't verified, {noMatch} returned no matching entry, {failed} couldn't be checked this time. Click this tag to scan again, or reseed the sites that have it.",
       "partialBadge": "Partial download",
       "partialTip": "Progress shows 100%, but only some of this torrent's files were selected, so the full data isn't on disk. Reseeding needs the whole torrent, so it isn't part of the Reseed Scan scope and shows neither pending nor checked. Select and download the remaining files first.",
       "filterLabel": "Pending check only ({count})"

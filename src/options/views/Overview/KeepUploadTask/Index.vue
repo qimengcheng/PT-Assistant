@@ -35,7 +35,13 @@ import {
   type IClientCategory,
 } from "@/shared/reseedPath.ts";
 import { pickRelocateCohort, type IRelocateCohort } from "@/shared/reseedMoveCohort.ts";
-import { categoryKindChoices, filterKeepUploadTasks, type TSiteCategoryMapOf } from "@/shared/keepUploadTaskFilter.ts";
+import {
+  categoryKindChoices,
+  filterKeepUploadTasks,
+  reseedStageChoices,
+  type TSiteCategoryMapOf,
+  type TStageOf,
+} from "@/shared/keepUploadTaskFilter.ts";
 import { categoryKindLabelKey, type TCategoryKind } from "@/shared/category.ts";
 import { watchReseedNotice } from "@/shared/reseedPresence.ts";
 import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
@@ -92,12 +98,14 @@ const {
 });
 
 /**
- * 名称搜索 + 分类筛选（用户 2026-10-19：「这个界面要支持名称搜索和分类筛选」）。
+ * 名称搜索 + 分类筛选 + 状态筛选（用户 2026-10-19：「这个界面要支持名称搜索和分类筛选」、
+ * 随后「还要支持状态的筛选」）。
  * 判据本体在 `@/shared/keepUploadTaskFilter.ts`（能被 Node 断言），这里只做取数与接线。
  */
 const searchWord = ref("");
 /** 空串 = 不按分类筛。用空串而不是 null 是因为 `a-select` 的清除态给的就是空 */
 const categoryFilter = ref<TCategoryKind | "">("");
+const stageFilter = ref<TReseedStage | "">("");
 
 /**
  * 站点 → 该站的用户覆盖表（设置页「其他设置 → 分类映射」那一栏）。
@@ -115,14 +123,38 @@ const siteCategoryMaps = computed(() => {
 const siteMapOf: TSiteCategoryMapOf = (siteId) => siteCategoryMaps.value[siteId];
 
 const kindFilter = computed<TCategoryKind | null>(() => (categoryFilter.value === "" ? null : categoryFilter.value));
+const stageFilterOf = computed<TReseedStage | null>(() => (stageFilter.value === "" ? null : stageFilter.value));
 
-/** 只按名称筛过的那一份：分类下拉的候选由它算，见 `categoryKindChoices` 上那段「不能拿筛完的算」 */
+/**
+ * 筛选吃的档位 = 界面上「做种状态」那一格画的同一个数（`taskStage` 折出来的那一档，
+ * 也是那颗「移除已完成」删的那一批）。薄薄一层 `.stage`：`taskStage` 还带着 x/y 那几个计数，
+ * 筛选用不上，不许把那一份对象塞进筛选契约里。
+ */
+const stageOfTask: TStageOf = (task) => taskStage(task).stage;
+
+/**
+ * 只按名称筛过的那一份：两枚下拉的候选都由它算（见 `categoryKindChoices` 上那段「不能拿筛完的算」）。
+ * 两枚下拉**互不缩候选**是刻意的：否则选了「辅种完成」会让「电影」那一档从另一枚里消失，
+ * 人就换不回去 —— 与「选了电影就只剩电影」是同一条理由的两半。
+ */
 const wordMatched = computed(() =>
-  filterKeepUploadTasks(tasks.value, { word: searchWord.value, kind: null, siteMapOf }),
+  filterKeepUploadTasks(tasks.value, {
+    word: searchWord.value,
+    kind: null,
+    stage: null,
+    siteMapOf,
+    stageOf: stageOfTask,
+  }),
 );
 
 const visibleTasks = computed(() =>
-  filterKeepUploadTasks(tasks.value, { word: searchWord.value, kind: kindFilter.value, siteMapOf }),
+  filterKeepUploadTasks(tasks.value, {
+    word: searchWord.value,
+    kind: kindFilter.value,
+    stage: stageFilterOf.value,
+    siteMapOf,
+    stageOf: stageOfTask,
+  }),
 );
 
 /** 标签集合必须 computed：里面有 t()，setup 里求值一次的话切语言不重算（AGENTS §3.4） */
@@ -131,6 +163,24 @@ const categoryOptions = computed(() => [
   ...categoryKindChoices(wordMatched.value, siteMapOf).map((kind) => ({
     value: kind,
     label: t(categoryKindLabelKey(kind)),
+  })),
+]);
+
+/**
+ * 状态下拉那一档的词 = 「做种状态」那一列正在用的那批键（`reseedStageLabel`），同一页不许两个说法。
+ * 只有 `wrong` 那一档例外：现成那句写着「{count} 条未正常做种」，下拉里没有条数、也不该留一个
+ * 空括号（v0.109.7 那句「一键辅种（）」就是这一族被界面画出来的样子），所以那一档改读条目级
+ * 那句不带条数的「未正常做种」。
+ */
+function stageFilterLabel(stage: TReseedStage): string {
+  return stage === "wrong" ? t("KeepUploadTask.recheck.state.wrong") : reseedStageLabel.value[stage];
+}
+
+const stageOptions = computed(() => [
+  { value: "" as const, label: t("KeepUploadTask.filter.stageAll") },
+  ...reseedStageChoices(wordMatched.value, stageOfTask).map((stage) => ({
+    value: stage,
+    label: stageFilterLabel(stage),
   })),
 ]);
 
@@ -149,7 +199,7 @@ function onTableChange(page: TablePaginationConfig, filters: unknown, sorter: Ta
   handleTableChange(page, filters, sorter);
 }
 
-watch([searchWord, categoryFilter], () => {
+watch([searchWord, categoryFilter, stageFilter], () => {
   tablePage.value = 1;
 });
 
@@ -1410,8 +1460,9 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
         </a-button>
       </a-flex>
 
-      <!-- 右端那一组：名称搜索 + 分类筛选（用户 2026-10-19：「这个界面要支持名称搜索和分类筛选」）。
-           两个控件共用一层 .page-bar-extra（全站口径：右端只有一个控件时 class 直接挂控件上，
+      <!-- 右端那一组：名称搜索 + 分类筛选 + 状态筛选（用户 2026-10-19：「这个界面要支持名称搜索和
+           分类筛选」「还要支持状态的筛选」）。
+           三个控件共用一层 .page-bar-extra（全站口径：右端只有一个控件时 class 直接挂控件上，
            多个才包一层，见 style.css 那条注释）。
            宽度给行内 style 而不是 scoped class —— Select 是多根 / 带 portal，根元素拿不到本组件的
            data-v-*，`.xxx { width }` 挂上去一条都不生效（AGENTS §3.4）。 -->
@@ -1427,6 +1478,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
           </template>
         </a-input>
         <a-select v-model:value="categoryFilter" :options="categoryOptions" style="width: 140px" />
+        <a-select v-model:value="stageFilter" :options="stageOptions" style="width: 160px" />
       </a-flex>
     </a-flex>
 

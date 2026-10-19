@@ -88,7 +88,8 @@
     "sendPartiallyFailed": "{succeeded} sent, {failed} failed ({firstReason})",
     "clearAll": "Clear All",
     "filter": {
-      "categoryAll": "All categories"
+      "categoryAll": "All categories",
+      "stageAll": "All statuses"
     },
     "usage": {
       "title": "How reseeding works"

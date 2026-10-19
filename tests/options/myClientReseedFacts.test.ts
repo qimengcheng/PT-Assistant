@@ -92,14 +92,22 @@ describe("完成态按行独立", () => {
     rows[1].completed = false;
     const facts = buildReseedFacts(rows, hostSiteEntries, usable, []);
     expect(facts.get("qb1:1")).toEqual({ kind: "candidate", pending: 1, covered: 2 });
-    expect(facts.get("qb1:2")).toEqual({ kind: "incomplete" });
+    expect(facts.get("qb1:2")).toEqual({ kind: "incomplete", partial: false });
+  });
+
+  it("进度那一格要一路传到判据：满进度 + 没下完 = partial（界面上那枚灰标记吃的是它）", () => {
+    const rows = copies("https://tracker.pandapt.net/announce", "https://novahd.top/announce");
+    rows[1].completed = false;
+    rows[1].progress = 100;
+    const facts = buildReseedFacts(rows, hostSiteEntries, usable, []);
+    expect(facts.get("qb1:2")).toEqual({ kind: "incomplete", partial: true });
   });
 
   it("整组都没下完时也照常把站并起来：判据先报没下完，但那份事实不许丢", () => {
     const rows = copies("https://tracker.pandapt.net/announce", "https://novahd.top/announce");
     rows.forEach((row) => (row.completed = false));
     const facts = buildReseedFacts(rows, hostSiteEntries, usable, []);
-    expect(facts.get("qb1:1")).toEqual({ kind: "incomplete" });
+    expect(facts.get("qb1:1")).toEqual({ kind: "incomplete", partial: false });
   });
 
   it("添加的站点已经全挂上 → all-covered，界面上那枚标记不出", () => {

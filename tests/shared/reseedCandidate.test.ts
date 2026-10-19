@@ -34,6 +34,25 @@ describe("judgeReseedCandidate：四档各管一件事", () => {
   it("没下完排第一：哪怕缺口最大，也不许给出「可辅」", () => {
     expect(judgeReseedCandidate({ completed: false, coveredSites: ["siteA"], usableSites: ["siteA", "siteB", "siteC"] })).toEqual({
       kind: "incomplete",
+      partial: false,
+    });
+  });
+
+  it("进度报满而数据没下完 → partial（界面上那一枚「只下载了部分文件」就是它）", () => {
+    expect(judgeReseedCandidate({ completed: false, progress: 100, coveredSites: ["siteA"], usableSites: ["siteA", "siteB"] })).toEqual({
+      kind: "incomplete",
+      partial: true,
+    });
+  });
+
+  it("还在下（进度没满）不算 partial：那一档界面上不标，标出来就是把噪声铺满列表", () => {
+    expect(judgeReseedCandidate({ completed: false, progress: 60, coveredSites: ["siteA"], usableSites: ["siteA"] })).toEqual({
+      kind: "incomplete",
+      partial: false,
+    });
+    expect(judgeReseedCandidate({ completed: false, coveredSites: ["siteA"], usableSites: ["siteA"] })).toEqual({
+      kind: "incomplete",
+      partial: false,
     });
   });
 
@@ -45,7 +64,7 @@ describe("judgeReseedCandidate：四档各管一件事", () => {
   });
 
   it("认不出站这一档压在下完之后：没下完就报没下完，不报认不出", () => {
-    expect(judgeReseedCandidate({ completed: false, coveredSites: [], usableSites: ["siteA"] })).toEqual({ kind: "incomplete" });
+    expect(judgeReseedCandidate({ completed: false, coveredSites: [], usableSites: ["siteA"] })).toEqual({ kind: "incomplete", partial: false });
   });
 
   it("已添加的站点全挂上了 → all-covered，界面上那枚标记不该出现", () => {

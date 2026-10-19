@@ -366,6 +366,7 @@ const reseedRows = computed<IReseedRow[]>(() =>
     tracker: row.tracker,
     contentPath: row.contentPath,
     completed: row.isCompleted === true,
+    progress: row.progress,
   })),
 );
 
@@ -405,18 +406,25 @@ const autoTagPlan = computed(() =>
 const autoTagSkipped = computed(() => countAutoTagSkips(autoTagPlan.value.skipped));
 
 /**
- * 行上那枚标记吃两档：`candidate` 说「还差 N 站没查」，`scanned` 说「没挂的那些站都查过了」。
- * 其余三档（没下完 / 认不出站 / 已挂满）都安静。
+ * 行上那枚标记吃三档：`candidate` 说「还差 N 站没查」，`scanned` 说「没挂的那些站都查过了」，
+ * `incomplete` 且进度报满的那一档说「这条只下载了部分文件，压根没进扫描范围」。
+ *
+ * 另外两档继续安静，是刻意的：`all-covered`（添加的站全挂上了）是个好结果，标出来只会让
+ * 人以为出了岔子；`no-site` 的命中面是「所有 tracker 认不出站点的种子」—— 公网种、非 PT 种
+ * 全在里面，给他 778 条里那一大片各挂一枚灰标记，是把噪声铺满列表而不是解释。
  */
 function reseedBadgeOf(record: CTorrent) {
   const verdict = reseedFacts.value.get(torrentKey(record));
-  return verdict?.kind === "candidate" || verdict?.kind === "scanned" ? verdict : undefined;
+  if (verdict?.kind === "candidate" || verdict?.kind === "scanned") return verdict;
+  if (verdict?.kind === "incomplete" && verdict.partial) return verdict;
+  return undefined;
 }
 
 /** 标记文字与浮层各算一次判据 —— 模板里不许为非空写感叹号 */
 function reseedBadgeText(record: CTorrent): string {
   const verdict = reseedBadgeOf(record);
   if (!verdict) return "";
+  if (verdict.kind === "incomplete") return t("MyClient.reseedCandidate.partialBadge");
   if (verdict.kind === "scanned") {
     // 查到有的那一档单独说：它是「现在就能去辅」的那一句，比「已查 N 站」更能让人接着往下做
     return verdict.tally.hasIt > 0
@@ -429,6 +437,7 @@ function reseedBadgeText(record: CTorrent): string {
 function reseedBadgeTip(record: CTorrent): string {
   const verdict = reseedBadgeOf(record);
   if (!verdict) return "";
+  if (verdict.kind === "incomplete") return t("MyClient.reseedCandidate.partialTip");
   if (verdict.kind === "scanned") {
     // 四档各报一个数、不并档：把「这次没查成」折进「那个站没有」会让人从此不去辅那个站
     return t("MyClient.reseedCandidate.scannedBadgeTip", {
@@ -443,9 +452,10 @@ function reseedBadgeTip(record: CTorrent): string {
   return t("MyClient.reseedCandidate.badgeTip", { covered: verdict.covered, pending: verdict.pending });
 }
 
-/** 查到有的那一枚标绿，其余照旧蓝 —— 两枚都是「可辅种扫描」面板的入口，颜色只分「有没有结果」 */
+/** 查到有的那一枚标绿，「只下了部分文件」那枚标灰（它说的是排除，不是结果），其余照旧蓝 */
 function reseedBadgeColor(record: CTorrent): string {
   const verdict = reseedBadgeOf(record);
+  if (verdict?.kind === "incomplete") return "default";
   return verdict?.kind === "scanned" && verdict.tally.hasIt > 0 ? "success" : "blue";
 }
 

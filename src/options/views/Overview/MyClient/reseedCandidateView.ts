@@ -21,6 +21,8 @@ export interface IReseedRow extends IRowForGroup {
   tracker?: string;
   /** 数据下完了没有。由调用方从 `isCompleted` 折过来，这里不认各家那套 state 字面 */
   completed: boolean;
+  /** 下载器报的进度（0~100），只用来分出「看着下完了其实只选了部分文件」那一档 */
+  progress?: number;
   /**
    * 数据**实际**所在那一条路径（只有报得出的客户端有，见 `CTorrent.contentPath`）。
    * 一键辅种要靠它才知道该把任务目录定到哪一层 —— `savePath` 是它的上一层。
@@ -156,6 +158,7 @@ export function buildReseedFacts(
       row.key,
       judgeReseedCandidate({
         completed: row.completed,
+        progress: row.progress,
         coveredSites: [...(covered.get(groupKeyOf(row)) ?? [])],
         usableSites,
         ...(scanned ? { scannedSites: [...scanned.scanned], scannedVerdicts: scanned.verdicts } : {}),

@@ -44,14 +44,16 @@ export type TReseedCandidateVerdict =
   | { kind: "scanned"; scanned: number; covered: number; tally: IReseedScanTally }
   /** 添加的站点已经全挂上了这份内容（没有可辅的目标） */
   | { kind: "all-covered"; covered: number }
-  /** 数据还没下完：推过去也做不了种 */
-  | { kind: "incomplete" }
+  /** 数据还没下完：推过去也做不了种。`partial` = 进度那一格报满、整条数据却不在本地（只勾了部分文件） */
+  | { kind: "incomplete"; partial: boolean }
   /** 这份内容挂在哪个站一条都认不出来，谈不上「还差哪些站」 */
   | { kind: "no-site" };
 
 export interface IReseedCandidateInput {
   /** 这一条（或同内容任一份副本）数据是否已下完 */
   completed: boolean;
+  /** 下载器报的进度（0~100）。只用来把「没下完」分成两种：还在下 / 看着下完了其实只选了部分文件 */
+  progress?: number;
   /**
    * 这份内容**已经挂着**的站点，来自同内容全部副本的 tracker 反查并集。
    * 空数组 = 一份都认不出站（界面上退回「-」而不是「已挂满」）。
@@ -87,7 +89,7 @@ function tallyOf(scannedVerdicts: readonly { siteId: string; verdict: keyof IRes
  * 「查过了」排在「待查」之后 —— 只要还剩一个站没查，那一档就还当值不值得去搜来说。
  */
 export function judgeReseedCandidate(input: IReseedCandidateInput): TReseedCandidateVerdict {
-  if (!input.completed) return { kind: "incomplete" };
+  if (!input.completed) return { kind: "incomplete", partial: (input.progress ?? 0) >= 100 };
 
   const covered = new Set(input.coveredSites.filter((siteId) => !!siteId));
   if (covered.size === 0) return { kind: "no-site" };

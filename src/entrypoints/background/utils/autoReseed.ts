@@ -458,7 +458,9 @@ async function autoReseedTick() {
         const liveBase = task.baseLocal ? index.get(String(task.baseLocal.hash).toLowerCase()) : undefined;
         const baseMismatch = task.baseLocal
           ? detectBasePathMismatch({
-              basePath: pickBaseDataPath(liveBase, task.downloadOptions.savePath) ?? task.baseLocal.savePath,
+              basePath:
+                pickBaseDataPath(liveBase, task.downloadOptions.savePath, task.baseLocal.contentIsFile) ??
+                task.baseLocal.savePath,
               taskPath: task.downloadOptions.savePath,
               categories,
             })

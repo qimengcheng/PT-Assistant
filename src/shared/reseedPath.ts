@@ -66,6 +66,23 @@ export function isCategorySavePath(raw?: string | null): boolean {
   return typeof raw === "string" && raw.trim().startsWith(CATEGORY_FOLDER_PREFIX);
 }
 
+/**
+ * 把路径的最后一段切掉，得到它所在那一层（`…/目录/文件` → `…/目录`）。
+ *
+ * 优先切**原样**那一份：切出来的串会被写进任务、会被界面显示、也会发给下载器，保持下载器报的
+ * 那种写法（反斜杠、大小写）比折成归一形状更不容易在别处对不上账。归一会折分隔符、去重斜杠，
+ * 字符数不一定守得住，所以切完再比一次：对不上就退回归一后的那一份。空串 = 没有父层（根目录）。
+ */
+export function parentTorrentPath(rawPath?: string | null): string {
+  const trimmed = (rawPath ?? "").trim();
+  if (!trimmed) return "";
+  const normalized = normalizeTorrentPath(trimmed);
+  const expected = normalized.slice(0, Math.max(0, normalized.lastIndexOf("/")));
+  const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  const raw = cut > 0 ? trimmed.slice(0, cut) : "";
+  return normalizeTorrentPath(raw) === expected ? raw : expected;
+}
+
 /** 分类表里我们吃得下的那一点形状（`/torrents/categories` 的返回值子集，方便造夹具） */
 export interface IClientCategory {
   savePath?: string | null;
@@ -124,7 +141,12 @@ export function detectBasePathMismatch(input: {
 
 /** 这条任务里「基准那份」与「这一批要挂到哪」两点，写成结构型好造夹具 */
 export interface IBasePathBearer {
-  baseLocal?: { hash?: string | null; savePath?: string | null; moveToTaskPath?: boolean } | null;
+  baseLocal?: {
+    hash?: string | null;
+    savePath?: string | null;
+    moveToTaskPath?: boolean;
+    contentIsFile?: boolean;
+  } | null;
   downloadOptions?: { savePath?: string | null } | null;
 }
 
@@ -134,7 +156,8 @@ export interface ILiveTorrentPath {
   savePath?: string | null;
   /**
    * 数据实际所在那一条路径（qBittorrent 的 `content_path`）：多文件种是顶层目录本身，
-   * **单文件种是那个文件**。所以它不能无条件当目录用 —— 这里只在它**等于任务目录**时才认它。
+   * **单文件种是那个文件**。所以它不能无条件当目录用 —— 这里只在它**等于任务目录**、
+   * 或（任务记着它是文件时）**它的父目录等于任务目录**这两档才认它。
    */
   contentPath?: string | null;
 }
@@ -147,16 +170,27 @@ export interface ILiveTorrentPath {
  * 而下载器报回来的 `save_path` 是**它的上一层**，拿那一层去比就会在一条已经对了的任务上
  * 挂出永久的「目录不一致」，并把自动辅种整条按住。
  *
- * 单调性是要的：**只许把「不一致」判成「一致」，绝不反向**。所以两格各比一次，
- * 谁真的等于任务目录就用谁；两边都不等时返回 `savePath`，与改之前一字不差。
- * 这一条守住了存量任务：它们的任务目录本来就等于 `save_path`，第二支命中，结论不变。
+ * 单调性是要的：**只许把「不一致」判成「一致」，绝不反向**。所以各比一次，谁真的等于任务目录就用谁；
+ * 全都不等时返回 `savePath`，与改之前一字不差。这一条守住了存量任务：它们的任务目录本来就等于
+ * `save_path`，那一支命中，结论不变。
+ *
+ * 第三支（`content_path` 的**父目录**等于任务目录 = 单文件种装在一个子目录里那一档，见
+ * `reseedTargetDir.ts` 的 ④）只在任务自己记着「基准那条的 `content_path` 是个文件」时才参与判定。
+ * 少了这道把关就破单调性：多文件种的 `content_path` 也是 `save_path` 的子项，它那个父目录恰好等于
+ * 任务目录时（人把任务目录填成了基准的上一层），这一支会把一条真的「目录不一致」判成一致，
+ * 把该给的提示和该拦的发送一起放掉。
  */
 export function pickBaseDataPath(
   live: ILiveTorrentPath | null | undefined,
   taskPath?: string | null,
+  baseContentIsFile?: boolean,
 ): string | undefined {
   if (!live) return undefined;
   if (taskPath && live.contentPath && isSameTorrentPath(live.contentPath, taskPath)) return live.contentPath;
+  if (taskPath && baseContentIsFile && live.contentPath) {
+    const parent = parentTorrentPath(live.contentPath);
+    if (parent && isSameTorrentPath(parent, taskPath)) return parent;
+  }
   return live.savePath ?? undefined;
 }
 
@@ -193,7 +227,7 @@ export function refreshBaseLocalPaths<T extends IBasePathBearer>(
     if (!task.baseLocal) continue;
     const baseHash = String(task.baseLocal.hash ?? "").toLowerCase();
     const live = torrents.find((x) => String(x.infoHash ?? "").toLowerCase() === baseHash);
-    const livePath = pickBaseDataPath(live, task.downloadOptions?.savePath);
+    const livePath = pickBaseDataPath(live, task.downloadOptions?.savePath, task.baseLocal.contentIsFile);
     if (!livePath || livePath === task.baseLocal.savePath) continue;
     task.baseLocal.savePath = livePath;
     const taskPath = task.downloadOptions?.savePath;

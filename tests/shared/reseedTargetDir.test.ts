@@ -43,13 +43,50 @@ describe("reseedTargetDirOf · 数据目录那一层", () => {
     // 下载器会新建一个叫 `xxx.mkv` 的目录并把整条重下一遍。
     expect(
       reseedTargetDirOf({ savePath: SAVE, contentPath: `${SAVE}/ToyStory.4.2019.mkv`, filePaths: ["ToyStory.4.2019.mkv"] }),
-    ).toEqual({ savePath: SAVE, contentLayout: "NoSubfolder" });
+    ).toEqual({ savePath: SAVE, contentLayout: "NoSubfolder", contentIsFile: true });
+  });
+
+  it("单文件种的那个文件装在子目录里 → 目标是它所在那一层，不是 save_path", () => {
+    // 用户 2026-10-19 第三屏：基准的内容面板是「文件夹 + 一个 .mp4」（`content_path` 比 `save_path`
+    // 深两层，最后那一段是文件名），要挂的那站是裸文件。v0.113.1 只认不带目录的那一半，
+    // 这一档判不出 ⇒ 走老路把裸文件放到 `save_path`，而数据在里面的文件夹里 ⇒ 0% 丢失文件。
+    expect(
+      reseedTargetDirOf({
+        savePath: SAVE,
+        contentPath: `${SAVE}/示例影片2/示例影片2.mp4`,
+        filePaths: ["示例影片2/示例影片2.mp4"],
+      }),
+    ).toEqual({ savePath: `${SAVE}/示例影片2`, contentLayout: "NoSubfolder", contentIsFile: true });
+  });
+
+  it("再往里几层也一样：切掉的是文件名那一段", () => {
+    expect(
+      reseedTargetDirOf({ savePath: "/d/pt", contentPath: "/d/pt/a/b/c.mkv", filePaths: ["a/b/c.mkv"] }),
+    ).toEqual({ savePath: "/d/pt/a/b", contentLayout: "NoSubfolder", contentIsFile: true });
+  });
+
+  it("切出来的那一层保持下载器报的原样写法（反斜杠不折成斜杠）", () => {
+    expect(
+      reseedTargetDirOf({
+        savePath: "D:\\PT\\movies",
+        contentPath: "D:\\PT\\movies\\示例影片\\示例影片.mkv",
+        filePaths: ["示例影片/示例影片.mkv"],
+      }),
+    ).toEqual({ savePath: "D:\\PT\\movies\\示例影片", contentLayout: "NoSubfolder", contentIsFile: true });
   });
 
   it("单文件种那一档不认「清单里那条名字对不上」——判不出就不动", () => {
     // 名字不同 ⇒ content_path 指的不是清单里那个文件，这一档的形状就不成立了
     expect(
       reseedTargetDirOf({ savePath: SAVE, contentPath: `${SAVE}/ToyStory.4.2019.mkv`, filePaths: ["别的片子.mkv"] }),
+    ).toBeNull();
+    // 带子目录时同理：清单那条与 content_path 对不上 ⇒ 不动
+    expect(
+      reseedTargetDirOf({
+        savePath: SAVE,
+        contentPath: `${SAVE}/Dir/Dir.mp4`,
+        filePaths: ["别的目录/别的片子.mp4"],
+      }),
     ).toBeNull();
     // 两条 ⇒ 那是多文件种，而它的清单又都不在某个顶层目录下 ⇒ 判不出，不动
     expect(
@@ -86,8 +123,8 @@ describe("reseedTargetDirOf · 数据目录那一层", () => {
   });
 
   it("content_path 还往下一层 → 不是「顶层目录」那一档，不动", () => {
-    // 这一条同时也是「以 `子目录/文件` 打包的单文件种」那一档：它落在 ④ 之前，照旧判不出。
-    // 已知没覆盖的形状，按「判不出就不动」交回去（不是缺陷，是不替他猜目录）
+    // 这一档 `content_path` 指的是一个**目录**（清单里那条 `ROOT/DISC1/a.mkv` 在它里面），
+    // 既不是④（那个文件）也不是③（直接子项）⇒ 判不出就不动，别替他猜哪一层是数据
     expect(
       reseedTargetDirOf({ savePath: SAVE, contentPath: `${SAVE}/${ROOT}/DISC1`, filePaths: [`${ROOT}/DISC1/a.mkv`] }),
     ).toBeNull();
@@ -131,6 +168,21 @@ describe("applyReseedTargetDir · 三处一起改", () => {
     expect(next.downloadOptions.savePath).toBe(`${SAVE}/${ROOT}`);
     expect(next.baseLocal?.savePath).toBe(`${SAVE}/${ROOT}`);
     expect(next.downloadOptions.addTorrentOptions?.advanceAddTorrentOptions).toEqual({ contentLayout: "NoSubfolder" });
+  });
+
+  it("③ 那一档不写 contentIsFile：基准的 content_path 是个目录，不该被当成文件", () => {
+    const next = applyReseedTargetDir(task(), { ...DIR });
+    expect(next.baseLocal?.contentIsFile).toBeUndefined();
+  });
+
+  it("④ 那一档要同时把「那是个文件」记进任务（目录一致性那道判据自己分不开）", () => {
+    const next = applyReseedTargetDir(task(), {
+      savePath: `${SAVE}/${ROOT}`,
+      contentLayout: "NoSubfolder",
+      contentIsFile: true,
+    });
+    expect(next.baseLocal?.savePath).toBe(`${SAVE}/${ROOT}`);
+    expect(next.baseLocal?.contentIsFile).toBe(true);
   });
 
   it("不碰任务上已有的那一份标签（v0.110.2 那条不许被这次带掉）", () => {
@@ -179,6 +231,33 @@ describe("pickBaseDataPath · 只许把「不一致」判成「一致」", () =>
     // v0.113.1 那一档把目标写成 save_path（数据就摊在那儿），而 content_path 是里面的**文件名**。
     // 这道闸若不分先后地先认 content_path，「一致」就会被判成「不一致」，后台那道硬闸当场停发。
     expect(pickBaseDataPath({ savePath: SAVE, contentPath: `${SAVE}/Zootopia.2.2025.mkv` }, SAVE)).toBe(SAVE);
+  });
+
+  it("基准的文件装在子目录里：任务目录 = 它的父目录时认（要带着 contentIsFile 才认）", () => {
+    // v0.114.1 那一档把目标定成 `save_path/子目录`（数据是 `save_path/子目录/文件`）。
+    // 而下载器报的 save_path 是再上一层，content_path 又比任务目录多一段文件名 ——
+    // 两格都不等于任务目录，不补这一支就会在一条已经对了的任务上挂出永久的「目录不一致」。
+    const live = { savePath: SAVE, contentPath: `${SAVE}/${ROOT}/${ROOT}.mp4` };
+    expect(pickBaseDataPath(live, `${SAVE}/${ROOT}`, true)).toBe(`${SAVE}/${ROOT}`);
+  });
+
+  it("没记 contentIsFile 时不许拿父目录当一致：那是一条真的不一致", () => {
+    // 基准是「一个文件装在 `/d/pt/a` 里」而任务目录写的是 `/d/pt`（多文件种的顶层目录也长这样：
+    // content_path 是 save_path 的子项）。这时 content_path 的父目录恰好等于任务目录，
+    // 不看那道标记就会把一条真的「不一致」判成「一致」—— 该给的提示和该拦的发送一起被放掉。
+    const live = { savePath: "/d/pt", contentPath: "/d/pt/a/x.mkv" };
+    expect(pickBaseDataPath(live, "/d/pt")).toBe("/d/pt");
+    expect(pickBaseDataPath(live, "/d/pt", false)).toBe("/d/pt");
+    // 反过来，任务目录记着「那是个文件」时同一份数据判成一致（= ④ 那一档建出来的任务）
+    expect(pickBaseDataPath(live, "/d/pt/a", true)).toBe("/d/pt/a");
+    // 这一条才是上面那道标记的判据：同一份数据、同一个任务目录，没记就**不许**认
+    expect(pickBaseDataPath(live, "/d/pt/a")).toBe("/d/pt");
+  });
+
+  it("父目录那一支只认紧邻的上一层，不替他猜更深的目录", () => {
+    const live = { savePath: "/d/pt", contentPath: "/d/pt/a/b/x.mkv" };
+    expect(pickBaseDataPath(live, "/d/pt/a/b", true)).toBe("/d/pt/a/b");
+    expect(pickBaseDataPath(live, "/d/pt/a", true)).toBe("/d/pt");
   });
 
   it("两边都不等于任务目录 → 仍报 save_path，与改前同一条结论", () => {

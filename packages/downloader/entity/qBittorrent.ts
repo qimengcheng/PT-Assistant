@@ -115,6 +115,14 @@ const QBittorrentAdvanceAddTorrentOptionsBooleanKey = clientMetaData
 type TQBittorrentAdvanceAddTorrentOptionsBooleanKey = (typeof QBittorrentAdvanceAddTorrentOptionsBooleanKey)[number];
 type TQBittorrentAdvanceAddTorrentOptionsKey = TQBittorrentAdvanceAddTorrentOptionsBooleanKey | string;
 
+/**
+ * qBittorrent `TorrentContentLayout` 的**键名原文**，逐字抄自它自己的枚举
+ * （`src/base/bittorrent/torrentcontentlayout.h`，4.5.0 / 4.6.0 / 5.2.3 三个 tag 一致）。
+ * 服务端拿 `QMetaEnum::keyToValue` 精确匹配，认不出的串静默退回 `Original`，所以这一串
+ * 不是可以随手改写的字符串 —— 改它之前先把上面那三行实测重做一遍。
+ */
+export const QBITTORRENT_CONTENT_LAYOUT_VALUES: string[] = ["Original", "Subfolder", "NoSubfolder"];
+
 type TrueFalseStr = "true" | "false";
 
 enum QbittorrentTorrentState {
@@ -169,6 +177,11 @@ interface rawTorrent {
   uploaded_session: number; // Amount of data uploaded since program open
   amount_left: number; // Amount of data left to download
   save_path: string; // Torrent save path
+  /**
+   * 数据实际所在路径：多文件种 = 顶层目录本身，单文件种 = 那个文件
+   * （qBittorrent `torrent.h` 对 `contentPath()` 的区分）。老版本不报这一格。
+   */
+  content_path?: string;
   completed: number; // Amount of data completed
   max_ratio: number; // Upload max share ratio
   max_seeding_time: number; // Upload max seeding time
@@ -599,6 +612,21 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
       }
     }
 
+    // 内容布局走 `advanceAddTorrentOptions.contentLayout`（辅种要用它，见 `src/shared/reseedTargetDir.ts`）。
+    // 值只能是它那个枚举的**键名原文**：服务端是 `QMetaEnum::keyToValue` 精确匹配，
+    // 认不出的串**静默退回 `Original`**（实测 release-5.2.3 的 `torrentscontroller.cpp` 那三行 +
+    // `utils/string.h` 的 `toEnum`），所以拼错了不会报错、只会「设了等于没设」—— 这里干脆只放行三个真名。
+    // 4.5.0 / 4.6.0 / 5.2.3 三个 tag 的枚举都是这一套名字（逐个拉过源码），更早的没查；
+    // 老拼法 `NoCreateSubfolder` 发过去只会静默不生效，所以不再兼容、也不发。
+    //
+    // 刻意**没**把它登记进上面那份 `clientMetaData.advanceAddTorrentOptions`：那一份被两处界面
+    // 当**布尔开关**渲染（`SetDownloader/Editor.vue` 与 `SentToDownloaderDialog/Index.vue` 都是
+    // `a-switch` 直绑 `opt.key`），一个字符串塞进去就是一颗「拨一下就把布局写成 true」的键。
+    const contentLayout = advanceAddTorrentOptions.contentLayout;
+    if (typeof contentLayout === "string" && QBITTORRENT_CONTENT_LAYOUT_VALUES.includes(contentLayout)) {
+      formData.append("contentLayout", contentLayout);
+    }
+
     // qBittorrent < v5.2.0 returns "Ok." or "Fails." as plain text;
     // qBittorrent >= v5.2.0 returns a JSON object with counts and IDs.
     const res = await this.request<"Ok." | "Fails." | QBittorrentAddTorrentResponse>("/torrents/add", {
@@ -694,6 +722,7 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
         progress: torrent.progress * 100,
         label: torrent.category,
         savePath: torrent.save_path,
+        contentPath: torrent.content_path || undefined,
         totalSize: torrent.total_size,
         ratio: torrent.ratio,
         uploadSpeed: torrent.upspeed,

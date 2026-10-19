@@ -23,6 +23,7 @@ import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import HoverTip from "@/options/components/HoverTip.vue";
 import { planReseedScan } from "@/shared/reseedScanPlan.ts";
 import { planReseedHandoff, handoffBlocksOf, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
+import { applyReseedTargetDir, reseedTargetDirOf, type IReseedTargetDir } from "@/shared/reseedTargetDir.ts";
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import {
   RESEED_SCAN_MAX_PAIRS,
@@ -323,6 +324,38 @@ async function loadExistingTasks() {
   existingTasks.value = await sendMessage("getKeepUploadTasks", undefined).catch(() => [] as IKeepUploadTask[]);
 }
 
+/**
+ * 建任务之前，把这一条的目标从「基准的保存目录」下沉到「数据实际所在那一层」。
+ *
+ * 为什么必须问下载器一次文件清单（用户 2026-10-19：「他们自带的文件夹名称不同，但是文件夹里的
+ * 内容是相同的…需要选到已有的那个不同名的文件夹作为目标，并且在内容布局上选择不创建子文件夹」）：
+ * 下载器报的 `content_path` 有两种形状 —— 多文件种是那个顶层目录，**单文件种是那个文件本身**，
+ * 而这两者在列表里长得一模一样。把后者当目录发下去，下载器会新建一个叫 `xxx.mkv` 的目录并把整条
+ * 重新下一遍，比现在这个 0% 坏得多。所以判据（`reseedTargetDirOf` 那三条）要吃文件清单，
+ * 问不到就整条按老路走。
+ *
+ * 一次一键辅种 = 每条内容各问一次（本地那一台下载器，一个请求一条），拿不到清单的那些照旧。
+ */
+async function reseedTargetDirFor(base: IReseedHandoffBase | undefined): Promise<IReseedTargetDir | null> {
+  if (!base?.contentPath || !base.savePath) return null;
+  const filePaths: string[] = [];
+  // 只有「content_path 比 save_path 深一层」那一档需要清单来证明它是个目录；
+  // 两者相等时数据本来就摊在保存目录里，不必多问一次
+  if (base.contentPath.trim() !== base.savePath.trim()) {
+    if (!base.hash) return null;
+    let files: { path?: string }[] | undefined;
+    try {
+      files = await sendMessage("getClientTorrentFiles", { downloaderId: base.downloaderId, torrent: base.hash });
+    } catch {
+      return null;
+    }
+    for (const file of files ?? []) {
+      if (file.path) filePaths.push(file.path);
+    }
+  }
+  return reseedTargetDirOf({ savePath: base.savePath, contentPath: base.contentPath, filePaths });
+}
+
 async function reseedNow() {
   const tasks = handoff.value.tasks;
   if (tasks.length === 0) return;
@@ -340,7 +373,9 @@ async function reseedNow() {
   let created = 0;
   try {
     for (const task of tasks) {
-      await sendMessage("createKeepUploadTask", task);
+      // 建之前先按基准的实际数据目录定一次目标（判据 `reseedTargetDirOf`，见上面那三行）
+      const base = props.bases.find((item) => !!item.hash && item.hash === task.baseLocal?.hash);
+      await sendMessage("createKeepUploadTask", applyReseedTargetDir(task, await reseedTargetDirFor(base)));
       created += 1;
     }
     // 催后台立刻走一轮：不催的话这批新任务要等下一次定时（最多 1 分钟）才被看到

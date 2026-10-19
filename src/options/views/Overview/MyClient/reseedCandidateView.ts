@@ -21,6 +21,11 @@ export interface IReseedRow extends IRowForGroup {
   tracker?: string;
   /** 数据下完了没有。由调用方从 `isCompleted` 折过来，这里不认各家那套 state 字面 */
   completed: boolean;
+  /**
+   * 数据**实际**所在那一条路径（只有报得出的客户端有，见 `CTorrent.contentPath`）。
+   * 一键辅种要靠它才知道该把任务目录定到哪一层 —— `savePath` 是它的上一层。
+   */
+  contentPath?: string;
 }
 
 /** 行 key → 组键。没进组（或组里只有一条）的行拿自己当组键 */
@@ -248,6 +253,7 @@ export function buildReseedLocalBases(
       hash: row.infoHash,
       name: row.name,
       savePath: row.savePath,
+      contentPath: row.contentPath,
       label: labelOf?.(row.clientId) ?? "",
     });
   }

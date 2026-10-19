@@ -140,6 +140,17 @@ export interface CTorrent<RAW = any> {
   dateAdded: number;
 
   savePath: string;
+  /**
+   * 数据**实际**所在的那一条路径，与 `savePath`（用户设的保存目录）不是一回事：
+   * 多文件种带顶层目录时它是 `savePath/<顶层目录>`，单文件种时它直接指向那个文件
+   * （这一条区分逐字抄自 qBittorrent `src/base/bittorrent/torrent.h` 的注释，不是推的）。
+   *
+   * 只有报得出的客户端才有 —— qBittorrent 的 `content_path` 在 v5.2.3 的列表里确实给
+   * （`src/webui/api/serialize/serialize_torrent.cpp` 的 `KEY_TORRENT_CONTENT_PATH`），
+   * 更老的版本没核对过，拿不到就是 undefined。辅种要靠它才知道「数据到底在哪个目录」，
+   * 见 `src/shared/reseedTargetDir.ts`。
+   */
+  contentPath?: string;
   label?: string;
   state: CTorrentState;
 

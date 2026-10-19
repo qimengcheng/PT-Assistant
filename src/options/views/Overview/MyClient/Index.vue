@@ -362,6 +362,7 @@ const reseedRows = computed<IReseedRow[]>(() =>
     savePath: row.savePath,
     infoHash: row.infoHash,
     tracker: row.tracker,
+    contentPath: row.contentPath,
     completed: row.isCompleted === true,
   })),
 );

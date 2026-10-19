@@ -231,7 +231,12 @@ export interface ProtocolMap {
   createTorrentCategory(data: { downloaderId: string; name: string; savePath: string }): boolean;
 
   // ===== 2.2.3 offscreen：文件级 / peers / tracker 管理 =====
-  getClientTorrentFiles(data: { downloaderId: string; torrent: CTorrent }): CTorrentFile[];
+  /**
+   * `torrent` 允许直接给 infoHash：驱动那层的 `getTorrentHash(string | CTorrent)` 本来就吃两种
+   * （`packages/downloader/types.ts:488`）。一键辅种手上只有基准那一条的 hash，
+   * 拿它去要文件清单是最短的一条路（见 `src/shared/reseedTargetDir.ts`）。
+   */
+  getClientTorrentFiles(data: { downloaderId: string; torrent: CTorrent | string }): CTorrentFile[];
   setClientTorrentFilePriority(data: {
     downloaderId: string;
     torrent: CTorrent;

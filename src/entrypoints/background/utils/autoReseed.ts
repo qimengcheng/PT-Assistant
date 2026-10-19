@@ -36,6 +36,7 @@ import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/
 import {
   detectBasePathMismatch,
   isCategorySavePath,
+  pickBaseDataPath,
   refreshBaseLocalPaths,
   type IClientCategory,
 } from "@/shared/reseedPath.ts";
@@ -457,7 +458,7 @@ async function autoReseedTick() {
         const liveBase = task.baseLocal ? index.get(String(task.baseLocal.hash).toLowerCase()) : undefined;
         const baseMismatch = task.baseLocal
           ? detectBasePathMismatch({
-              basePath: liveBase?.savePath ?? task.baseLocal.savePath,
+              basePath: pickBaseDataPath(liveBase, task.downloadOptions.savePath) ?? task.baseLocal.savePath,
               taskPath: task.downloadOptions.savePath,
               categories,
             })

@@ -132,6 +132,32 @@ export interface IBasePathBearer {
 export interface ILiveTorrentPath {
   infoHash?: string | null;
   savePath?: string | null;
+  /**
+   * 数据实际所在那一条路径（qBittorrent 的 `content_path`）：多文件种是顶层目录本身，
+   * **单文件种是那个文件**。所以它不能无条件当目录用 —— 这里只在它**等于任务目录**时才认它。
+   */
+  contentPath?: string | null;
+}
+
+/**
+ * 基准那条**此刻**的数据目录，用来替掉「一律读 `savePath`」那一句。
+ *
+ * 为什么需要：辅种有一条路会把任务目录定成基准的顶层目录本身（判据在
+ * `src/shared/reseedTargetDir.ts`，用户 2026-10-19 报的「自带文件夹名不同、内容相同」那一档）。
+ * 而下载器报回来的 `save_path` 是**它的上一层**，拿那一层去比就会在一条已经对了的任务上
+ * 挂出永久的「目录不一致」，并把自动辅种整条按住。
+ *
+ * 单调性是要的：**只许把「不一致」判成「一致」，绝不反向**。所以两格各比一次，
+ * 谁真的等于任务目录就用谁；两边都不等时返回 `savePath`，与改之前一字不差。
+ * 这一条守住了存量任务：它们的任务目录本来就等于 `save_path`，第二支命中，结论不变。
+ */
+export function pickBaseDataPath(
+  live: ILiveTorrentPath | null | undefined,
+  taskPath?: string | null,
+): string | undefined {
+  if (!live) return undefined;
+  if (taskPath && live.contentPath && isSameTorrentPath(live.contentPath, taskPath)) return live.contentPath;
+  return live.savePath ?? undefined;
 }
 
 /**
@@ -166,7 +192,8 @@ export function refreshBaseLocalPaths<T extends IBasePathBearer>(
   for (const task of list) {
     if (!task.baseLocal) continue;
     const baseHash = String(task.baseLocal.hash ?? "").toLowerCase();
-    const livePath = torrents.find((x) => String(x.infoHash ?? "").toLowerCase() === baseHash)?.savePath;
+    const live = torrents.find((x) => String(x.infoHash ?? "").toLowerCase() === baseHash);
+    const livePath = pickBaseDataPath(live, task.downloadOptions?.savePath);
     if (!livePath || livePath === task.baseLocal.savePath) continue;
     task.baseLocal.savePath = livePath;
     const taskPath = task.downloadOptions?.savePath;

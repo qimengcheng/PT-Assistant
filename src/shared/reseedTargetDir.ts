@@ -35,15 +35,25 @@ export interface IReseedTargetDir {
 }
 
 /**
- * 基准那条的数据目录。三条判据，任何一条不过就返回 null（= 不改现状）：
+ * 基准那条的数据目录。四条判据，任何一条不过就返回 null（= 不改现状）：
  *
  * ① `contentPath` 拿不到（老客户端、别的下载器）→ null。这一条把整个机制限死在报得出它的下载器上。
  * ② `contentPath === savePath` → 数据直接摊在保存目录里（多文件种、没有顶层目录），
  *    目标就是 `savePath`。这一档**不需要文件清单**：单文件种不可能落在这里（它必然带一段文件名）。
  * ③ `contentPath` 是 `savePath` 的**直接子项**，且文件清单里每一条都以 `<那一段>/` 开头
  *    → 它确实是顶层目录，目标就是 `contentPath`。清单为空 / 缺一条不匹配 → null。
+ * ④ 同样是直接子项，但清单**只有那一条、且它就是这一段文件名**（不带目录）→ 这是**单文件种**，
+ *    `content_path` 指的是那个文件本身而不是目录，数据摊在 `savePath` 里 → 目标就是 `savePath`。
+ *    这一档 v0.111.0 漏了：它被 ③ 那句「每条都在 `<顶层目录>/` 下」挡掉（裸文件名没有那段前缀），
+ *    于是照旧走老路，在保存目录旁边另起一个以新种子命名的空目录（用户 2026-10-19 第二屏：
+ *    同一份 20.09 GiB 的 `.mkv`，一条以文件打包、一条以目录打包，「一个有目录一个没有目录」）。
+ *    名字必须逐字对上才认：对不上就是「不知道这是哪个文件」，照旧不动。
+ *    已知没覆盖的一档：以 `子目录/文件` 打包的单文件种（那一条带斜杠）落不进 ④，被上面那道
+ *    「再往里一层」守卫判成 null —— 判不出就不动，与改之前一样。
  *
  * 其余形状（`contentPath` 在 `savePath` 之外，比如分类管理把数据挪走了）一律 null：判不出就别动。
+ *
+ * ⚠️  与 ④ 的先后不是随便排的：④ 必须排在 ③ 那句 `every` **之前**，否则单文件种先被它判成 null。
  */
 export function reseedTargetDirOf(input: {
   savePath?: string | null;
@@ -68,6 +78,8 @@ export function reseedTargetDirOf(input: {
 
   const paths = (input.filePaths ?? []).map((item) => normalizeTorrentPath(item)).filter((item) => item !== "");
   if (paths.length === 0) return null;
+  // ④ 单文件种：清单里就那一条，而且它的名字正好是 `content_path` 多出来的那一段（不带目录）
+  if (paths.length === 1 && paths[0] === rootFolder) return { savePath, contentLayout: "NoSubfolder" };
   if (!paths.every((item) => item.startsWith(`${rootFolder}/`))) return null;
 
   return { savePath: contentPath, contentLayout: "NoSubfolder" };

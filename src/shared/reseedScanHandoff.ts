@@ -38,7 +38,8 @@ export interface IReseedHandoffBase {
    *
    * 它常常是 `savePath/<顶层目录>`，而那一段目录名各站打包时起的并不一样 —— 一键辅种要把目标
    * 定到它那一层，新副本才认得出盘上已有的数据（用户 2026-10-19 报的 0% 已停止）。
-   * 判据与「拿不准就不动」那三条都在 `src/shared/reseedTargetDir.ts`，这里只负责把它带过来。
+   * 但同一格也可能是 `savePath/那个文件本身`（单文件种），那一档目标反而是 `savePath`。
+   * 判据与「拿不准就不动」那四条都在 `src/shared/reseedTargetDir.ts`，这里只负责把它带过来。
    */
   contentPath?: string;
   /**

@@ -22,6 +22,7 @@ import { extStore } from "@/storage.ts";
 import { ptdIndexDb } from "@/shared/indexdb.ts";
 import {
   planReseedScan,
+  reconcileReseedScanJob,
   reseedScanLocalGroup,
   reseedScanResultId,
   reseedScanScreen,
@@ -50,6 +51,23 @@ async function readJob(): Promise<IReseedScanJob | null> {
 
 async function writeJob(job: IReseedScanJob): Promise<void> {
   await extStore.setItem("reseedScan", job);
+}
+
+/**
+ * 读进度，并顺手把「存储说在跑、这一份 offscreen 里却没有那一轮」对账掉。
+ *
+ * 轮次身份是模块变量 `running`，进度是存储键 —— 插件更新 / 重载只留得下后面那一份，
+ * 于是界面会永远转圈、停止键按了没人接（判据与实测口径见 `reconcileReseedScanJob` 上方那段）。
+ * 对账出来的那一份要**写回去**：不写的话每一次读都重新判一遍、界面每次都重新折一次结论。
+ */
+async function readReconciledJob(): Promise<IReseedScanJob | null> {
+  const stored = await readJob();
+  const healed = reconcileReseedScanJob(stored, running !== null, Date.now());
+  if (healed && healed !== stored) {
+    await writeJob(healed);
+    logger({ msg: "可辅种扫描的进度记录是上一轮留下的（后台已重载），已就地判为中断", level: "warn" });
+  }
+  return healed;
 }
 
 /** 上次查过的全部结论（整表读：一张面板要显示的就是这几百条，按前缀取反而要建 index） */
@@ -342,12 +360,14 @@ onMessage("startReseedScan", async ({ data }) => {
   return job;
 });
 
-onMessage("getReseedScanJob", async () => await readJob());
+onMessage("getReseedScanJob", async () => await readReconciledJob());
 
 onMessage("stopReseedScan", async () => {
   running?.cancel();
-  // 只把标志翻过来：真正落到 stopped 是队列排空之后那一次写（那时才知道还剩几条没排）
-  return await readJob();
+  // 只把标志翻过来：真正落到 stopped 是队列排空之后那一次写（那时才知道还剩几条没排）。
+  // 走 readReconciledJob 是为了「场上压根没有那一轮」那种情况也能当场有个说法，
+  // 而不是把那句 running 原样回给界面（那等于让人再按一次停止）。
+  return await readReconciledJob();
 });
 
 onMessage("getReseedScanResults", async ({ data }) => {

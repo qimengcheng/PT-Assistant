@@ -121,6 +121,15 @@ export interface IReseedScanJob {
   currentSite?: TSiteID;
   /** 内容标题，配合 `currentSite` 说「正在查哪一条的哪个站」 */
   currentName?: string;
+  /**
+   * 这一轮不是被人叫停的，是**读进度时对账出来的**：存储里写着 running，而 offscreen 里
+   * 已经没有那一轮了（插件更新 / 重载把内存清掉，进度键却留着）。判据与后果见
+   * `reseedScanPlan.ts` 的 `reconcileReseedScanJob`。
+   *
+   * 界面上它单独一句话（「扫描已中断」而不是「已停止」）：后者会让人以为是自己刚才那下
+   * 停止键生效了，而这一轮其实早就死了 —— 那正是用户 2026-10-19 报「点停止也没反应」时场上的形状。
+   */
+  interrupted?: boolean;
 }
 
 /**

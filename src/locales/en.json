@@ -413,6 +413,7 @@
         "preparing": "Building the query plan",
         "running": "Scanning",
         "stopped": "Stopped",
+        "interrupted": "Scan interrupted (the background reloaded); you can start again",
         "done": "Run finished"
       },
       "col": {

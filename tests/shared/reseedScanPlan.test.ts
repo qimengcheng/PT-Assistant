@@ -11,6 +11,7 @@ import {
   RESEED_SCAN_SIZE_TOLERANCE_RATIO,
   isReseedScanFresh,
   planReseedScan,
+  reconcileReseedScanJob,
   reseedScanContentKey,
   reseedScanKeywords,
   reseedScanLocalGroup,
@@ -19,7 +20,7 @@ import {
   reseedScanVerdict,
 } from "@/shared/reseedScanPlan.ts";
 import type { ILocalTorrentFingerprintEntry } from "@/shared/fingerprint/types.ts";
-import type { IReseedScanResult, IReseedScanTarget } from "@/shared/types/storages/reseedScan.ts";
+import type { IReseedScanJob, IReseedScanResult, IReseedScanTarget } from "@/shared/types/storages/reseedScan.ts";
 
 const GIB = 1024 ** 3;
 /** 本地那份：一份 10 GiB 的发布名种子，算得出文件清单 */
@@ -278,5 +279,75 @@ describe("reseedScanVerdict：四档不许并成两档", () => {
 
   it("查成了就压得过另一档词的失败：一档报错、一档正常且没结果 → no-match", () => {
     expect(reseedScanVerdict({ requestsSent: 2, requestFailed: false, candidates: 0, filesCompared: false }).verdict).toBe("no-match");
+  });
+});
+
+/**
+ * 「进度键说在跑」与「offscreen 里真有一轮在跑」的对账。
+ *
+ * 这一族 bug 的形状是**一份事实写两处、只有一处有人回收**：轮次身份是模块变量，插件更新 / 重载
+ * 就把它清空，而存储里那句 `running` 永远留着 ⇒ 界面永远转圈、停止键按了没人接
+ * （用户 2026-10-19 报的就是这个）。站点 id 与标题都是合成值。
+ */
+describe("reconcileReseedScanJob · 孤儿轮次", () => {
+  const NOW = 9_000_000;
+  const orphan = (): IReseedScanJob => ({
+    status: "running",
+    startedAt: 1_000,
+    total: 258,
+    done: 172,
+    skipped: 1571,
+    remaining: 3,
+    currentSite: "novahd",
+    currentName: "示例影片",
+  });
+
+  it("存储说在跑而场上没有那一轮 → 判成中断，进度那几格原样留着", () => {
+    const healed = reconcileReseedScanJob(orphan(), false, NOW)!;
+    expect(healed.status).toBe("stopped");
+    expect(healed.interrupted).toBe(true);
+    expect(healed.finishedAt).toBe(NOW);
+    expect({ total: healed.total, done: healed.done, skipped: healed.skipped, remaining: healed.remaining }).toEqual({
+      total: 258,
+      done: 172,
+      skipped: 1571,
+      remaining: 3,
+    });
+    // 「正在查哪一对」说的是那一轮，轮次没了就不该再点名一个不存在的查询
+    expect(healed.currentSite).toBeUndefined();
+    expect(healed.currentName).toBeUndefined();
+  });
+
+  it("改判返回的是新对象，不许就地改传进来那一份（调用方拿引用相等判有没有改过）", () => {
+    const stored = orphan();
+    const healed = reconcileReseedScanJob(stored, false, NOW)!;
+    expect(healed).not.toBe(stored);
+    expect(stored.status).toBe("running");
+    expect(stored.interrupted).toBeUndefined();
+  });
+
+  it("场上真有一轮时一个字都不动：那是正在跑的，不是孤儿", () => {
+    const stored = orphan();
+    expect(reconcileReseedScanJob(stored, true, NOW)).toBe(stored);
+  });
+
+  it("其余三档一律原样返回，也不许补 interrupted", () => {
+    for (const status of ["idle", "stopped", "done"] as const) {
+      const job: IReseedScanJob = { status, startedAt: 1, total: 10, done: 10 };
+      expect(reconcileReseedScanJob(job, false, NOW)).toBe(job);
+    }
+    // 人自己按过停止的那一条：已经 stopped，不许被这次对账改写成「中断」
+    const byHand: IReseedScanJob = { status: "stopped", startedAt: 1, total: 10, done: 4, finishedAt: 2 };
+    expect(reconcileReseedScanJob(byHand, false, NOW)).toBe(byHand);
+  });
+
+  it("没有进度记录时返回 null：没跑过不等于在跑", () => {
+    expect(reconcileReseedScanJob(null, false, NOW)).toBeNull();
+    expect(reconcileReseedScanJob(null, true, NOW)).toBeNull();
+  });
+
+  it("判过一次之后不会反复改判：第二次读进来已经是 stopped", () => {
+    const once = reconcileReseedScanJob(orphan(), false, NOW)!;
+    expect(reconcileReseedScanJob(once, false, NOW + 1)).toBe(once);
   });
 });

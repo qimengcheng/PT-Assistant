@@ -188,7 +188,10 @@ const statusText = computed(() => {
   if (current.status === "running") {
     return current.total === 0 ? t("MyClient.reseedScan.status.preparing") : t("MyClient.reseedScan.status.running");
   }
-  if (current.status === "stopped") return t("MyClient.reseedScan.status.stopped");
+  if (current.status === "stopped") {
+    // 「已停止」只说人叫停的那一种：中断那一档不是他按出来的，写成同一句会让人以为停止键生效了
+    return current.interrupted ? t("MyClient.reseedScan.status.interrupted") : t("MyClient.reseedScan.status.stopped");
+  }
   return t("MyClient.reseedScan.status.done");
 });
 

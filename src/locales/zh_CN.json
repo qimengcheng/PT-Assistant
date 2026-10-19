@@ -413,6 +413,7 @@
         "preparing": "正在排查询计划",
         "running": "扫描中",
         "stopped": "已停止",
+        "interrupted": "扫描已中断（后台已重载），可重新开始",
         "done": "本轮已完成"
       },
       "col": {

@@ -14,7 +14,7 @@
 import { buildTitleSizeKey, normalizeTitle } from "./fingerprint/title.ts";
 import { toSizeBytes } from "./torrentSize.ts";
 import type { ILocalTorrentFingerprintEntry } from "./fingerprint/types.ts";
-import { RESEED_SCAN_FAILED_RETRY_MS, RESEED_SCAN_TTL_MS, type IReseedScanResult, type IReseedScanTarget, type TReseedScanVerdict } from "./types/storages/reseedScan.ts";
+import { RESEED_SCAN_FAILED_RETRY_MS, RESEED_SCAN_TTL_MS, type IReseedScanJob, type IReseedScanResult, type IReseedScanTarget, type TReseedScanVerdict } from "./types/storages/reseedScan.ts";
 
 /** 一次要查的一对：某条内容 × 某个站 */
 export interface IReseedScanPair {
@@ -246,4 +246,38 @@ export function reseedScanVerdict(input: IReseedScanOutcome): { verdict: TReseed
   }
   // 没验成文件（本地算不出清单、或候选那条下不下来）：只能说「相符，未验文件」
   return { verdict: "suspect", note: input.note };
+}
+
+/**
+ * 「存储里写着在跑」与「这一份 offscreen 里真的有一轮在跑」两件事的**对账**。
+ *
+ * 为什么要这一处（用户 2026-10-19：「现在一打开这个界面这里就转圈圈，点停止也没反应」）：
+ * 一轮扫描的**身份**（谁在跑、怎么叫停）是 offscreen 模块里的一个变量，而**进度**落在
+ * `chrome.storage` 的 `reseedScan` 键上 —— 一份事实写两处，其中一处没人回收。插件更新 / 重载
+ * （他今天就装了 v0.113.1 与 v0.114.0 两次）会把 offscreen 连内存一起清掉，那一轮真的没了，
+ * 存储里那句 `running` 却永远留着。于是这一屏死锁：界面读到 running 就以为在跑 ⇒「开始扫描」
+ * 转圈且点下去直接早退，「停止」把 `cancel()` 发给一个已经不存在的对象 ⇒ 什么都不动。
+ * 不是「进度慢」：站点请求本身有 30 秒上限（`AbstractBittorrentSite` 给 axios 兜的 timeout），
+ * 真在跑的一轮不会长时间一格不动。
+ *
+ * 判据是**单向**的：只有「存储说 running **且**场上确实没有那一轮」才改判，改完写成
+ * `stopped + interrupted`（那句「已中断」是给界面看的，不许写成「已停止」—— 那不是人叫停的）；
+ * 其余一切情况**原样返回同一个对象**，让调用方拿引用相等就能判「有没有改过」。
+ * 反过来（场上有轮、存储说没跑）不在这条路上：那种状态下一轮自己会写回来。
+ */
+export function reconcileReseedScanJob(
+  stored: IReseedScanJob | null,
+  liveRound: boolean,
+  now: number,
+): IReseedScanJob | null {
+  if (!stored || stored.status !== "running" || liveRound) return stored;
+  // 一份新对象，不许就地改传进来那一份：调用方靠「引用变了没有」决定要不要写回存储
+  const healed: IReseedScanJob = { ...stored };
+  healed.status = "stopped";
+  healed.interrupted = true;
+  healed.finishedAt = now;
+  // 那两格说的是「正在查哪一对」，轮次已经没了，留着会让界面继续点名一个不存在的查询
+  healed.currentSite = undefined;
+  healed.currentName = undefined;
+  return healed;
 }

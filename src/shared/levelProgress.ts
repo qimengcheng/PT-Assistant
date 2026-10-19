@@ -20,7 +20,11 @@
  * 界面那一行同时把「还差」那一项的**原始缺口**画出来（不画折过权重的数），顺序与依据才落在同一个数上。
  * 算不出汇率的那一边在总分里记 0（下界），不把已经称得出重量的那半抹成「不知道」；两边都没得称才 null。
  *
- * 层与层的先后照旧：分档 → 差几项 → 代价（v0.83.0 定的第一、二层，2026-10-17 只换了第三层的算法）。
+ * 层与层的先后：**分档 → 已达标 → 代价 → 差几项**（后两层是 v0.110.3 换的顺序）。
+ * 原先「差几项」压在代价之前（v0.83.0 定的第二层），表现是**还差 285.70 GiB 的那一站排在
+ * 还差 50 GiB 的前面**（只因为前者差 1 项、后者差 2 项）—— 用户 2026-10-19 指着这一屏问
+ * 「为什么 50G 的反而排在后面，这个不是更容易些吗？」。那一档的名字就叫「离升级要求最近」，
+ * 项数压住远近连这个名字都不成立，所以改成远近优先、项数只在代价并列时说话。
  */
 
 /**
@@ -221,20 +225,27 @@ export function rankLevelProgress(input: ILevelProgressInput): ILevelProgressRan
 }
 
 /**
- * 排序：先分档，同档内「差几项」少的在前，再比折成上传代价的总分（小的在前）。
+ * 排序：先分档；同档内「已经达标（差 0 项）」最前，再比折成上传代价的总分（小的在前），
+ * 代价并列（含两边都算不出）才比差几项。
  * 并列时这里返回 0，由调用方接着按站点名比 —— 代价里没有站点名，
  * 而调用方手里那一行同时有 rank 和站点名，兜底放在它那边只有一份。
+ *
+ * 为什么差 0 项要单独拦一道：它的代价是 `null`（没有未达标项可折），落到下面那行会被
+ * 当成「不知道」排到最后 —— 而它的意思是「已经到了」，不是「远近未知」。
  */
 export function compareLevelProgress(a: ILevelProgressRank, b: ILevelProgressRank): number {
   const stateDiff = LEVEL_STATE_ORDER.indexOf(a.state) - LEVEL_STATE_ORDER.indexOf(b.state);
   if (stateDiff !== 0) return stateDiff;
 
   if (a.state === "rankable") {
-    if (a.unmetCount !== b.unmetCount) return a.unmetCount - b.unmetCount;
+    const doneDiff = Number(b.unmetCount === 0) - Number(a.unmetCount === 0);
+    if (doneDiff !== 0) return doneDiff;
     // 算不出代价的行排在「有数但只差一点」之后：前者是不知道，后者是真的只差一步
     const av = a.cost === null ? Number.POSITIVE_INFINITY : a.cost;
     const bv = b.cost === null ? Number.POSITIVE_INFINITY : b.cost;
     if (av !== bv) return av - bv;
+    // 到这一步两行的远近称出来是一样的（或都称不出），项数才是剩下的信息
+    if (a.unmetCount !== b.unmetCount) return a.unmetCount - b.unmetCount;
   }
   return 0;
 }

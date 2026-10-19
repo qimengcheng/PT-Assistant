@@ -3,7 +3,8 @@
  *
  * 最该被这里拦住的是三件事，它们都是用户当场定的口径，改判据的人看不见界面：
  * 1) 分档的先后顺序（v0.83.0）；
- * 2) 同档内「差几项」赢「还差多少」（v0.83.0）；
+ * 2) 同档内「还差多少（折成上传代价）」赢「差几项」（v0.110.3 —— 原先是项数赢，被他驳回：
+ *    「为什么 50G 的反而排在后面，这个不是更容易些吗？」）；
  * 3) 「还差多少」= 读达标判据折好的差额、按「上传为主下载打折」折成上传代价（用户 2026-10-17 连定两层，
  *    先推翻完成度百分比，再指出分享率本身就能把下载折成上传 —— 见文件头那两条）。
  */
@@ -224,7 +225,7 @@ describe("rankLevelProgress：整行的差几项、代价与那句「还差」",
   });
 });
 
-describe("compareLevelProgress：先分档，档内差几项，再比折成上传代价的总分", () => {
+describe("compareLevelProgress：先分档，档内比折成上传代价的总分，代价并列才比差几项", () => {
   it("五档的先后顺序就是 LEVEL_STATE_ORDER", () => {
     expect([...LEVEL_STATE_ORDER]).toEqual(["rankable", "maxed", "special", "noLevel", "noRequirements"]);
   });
@@ -236,8 +237,30 @@ describe("compareLevelProgress：先分档，档内差几项，再比折成上�
   ])("%s", (_label, a, b) => {
     expect(compareLevelProgress(a, b)).toBeLessThan(0);
   });
-  it("同档先比差几项 —— 项数赢代价", () => {
-    expect(compareLevelProgress(r("rankable", 1, 100 * GiB), r("rankable", 3, 1))).toBeLessThan(0);
+  it("同档内代价赢项数 —— 差 3 项但只差一点的，排在差 1 项却要一大笔之前", () => {
+    expect(compareLevelProgress(r("rankable", 3, 1), r("rankable", 1, 100 * GiB))).toBeLessThan(0);
+  });
+  it("代价并列时才轮到项数说话（含两边都算不出那一档）", () => {
+    expect(compareLevelProgress(r("rankable", 1, 5 * GiB), r("rankable", 3, 5 * GiB))).toBeLessThan(0);
+    expect(compareLevelProgress(r("rankable", 1, null), r("rankable", 3, null))).toBeLessThan(0);
+  });
+  it("复现他截图那一档：差 2 项·还差 50 GiB 下载，要排在差 1 项·还差 285.70 GiB 下载之前", () => {
+    // 走 `rankLevelProgress` 而不是手填 cost：这一条要连「下载折 0.1 档」与「无兑换率的项不进综合分」
+    // 一起验，手填就把这两层又抄了一遍。
+    const 只差一笔 = rankLevelProgress({
+      state: "rankable",
+      primary: g(2, [down("downloaded", 50 * GiB), plain("posts", 5)]),
+    });
+    const 差一大笔 = rankLevelProgress({
+      state: "rankable",
+      primary: g(1, [down("downloaded", 285.7 * GiB)]),
+    });
+    expect(只差一笔.unmetCount).toBe(2);
+    expect(差一大笔.unmetCount).toBe(1);
+    // 折过权重的代价：50 GiB 下载 = 5 GiB 上传，285.70 GiB 下载 = 28.57 GiB 上传
+    expect(只差一笔.cost ?? 0).toBeCloseTo(5 * GiB, 0);
+    expect(差一大笔.cost ?? 0).toBeCloseTo(28.57 * GiB, 0);
+    expect(compareLevelProgress(只差一笔, 差一大笔)).toBeLessThan(0);
   });
   it("差项数相同时比代价，小的在前", () => {
     expect(compareLevelProgress(r("rankable", 2, 5 * GiB), r("rankable", 2, 50 * GiB))).toBeLessThan(0);
@@ -277,16 +300,17 @@ it("整批混排：单条都对不等于整批排得对", () => {
   const order = [...rows]
     .sort((a, b) => compareLevelProgress(a, b) || a.n.localeCompare(b.n, "zh"))
     .map((x) => x.n);
-  // 「差 2 项·还差 5 GiB」不该插到任何「差 1 项」前面 —— 第一层仍是差几项。
-  // 「只欠 2 个帖子」那一行代价算不出，落在所有「有代价」的差 1 项之后：那一格是次数，
+  // v0.110.3 起第一判据是**代价**：「差 2 项·还差 5 GiB」要插到「差 1 项·还差 10 GiB」之前 ——
+  // 项数只在代价并列时说话（下面那两行 10 GiB 上传 / 100 GiB 下载折出来都是 10，就是这一档）。
+  // 「只欠 2 个帖子」那一行代价算不出，落在所有「有代价」的行之后：那一格是次数，
   // 站点没公布它折多少上传，硬编汇率就是替数据源编数。
   expect(order).toEqual([
     "已达标",
     "差 1 项·还差 1 GiB 上传",
-    "差 1 项·还差 10 GiB 上传",
-    "差 1 项·只欠 2 个帖子（不进综合分）",
     "差 2 项·还差 5 GiB 上传",
+    "差 1 项·还差 10 GiB 上传",
     "差 2 项·还差 100 GiB 下载",
+    "差 1 项·只欠 2 个帖子（不进综合分）",
     "已到底级",
     "贵宾",
     "没取到等级",

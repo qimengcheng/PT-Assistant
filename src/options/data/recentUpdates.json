@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-19 23:03:12",
-  "headSha": "feb6fd6",
+  "generatedAt": "2026-10-19 23:18:49",
+  "headSha": "b07e424",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.117.2",
+      "date": "2026-10-19 23:18:49",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "认得出「首页与 announce 不在同一个子域上」的站点了：一条种子挂在哪个站，原先只比「announce 的域名是不是站点域名的子域」，而站点表里存的是带 `www.` 的首页地址、Tracker 那一侧不带 —— 于是「首页 `www.x.cc` + announce `announce.x.cc`」这一类两边都判不亲。",
+        "上面那一处同时修好两件事：「按所属站点自动补标签」不再把这些种子当成「认不出所属站点」跳过，名称下面那枚标记也不再报「已挂在几个站点」报不出。同一份反查还管着辅种检测里的「做种中」与种子指纹的站点归属，一并跟着修好。"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.117.1",
       "date": "2026-10-19 23:03:12",

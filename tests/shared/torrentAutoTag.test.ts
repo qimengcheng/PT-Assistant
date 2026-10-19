@@ -78,6 +78,17 @@ describe("planAutoTagRows · 认不出站点就不写", () => {
     expect(plan.adds[0].tag).toBe("站点甲");
   });
 
+  it("表里存的是带 www. 的首页域名、announce 在同域另一子域上也认得（用户 2026-10-19「这个明显是海胆的啊」）", () => {
+    // `siteHostMap` 的键是 `getHostFromUrl()` 的原样 host，**带 `www.`**；tracker 那一侧折出来不带。
+    // 这一条钉的是两侧归一化对齐（判据在 `trackerHost.ts`），少对齐一次就是这一整批种子补不上标签。
+    const plan = planAutoTagRows([row({ id: "h1", tracker: "https://announce.a.example/announce.php" })], {
+      hostSiteEntries: [["www.a.example", "siteA"]],
+      siteNameOf,
+    });
+    expect(plan.adds).toEqual([{ downloaderId: "dl1", id: "h1", tag: "站点甲" }]);
+    expect(plan.skipped).toEqual([]);
+  });
+
   it("站名算出来是空串时不写空标签，按「认不出站点」跳过", () => {
     const plan = planAutoTagRows([row({ id: "h1" })], {
       hostSiteEntries: HOSTS,

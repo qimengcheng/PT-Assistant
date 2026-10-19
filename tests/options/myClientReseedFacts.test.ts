@@ -73,6 +73,15 @@ describe("tracker 那一格的各家形态", () => {
     }
   });
 
+  it("表里存的是带 www. 的首页域名、announce 在同域另一子域 → 这一格要认得出站（v0.117.2）", () => {
+    // 两侧归一化没对齐时，这一行会退到 `covered: 0`（界面上就是那句「认不出来源站点」）
+    const rows: IReseedRow[] = [
+      { key: "one", clientId: "qb1", name: "N", totalSize: 1, savePath: "/s", infoHash: "h", tracker: "https://announce.pandapt.cc/announce.php", completed: true },
+    ];
+    const facts = buildReseedFacts(rows, [["www.pandapt.cc", "pandapt"], ["novahd.top", "novahd"]], ["pandapt", "novahd"], []);
+    expect(facts.get("one")).toEqual({ kind: "candidate", pending: 1, covered: 1 });
+  });
+
   it("整组一条都认不出站 → 照报缺口、covered 0（v0.117.1：这一档不再静默，也不许被挡在扫描范围外）", () => {
     const facts = buildReseedFacts(copies("udp://tracker.unrelated.org/announce", "udp://tracker.unrelated.org/announce"), hostSiteEntries, usable, []);
     for (const key of ["qb1:1", "qb1:2"]) expect(facts.get(key)).toEqual({ kind: "candidate", pending: 3, covered: 0 });

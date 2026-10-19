@@ -67,6 +67,40 @@ describe("resolveTrackerHostSite：认不出可以，认错不行", () => {
   it("表里的空地址不参与", () => {
     expect(resolveTrackerHostSite("anything.net", [["", "broken"] as [string, string]])).toBeNull();
   });
+
+  /**
+   * 用户 2026-10-19 那一屏：「这个明显是海胆的啊，怎么会认不出来呢？」
+   * 海胆首页是 `www.haidan.cc`（站点定义 `urls`，rot13 解出来），announce 却在同域的另一个子域
+   * `announce.haidan.cc` 上。表里存的是 `getHostFromUrl()` 的原样 host（**留着 `www.`**），
+   * 而 tracker 那一侧折出来是脱过 `www.` 的 —— 两侧归一化不同源，于是父子域那一档比的是
+   * `announce.haidan.cc` 对 `www.haidan.cc`，两个都是 `haidan.cc` 的孩子、谁也不是谁的父。
+   */
+  it("站点表里存的是带 www. 的首页域名，announce 挂在同域另一子域上 → 仍要认得出", () => {
+    const entries: [string, string][] = [["www.haidan.cc", "haidan"]];
+    expect(resolveTrackerHostSite("announce.haidan.cc", entries)).toBe("haidan");
+    // 对照：这就是坏掉的那一步 —— 不先把两侧过同一个归一化，父子域判据结构上比不到
+    expect(isSameSiteHostRelation("announce.haidan.cc", "www.haidan.cc")).toBe(false);
+  });
+
+  it("整条链从 announce 全串走到站点（两步之间不许再各自补一次规整）", () => {
+    const entries: [string, string][] = [["www.haidan.cc", "haidan"]];
+    expect(resolveTrackerHostSite(trackerFieldToHost("https://announce.haidan.cc/announce.php?x=1"), entries)).toBe("haidan");
+    // 首页域名自己报回来时也认得（announce 就挂在 www 那个域上，是另一种常见形状）
+    expect(resolveTrackerHostSite(trackerFieldToHost("https://www.haidan.cc/announce.php"), entries)).toBe("haidan");
+  });
+
+  it("脱 www. 不许把歧义蒙过去：两个站分别占着同一个父域的两种写法时仍返回 null", () => {
+    // 有人把 `www.aaa.com` 和 `aaa.com` 加成两个站（同域站群、或同一个站的两个账号）。
+    // 归一化之后这两项都成了 `aaa.com` 的亲 —— 这正是「脱 www.」唯一可能造出来的新歧义，
+    // 判据的口径不变：两边都沾亲就不猜，返回 null（认错站比少标一条坏得多）。
+    const twoSites: [string, string][] = [
+      ["www.aaa.com", "siteA"],
+      ["aaa.com", "siteB"],
+    ];
+    expect(resolveTrackerHostSite("announce.aaa.com", twoSites)).toBeNull();
+    // 而精确等值那一档不经过歧义判断，照旧直接给
+    expect(resolveTrackerHostSite("aaa.com", twoSites)).toBe("siteB");
+  });
 });
 
 /**
@@ -85,7 +119,10 @@ describe("trackerFieldToHost：三种形态都折成同一个主机名", () => {
     expect(trackerFieldToHost("tracker.example.net:80")).toBe("tracker.example.net");
   });
 
-  it("www. 前缀与末尾的点都去掉：反查表里存的是不带这两样的主机名", () => {
+  it("www. 前缀与末尾的点都去掉（这一侧的规整要和表里那一侧对齐）", () => {
+    // ⚠️ 这条原先的说明写反了：它写着「反查表里存的是不带这两样的主机名」，而表里存的
+    // 是 `getHostFromUrl()` 的原样 host，**带 `www.`**（`siteHostMap` 还要给内容脚本按整串 URL 查）。
+    // 那句假前提就是海胆那一档漏认的来处 —— 对齐改在 `resolveTrackerHostSite` 里做，不许动那张表。
     expect(trackerFieldToHost("www.pandapt.net.")).toBe("pandapt.net");
   });
 

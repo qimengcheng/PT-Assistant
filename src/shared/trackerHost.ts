@@ -9,6 +9,10 @@
  * 站点名那一行也少一个站（同一个形状在 NovaHD 上不存在，因为它的定义里已经把 `tracker.novahd.top`
  * 一起列进 `urls` 了）。
  *
+ * v0.117.2 补上另一半：父子域那一档**两侧要先过同一个归一化**。表里的键留着 `www.`、tracker 那一侧
+ * 脱掉了 `www.`，于是「首页 `www.haidan.cc` + announce `announce.haidan.cc`」这一族比不到
+ * （两个都是 `haidan.cc` 的孩子）。判据本体见 `resolveTrackerHostSite`。
+ *
  * 这条判据不许 import 任何东西：反查发生在 offscreen，而行为断言要能在 Node 里直接跑。
  */
 
@@ -32,19 +36,30 @@ export function isSameSiteHostRelation(a: string, b: string): boolean {
  * 2. 父子域兜底 —— **只有唯一一个站点认得上时才认**。两个站点的域名都跟这个主机名有父子关系时
  *    （同域站群、或有人把同一个域名的两个子域加成两个站）不猜，返回 null。
  *
+ * **父子域那一档比的是两侧都过过 `trackerFieldToHost` 的形状**（v0.117.2）。不这么做就会漏认：
+ * 表里的键是 `getHostFromUrl()` 的原样 host，**留着 `www.`**（那张表还要给内容脚本按整串 URL 查，
+ * 不能改它），而 tracker 那一侧折出来是脱过 `www.` 的。实测形状：海胆首页 `www.haidan.cc`、
+ * announce `announce.haidan.cc` —— 两个都是 `haidan.cc` 的孩子，谁也不是谁的父，
+ * 于是那一条既不标站点、补标签也把它当「认不出所属站点」跳过（用户 2026-10-19 两句
+ * 「这个明显是海胆的啊，怎么会认不出来呢？」）。
+ *
  * 方向是刻意的：认不出只是少标一条「做种中」（假阴性），认错站会把「这一站已经在做种」的结论
- * 安到另一个站头上，那才是不能犯的错。
+ * 安到另一个站头上，那才是不能犯的错。所以脱 `www.` 之后如果两个站都沾亲（有人把
+ * `www.x.com` 与 `x.com` 加成两个站），仍然返回 null。
  */
 export function resolveTrackerHostSite<TSiteId>(
   host: string,
   hostSiteEntries: Iterable<readonly [string, TSiteId]>,
 ): TSiteId | null {
+  const query = trackerFieldToHost(host);
   const exact = new Map<string, TSiteId>();
   const parents = new Set<TSiteId>();
   for (const [knownHost, siteId] of hostSiteEntries) {
     if (!knownHost) continue;
     exact.set(knownHost, siteId);
-    if (knownHost !== host && isSameSiteHostRelation(host, knownHost)) parents.add(siteId);
+    // 表里那一侧也走同一个归一化：只差一个 `www.` / 端口 / 末尾点的，算同一个域
+    const known = trackerFieldToHost(knownHost);
+    if (known && isSameSiteHostRelation(query, known)) parents.add(siteId);
   }
   const direct = exact.get(host);
   if (direct !== undefined) return direct;

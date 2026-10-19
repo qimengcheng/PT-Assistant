@@ -901,6 +901,23 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
   }
 
   /**
+   * 追加标签（qBittorrent 的 tags，与上面那个 category 是两格）。
+   *
+   * `addTags` 是**并集**语义：已有的标签不会被冲掉，站名也不存在时 qBittorrent 会顺手建出来，
+   * 所以这一步不需要先查一遍全局标签表。传进来的空串要滤掉 —— 逗号串里留一个空项，
+   * 服务端会当成一个真要去掉的名字处理，那是往用户数据上做反向操作。
+   */
+  override async addTorrentTags(id: string | number, tags: string[]): Promise<boolean> {
+    const joined = tags.map((tag) => (tag ?? "").trim()).filter(Boolean).join(",");
+    if (!joined) return false;
+    await this.request("/torrents/addTags", {
+      method: "post",
+      data: { hashes: normalizePieces(String(id)), tags: joined },
+    });
+    return true;
+  }
+
+  /**
    * 把种子已有的数据搬到别的目录（qBittorrent WebUI 里那颗 "Set Location"）。
    *
    * 两条实测自上游源码（`src/webui/api/torrentscontroller.cpp` 的 `setLocationAction` +

@@ -528,6 +528,17 @@ export abstract class AbstractBittorrentClient<T extends DownloaderBaseConfig = 
   }
 
   /**
+   * 给单条种子**追加**标签（不是替换），默认不支持，由各客户端 override。
+   *
+   * 为什么不复用上面那颗 `setTorrentLabel`：qBittorrent 里那是**分类**（`/torrents/setCategory`），
+   * 与标签（tags）是两个格子，读列表时我们把 category 折进 `label` 字段 —— 所以「给没标签的种子补标签」
+   * 走 `setTorrentLabel` 会把分类改掉，而不是补上标签。判据见 `src/shared/torrentAutoTag.ts`。
+   */
+  public async addTorrentTags(_id: string | number, _tags: string[]): Promise<boolean> {
+    return false;
+  }
+
+  /**
    * 把某条种子**已经在盘上的数据**搬到另一个目录，默认不支持，由各客户端 override。
    *
    * 辅种要它：基准取自下载器时那份数据已经在某处，而任务挑的目录可能是另一处

@@ -333,12 +333,22 @@
       "removeDataIgnored": "其中 {count} 条在群晖 Download Station 上：那边只调「删任务」这一个接口，这个勾选对它不起作用。"
     },
     "label": {
-      "batchBtn": "批量设置标签",
-      "emptyLabel": "标签不能为空",
-      "existing": "已有的标签",
-      "input": "标签",
-      "success": "已设置 {count} 个种子的标签",
-      "title": "设置标签（{count} 个种子）"
+      "batchBtn": "标签（自动补标或设为分类）",
+      "modeAuto": "按所属站点自动补标签",
+      "modeCategory": "设为分类（手动填写）",
+      "autoScopeSelected": "范围：已勾选的 {count} 条",
+      "autoScopeAll": "范围：当前下载器的全部 {count} 条（未勾选任何种子）",
+      "autoSummary": "将补 {adds} 条；已有标签 {hasTags} 条不动；认不出所属站点 {noSite} 条跳过",
+      "autoNothing": "这一批里没有可补的种子：要么已经有标签，要么认不出所属站点",
+      "autoResult": "已为 {count} 个种子补上标签",
+      "autoUnsupported": "{count} 条所在下载器不支持追加标签",
+      "autoFailed": "{count} 条请求失败",
+      "categoryHint": "这一档改的是下载器的分类（qBittorrent 的 category），不是标签；要补标签请用上面那一档。",
+      "emptyLabel": "分类不能为空",
+      "existing": "已有的分类与候选标签",
+      "input": "分类",
+      "success": "已设置 {count} 个种子的分类",
+      "title": "标签（已勾选 {count} 条）"
     },
     "pauseSelected": "暂停",
     "pushToDownloader": {

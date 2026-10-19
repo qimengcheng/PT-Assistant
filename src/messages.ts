@@ -214,6 +214,11 @@ export interface ProtocolMap {
   moveClientTorrentInQueue(data: { downloaderId: string; id: CTorrent["id"]; direction: TorrentQueueDirection }): boolean;
   setClientTorrentSpeedLimit(data: { downloaderId: string; id: CTorrent["id"]; limits: TorrentSpeedLimit }): boolean;
   setClientTorrentLabel(data: { downloaderId: string; id: CTorrent["id"]; label: string }): boolean;
+  /**
+   * 给单条种子**追加**标签（qBittorrent 的 tags，与 `setClientTorrentLabel` 那个分类是两格）。
+   * false = 这台客户端没有这个能力（基类默认实现），请求本身失败走抛错。
+   */
+  addClientTorrentTags(data: { downloaderId: string; id: CTorrent["id"]; tags: string[] }): boolean;
   /** 把种子已在盘上的数据搬到别的目录（只有部分客户端支持，判据见 `src/shared/reseedPath.ts`） */
   setClientTorrentLocation(data: { downloaderId: string; id: CTorrent["id"]; location: string }): boolean;
   /**

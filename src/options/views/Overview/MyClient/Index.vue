@@ -44,6 +44,7 @@ import { buildSortOrderMap, makeSorter, toPagination, toTableColumns } from "@/o
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import type { IReseedScanResult } from "@/shared/types/storages/reseedScan.ts";
 import { reseedHandoffLabelOf } from "@/shared/reseedScanHandoff.ts";
+import { countAutoTagSkips, planAutoTagRows } from "@/shared/torrentAutoTag.ts";
 import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
@@ -376,6 +377,32 @@ const reseedFacts = computed(() =>
     now: Date.now(),
   }),
 );
+
+/**
+ * 「按所属站点自动补标签」这一档要扫的那些行。
+ *
+ * 范围：**勾了就用勾选的，没勾就用这一台/几台下载器报回来的全部行** —— 他要补的是存量那一堆
+ * （一键辅种 v0.110.2 之前推出去的那批什么都没带），一页 12 条地勾不现实。
+ * 判据本体在 `@/shared/torrentAutoTag`（只碰 `tags` 为空的那些条，认不出站点就跳过，不猜）。
+ */
+const autoTagSource = computed(() => (tableSelected.value.length > 0 ? tableSelected.value : allTorrents.value));
+
+const autoTagPlan = computed(() =>
+  planAutoTagRows(
+    autoTagSource.value.map((row) => ({
+      downloaderId: row.clientId,
+      id: row.id,
+      tracker: row.tracker,
+      tags: row.tags,
+    })),
+    {
+      hostSiteEntries: hostSiteEntries.value,
+      siteNameOf: (siteId) => metadataStore.siteNameMap[siteId] ?? siteId,
+    },
+  ),
+);
+
+const autoTagSkipped = computed(() => countAutoTagSkips(autoTagPlan.value.skipped));
 
 /**
  * 行上那枚标记吃两档：`candidate` 说「还差 N 站没查」，`scanned` 说「没挂的那些站都查过了」。
@@ -998,8 +1025,10 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
           <template #icon><FieldTimeOutlined /></template>
         </a-button>
       </a-tooltip>
+      <!-- 不再「没勾选就灰」：自动那一档不勾任何一条 = 对这一台下载器的全部种子补标签，
+           他要处理的正是存量那一堆（一页 12 条地勾不现实）。 -->
       <a-tooltip :title="t('MyClient.label.batchBtn')">
-        <a-button size="small" type="text" :disabled="tableSelected.length === 0" @click="showLabelDialog = true">
+        <a-button size="small" type="text" @click="showLabelDialog = true">
           <template #icon><TagsOutlined /></template>
         </a-button>
       </a-tooltip>
@@ -1435,7 +1464,15 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
 
   <SpeedLimitDialog v-model="showSpeedLimitDialog" :torrents="tableSelected" />
 
-  <LabelDialog v-model="showLabelDialog" :torrents="tableSelected" :suggest-labels="existingLabels" />
+  <LabelDialog
+    v-model="showLabelDialog"
+    :torrents="tableSelected"
+    :suggest-labels="existingLabels"
+    :auto-tag-adds="autoTagPlan.adds"
+    :auto-tag-skipped="autoTagSkipped"
+    :auto-tag-scope="autoTagSource.length"
+    @done="loadTorrents"
+  />
 
   <RecheckConfirmDialog
     v-model="showRecheckDialog"

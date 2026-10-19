@@ -333,12 +333,22 @@
       "removeDataIgnored": "{count} of them are on Synology Download Station: that API only has one “delete task” call, so this checkbox does nothing for them."
     },
     "label": {
-      "batchBtn": "Set Label",
-      "emptyLabel": "Label cannot be empty",
-      "existing": "Existing labels",
-      "input": "Label",
-      "success": "Labeled {count} torrent(s)",
-      "title": "Set Label ({count} torrent(s))"
+      "batchBtn": "Tags (auto-fill or set category)",
+      "modeAuto": "Auto-add tag from the owning site",
+      "modeCategory": "Set category (manual)",
+      "autoScopeSelected": "Scope: {count} selected torrents",
+      "autoScopeAll": "Scope: all {count} torrents in this downloader (none selected)",
+      "autoSummary": "Will tag {adds}; {hasTags} already have tags; {noSite} skipped (site not recognized)",
+      "autoNothing": "Nothing to tag in this batch: the torrents already have tags or their site can't be resolved",
+      "autoResult": "Added tags to {count} torrents",
+      "autoUnsupported": "{count} skipped: that downloader can't add tags",
+      "autoFailed": "{count} requests failed",
+      "categoryHint": "This sets the downloader's category (qBittorrent's category), not tags. Use the option above to add tags.",
+      "emptyLabel": "Category cannot be empty",
+      "existing": "Existing categories and suggested tags",
+      "input": "Category",
+      "success": "Set the category on {count} torrent(s)",
+      "title": "Tags ({count} selected)"
     },
     "pauseSelected": "Pause",
     "pushToDownloader": {

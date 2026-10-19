@@ -286,6 +286,14 @@ onMessage("setClientTorrentLabel", async ({ data: { downloaderId, id, label } })
   return labelStatus;
 });
 
+// false 只表示**这台客户端没有这个能力**（基类默认实现）；请求失败走抛错，与上面那条同口径
+onMessage("addClientTorrentTags", async ({ data: { downloaderId, id, tags } }) => {
+  const downloaderInstance = await getDownloaderInstance(downloaderId);
+  if (!downloaderInstance) return false;
+
+  return await downloaderInstance.addTorrentTags(id, tags);
+});
+
 // 返回 false 只表示**这台客户端没有这个能力**（各驱动的默认实现）；
 // 请求本身失败（没连上、被拒）走的是抛错，调用方分得清这两种，提示的措辞也不一样。
 onMessage("setClientTorrentLocation", async ({ data: { downloaderId, id, location } }) => {

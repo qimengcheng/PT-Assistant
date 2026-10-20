@@ -917,6 +917,34 @@
       }
     }
   },
+  "SeedValue": {
+    "activeTip": "当前正在上传",
+    "column": {
+      "name": "名称",
+      "sites": "做种站点",
+      "size": "占用磁盘",
+      "tier": "价值判定",
+      "uploaded": "累计上传",
+      "weight": "时魔权重"
+    },
+    "copiesLine": "{copies} 份副本 · 占用 {bytes}",
+    "formulaNotice": "时魔权重按 NexusPHP 一族的公式折算（时长因子 × 大小 GB × 做种人数因子），每一份在做种的副本各算一次再求和。各站参数不同，且站点发放时按账号汇总后封顶，所以这个数只用于同一批内容之间比较，不等于站点实际发放的魔力。",
+    "idleCopies": "{count} 份未做种",
+    "loadFailed": "{name} 加载失败：{message}",
+    "onlyLow": "只看低价值（{count}）",
+    "refresh": "刷新",
+    "siteTipPartial": "{names}；另有 {missing} 份认不出所属站点",
+    "siteUnknown": "认不出所属站点",
+    "summary": "共 {items} 项内容 · {copies} 份副本",
+    "tier": {
+      "high": "高",
+      "idle": "未在做种",
+      "low": "低",
+      "normal": "中",
+      "unknown": "数据不全"
+    },
+    "weightTip": "合计 {copies} 份副本，其中 {seeding} 份正在做种、分布在 {sites} 个站点（另有 {unknownSites} 份认不出所属站点），{incomplete} 份因数据缺失未计入权重。权重 {weight} 是按 NexusPHP 一族的公式对每一份各折一次再求和得到的估算值：低于 {low} 判为低价值，不低于 {high} 判为高价值。"
+  },
   "SentToDownloaderDialog": {
     "categoryCreate": "新建分类「{category}」",
     "categoryForget": "不再记住",
@@ -2160,6 +2188,7 @@
       "MyData": "我的数据",
       "SearchEntity": "搜索结果",
       "SearchResultSnapshot": "搜索结果快照",
+      "SeedValue": "做种价值",
       "default": "概览"
     },
     "Settings": {

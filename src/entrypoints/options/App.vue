@@ -10,6 +10,7 @@ import {
   DownloadOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  FundOutlined,
   GlobalOutlined,
   HistoryOutlined,
   HomeOutlined,
@@ -108,6 +109,8 @@ const navItems = computed(() => {
     // 按钮能跳过来（manageDownloader），左侧导航漏了这条 —— 文件在 ≠ 用户能看到。
     // 放在「我的数据」后面：两个「我的」页面相邻；下载器设置仍在下面 /set-downloader。
     { path: "/my-client", label: t("layout.nav.myClient"), icon: DatabaseOutlined },
+    // 紧跟「我的下载器」：这一屏读的就是那一份列表，只是把行折成「一份内容一行」
+    { path: "/seed-value", label: t("route.Overview.SeedValue"), icon: FundOutlined },
     { path: "/download-history", label: t("route.Overview.DownloadHistory"), icon: HistoryOutlined },
     { path: "/keep-upload-task", label: t("route.Overview.KeepUploadTask"), icon: InboxOutlined },
     { path: "/media-server-entity", label: t("route.Overview.MediaServerEntity"), icon: PlaySquareOutlined },

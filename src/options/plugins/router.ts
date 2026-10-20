@@ -81,6 +81,12 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("../views/Overview/MyClient/Index.vue"),
   },
   {
+    // 紧挨着「我的下载器」：这一屏读的就是那一份列表，只是把行折成「一份内容一行」
+    path: "/seed-value",
+    name: "SeedValue",
+    component: () => import("../views/Overview/SeedValue/Index.vue"),
+  },
+  {
     path: "/media-server-entity",
     name: "MediaServerEntity",
     component: () => import("../views/Overview/MediaServerEntity/Index.vue"),

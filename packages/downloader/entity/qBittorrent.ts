@@ -730,6 +730,8 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
         totalUploaded: torrent.uploaded,
         totalDownloaded: torrent.downloaded,
         seeds: torrent.num_seeds,
+        // 全网做种人数：时魔那套判据吃的是这一格，不是上面那格「已连上的做种者」
+        swarmSeeders: torrent.num_complete,
         peers: torrent.num_leechs,
         eta: torrent.eta,
         completedDate: torrent.completion_on,

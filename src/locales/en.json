@@ -917,6 +917,34 @@
       }
     }
   },
+  "SeedValue": {
+    "activeTip": "Uploading now",
+    "column": {
+      "name": "Name",
+      "sites": "Seeding Sites",
+      "size": "Disk Used",
+      "tier": "Verdict",
+      "uploaded": "Total Upload",
+      "weight": "Magic Weight"
+    },
+    "copiesLine": "{copies} copies · {bytes} on disk",
+    "formulaNotice": "The magic weight is folded from the NexusPHP-family formula (age factor x size in GB x seeders factor), computed once per copy that is currently seeding and then summed. Sites use different parameters and cap the total per account, so this number is only comparable within this list — it is not the mana a site actually grants.",
+    "idleCopies": "{count} not seeding",
+    "loadFailed": "{name} failed to load: {message}",
+    "onlyLow": "Low value only ({count})",
+    "refresh": "Refresh",
+    "siteTipPartial": "{names}; {missing} copies with an unrecognized site",
+    "siteUnknown": "Site unrecognized",
+    "summary": "{items} items · {copies} copies",
+    "tier": {
+      "high": "High",
+      "idle": "Not seeding",
+      "low": "Low",
+      "normal": "Medium",
+      "unknown": "Incomplete data"
+    },
+    "weightTip": "{copies} copies in total, {seeding} of them seeding across {sites} sites ({unknownSites} copies with an unrecognized site), {incomplete} left out of the weight because their data is missing. The weight {weight} is an estimate: the NexusPHP-family formula folded once per copy, then summed. Below {low} counts as low value, at or above {high} as high value."
+  },
   "SentToDownloaderDialog": {
     "categoryCreate": "Create category \"{category}\"",
     "categoryForget": "Forget",
@@ -2160,6 +2188,7 @@
       "MyData": "My Data",
       "SearchEntity": "Search Results",
       "SearchResultSnapshot": "Search Snapshot",
+      "SeedValue": "Seed Value",
       "default": "Overview"
     },
     "Settings": {

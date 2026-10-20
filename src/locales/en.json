@@ -149,6 +149,20 @@
       }
     },
     "qBittorrentLegacyFails": "qBittorrent rejected the torrent, but its legacy Web API returned no details; check for a duplicate torrent, validate the save path or category, and review the qBittorrent logs",
+    "rebase": {
+      "removed": "The previous base was removed from the downloader (files kept)",
+      "kept": "The previous base was not removed: {reason}",
+      "failed": "Removing the previous base failed: {reason}",
+      "refused": "the downloader refused the deletion",
+      "sendFailed": "The new base was not sent, so the previous base stays in the downloader",
+      "keep": {
+        "noHash": "this entry has no infoHash recorded",
+        "sameAsNew": "the new base is the same torrent",
+        "shared": "another entry or task is still on this torrent",
+        "unreachable": "the downloader is unreachable",
+        "notFound": "it is not in the downloader"
+      }
+    },
     "removeDone": "Remove Completed",
     "removeDoneConfirm": "Remove these {count} 'All seeded' tasks? This only drops them from the assistant's list - torrents still seeding in your downloader are untouched. Managing them again means creating a new task.",
     "removeDoneSuccess": "Removed {count} completed task(s)",
@@ -166,13 +180,11 @@
     "sendSingleSuccess": "Sent",
     "sending": "Sending {count} to the downloader…",
     "sendThisOne": "Send only this one",
-    "sendAndSetBase": "Send this and make it the base",
     "sendBaseDisabled": "The base is already in the downloader — nothing to send",
     "sendOtherDisabled": "The base is in the downloader, so there is no \"other torrent\" to send",
     "sendSuccess": "Sent successfully",
-    "setAsBaseTorrent": "Set as base torrent",
+    "setAsBaseTip": "Make this the base torrent: send it to the downloader and remove the previous base from it (task entry only, files are kept)",
     "setBaseError": "Failed to set as base torrent",
-    "setBaseSuccess": "Set as base torrent successfully",
     "table": {
       "completedAt": "Completed At",
       "count": "Count",

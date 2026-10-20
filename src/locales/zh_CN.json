@@ -149,6 +149,20 @@
       }
     },
     "qBittorrentLegacyFails": "qBittorrent 拒绝添加，但旧版 Web API 未返回具体原因；请检查是否已有相同种子、保存路径或分类是否有效，并查看 qBittorrent 日志",
+    "rebase": {
+      "removed": "原基准已从下载器移除（数据文件保留）",
+      "kept": "原基准未从下载器移除：{reason}",
+      "failed": "原基准删除失败：{reason}",
+      "refused": "下载器拒绝了这次删除",
+      "sendFailed": "新基准没有发出去，原基准保留在下载器里",
+      "keep": {
+        "noHash": "这一条没有记录 infoHash",
+        "sameAsNew": "新旧基准是同一条种子",
+        "shared": "还有别的任务挂在同一条种子上",
+        "unreachable": "下载器连不上",
+        "notFound": "下载器里没有这一条"
+      }
+    },
     "removeDone": "移除已完成",
     "removeDoneConfirm": "确认移除这 {count} 条「辅种完成」的任务吗？只是把它们从助手的列表里去掉，下载器里那些还在做种的种子不受影响；以后要再管它们得重新建任务。",
     "removeDoneSuccess": "已移除 {count} 条已完成任务",
@@ -166,13 +180,11 @@
     "sendSingleSuccess": "发送成功",
     "sending": "正在发送 {count} 条到下载器…",
     "sendThisOne": "只发送这一条",
-    "sendAndSetBase": "发送这一条并换它当基准",
     "sendBaseDisabled": "基准就在下载器里，这一条不用再发",
     "sendOtherDisabled": "基准即下载器中的种子，本任务没有可发送的「其他种子」",
     "sendSuccess": "发送成功",
-    "setAsBaseTorrent": "设为基准种子",
+    "setAsBaseTip": "设为基准种子：把这一条发到下载器，并把原基准从下载器移除（只删任务记录，不删数据文件）",
     "setBaseError": "设置失败",
-    "setBaseSuccess": "已设为基准种子",
     "table": {
       "completedAt": "完成时间",
       "count": "种子数",

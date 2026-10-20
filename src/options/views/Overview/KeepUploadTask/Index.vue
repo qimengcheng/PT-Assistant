@@ -16,18 +16,21 @@ import {
 } from "@antdv-next/icons";
 
 import type { CTorrent } from "@ptd/downloader";
-import type { IKeepUploadTask, TKeepUploadTaskKey } from "@/shared/types.ts";
+import type { TSiteID } from "@ptd/site";
+import type { IKeepUploadTask, IKeepUploadTaskItem, TKeepUploadTaskKey } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";
 import { formatDate, sizeText } from "@/options/utils.ts";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 
+import HoverTip from "@/options/components/HoverTip.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
+import { decideOldBaseRemoval } from "@/shared/rebaseOldBase.ts";
 import {
   detectBasePathMismatch,
   isCategorySavePath,
@@ -345,6 +348,13 @@ const rowSubTitle = (row: TTableRow) => (row.kind === "item" ? row.item.subTitle
 const rowLink = (row: TTableRow) => (row.kind === "item" ? row.item.link : row.task.items[0]?.link);
 const rowSiteId = (row: TTableRow) => (row.kind === "item" ? row.item.site : row.task.items[0]?.site);
 const rowSize = (row: TTableRow) => (row.kind === "item" ? row.item.size : row.task.size);
+
+/**
+ * 「站点」那一列只有图标、没有名字（全站唯一一处这么摆的：别的列表名字就写在图标旁边），
+ * 所以悬停要说清是哪一站 —— 同一份内容挂在几个站上，认图标认不出来（用户 2026-10-20）。
+ * 取数走那份共享的 `siteNameMap`，与「我的下载器」「可辅种扫描」那几处同一个来源。
+ */
+const siteNameOf = (siteId?: TSiteID) => (siteId ? (metadataStore.siteNameMap?.[siteId] ?? siteId) : "");
 
 /** 保存路径那一列第一行：列头已经写着「保存路径」，所以这里不再重复那个前缀 */
 function savePathLine(record: IKeepUploadTask) {
@@ -733,7 +743,7 @@ async function clearAllTasks() {
   }
 }
 
-// 发送种子到下载器。返回「这一趟有没有真发出去」—— 行内那颗「发送并换为基准」要等它成功才挪基准
+// 发送种子到下载器。返回「这一趟有没有真发出去」—— 那颗「设为基准种子」要等它成功才去删原基准
 async function sendTorrentsToDownloader(
   task: IKeepUploadTask,
   items: IKeepUploadTask["items"],
@@ -839,7 +849,16 @@ async function sendTorrentsToDownloader(
   }
 }
 
-// 设为基准种子（移动到第一位并更新存储）
+/**
+ * 设为基准种子 = 换下载源，一次做完（用户 2026-10-20：「替换基准后自动把原基准任务从下载器删除
+ * 并自动发送新基准，把原来设为基准并发送的按钮删掉，因为设为基准后就会自动发送」）。
+ *
+ * 顺序是**先挪 → 再发 → 发成功才删**：
+ * - 必须先挪：发送那一步按 `task.items[0]` 认「哪一条是要下全量的基准」（见
+ *   `sendTorrentsToDownloader` 里的 `baseEntry`），不先重排就会把新的那条当辅种副本跳过校验发出去；
+ * - 必须发成功才删：删是不可逆的那一半。新的还没接上就清掉旧的，一旦发送失败（目录不一致那道闸、
+ *   下载器连不上）这一批就没有基准在下了 —— 与这颗键原先那颗合并键「先发成功后才挪基准」同一个理由。
+ */
 async function setAsBaseTorrent(task: IKeepUploadTask, itemIndex: number) {
   if (itemIndex === 0) {
     return;
@@ -847,12 +866,13 @@ async function setAsBaseTorrent(task: IKeepUploadTask, itemIndex: number) {
 
   // 将选中的种子移动到第一位
   const item = task.items.splice(itemIndex, 1)[0];
+  // splice 之后 items[0] 正是被换下去的那一条 —— 它就是「原基准」
+  const oldBase = task.items[0];
   task.items.unshift(item);
 
   // 更新任务存储
   try {
     await sendMessage("updateKeepUploadTask", task);
-    runtimeStore.showSnakebar(t("KeepUploadTask.setBaseSuccess"), { color: "success" });
   } catch (e) {
     // ⚠️ 乐观更新失败没有回滚：列表里基准已经挪了（界面上是新的顺序），
     // 而存储里还是旧顺序。用户下次进页面看到的是旧基准，
@@ -862,6 +882,70 @@ async function setAsBaseTorrent(task: IKeepUploadTask, itemIndex: number) {
     task.items.splice(itemIndex, 0, item);
     runtimeStore.showSnakebar(t("KeepUploadTask.setBaseError"), { color: "error" });
     console.error("[KeepUploadTask] 换基准失败，顺序已回退", e);
+    return;
+  }
+
+  const sent = await sendTorrentsToDownloader(task, [item], "base");
+  if (!sent) {
+    // 发送那一步自己已经报过原因了，这里只补一句「所以旧的没动」，别让他以为旧的那条也没了
+    runtimeStore.showSnakebar(t("KeepUploadTask.rebase.sendFailed"), { color: "warning" });
+    return;
+  }
+  await dropOldBase(task, oldBase);
+}
+
+/**
+ * 把原基准那一条从下载器里清掉，并把「为什么没清掉」说出来。
+ *
+ * `removeData: false` 是这一整段里最要紧的一个参数：这一批所有副本挂的就是那一份数据，
+ * 连文件一起删等于把已经辅好的那些站一并停掉。判据本体在 `shared/rebaseOldBase.ts`
+ * （那一份能直接跑断言），这里只负责把输入摊出来。
+ */
+async function dropOldBase(task: IKeepUploadTask, oldBase: IKeepUploadTaskItem | undefined) {
+  const oldHash = String(oldBase?.hash ?? "").toLowerCase();
+  // 连得上但列表里没这一条 = notFound；连不上 = 列表压根没拿到，两者在判据里是两档
+  let entries: Array<{ hash?: string; id: CTorrent["id"] }> | null;
+  try {
+    const torrents: CTorrent[] = await sendMessage("getClientTorrents", task.downloadOptions.downloaderId);
+    entries = torrents.map((one) => ({ hash: one.infoHash, id: one.id }));
+  } catch {
+    entries = null;
+  }
+
+  const result = decideOldBaseRemoval({
+    oldHash,
+    newHash: task.items[0]?.hash,
+    sameInTask: task.items.filter((i) => String(i.hash ?? "").toLowerCase() === oldHash).length - 1,
+    sameInOtherTasks: tasks.value
+      .filter((other) => other.id !== task.id && other.downloadOptions.downloaderId === task.downloadOptions.downloaderId)
+      .reduce((n, other) => n + other.items.filter((i) => String(i.hash ?? "").toLowerCase() === oldHash).length, 0),
+    downloaderEntries: entries,
+  });
+
+  if (result.outcome !== "removed") {
+    runtimeStore.showSnakebar(t("KeepUploadTask.rebase.kept", { reason: t(`KeepUploadTask.rebase.keep.${result.outcome}`) }), {
+      color: "warning",
+    });
+    return;
+  }
+
+  try {
+    const ok = await sendMessage("deleteClientTorrent", {
+      downloaderId: task.downloadOptions.downloaderId,
+      id: result.id,
+      removeData: false,
+    });
+    runtimeStore.showSnakebar(
+      ok
+        ? t("KeepUploadTask.rebase.removed")
+        : t("KeepUploadTask.rebase.failed", { reason: t("KeepUploadTask.rebase.refused") }),
+      { color: ok ? "success" : "error" },
+    );
+  } catch (e) {
+    runtimeStore.showSnakebar(
+      t("KeepUploadTask.rebase.failed", { reason: e instanceof Error ? e.message : String(e) }),
+      { color: "error" },
+    );
   }
 }
 
@@ -1383,20 +1467,6 @@ async function sendAllTorrents(task: IKeepUploadTask) {
   void sendTorrentsToDownloader(task, items, "all");
 }
 
-/**
- * 行内那颗「只发这一条并换它当基准」：他 2026-10-09 的场景是「基准那条下得太慢，想换个站下」。
- *
- * 顺序是**先发、成功后才挪基准** —— 反过来一旦发送失败，任务的基准已经变成一条根本没发出去的种子，
- * 那比「没换」更难发现（界面会开始按错的那条判断做种状态）。
- * 第一条本身就是基准，所以那一行只做发送、不做重排。
- */
-async function sendOneAndPromote(task: IKeepUploadTask, index: number) {
-  const item = task.items[index];
-  if (!item) return;
-  const okToSend = await sendTorrentsToDownloader(task, [item], `one:${index}`);
-  if (okToSend && index > 0) await setAsBaseTorrent(task, index);
-}
-
 /** 「只发送」：把这一条发出去，基准不动（他 2026-10-09：「应该还可以单独发送和单独换基准」） */
 async function sendOneOnly(task: IKeepUploadTask, index: number) {
   const item = task.items[index];
@@ -1507,7 +1577,9 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'site'">
-          <SiteFavicon :site-id="rowSiteId(record)" :size="18" />
+          <HoverTip :text="siteNameOf(rowSiteId(record))" placement="right">
+            <SiteFavicon :site-id="rowSiteId(record)" :size="18" />
+          </HoverTip>
         </template>
 
         <!-- 这一格只放标题：主标题 + 副标题两行，和搜索结果那一列同一个形状。
@@ -1743,12 +1815,14 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
             </a-tooltip>
           </a-space>
 
-          <!-- 条目行这一格三颗图标键：只发送 / 只换基准 / 发送并换基准。
-               他 2026-10-09：「应该还可以单独发送和单独换基准」—— 原先只有一颗合并键 + 一颗没人认得的「↑」。
-               他 2026-10-10 看了那排文字键的截图：「把文字换成图标吧，文字放在 popover 里面」—— 三个汉字
-               在一格里会把整排撑成两行，而父行那 5 颗本来就是「图标 + 悬停说法」，这一格跟着同一套写法。
+          <!-- 条目行这一格两颗图标键：只发送 / 设为基准。
+               他 2026-10-09：「应该还可以单独发送和单独换基准」；他 2026-10-10：「把文字换成图标吧，
+               文字放在 popover 里面」—— 三个汉字在一格里会把整排撑成两行，而父行那 5 颗本来就是
+               「图标 + 悬停说法」，这一格跟着同一套写法。
+               原先还有第三颗「发送这一条并换它当基准」，用户 2026-10-20 要求删掉：
+               「设为基准后就会自动发送」，两颗键的差别没了。
                图标不另造一套语义，按**同一列父行已有的**复用：DownloadOutlined 在那边就是「发到下载器」，
-               NumberOutlined 在那边就是「基准」，所以第三颗是两枚并排（发 + 基准）。
+               NumberOutlined 在那边就是「基准」。
                按住不给点而不是藏起来：第一条本来就是基准、基准在下载器里时换基准也没有对象。 -->
           <a-space v-else :size="0">
             <a-tooltip :title="t('KeepUploadTask.sendThisOne')">
@@ -1764,7 +1838,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                 </template>
               </a-button>
             </a-tooltip>
-            <a-tooltip :title="t('KeepUploadTask.setAsBaseTorrent')">
+            <a-tooltip :title="t('KeepUploadTask.setAsBaseTip')">
               <a-button
                 size="small"
                 type="text"
@@ -1773,21 +1847,6 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
               >
                 <template #icon>
                   <NumberOutlined />
-                </template>
-              </a-button>
-            </a-tooltip>
-            <a-tooltip :title="t('KeepUploadTask.sendAndSetBase')">
-              <a-button
-                size="small"
-                type="text"
-                :disabled="record.index === 0 || !!record.task.baseLocal || !!sendingOf(record.task.id)"
-                @click="sendOneAndPromote(record.task, record.index)"
-              >
-                <template #icon>
-                  <span class="dual-icon">
-                    <DownloadOutlined />
-                    <NumberOutlined />
-                  </span>
                 </template>
               </a-button>
             </a-tooltip>
@@ -1813,14 +1872,6 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 .task-title {
   font-size: 14px;
   font-weight: 500;
-}
-
-/* 「发送并换基准」那颗是两枚图标并排（发到下载器 + 设为基准），缝收到 1px：
-   按钮的 #icon 那一档内衬本来就窄，两枚之间再留 anticon 默认的空白就会让这颗比旁边两颗宽一截。 */
-.dual-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
 }
 
 /* 副标题与保存路径那两行要「比标题小一档、灰」。

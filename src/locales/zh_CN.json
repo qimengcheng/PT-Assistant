@@ -563,8 +563,7 @@
     },
     "UserLevelRequirementsTd": {
       "collapseLevelList": "收起等级列表",
-      "expandLevelList": "查看全部 {count} 个等级",
-      "levelList": "用户等级列表"
+      "expandLevelList": "查看全部 {count} 个等级"
     },
     "exportDialog": {
       "exportAll": "导出全部 {count} 个站点的用户信息",

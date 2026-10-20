@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, type Component } from "vue";
+import { computed, nextTick, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { computedAsync } from "@vueuse/core";
 import { isEmpty } from "es-toolkit/compat";
@@ -12,6 +12,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 
 import UserLevelsComponent from "./UserLevelsComponent.vue";
 import UserNextLevelUnMet from "@/options/views/Overview/MyData/UserNextLevelUnMet.vue";
+import { LEVEL_LIST_MOTION_MS, levelPanelBoxSize } from "./levelPanelBox.ts";
 
 const { userInfo } = defineProps<{
   userInfo: IUserInfo;
@@ -98,6 +99,66 @@ const userLevelGroupIcon = computed(() => {
 
 const showAllLevels = ref(false);
 
+/**
+ * 悬停开合与「展开了所以要钉住」分开记：`mergedOpen` 才是交给浮层的那个开合。
+ *
+ * 为什么非要钉：这一层默认 `mouseLeaveDelay` 只有 0.1s（antdv-next/dist/tooltip/index.js:48），
+ * 而框里放着一颗要点、点完还会变高的键 —— 悬停链一被打断，框就当众消失（用户报的「马上消失」）。
+ * 具体是哪一下打断的，本机量不出来（隐藏标签里合成 mouseenter 叫不出浮层，真指针操作又报
+ * viewport=0x0 不可用），所以这里不赌成因，直接把「展开态不许自己关」做成判据：
+ * 指针真的离开浮层时 openChange 报 false，那一刻才连展开态一起收掉。
+ */
+const hoverOpen = ref(false);
+const mergedOpen = computed(() => hoverOpen.value || showAllLevels.value);
+
+/**
+ * 浮层的可用画幅。判据本体在 levelPanelBox.ts（那里写着这几个数是怎么量出来的、
+ * 以及「为什么是左上角锚定」），这里只在打开那一刻把触发元素的位置喂给它。
+ */
+const panelBox = ref<{ maxWidth: number; maxHeight: number }>();
+
+const triggerEl = ref<HTMLElement>();
+
+function onOpenChange(open: boolean) {
+  hoverOpen.value = open;
+  if (!open) {
+    showAllLevels.value = false;
+    panelBox.value = undefined;
+    return;
+  }
+
+  const rect = triggerEl.value?.getBoundingClientRect();
+  panelBox.value = rect ? levelPanelBoxSize(rect, window.innerWidth, window.innerHeight) : undefined;
+}
+
+const listEl = ref<HTMLElement>();
+
+/**
+ * 展开/收起。列表内容是**整批换掉**的（收起态只有当前那一级，展开态是全表），没有「一个元素从 0
+ * 长出来」可以给 `<Transition>` 挂，所以量两端高度自己演一段。
+ *
+ * 用 Web Animations 而不是「写内联 height + CSS transition + 等 transitionend 清掉」：
+ * 后一种的收尾挂在事件上，而那一趟动画完全可能等不到 transitionend（浮层在动画途中被关掉、
+ * 连点两下把上一次打断）—— 台架量到过：收起那一下因为上一轮留下了 `height: 251px`，
+ * 内容已经缩回两行而框还停在 251 高。WAAPI 这条从头到尾不碰内联样式，演完自然回到 `auto`。
+ */
+function toggleLevels() {
+  const el = listEl.value;
+  if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    showAllLevels.value = !showAllLevels.value;
+    return;
+  }
+
+  const from = el.offsetHeight;
+  showAllLevels.value = !showAllLevels.value;
+  void nextTick(() => {
+    el.animate([{ height: `${from}px` }, { height: `${el.offsetHeight}px` }], {
+      duration: LEVEL_LIST_MOTION_MS,
+      easing: "cubic-bezier(0.25, 0.8, 0.5, 1)",
+    }).id = "level-list-height";
+  });
+}
+
 /** 开了「只显示普通用户等级要求」时，vip/manager 等级不进列表；用户本身就是 vip/manager 则不过滤 */
 const listedLevelRequirements = computed(() => {
   const list = userLevelRequirements.value ?? [];
@@ -116,18 +177,28 @@ const visibleLevelRequirements = computed(() => {
 
 <template>
   <span v-if="userInfo.levelName" class="text-no-wrap">
+    <!--
+      placement 走 bottomLeft 且把避让整个关掉（adjustX/adjustY 都不调），这两条是绑在一起的：
+      锚点必须是浮层的**左上角**，展开时只往右下长，那颗键和框的左边都不动。
+      留着避让的话，收起态（实测 x 60→630）与展开态（x 590→1500）会被判成两次不同的让位，
+      框就从触发元素左边翻到右边 —— 用户 2026-10-20 那句「这个还是会换方向，你统一到右边不就不会跳变了」。
+      避让换来的那点「不出屏幕」由 levelPanelBoxSize 按真实剩余算出来的画幅兜住。
+    -->
     <a-tooltip
       v-if="
         configStore.myDataTableControl.showLevelRequirement && userLevelRequirements && userLevelRequirements.length > 0
       "
-      placement="bottomRight"
+      placement="bottomLeft"
       :trigger="isMobile ? 'click' : 'hover'"
       :mouse-enter-delay="0.2"
-      color="#fff"
+      :open="mergedOpen"
+      :auto-adjust-overflow="false"
       :styles="{ root: { maxWidth: 'none' }, container: { padding: 0 } }"
+      color="#fff"
+      @open-change="onOpenChange"
     >
       <template #default>
-        <span>
+        <span ref="triggerEl">
           <component
             :is="userLevelGroupIcon"
             class="level-icon mr-1"
@@ -162,7 +233,13 @@ const visibleLevelRequirements = computed(() => {
       </template>
 
       <template #title>
-        <div class="level-requirement-panel">
+        <div
+          class="level-requirement-panel"
+          :style="{
+            maxWidth: panelBox ? `${panelBox.maxWidth}px` : undefined,
+            maxHeight: panelBox ? `${panelBox.maxHeight}px` : undefined,
+          }"
+        >
           <!-- 差值是算出来的、不在等级列表里，所以收起/展开两种形态下都固定在顶部 -->
           <div
             v-if="
@@ -180,44 +257,17 @@ const visibleLevelRequirements = computed(() => {
             />
           </div>
 
-          <div v-if="showAllLevels" class="text-body-small text-medium-emphasis">
-            {{ t("MyData.UserLevelRequirementsTd.levelList") }}
-          </div>
-
-          <div
-            v-for="userLevel in visibleLevelRequirements"
-            :key="userLevel.id"
-            class="level-requirement-row"
-            :class="{ 'level-requirement-row--current': userLevel.id === userInfo.levelId }"
-          >
-            <component
-              :is="userLevel.id <= (userInfo.levelId ?? -1) ? CheckOutlined : MinusCircleOutlined"
-              class="level-icon"
-              :style="{ color: userLevel.id <= (userInfo.levelId ?? -1) ? '#4caf50' : '#f44336' }"
-            />
-
-            <span class="level-requirement-name">
-              {{ userLevel.name }}:&nbsp;
-              <!-- 展示用户等级要求时， interval 向 date 的转换应该基于 joinTime 计算 -->
-              <UserLevelsComponent
-                :user-info="userInfo"
-                :level-requirement="userLevel"
-                :use-join-time-as-ref="true"
-              />
-            </span>
-
-            <!-- 权限名可能很长：用 a-typography-text 的 ellipsis.tooltip 一步拿到
-                 「截断 + 悬停显示完整文案」，不再靠手写 text-ellipsis + 原生 :title -->
-            <a-typography-text class="level-requirement-privilege" :ellipsis="{ tooltip: userLevel.privilege }">
-              {{ userLevel.privilege }}
-            </a-typography-text>
-          </div>
-
+          <!--
+            这颗键排在列表**前面**，不是排版偏好，是「原地展开」的唯一解：
+            浮层的锚点是它的左上角（见上面 placement 那段），所以只要键上面那些内容不变，
+            它的 x/y 都不变 —— 新增的等级只能从它下面长出来。写在列表后面那一版会把整颗键
+            顶下去 235px（台架量的数），指针还留在原位，读起来就是「弹了一个新框、鼠标不在框上」。
+          -->
           <button
             v-if="listedLevelRequirements.length > 1"
             type="button"
             class="level-requirement-toggle"
-            @click="showAllLevels = !showAllLevels"
+            @click="toggleLevels"
           >
             {{
               showAllLevels
@@ -225,6 +275,37 @@ const visibleLevelRequirements = computed(() => {
                 : t("MyData.UserLevelRequirementsTd.expandLevelList", { count: listedLevelRequirements.length })
             }}
           </button>
+
+          <div ref="listEl" class="level-requirement-list">
+            <div
+              v-for="userLevel in visibleLevelRequirements"
+              :key="userLevel.id"
+              class="level-requirement-row"
+              :class="{ 'level-requirement-row--current': userLevel.id === userInfo.levelId }"
+            >
+              <component
+                :is="userLevel.id <= (userInfo.levelId ?? -1) ? CheckOutlined : MinusCircleOutlined"
+                class="level-icon"
+                :style="{ color: userLevel.id <= (userInfo.levelId ?? -1) ? '#4caf50' : '#f44336' }"
+              />
+
+              <span class="level-requirement-name">
+                {{ userLevel.name }}:&nbsp;
+                <!-- 展示用户等级要求时， interval 向 date 的转换应该基于 joinTime 计算 -->
+                <UserLevelsComponent
+                  :user-info="userInfo"
+                  :level-requirement="userLevel"
+                  :use-join-time-as-ref="true"
+                />
+              </span>
+
+              <!-- 权限名可能很长：用 a-typography-text 的 ellipsis.tooltip 一步拿到
+                   「截断 + 悬停显示完整文案」，不再靠手写 text-ellipsis + 原生 :title -->
+              <a-typography-text class="level-requirement-privilege" :ellipsis="{ tooltip: userLevel.privilege }">
+                {{ userLevel.privilege }}
+              </a-typography-text>
+            </div>
+          </div>
         </div>
       </template>
     </a-tooltip>
@@ -260,12 +341,18 @@ const visibleLevelRequirements = computed(() => {
   color: rgba(0, 0, 0, 0.88); // parseColor 给的是纯黑，压回更柔和的正文色
   padding: 6px 8px;
   width: max-content;
-  /* 上限按内容给足，再用 100vw 兜住窄窗口 —— 浮层挂在 body 上，超视口的部分
-     会被 autoAdjustOverflow 移位后裁掉，那时用户看到的是「右边少了东西」而不是滚动条。 */
+  /* 这两条是**上限的上限**：模板上的 :style 会在打开那一刻按触发元素右侧/下方的真实剩余再收一次
+     （判据在 levelPanelBox.ts）。浮层的避让已经整个关掉，所以不收就会真伸出屏幕，而不是被挪回来。 */
   max-width: min(860px, calc(100vw - 40px));
   max-height: 420px;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* 展开/收起那段高度动画是 JS 现量现写的（见 toggleLevels），这一层必须裁掉溢出，
+   否则收缩过程中下面的等级会先露出来再被抽走。 */
+.level-requirement-list {
+  overflow: hidden;
 }
 
 .level-requirement-row {
@@ -312,9 +399,11 @@ const visibleLevelRequirements = computed(() => {
   display: block;
   width: 100%;
   margin-top: 4px;
-  padding: 5px 2px 1px;
+  padding: 5px 2px;
   border: 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  /* 它是下面那段列表的标题行，所以两头都要有缝：上头隔开差值那一行，下头隔开等级列表
+     （列表之间靠 .level-requirement-row + .level-requirement-row 那条边线，第一条轮不到它） */
+  border-block: 1px solid rgba(0, 0, 0, 0.06);
   background: none;
   color: #1677ff;
   font-size: 12px;

@@ -563,8 +563,7 @@
     },
     "UserLevelRequirementsTd": {
       "collapseLevelList": "Collapse level list",
-      "expandLevelList": "Show all {count} levels",
-      "levelList": "User Level List"
+      "expandLevelList": "Show all {count} levels"
     },
     "exportDialog": {
       "exportAll": "Export User Info From {count} sites",

@@ -12,7 +12,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 
 import UserLevelsComponent from "./UserLevelsComponent.vue";
 import UserNextLevelUnMet from "@/options/views/Overview/MyData/UserNextLevelUnMet.vue";
-import { LEVEL_LIST_MOTION_MS, levelPanelBoxSize } from "./levelPanelBox.ts";
+import { LEVEL_LIST_MOTION_MS, levelPanelBoxSize, type ILevelPanelBox } from "./levelPanelBox.ts";
 
 const { userInfo } = defineProps<{
   userInfo: IUserInfo;
@@ -112,10 +112,18 @@ const hoverOpen = ref(false);
 const mergedOpen = computed(() => hoverOpen.value || showAllLevels.value);
 
 /**
- * 浮层的可用画幅。判据本体在 levelPanelBox.ts（那里写着这几个数是怎么量出来的、
- * 以及「为什么是左上角锚定」），这里只在打开那一刻把触发元素的位置喂给它。
+ * 浮层的可用画幅与朝哪一头长。判据本体在 levelPanelBox.ts（那里写着这几个数是怎么量出来的、
+ * 以及「为什么方向只能在打开那一刻定一次」），这里只在打开那一刻把触发元素的位置喂给它。
  */
-const panelBox = ref<{ maxWidth: number; maxHeight: number }>();
+const panelBox = ref<ILevelPanelBox>();
+
+/**
+ * antd 对 `topLeft` 用的是 **bottom** 内缩定位（`_util/placements.js` 给每条 placement 都带
+ * `dynamicInset: true`，而 `points[0]` 是 `bl` → `useOffsetStyle` 写 `bottom` 不写 `top`），
+ * 所以「朝上长」这件事不需要在展开时补一次对齐：内容变高自己往上面去。
+ * 也正因为钉住的是下边缘，那颗键在这一档必须待在列表**下面**（见模板里 `--up` 那段）。
+ */
+const growUp = computed(() => panelBox.value?.growUp ?? false);
 
 const triggerEl = ref<HTMLElement>();
 
@@ -178,17 +186,20 @@ const visibleLevelRequirements = computed(() => {
 <template>
   <span v-if="userInfo.levelName" class="text-no-wrap">
     <!--
-      placement 走 bottomLeft 且把避让整个关掉（adjustX/adjustY 都不调），这两条是绑在一起的：
-      锚点必须是浮层的**左上角**，展开时只往右下长，那颗键和框的左边都不动。
+      横向两个方向都锚**左**边缘、纵向按开合那一刻比过的剩余取一侧，这两条是绑在一起的：
+      锚点定了，展开时框只往「没被钉住」那一头长，那颗键和框的左边都不动。
       留着避让的话，收起态（实测 x 60→630）与展开态（x 590→1500）会被判成两次不同的让位，
       框就从触发元素左边翻到右边 —— 用户 2026-10-20 那句「这个还是会换方向，你统一到右边不就不会跳变了」。
       避让换来的那点「不出屏幕」由 levelPanelBoxSize 按真实剩余算出来的画幅兜住。
+      纵向也不是交给避让：避让只按**当下**那一份高度判，收起态给的方向会在展开时翻面（=又一种跳变），
+      所以两侧剩余在这**同一刻**比出来（用户 2026-10-20 第三句「下面的肯定一开始就是往上的啊」），
+      整场不再变。
     -->
     <a-tooltip
       v-if="
         configStore.myDataTableControl.showLevelRequirement && userLevelRequirements && userLevelRequirements.length > 0
       "
-      placement="bottomLeft"
+      :placement="growUp ? 'topLeft' : 'bottomLeft'"
       :trigger="isMobile ? 'click' : 'hover'"
       :mouse-enter-delay="0.2"
       :open="mergedOpen"
@@ -235,6 +246,7 @@ const visibleLevelRequirements = computed(() => {
       <template #title>
         <div
           class="level-requirement-panel"
+          :class="{ 'level-requirement-panel--up': growUp }"
           :style="{
             maxWidth: panelBox ? `${panelBox.maxWidth}px` : undefined,
             maxHeight: panelBox ? `${panelBox.maxHeight}px` : undefined,
@@ -258,10 +270,12 @@ const visibleLevelRequirements = computed(() => {
           </div>
 
           <!--
-            这颗键排在列表**前面**，不是排版偏好，是「原地展开」的唯一解：
-            浮层的锚点是它的左上角（见上面 placement 那段），所以只要键上面那些内容不变，
-            它的 x/y 都不变 —— 新增的等级只能从它下面长出来。写在列表后面那一版会把整颗键
-            顶下去 235px（台架量的数），指针还留在原位，读起来就是「弹了一个新框、鼠标不在框上」。
+            这颗键与列表的先后不是排版偏好，是「原地展开」的唯一解：浮层被钉住的那条边不动，
+            新增的等级只能往另一头长，所以**键必须贴住被钉住的那条边**。
+            DOM 里它排在列表前面 —— 那是朝下那一档（bottomLeft 钉上边缘）要的次序；
+            朝上那一档钉的是**下**边缘，由 CSS 的 order 把它换到列表之后（见样式里 --up 那段）。
+            两档都写反的话会把整颗键顶开 235px（台架量的数），指针还留在原位，读起来就是
+            「弹了一个新框、鼠标不在框上」。
           -->
           <button
             v-if="listedLevelRequirements.length > 1"
@@ -341,8 +355,9 @@ const visibleLevelRequirements = computed(() => {
   color: rgba(0, 0, 0, 0.88); // parseColor 给的是纯黑，压回更柔和的正文色
   padding: 6px 8px;
   width: max-content;
-  /* 这两条是**上限的上限**：模板上的 :style 会在打开那一刻按触发元素右侧/下方的真实剩余再收一次
-     （判据在 levelPanelBox.ts）。浮层的避让已经整个关掉，所以不收就会真伸出屏幕，而不是被挪回来。 */
+  /* 这两条是**上限的上限**：模板上的 :style 会在打开那一刻按触发元素右侧、以及选中的那一侧（上或下）
+     的真实剩余再收一次（判据在 levelPanelBox.ts）。浮层的避让已经整个关掉，所以不收就会真伸出屏幕，
+     而不是被挪回来。 */
   max-width: min(860px, calc(100vw - 40px));
   max-height: 420px;
   overflow-y: auto;
@@ -353,6 +368,40 @@ const visibleLevelRequirements = computed(() => {
    否则收缩过程中下面的等级会先露出来再被抽走。 */
 .level-requirement-list {
   overflow: hidden;
+}
+
+/*
+ * 朝上长那一档（贴着窗口底的那些行，用户 2026-10-20：「下面的肯定一开始就是往上的啊」）。
+ * antd 对 topLeft 钉的是浮层的**下**边缘，所以这颗键要待在列表之后 —— 键不动，新等级往上面长。
+ * DOM 次序一个字不动（前面列表那个写法是朝下那一档要的），这里只用 order 换视觉先后。
+ * `flex-shrink: 0` 是必要的：不写的话这一列会被 max-height 压扁而不是滚起来。
+ */
+.level-requirement-panel--up {
+  display: flex;
+  flex-direction: column;
+
+  > * {
+    flex-shrink: 0;
+  }
+
+  > .level-requirement-row--next {
+    order: 1;
+  }
+
+  > .level-requirement-list {
+    order: 2;
+  }
+
+  > .level-requirement-toggle {
+    order: 3;
+    /* 这一档它是**内容的末尾**，所以画幅顶不住（等级多到一屏装不下）时整颗键会落在折线下面 ——
+       指针原位只剩几行等级，那颗键再也点不回去。钉在滚动区下沿：不溢出时它自然待在原位（读数上
+       键底距面板底就是那 6px 内衬），溢出时永远看得见。底色必须给实 —— 原来那条 `background: none`
+       在滚动时会把等级行从键底下透出来。 */
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+  }
 }
 
 .level-requirement-row {

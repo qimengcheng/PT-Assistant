@@ -1046,7 +1046,9 @@
     },
     "AddDialog": {
       "title": "添加备份服务器",
-      "selectTypePlaceholder": "请选择备份服务器类型"
+      "selectTypePlaceholder": "请选择备份服务器类型",
+      "noneSelectNotice": "请选择一个服务器类型",
+      "newType": "找不到想要的服务器类型？来这里添加吧！"
     },
     "Editor": {
       "backupConfig": "备份配置",
@@ -1056,6 +1058,10 @@
       "backupIntervalHint": "设置自动备份间隔（小时），留空或为 0 表示不自动备份，可设置为任意时长（例如 168 小时即 7 天）",
       "clearRetention": "清空保留策略（不自动清理历史备份）",
       "retention": "备份保留策略",
+      "name": "服务器名称",
+      "nameTip": "取一个好听又好分辨的名称",
+      "uid": "服务器ID",
+      "uidPlaceholder": "（自动生成）",
       "serverConfig": "服务器配置"
     },
     "RetentionDialog": {
@@ -1508,10 +1514,6 @@
       "NoneSelectNotice": "请选择一个服务器类型",
       "newType": "找不到想要的服务器类型？来这里添加吧！",
       "selectPlaceholder": "@:SetDownloader.add.NoneSelectNotice （支持搜索）",
-      "step": {
-        "selectType": "选择服务器类型",
-        "setOptions": "详细配置"
-      },
       "title": "新增下载服务器"
     },
     "common": {

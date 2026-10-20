@@ -37,8 +37,14 @@ const SECRET_BACKUP_FIELDS = new Set([
 const isSecretBackupField = (key: unknown) => typeof key === "string" && SECRET_BACKUP_FIELDS.has(key);
 
 const clientConfig = defineModel<IBackupServerMetadata>();
+/**
+ * 表单有效性上抛的名字全站只许一种拼法：`update:form-valid`（模板侧 `@update:form-valid`）。
+ * 原先这里写的是 camel 的 `update:configValid`，而两个调用点听的是 kebab 的 `config-valid` ——
+ * 它俩靠 Vue `emit()` 的 hyphenate 兜底才对得上（`runtime-core.cjs.js:4538-4542`：原样 → camelize → hyphenate）。
+ * 兜底不是契约：换个下划线或拼错一个字母就静默不响，而防线④只看 prop/插槽，看不见 emit 的名字。
+ */
 const emits = defineEmits<{
-  (e: "update:configValid", value: boolean): void;
+  (e: "update:form-valid", value: boolean): void;
 }>();
 
 const hasRetention = computed(() => hasBackupRetentionToApply(clientConfig.value?.retention));
@@ -192,7 +198,7 @@ const formRef = ref<FormInstance | null>(null);
 
 /**
  * Vuetify 的 `<v-form v-model="formValid">` 会把校验结果自动回写，antd 的 a-form 不会。
- * 这里手动把校验结果同步到 formValid —— 它经 `@update:configValid` 决定
+ * 这里手动把校验结果同步到 formValid —— 它经 `@update:form-valid` 决定
  * 添加/编辑对话框里「确定」按钮是否可用（见 AddDialog.vue / EditDialog.vue）。
  */
 function syncFormValid() {
@@ -207,7 +213,7 @@ onMounted(syncFormValid);
 
 // 父对话框的「保存」原本只在 @after:check-connect 里拿 configValid，不点测试连接就永远禁用；
 // 这里让校验结果自己上报，immediate 是为了挂载那一次同步的结果也能送出去。
-watch(formValid, (v) => emits("update:configValid", v), { immediate: true });
+watch(formValid, (v) => emits("update:form-valid", v), { immediate: true });
 
 async function checkConnect() {
   const clientType = clientConfig.value?.type;
@@ -239,19 +245,19 @@ async function checkConnect() {
         </a-col>
         <a-col :span="12" :md="4">
           <a-form-item
-            :label="t('SetDownloader.common.name')"
+            :label="t('SetBackup.Editor.name')"
             name="name"
-            :rules="[{ required: true, message: t('SetDownloader.editor.nameTip') }]"
+            :rules="[{ required: true, message: t('SetBackup.Editor.nameTip') }]"
           >
             <a-input
               v-model:value="clientConfig.name"
-              :placeholder="t('SetDownloader.common.name')"
+              :placeholder="t('SetBackup.Editor.name')"
               @change="syncFormValid"
             />
           </a-form-item>
         </a-col>
         <a-col :span="12" :md="4">
-          <a-form-item :label="t('SetDownloader.common.uid') + t('SetDownloader.editor.uidPlaceholder')">
+          <a-form-item :label="t('SetBackup.Editor.uid') + t('SetBackup.Editor.uidPlaceholder')">
             <a-input v-model:value="clientConfig.id" disabled />
           </a-form-item>
         </a-col>
@@ -460,7 +466,7 @@ async function checkConnect() {
         :check-fn="checkConnect"
         :reset-timeout="3e3"
         @after:check-connect="
-          () => emits('update:configValid', formValid && true) // 不管是否测试成功，都允许用户进行下一步操作（保存下载服务器配置）
+          () => emits('update:form-valid', formValid && true) // 不管是否测试成功，都允许用户进行下一步操作（保存下载服务器配置）
         "
       />
     </a-form>

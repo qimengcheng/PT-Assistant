@@ -118,9 +118,7 @@ function resetDialog() {
 
       <!-- v-autocomplete 的 persistent-hint -->
       <div class="select-hint">
-        {{
-          allBackupServerMetaData[selectedBackupServerType!]?.description ?? t("SetDownloader.add.NoneSelectNotice")
-        }}
+        {{ allBackupServerMetaData[selectedBackupServerType!]?.description ?? t("SetBackup.AddDialog.noneSelectNotice") }}
       </div>
     </div>
 
@@ -128,7 +126,7 @@ function resetDialog() {
       <Editor
         v-if="storedBackupServerConfig.type"
         v-model="storedBackupServerConfig"
-        @update:config-valid="(v) => (isBackupServerConfigValid = v)"
+        @update:form-valid="(v) => (isBackupServerConfigValid = v)"
       />
     </div>
 
@@ -145,7 +143,7 @@ function resetDialog() {
           <template #icon>
             <QuestionCircleOutlined />
           </template>
-          <span>{{ t("SetDownloader.add.newType") }}</span>
+          <span>{{ t("SetBackup.AddDialog.newType") }}</span>
         </a-button>
 
         <!-- 新增服务器链接靠左、取消/上一步/下一步/确定靠右。右侧这组用 flex="auto"

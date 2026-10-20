@@ -27,8 +27,9 @@ const SECRET_INPUT_PATTERN = /^(?:.*_)?(?:token|passkey|apikey|rsskey|passwd|pas
 const isSecretInput = (name: string) => SECRET_INPUT_PATTERN.test(name);
 
 const siteId = defineModel<TSiteID>({ default: "" });
+/** 表单有效性上抛：名字全站统一成 `update:form-valid`（与两个调用点听的那串一致，不再靠 Vue 的 hyphenate 兜底）。 */
 const emit = defineEmits<{
-  (e: "update:formValid", v: boolean): void;
+  (e: "update:form-valid", v: boolean): void;
 }>();
 
 const siteMetaData = ref<ISiteMetadata>({} as unknown as ISiteMetadata);
@@ -145,7 +146,7 @@ const isFormValid = computed(
 watch(
   isFormValid,
   (v) => {
-    emit("update:formValid", v);
+    emit("update:form-valid", v);
   },
   { immediate: true },
 );

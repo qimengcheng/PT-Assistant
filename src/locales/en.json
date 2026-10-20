@@ -1046,7 +1046,9 @@
     },
     "AddDialog": {
       "title": "Add Backup Server",
-      "selectTypePlaceholder": "Select a backup server type"
+      "selectTypePlaceholder": "Select a backup server type",
+      "noneSelectNotice": "Please select a server type",
+      "newType": "Come here to add the server type you want!"
     },
     "Editor": {
       "backupConfig": "Backup Configuration",
@@ -1056,6 +1058,10 @@
       "backupIntervalHint": "Set auto-backup interval (hours). Leave empty or 0 to disable auto backup. Any length is allowed (e.g. 168 hours = 7 days).",
       "clearRetention": "Clear retention policy (never clean up historical backups)",
       "retention": "Backup Retention Policy",
+      "name": "Server Name",
+      "nameTip": "Pick a nice and recognizable name for this backup server",
+      "uid": "Server Id",
+      "uidPlaceholder": " (Generate automatically)",
       "serverConfig": "Server Configuration"
     },
     "RetentionDialog": {
@@ -1508,10 +1514,6 @@
       "NoneSelectNotice": "Please select a server type",
       "newType": "Come here to add the server type you want!",
       "selectPlaceholder": "@:SetDownloader.add.NoneSelectNotice ( Support Search )",
-      "step": {
-        "selectType": "Select server type",
-        "setOptions": "Configuration"
-      },
       "title": "Add Download Client"
     },
     "common": {

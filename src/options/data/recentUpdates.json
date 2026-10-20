@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-20 17:45:29",
-  "headSha": "d0043da",
+  "generatedAt": "2026-10-20 18:34:44",
+  "headSha": "40b6e1b",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.120.1",
+      "date": "2026-10-20 18:34:44",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「数据备份 → 编辑备份服务器」那一屏的英文提示改对了对象：名称那一格原先写着 “…for this Download Server”（下载服务器），现在写 backup server。这一屏原先整片借用下载器那一族的文案，六个字段现在各用备份自己的一句 —— 中文界面画出来一字未变。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.120.0",
       "date": "2026-10-20 17:45:29",

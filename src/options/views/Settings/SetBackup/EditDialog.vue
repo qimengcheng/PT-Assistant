@@ -66,7 +66,7 @@ async function editClientConfig() {
     :width="800"
     :after-open-change="(open: boolean) => open && dialogEnter()"
   >
-    <Editor v-if="clientConfig" v-model="clientConfig" @update:config-valid="(v) => (isFormValid = v)" />
+    <Editor v-if="clientConfig" v-model="clientConfig" @update:form-valid="(v) => (isFormValid = v)" />
 
     <template #footer>
       <a-flex justify="flex-end" align="center" gap="small">

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
+  CloudSyncOutlined,
   CloudUploadOutlined,
   ClockCircleOutlined,
   ColumnWidthOutlined,
@@ -43,6 +44,7 @@ import { useConfigStore } from "@/options/stores/config.ts";
 import { buildSortOrderMap, makeSorter, toPagination, toTableColumns } from "@/options/components/tableSorters.ts";
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import type { IReseedScanResult } from "@/shared/types/storages/reseedScan.ts";
+import type { ITransferSourceRow } from "@/shared/upload/types.ts";
 import { reseedHandoffLabelOf } from "@/shared/reseedScanHandoff.ts";
 import { countAutoTagSkips, planAutoTagRows } from "@/shared/torrentAutoTag.ts";
 import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
@@ -66,6 +68,7 @@ import SpeedLimitDialog from "./SpeedLimitDialog.vue";
 import LabelDialog from "./LabelDialog.vue";
 import RecheckConfirmDialog from "./RecheckConfirmDialog.vue";
 import HoverTip from "@/options/components/HoverTip.vue";
+import TransferUploadDialog from "@/options/components/TransferUploadDialog/Index.vue";
 
 import {
   torrents,
@@ -119,6 +122,28 @@ const toDeleteTorrents = ref<CTorrent[]>([]);
 
 // push to downloader dialog
 const showPushToDownloaderDialog = ref(false);
+
+/**
+ * 转种（转载发布）：把下载器里的这一颗交到**另一个站的上传页**，与上面那颗「推送种子」
+ * 不是一件事 —— 那个是把种子发给另一台下载器，这个要回源站取原始种子、填目标站的发布表单。
+ */
+const showTransferUploadDialog = ref(false);
+
+/**
+ * 递给转种对话框的那几列。刻意收成窄类型而不是把整个 `CTorrent` 传进去：
+ * 那一步离开这一页之后只认这五个字段，多传的部分只会变成一处没人核对的隐式依赖。
+ */
+const transferSourceRows = computed<ITransferSourceRow[]>(() =>
+  tableSelected.value.map((t) => ({
+    downloaderId: t.clientId,
+    id: t.id,
+    name: t.name,
+    totalSize: t.totalSize,
+    // 各家报的 tracker 可能是空的；空串交给反查那一步当「认不出来」处理，不给它 undefined
+    tracker: t.tracker ?? "",
+    infoHash: t.infoHash,
+  })),
+);
 
 // detail dialog
 const showDetailDialog = ref(false);
@@ -1016,6 +1041,16 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
         </a-button>
       </a-tooltip>
 
+      <!-- 转种：把选中的这一颗交到另一个站的上传页。与上面那颗「推送种子」并排 —— 两件事都是
+           「把这一颗发出去」，区别只在发到另一台下载器 / 另一个站。同样只放图标：这一排的宽度
+           预算按台架量过（见下面搜索框那段），多一颗 small 图标档约 32px，英文那一档 1540.2 →
+           1572.2 仍在 1591 之内。 -->
+      <a-tooltip :title="t('MyClient.transferUpload.entry')">
+        <a-button size="small" type="text" :disabled="tableSelected.length === 0" @click="showTransferUploadDialog = true">
+          <template #icon><CloudSyncOutlined /></template>
+        </a-button>
+      </a-tooltip>
+
       <a-divider type="vertical" />
 
       <a-tooltip :title="t('MyClient.resumeSelected')">
@@ -1465,6 +1500,9 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   />
 
   <PushToDownloaderDialog v-model="showPushToDownloaderDialog" />
+
+  <!-- 转种：源种子由 offscreen 回源站按 infoHash 认出来，见 TransferUploadDialog 的文件头 -->
+  <TransferUploadDialog v-model="showTransferUploadDialog" :torrents="transferSourceRows" />
 
   <!-- 「可辅种扫描」：两处入口 —— 工具条左端末尾那颗图标按钮，与名称下面那枚可辅种标记（见标记处注释）。
        范围三档与本地指纹要读的下载器都在这里算好传进去，面板自己不再判第二遍。 -->

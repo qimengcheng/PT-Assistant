@@ -15,6 +15,7 @@ import {
   HistoryOutlined,
   HomeOutlined,
   InboxOutlined,
+  PictureOutlined,
   PlaySquareOutlined,
   ReadOutlined,
   SearchOutlined,
@@ -115,6 +116,8 @@ const navItems = computed(() => {
     { path: "/keep-upload-task", label: t("route.Overview.KeepUploadTask"), icon: InboxOutlined },
     { path: "/media-server-entity", label: t("route.Overview.MediaServerEntity"), icon: PlaySquareOutlined },
     { path: "/set-backup", label: t("layout.nav.backup"), icon: CloudUploadOutlined },
+    // 紧跟「数据备份」：同为外部服务的连接信息，转种时要靠它换截图链接
+    { path: "/set-image-host", label: t("layout.nav.imageHost"), icon: PictureOutlined },
     { path: "/set-downloader", label: t("layout.nav.downloader"), icon: DownloadOutlined },
     // 「基础设置」不在这里了（用户 2026-10-08）：它和上面两条一样是 set-* 那族，但入口挪到了
     // logo 那一行右边那颗齿轮上 —— 菜单里少一条，选中态也跟着由齿轮自己标。

@@ -373,6 +373,52 @@
       "urlInputHint": "One URL or magnet link per line",
       "urlInputLabel": "URLs / Magnet Links"
     },
+    "transferUpload": {
+      "entry": "Transfer to Another Site",
+      "title": "Transfer to Another Site",
+      "singleOnly": "Only the first selected torrent will be transferred. Batch transfer is not supported yet.",
+      "sourceTorrent": "Source Torrent",
+      "sourceSize": "Size",
+      "locatedTitle": "Title on Source Site",
+      "sourceSite": "Source Site",
+      "sourceSitePlaceholder": "Which site this torrent came from",
+      "noSite": "No site added yet",
+      "locating": "Locating this torrent on the source site",
+      "locateFailed": "Could not identify this torrent on the source site",
+      "targetSite": "Target Site",
+      "targetSitePlaceholder": "Pick a site you can publish to",
+      "noTargetSite": "No other site added yet",
+      "loadingForm": "Loading the upload form",
+      "loadFormFailed": "Could not load the upload form",
+      "missingRequired": "Still empty: {0}",
+      "keepSourceTag": "Keep the source site tag (info.source)",
+      "description": "Source Description",
+      "loadingDescription": "Loading the source description",
+      "descriptionFailed": "Could not load the source description",
+      "useDescription": "Fill the source description into the target site",
+      "descriptionSummary": "{0} characters · {1} screenshots · {2}",
+      "withMediaInfo": "mediainfo present",
+      "withoutMediaInfo": "no mediainfo",
+      "showPreview": "Preview",
+      "hidePreview": "Hide preview",
+      "previewHint": "Broken images are caused by the source site's hotlink protection — replace them with image-host links before submitting. Styles may also differ on the target site.",
+      "noDescriptionField": "This site's upload page has no description field, so the description cannot be used",
+      "checkingDuplicate": "Checking the target site for duplicates…",
+      "duplicateFound": "The target site already has this torrent — do not upload it again",
+      "duplicateFoundHint": "Already there: {0}",
+      "duplicateSkip": "Source tag removed: the infoHash changes, so this counts as a different torrent and the duplicate check no longer applies",
+      "duplicateNone": "No torrent with the same infoHash on the target site (the search is title-based, so this is not a guarantee)",
+      "duplicateFailed": "Duplicate check failed: {0} (this does not mean the torrent is absent)",
+      "imageHostPlaceholder": "Image host",
+      "noImageHost": "No image host configured yet (Settings → Image hosts)",
+      "transferImages": "Re-upload {0} image(s)",
+      "transferring": "Uploading {0}/{1}",
+      "imageHostHint": "Source images are hotlink-protected and will break on other sites; re-uploading replaces their links",
+      "imageTransferDone": "Replaced the links of {0} image(s) with image-host URLs",
+      "submit": "Submit",
+      "submitFailed": "Submission failed",
+      "cancel": "Cancel"
+    },
     "recheckSelected": "Recheck",
     "recheckDialog": {
       "text": "Are you sure you want to recheck the selected {count} torrent(s)? Rechecking consumes downloader resources and may temporarily interrupt seeding.",
@@ -1370,6 +1416,52 @@
       "importFailed": "Failed to import PT-Plugin-Plus user data"
     }
   },
+  "SetImageHost": {
+    "pageHint": "Image hosts are used by \"transfer upload\": screenshots in the source description get re-uploaded and the links replaced before publishing. Source images are hotlink-protected, so referencing them from another site shows broken images.",
+    "empty": "No image host configured yet. Transfers still work without it, but source screenshots will most likely be broken on the target site.",
+    "notSet": "No endpoint",
+    "builtinEndpoint": "Official endpoint (nothing to fill)",
+    "column": {
+      "endpoint": "Endpoint"
+    },
+    "action": {
+      "test": "Test upload (1×1 px image)"
+    },
+    "editor": {
+      "titleAdd": "Add image host",
+      "titleEdit": "Edit image host",
+      "type": "Type",
+      "name": "Name",
+      "requiredMissing": "Some required fields are still empty"
+    },
+    "field": {
+      "apiKey": "API Key / Token",
+      "endpoint": "Endpoint",
+      "fileField": "File field name",
+      "urlPath": "URL path in response",
+      "urlTemplate": "URL template",
+      "headerName": "Auth header name",
+      "headerValue": "Auth header value",
+      "extraFields": "Extra form fields"
+    },
+    "hint": {
+      "endpoint": "The site root, e.g. https://img.example.com (without /api/…)",
+      "apiKey": "Generated in the host's dashboard; stored only in this browser's extension storage",
+      "imgbbKey": "Get a free key at https://api.imgbb.com/ — a 32-character string",
+      "smmsKey": "Generate an API Token at https://sm.ms/home/apitoken",
+      "imgurKey": "Register an app at https://api.imgur.com/oauth2/addclient and use the Client ID (not the secret)",
+      "cheveretoKey": "API key from the Chevereto dashboard (API page); leave empty if the API needs no auth",
+      "lskyKey": "Lsky Pro dashboard → API → create a token; paste the token itself, no Bearer prefix",
+      "easyimageKey": "API token from EasyImage; leave empty when auth is disabled",
+      "customEndpoint": "The full upload URL, e.g. https://img.example.com/api/upload",
+      "customKey": "Optional. Reference it as {apiKey} in the fields below",
+      "customFileField": "Form field name for the file, default file (also seen: image / source / smfile)",
+      "customUrlPath": "Path to the image URL in the JSON response, e.g. data.url / image.url / data.links.url. Leave empty to auto-detect",
+      "customUrlTemplate": "Use when the host returns only a filename instead of a full URL; {value} is replaced with the value above, e.g. https://img.example.com/{value}",
+      "customHeaderValue": "Auth header value, may use {apiKey}, e.g. Bearer {apiKey}",
+      "customExtraFields": "Extra form fields as JSON, values may use {apiKey}, e.g. {\"token\": \"{apiKey}\"}"
+    }
+  },
   "SetDownloader": {
     "PathAndTag": {
       "downloadPath": {
@@ -2077,6 +2169,7 @@
       "backup": "Backup",
       "downloader": "Downloaders",
       "myClient": "My Clients",
+      "imageHost": "Image hosts",
       "basicSettings": "Basic Settings",
       "techStack": "Tech Stack",
       "logger": "Runtime Log",

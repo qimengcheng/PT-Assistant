@@ -24,6 +24,7 @@ import {
   type TSolutionKey,
   type ISearchSolutionMetadata,
 } from "@/shared/types.ts";
+import type { IImageHostMetadata, TImageHostKey } from "@/shared/imageHost/types.ts";
 import { siteIdsNeedingGroups } from "@/shared/siteGroupsBackfill.ts";
 import { sendMessage } from "@/messages.ts";
 import { i18n } from "@/options/plugins/i18n.ts";
@@ -33,7 +34,7 @@ import { tOutside } from "@/options/i18nOutside.ts";
 
 type TSimplePatchFieldKey = keyof Pick<
   IMetadataPiniaStorageSchema,
-  "sites" | "solutions" | "snapshots" | "downloaders" | "mediaServers" | "backupServers"
+  "sites" | "solutions" | "snapshots" | "downloaders" | "mediaServers" | "backupServers" | "imageHosts"
 >;
 
 export const useMetadataStore = defineStore("metadata", {
@@ -58,6 +59,7 @@ export const useMetadataStore = defineStore("metadata", {
     downloaders: {},
     mediaServers: {},
     backupServers: {},
+    imageHosts: {},
 
     defaultSolutionId: "default",
     defaultDownloader: {},
@@ -417,6 +419,15 @@ export const useMetadataStore = defineStore("metadata", {
     getBackupServers(state) {
       return Object.values(state.backupServers);
     },
+
+    getImageHosts(state) {
+      return Object.values(state.imageHosts ?? {});
+    },
+
+    /** 转种时能选的图床：只列启用的，顺序按添加顺序 */
+    getEnabledImageHosts(): IImageHostMetadata[] {
+      return this.getImageHosts.filter((host) => host.enabled);
+    },
   },
   actions: {
     /**
@@ -642,6 +653,20 @@ export const useMetadataStore = defineStore("metadata", {
 
     async removeBackupServer(backupServerId: string) {
       delete this.backupServers[backupServerId];
+      await this.$save();
+    },
+
+    /** 图床的新增与编辑走同一条：`id` 是主键，存在即覆盖 */
+    async saveImageHost(imageHost: IImageHostMetadata) {
+      // 恢复旧备份后这一格可能是 undefined：恢复是整份覆盖，旧包里还没有这个键
+      this.imageHosts ??= {};
+      this.imageHosts[imageHost.id] = imageHost;
+      await this.$save();
+    },
+
+    async removeImageHost(imageHostId: TImageHostKey) {
+      this.imageHosts ??= {};
+      delete this.imageHosts[imageHostId];
       await this.$save();
     },
 

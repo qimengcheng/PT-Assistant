@@ -98,8 +98,13 @@ function createSiteCache() {
   };
 }
 
-/** 这一档搜索状态算不算「真的查成了」 */
-function isSearchAnswered(status: EResultParseStatus): boolean {
+/**
+ * 这一档搜索状态算不算「真的查成了」。
+ *
+ * 导出去给「定位源站那颗种子」（`torrentUpload.ts`）复用：那一步同样要在「搜过、没有」
+ * 与「这一次没搜成」之间分开，两处各判一套就会有一处把「要登录」说成「那个站没有」。
+ */
+export function isSearchAnswered(status: EResultParseStatus): boolean {
   // 只有这两档是「站点给了一个可信的页」：success = 解析出内容，noResults = 页面正常但这条词没结果。
   // 其余（要登录 / 要凭据 / 被 CF 挡 / 解析歪了 / 超时）都不能拿来判「那个站没有这条种子」。
   return status === EResultParseStatus.success || status === EResultParseStatus.noResults;
@@ -112,7 +117,7 @@ function isSearchAnswered(status: EResultParseStatus): boolean {
  * 弹窗那一种调用方会把它翻成真句子），而这里的 note 会被界面原样摆出来 —— 按 AGENTS §3.5，
  * 内部标识进 UI 是零容忍项。
  */
-const SEARCH_STATUS_TEXT: Partial<Record<EResultParseStatus, string>> = {
+export const SEARCH_STATUS_TEXT: Partial<Record<EResultParseStatus, string>> = {
   [EResultParseStatus.needLogin]: "需要重新登录",
   [EResultParseStatus.noUserInput]: "该站必填的凭据没有填写",
   [EResultParseStatus.CFBlocked]: "被 Cloudflare 挡住",

@@ -373,6 +373,52 @@
       "urlInputHint": "每行一个链接或磁力链接",
       "urlInputLabel": "下载链接 / 磁力链接"
     },
+    "transferUpload": {
+      "entry": "转种到其他站",
+      "title": "转种到其他站",
+      "singleOnly": "只处理选中的第一颗种子，批量转种还没做。",
+      "sourceTorrent": "源种子",
+      "sourceSize": "大小",
+      "locatedTitle": "源站标题",
+      "sourceSite": "源站",
+      "sourceSitePlaceholder": "这颗种子来自哪个站",
+      "noSite": "还没有添加站点",
+      "locating": "正在源站定位这颗种子",
+      "locateFailed": "没能在源站认出这颗种子",
+      "targetSite": "目标站",
+      "targetSitePlaceholder": "选择你要发布的站点",
+      "noTargetSite": "还没有添加其他站点",
+      "loadingForm": "正在抓取上传页",
+      "loadFormFailed": "抓取上传页失败",
+      "missingRequired": "还差：{0}",
+      "keepSourceTag": "保留源站站标（info.source）",
+      "description": "源站简介",
+      "loadingDescription": "正在抓取源站简介",
+      "descriptionFailed": "没抓到源站简介",
+      "useDescription": "把源站简介填入目标站",
+      "descriptionSummary": "正文 {0} 字 · 截图 {1} 张 · {2}",
+      "withMediaInfo": "含 mediainfo",
+      "withoutMediaInfo": "无 mediainfo",
+      "showPreview": "预览简介",
+      "hidePreview": "收起预览",
+      "previewHint": "预览里的裂图是源站防盗链导致的，提交前要换成图床链接；源站简介里的样式也可能与目标站不同",
+      "noDescriptionField": "这个站的上传页没有简介字段，抓到的简介用不上",
+      "checkingDuplicate": "正在目标站查重…",
+      "duplicateFound": "目标站已经有这颗种子，不要再发一次",
+      "duplicateFoundHint": "目标站上已有：{0}",
+      "duplicateSkip": "已选择清掉源站站标：infoHash 会变，这条在目标站上算另一颗种子，查重结果不适用",
+      "duplicateNone": "目标站没查到同一 infoHash 的种子（搜索按标题分词，不等于一定没有）",
+      "duplicateFailed": "查重没做成：{0}（这不等于目标站没有）",
+      "imageHostPlaceholder": "选图床",
+      "noImageHost": "还没配置图床（设置 → 图床）",
+      "transferImages": "转存 {0} 张图",
+      "transferring": "正在转存 {0}/{1}",
+      "imageHostHint": "源站图片有防盗链，直接发布到别的站会裂图；转存后链接会被替换掉",
+      "imageTransferDone": "已把 {0} 张图的链接换成图床地址",
+      "submit": "提交",
+      "submitFailed": "提交失败",
+      "cancel": "取消"
+    },
     "recheckSelected": "重新校验",
     "recheckDialog": {
       "text": "确定要重新校验选中的 {count} 个种子吗？重新校验会消耗下载服务器的资源，并可能暂时中断做种。",
@@ -1370,6 +1416,52 @@
       "importFailed": "PT-Plugin-Plus 用户数据导入失败"
     }
   },
+  "SetImageHost": {
+    "pageHint": "图床用于「转种」：把源站简介里的截图转存一份，换成新链接再发布。源站图片有防盗链，直接引用到别的站会裂图。",
+    "empty": "还没有配置图床。转种时不做图片转存也能发，但源站截图在目标站多半是裂的。",
+    "notSet": "未填地址",
+    "builtinEndpoint": "官方地址（无需填写）",
+    "column": {
+      "endpoint": "地址"
+    },
+    "action": {
+      "test": "测试上传（1×1 像素图）"
+    },
+    "editor": {
+      "titleAdd": "添加图床",
+      "titleEdit": "编辑图床",
+      "type": "类型",
+      "name": "名称",
+      "requiredMissing": "必填项还没填完"
+    },
+    "field": {
+      "apiKey": "API Key / Token",
+      "endpoint": "站点地址",
+      "fileField": "文件字段名",
+      "urlPath": "返回地址路径",
+      "urlTemplate": "地址拼接模板",
+      "headerName": "鉴权头名称",
+      "headerValue": "鉴权头内容",
+      "extraFields": "附加表单字段"
+    },
+    "hint": {
+      "endpoint": "填图床的站点根地址，例如 https://img.example.com（不带 /api/…）",
+      "apiKey": "在该图床的后台生成，只存在本机扩展存储里",
+      "imgbbKey": "在 https://api.imgbb.com/ 免费申请，一串 32 位字符",
+      "smmsKey": "在 https://sm.ms/home/apitoken 生成 API Token",
+      "imgurKey": "在 https://api.imgur.com/oauth2/addclient 注册应用，取 Client ID（不是 Client Secret）",
+      "cheveretoKey": "自建 Chevereto 的 API key，可在后台「API」页生成；未开启 API 鉴权时留空也能传",
+      "lskyKey": "兰空图床后台 → 接口 → 新建令牌；填令牌本身，不用加 Bearer 前缀",
+      "easyimageKey": "简单图床后台的 API Token；站点没开鉴权时留空",
+      "customEndpoint": "填完整的接口地址，例如 https://img.example.com/api/upload",
+      "customKey": "可选。下面几个字段里可以用 {apiKey} 引用它",
+      "customFileField": "上传文件的表单字段名，默认 file（常见还有 image / source / smfile）",
+      "customUrlPath": "从返回 JSON 里取图片地址的路径，例如 data.url / image.url / data.links.url。留空会自动找常见路径",
+      "customUrlTemplate": "图床只返回文件名而不是完整地址时用，{value} 会被上面取到的值替换，例如 https://img.example.com/{value}",
+      "customHeaderValue": "鉴权头的值，可用 {apiKey} 占位，例如 Bearer {apiKey}",
+      "customExtraFields": "额外要提交的表单字段，JSON 格式，值可用 {apiKey} 占位，例如 {\"token\": \"{apiKey}\"}"
+    }
+  },
   "SetDownloader": {
     "PathAndTag": {
       "downloadPath": {
@@ -2077,6 +2169,7 @@
       "backup": "数据备份",
       "downloader": "下载器管理",
       "myClient": "我的下载器",
+      "imageHost": "图床",
       "basicSettings": "基础设置",
       "techStack": "技术栈",
       "logger": "运行日志",

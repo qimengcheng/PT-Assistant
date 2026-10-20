@@ -37,8 +37,20 @@ import type { IBackupData, IBackupFileInfo } from "@ptd/backupServer";
 import type { IExtensionStorageSchema, TExtensionStorageKey } from "@/storage.ts";
 
 import type { IFilesFingerprint, IPieceSample, ILocalFingerprintIndex } from "@/shared/fingerprint/index.ts";
+// type-only：图床转存（纯数据，可结构化克隆；实现住 offscreen）
+import type { IImageHostTestResult, IImageHostUploadItem, IImageHostUploadRequest } from "@/shared/imageHost/types.ts";
 // type-only：站点等级祝贺那条消息的载荷（判据与措辞都住在这一份文件里）
 import type { ILevelUpItem } from "@/shared/levelUp.ts";
+// type-only：转载发布的表单描述（纯数据，可结构化克隆；实现住 offscreen）
+import type {
+  ISourceDescription,
+  ISourceDescriptionRequest,
+  ITransferDuplicateCheck,
+  ITransferSourceLocateRequest,
+  ITransferUploadRequest,
+  ITransferUploadResult,
+  IUploadFormDescriptor,
+} from "@/shared/upload/types.ts";
 import type {
   IDownloaderMetadata,
   IDownloadTorrentOption,
@@ -188,6 +200,52 @@ export interface ProtocolMap {
   getTorrentDownloadLink(torrent: ITorrent): string;
   getTorrentInfoForVerification(torrent: ITorrent): ITorrentInfoForVerification;
   downloadTorrent(data: IDownloadTorrentOption): IDownloadTorrentResult;
+
+  // ===== 2.2.0 offscreen：转载发布（utils/torrentUpload）=====
+  /**
+   * 抓目标站上传页，返回可渲染的表单描述。
+   *
+   * 抓不到会抛错（不是返回空表单）：「站点没有上传字段」与「你没有发布权限」
+   * 在界面上必须能分清，见 offscreen/utils/torrentUpload.ts 的 explainMissingForm。
+   */
+  getSiteUploadForm(siteId: TSiteID): IUploadFormDescriptor;
+  /**
+   * 回到源站把「下载器里的这一条」认出来，返回可以直接拿去下载种子的站点条目。
+   *
+   * 认的判据是 infoHash 逐字相等（不是文件指纹）—— 转种要交原始那颗 .torrent，
+   * 认错一颗就是转出去另一颗种子。认不出会抛错并带上试过哪些搜索词。
+   */
+  locateTransferSource(data: ITransferSourceLocateRequest): ITorrent;
+  /**
+   * 去源站详情页抓这颗种子的简介素材（简介 HTML / 截图 URL / mediainfo 文本）。
+   *
+   * 只抓**页面原样给出的**，不生成 mediainfo 与截图 —— 扩展拿不到媒体文件本体也没有
+   * ffmpeg，本地拼出来的技术参数是假的。抓不到会抛错并说明卡在哪一步（登录页 / 没有简介区）。
+   */
+  getSourceDescription(data: ISourceDescriptionRequest): ISourceDescription;
+  /** 提交一颗种子到目标站。种子本体由 offscreen 现取现洗，界面只传字段值 */
+  submitTransferUpload(data: ITransferUploadRequest): ITransferUploadResult;
+  /**
+   * 提交前在目标站查重：同一 infoHash 是否已经有人发过。
+   *
+   * 与 `locateTransferSource` 是同一条判据（infoHash 逐字相等）的另一次调用，区别在
+   * 「查不到」的语义 —— 这里查不到不等于没有（目标站改过标题、搜索分词不同），
+   * 所以结果里带 `note` 说明搜过什么，界面不能把它说成「确认可以发」。
+   * 查不动（未登录 / 站点报错）也不抛错，走 `note`：查重只是尽力而为，不该挡住发布。
+   */
+  checkTransferDuplicate(data: ITransferSourceLocateRequest): ITransferDuplicateCheck;
+
+  // ===== 2.2.0b offscreen：图床（utils/imageHost）=====
+  /**
+   * 把一张源图转存到指定图床，返回可替换的新地址。
+   *
+   * **失败不抛错**：返回值的 `error` 里带原因。一次转存是十几张图的循环，
+   * 抛错会让调用方丢掉「哪几张已经成功」，而部分成功恰恰是最常见的结果。
+   */
+  uploadImageToHost(data: IImageHostUploadRequest): IImageHostUploadItem;
+  /** 设置页的「测试上传」：拿内置的 1×1 PNG 试一次地址与凭证，不碰用户的任何真实图片 */
+  testImageHost(hostId: string): IImageHostTestResult;
+
   getDownloadHistory(): ITorrentDownloadMetadata[];
   getDownloadHistoryById(downloadId: TTorrentDownloadKey): ITorrentDownloadMetadata;
   setDownloadHistoryStatus(data: { downloadId: TTorrentDownloadKey; status: TTorrentDownloadStatus }): void;

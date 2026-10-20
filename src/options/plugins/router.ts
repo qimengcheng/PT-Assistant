@@ -114,6 +114,12 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("../views/Settings/SetBackup/Index.vue"),
   },
   {
+    // 与「数据备份」同一族：都是外部服务的连接信息（地址 + 凭证 + 连通性测试）
+    path: "/set-image-host",
+    name: "SetImageHost",
+    component: () => import("../views/Settings/SetImageHost/Index.vue"),
+  },
+  {
     path: "/set-search-solution",
     name: "SetSearchSolution",
     component: () => import("../views/Settings/SetSearchSolution/Index.vue"),

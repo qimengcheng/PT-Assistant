@@ -10,6 +10,7 @@ import type { TSelectSearchCategoryValue } from "@ptd/site";
 import type { CAddTorrentOptions, DownloaderBaseConfig } from "@ptd/downloader";
 import type { IMediaServerBaseConfig } from "@ptd/mediaServer";
 import type { IBackupConfig, IBackupRetention } from "@ptd/backupServer";
+import type { IImageHostMetadata, TImageHostKey } from "@/shared/imageHost/types.ts";
 
 export interface ISearchSolution {
   id: string;
@@ -128,6 +129,14 @@ export interface IMetadataPiniaStorageSchema {
 
   // 备份服务器配置
   backupServers: Record<TBackupServerKey, IBackupServerMetadata>;
+
+  /**
+   * 图床配置（转种时把源站截图转存过去）。
+   *
+   * 与 backupServers / downloaders 同住在 metadata 而不是 config：config 那份只管界面偏好，
+   * 这一份是外部服务的连接信息，要跟着备份包一起走。凭证是明文，与站点 cookie 同一笔账。
+   */
+  imageHosts: Record<TImageHostKey, IImageHostMetadata>;
 
   // 默认搜索方案
   defaultSolutionId: TSolutionKey | "default";

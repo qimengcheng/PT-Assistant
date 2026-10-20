@@ -1264,6 +1264,10 @@
     "Index": {
       "savedToast": "修改已保存",
       "toc": "目录",
+      "searchPlaceholder": "搜索设置项",
+      "searchCount": "命中 {count} 项",
+      "searchEmpty": "没有匹配的设置项",
+      "searchEmptyHint": "这一页有一部分设置项要先把上面的开关打开才会显示。也可以直接搜节名，例如「账号」。",
       "tierDaily": "天天用得上",
       "tierWhenNeeded": "按需调整",
       "tierOnce": "一次配好",

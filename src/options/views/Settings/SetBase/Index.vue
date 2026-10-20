@@ -24,10 +24,18 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { MutationType } from "pinia";
 import { useDebounceFn } from "@vueuse/core";
-import { App } from "antdv-next";
+import { App } from "antdv-next";import { SearchOutlined } from "@antdv-next/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 
+import {
+  readSettingRows,
+  searchSettingRows,
+  splitHighlight,
+  type IDomSettingRow,
+  type ISettingSegment,
+  type TSettingHit,
+} from "./settingsSearch.ts";
 import AppearanceWindow from "./AppearanceWindow.vue";
 import SitePageWindow from "./SitePageWindow.vue";
 import AdvancedWindow from "./AdvancedWindow.vue";
@@ -171,6 +179,69 @@ function jumpTo(key: string, smooth = true) {
   resumeTimer = setTimeout(() => (spyPaused = false), 900);
 }
 
+// ===== 搜索设置项 =====
+const searchQuery = ref("");
+
+/** 节的先后：同档命中时按页面顺序排，而不是按 DOM 扫描顺序（结果列表因此与目录对得上） */
+const sectionOrderByKey = computed(() =>
+  Object.fromEntries(sections.value.map((s, index) => [s.key, index] as const)),
+);
+
+const sectionLabelOf = (key: string) => sections.value.find((s) => s.key === key)?.label ?? "";
+
+/**
+ * 现扫现算：搜索那一刻才读 DOM（`scroller` 是模板 ref，挂载后才有值），
+ * 所以「上一级开关关掉就整组不渲染」的那些项不会留下一份冻在挂载那一刻的索引。
+ *
+ * `rowsVersion` 是这条功能的另一半，缺了它前半句就是假话：computed 只会跟着**响应式数据**重算，
+ * 而 `readSettingRows` 吃的是 DOM —— 台架实测（拨开关之后不重新输入）结果列表一直停在 0 条。
+ * 于是借这一页本来就挂着的配置订阅，在渲染落定之后踢一次（见下面那条订阅里的注释）。
+ */
+const rowsVersion = ref(0);
+const searchHits = computed<TSettingHit<IDomSettingRow>[]>(() => {
+  void rowsVersion.value;
+  const box = scroller.value;
+  if (!box || !searchQuery.value.trim()) return [];
+  return searchSettingRows(readSettingRows(box, sectionOrderByKey.value), searchQuery.value);
+});
+
+/** 点结果：跳到那一格并闪一下。`el.isConnected` 兜的是「列出来之后 DOM 又变了」那一档 */
+function jumpToHit(hit: TSettingHit<IDomSettingRow>) {
+  spyPaused = true;
+  clearTimeout(resumeTimer);
+  if (hit.sectionKey) activeKey.value = hit.sectionKey;
+  if (hit.el.isConnected) {
+    hit.el.scrollIntoView({ behavior: "smooth", block: "center" });
+    flashRow(hit.el);
+  } else if (hit.sectionKey) {
+    jumpTo(hit.sectionKey);
+    return;
+  }
+  resumeTimer = setTimeout(() => (spyPaused = false), 900);
+}
+
+/**
+ * 高亮靠 CSS 动画 + 手动摘 class，不用 `animationend` 收尾：那个事件在「动画途中页面被切走」
+ * 与「连点两次同一条」时都不会来，摘不到 class 就把那一格永久留在动画末态（v0.118.1 那条教训）。
+ * 重点同一条要先摘掉再强制一次布局重算，否则动画不会重头播。
+ *
+ * 摘的范围是「整页带这个 class 的」而不只是这一格：动画本身不 fill，留在末态是不成立的，
+ * 但一串点过的格子各挂一份没人管的 class，后面任何一条 CSS 都会踩到它。
+ */
+function flashRow(el: HTMLElement) {
+  scroller.value?.querySelectorAll<HTMLElement>(".set-search-flash").forEach((old) => old.classList.remove("set-search-flash"));
+  el.classList.remove("set-search-flash");
+  void el.offsetWidth;
+  el.classList.add("set-search-flash");
+}
+
+const segmentsOf = (text: string): ISettingSegment[] => splitHighlight(text, searchQuery.value);
+
+function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key === "Escape") searchQuery.value = "";
+  else if (e.key === "Enter" && searchHits.value.length) jumpToHit(searchHits.value[0]);
+}
+
 /**
  * 滚轮跟踪：取「顶沿已经越过读数线」的最后一条。读数线在滚动区顶边往下 12px。
  *
@@ -245,6 +316,13 @@ configStore.$onReady(() => {
   if (isUnmounted) return;
   stopConfigWatch = configStore.$subscribe(
     (mutation) => {
+      /**
+       * 搜索结果要跟着重扫一遍：这一页有一批格子是被上一级开关按住就不渲染的，而 computed
+       * 看不见 DOM（只有响应式数据变化才会重算）。放在类型过滤**之前**、并且 nextTick 之后踢 ——
+       * ① 跨上下文同步（patch）一样会改这一页的渲染；② nextTick 落在本次渲染 flush 之后，
+       * 那一刻读到的才是新 DOM，否则重扫的还是刚被摘掉的那一版。
+       */
+      void nextTick(() => rowsVersion.value++);
       if (mutation.type !== MutationType.direct) return;
       announceSaved();
     },
@@ -264,25 +342,64 @@ onUnmounted(() => {
       <div class="set-base-layout">
         <nav class="set-base-toc">
           <span class="set-base-toc-label">{{ t("SetBase.Index.toc") }}</span>
-          <!-- 目录按档位分块（天天用得上 / 按需调整 / 一次配好）：九节平铺着排，
-               用户仍然是从头读到尾才知道有没有自己要的那一条；档名先把范围圈出来。
-               窄屏那一档（下面 @container 里那一段）只把这一列横排，块结构照留。 -->
-          <div v-for="tier in tocTiers" :key="tier.tier" class="set-base-toc-tier">
-            <span class="set-base-toc-tier-label">{{ tier.tier }}</span>
-            <!-- 按钮 + scrollIntoView，不用 <a href="#x">：这个应用走 hash 路由
-                 （createWebHashHistory），href="#x" 会被路由吃掉并跳到一个不存在的页。同 GuideView -->
+          <a-input
+            v-model:value="searchQuery"
+            class="set-base-toc-search"
+            :placeholder="t('SetBase.Index.searchPlaceholder')"
+            allow-clear
+            @keydown="onSearchKeydown"
+          >
+            <template #prefix>
+              <SearchOutlined />
+            </template>
+          </a-input>
+
+          <!-- 有查询词时这一整列换成结果、目录先让位：两边说的是同一件事（去哪儿），
+               并排摆两条列表只会让人分不清点哪个。 -->
+          <template v-if="searchQuery.trim()">
+            <span class="set-base-toc-count">
+              {{ t("SetBase.Index.searchCount", { count: searchHits.length }) }}
+            </span>
             <a-button
-              v-for="s in tier.items"
-              :key="s.key"
+              v-for="hit in searchHits"
+              :key="`${hit.kind}-${hit.sectionKey}-${hit.domOrder}`"
               type="text"
               block
-              class="set-base-toc-item"
-              :class="{ 'set-base-toc-item--on': activeKey === s.key }"
-              @click="jumpTo(s.key)"
+              class="set-base-toc-item set-base-toc-hit"
+              @click="jumpToHit(hit)"
             >
-              {{ s.label }}
+              <span class="set-base-toc-hit-label">
+                <span v-for="(seg, i) in segmentsOf(hit.label)" :key="i" :class="{ 'set-base-toc-mark': seg.hit }">
+                  {{ seg.text }}
+                </span>
+              </span>
+              <!-- 节自己那一条不再重复一遍节名（一行里出现两个一样的词是新 bug，同 §3.4 那条） -->
+              <span v-if="hit.kind === 'item'" class="set-base-toc-hit-section">{{ sectionLabelOf(hit.sectionKey) }}</span>
             </a-button>
-          </div>
+            <div v-if="searchHits.length === 0" class="set-base-toc-empty">
+              <span>{{ t("SetBase.Index.searchEmpty") }}</span>
+              <span class="set-base-toc-empty-hint">{{ t("SetBase.Index.searchEmptyHint") }}</span>
+            </div>
+          </template>
+
+          <template v-else>
+            <div v-for="tier in tocTiers" :key="tier.tier" class="set-base-toc-tier">
+              <span class="set-base-toc-tier-label">{{ tier.tier }}</span>
+              <!-- 按钮 + scrollIntoView，不用 <a href="#x">：这个应用走 hash 路由
+                   （createWebHashHistory），href="#x" 会被路由吃掉并跳到一个不存在的页。同 GuideView -->
+              <a-button
+                v-for="s in tier.items"
+                :key="s.key"
+                type="text"
+                block
+                class="set-base-toc-item"
+                :class="{ 'set-base-toc-item--on': activeKey === s.key }"
+                @click="jumpTo(s.key)"
+              >
+                {{ s.label }}
+              </a-button>
+            </div>
+          </template>
         </nav>
 
         <div ref="scroller" class="set-base-content">
@@ -375,6 +492,77 @@ onUnmounted(() => {
   color: rgba(0, 0, 0, 0.45);
 }
 
+/* 搜索框不写 size：这一列在窄屏那档会跟目录按钮横排进同一条 flex 行，
+   而降档就是 24 挨着 32（AGENTS §3.4 那条「同一行里并排着默认档控件时谁都不许单独降档」）。 */
+.set-base-toc-search {
+  margin-bottom: 8px;
+}
+
+/* 结果条数那一行：与目录档名同档（12 / 次要色），跟条目本身拉开一层 */
+.set-base-toc-count {
+  margin: 0 0 2px 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 一条结果占两行：名称 + 它在哪一节。目录列只有 168 宽，而设置名最长的那几条
+   （「显示开发者菜单（站点定义 / 调试信息）」这种）本来就放不下单行 —— 允许折行，
+   不截断（AGENTS §3.5：截断一个设置名比让它占两行严重）。 */
+.set-base-toc .set-base-toc-hit {
+  height: auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding-block: 6px;
+  white-space: normal;
+  text-align: start;
+}
+
+.set-base-toc-hit-label {
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.set-base-toc-hit-section {
+  font-weight: 400;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 命中的那一段加底色：用全站那一档选中色，不新造一套 */
+.set-base-toc-mark {
+  background: var(--pt-color-bg-selected);
+  border-radius: 2px;
+}
+
+.set-base-toc-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 8px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 点中一条之后在那一格上闪一下。一次性动画且不写 fill-mode，演完自己回到原样，
+   所以「下一次没来得及摘掉 class」不会留下末态（v0.118.1 那条：收尾不许挂在事件上）。 */
+.set-search-flash {
+  border-radius: 6px;
+  animation: set-search-flash 900ms ease-out 1;
+}
+
+@keyframes set-search-flash {
+  0% {
+    box-shadow: 0 0 0 2px var(--pt-color-primary);
+    background: var(--pt-color-bg-hover);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0);
+    background: transparent;
+  }
+}
+
 /* 目录这一列用 type="text" 的按钮，不是随手挑的：antd 的 Button 只在「有边框那几档」上
    才会把两个汉字的标签拆成「搜 索」（Button.js:121 的 isUnBorderedButtonVariant 判据），
    而这一列标签里「搜索 / 下载 / 备份」正好是两个字 —— 用默认档就会跟右边那节的标题
@@ -462,6 +650,11 @@ onUnmounted(() => {
 
   .set-base-toc .ant-btn {
     width: auto;
+  }
+
+  /* 横排那一档里搜索框自己占一行：不撑满的话它会缩成内容宽，跟目录按钮挤在同一行读不成 */
+  .set-base-toc-search {
+    width: 100%;
   }
 }
 

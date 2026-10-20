@@ -1264,6 +1264,10 @@
     "Index": {
       "savedToast": "Changes saved",
       "toc": "Contents",
+      "searchPlaceholder": "Search settings",
+      "searchCount": "{count} matched",
+      "searchEmpty": "No settings match this search",
+      "searchEmptyHint": "Some settings on this page only appear after the switch above them is turned on. You can also search a section name, for example “Accounts”.",
       "tierDaily": "Day to day",
       "tierWhenNeeded": "When needed",
       "tierOnce": "Set once",

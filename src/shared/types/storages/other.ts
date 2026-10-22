@@ -78,6 +78,25 @@ export type TUpdateCheckVia = "" | "api" | "html";
  */
 export type TUpdateCheckFallback = "" | "noTag" | "threw";
 
+/** 这次那份 sha256 摘要是从哪条路拿到的 —— 决定它能不能当校验锚（见 IUpdateCheckState.digestFrom）。 */
+export type TUpdateDigestSource = "" | "github" | "mirror" | "html";
+
+/**
+ * 自动下载这一路停在哪一步。存的还是码不是句子（§3.5），界面按键名取当前语言的文案。
+ *
+ * 前两档是「压根不该开始下」：`noDigest` = 这次没拿到摘要；`untrustedDigest` = 摘要也是镜像送的，
+ * 拿它去验同一个镜像送来的字节不构成独立保证。后面五档是下了但没成。
+ */
+export type TUpdateDownloadError =
+  | ""
+  | "noDigest"
+  | "untrustedDigest"
+  | "allSourcesFailed"
+  | "sizeMismatch"
+  | "digestMismatch"
+  | "notZip"
+  | "saveFailed";
+
 /** 自动下载那个安装包走到哪一步了（"" = 从没下过） */
 export type TUpdateDownloadState = "" | "downloading" | "done" | "failed";
 
@@ -124,6 +143,31 @@ export interface IUpdateCheckState {
    * "" = 从没下过。
    */
   downloadedFor: string;
+  /**
+   * GitHub 那条 API 记录里这个包的字节数；0 = 这次没拿到（走的是发布页跳转或镜像代理的旧响应）。
+   * 与 assetSha256 一起构成下载前的校验依据。
+   */
+  assetSize: number;
+  /**
+   * GitHub 发布记录里这条资产的 SHA-256（小写 hex，已剥掉 `sha256:` 前缀）；"" = 没拿到。
+   * 这是**唯一的校验锚**：镜像只许送字节，摘要取自 api.github.com 原链，
+   * 否则「镜像给坏包 + 镜像给假摘要」检不出来 —— 那一档记成 untrustedDigest，不自动下。
+   */
+  assetSha256: string;
+  /** 上面那份摘要这次是从哪条路拿到的（见 TUpdateDigestSource） */
+  digestFrom: TUpdateDigestSource;
+  /**
+   * GitHub 记录里这个包的文件名（`PT-Assistant-<版本>-chrome.zip`）。
+   * 校验过的字节是自己从内存交给下载管理器的，**没有服务器给的名字可用**，
+   * 所以名字必须跟着摘要一起存下来 —— 拿 infoHash 或版本号现拼一个就是替发布物编名字。
+   */
+  assetName: string;
+  /** 这次取包成在哪一档：`ghproxy.net` / `gh-proxy.com` / `github`；"" = 还没下过 */
+  downloadSource: string;
+  /** 校验通过并交给下载管理器时的字节数（用来在界面上说「整包 6.8 MB 取满」而不是「下过」） */
+  downloadBytes: number;
+  /** 这一路停在哪一步（见 TUpdateDownloadError）；界面按它取文案 */
+  downloadFailCode: TUpdateDownloadError;
   /** `chrome.downloads` 给那次下载的 id；0 = 没有（没下过，或发起就失败了） */
   downloadId: number;
   /** 那次自动下载到哪一步了（见 TUpdateDownloadState） */

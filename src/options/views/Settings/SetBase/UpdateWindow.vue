@@ -39,16 +39,36 @@ const showReleaseLink = computed(
 );
 
 /**
- * 「安装包」那一行的措辞。三个键按字面写死，不用 `t("前缀" + 状态)`：
+ * 「安装包」那一行的措辞。键按字面写死，不用 `t("前缀" + 状态)`：
  * 拼出来的键防线③看不见，写错一个状态名就是界面上多一条键路径（AGENTS §3.4）。
+ *
+ * 失败那一档要说得出**停在哪一步**：v0.122.0 起包必须先过 SHA-256 校验才落盘，
+ * 「自动下载失败」这一句把七种完全不同的事揉成一条 —— 而「摘要没拿到」与「包被换过」
+ * 他要做的反应相反（前者等下一次检查就行，后者该停下来查网络有没有被改包）。
  */
-const downloadTextKey = computed(() =>
-  state.value.downloadState === "done"
-    ? "SetUpdate.download.done"
-    : state.value.downloadState === "downloading"
-      ? "SetUpdate.download.downloading"
-      : "SetUpdate.download.failed",
-);
+const DOWNLOAD_FAIL_KEYS: Record<string, string> = {
+  noDigest: "SetUpdate.downloadFail.noDigest",
+  untrustedDigest: "SetUpdate.downloadFail.untrusted",
+  allSourcesFailed: "SetUpdate.downloadFail.allSources",
+  sizeMismatch: "SetUpdate.downloadFail.size",
+  digestMismatch: "SetUpdate.downloadFail.digest",
+  notZip: "SetUpdate.downloadFail.notZip",
+  saveFailed: "SetUpdate.downloadFail.save",
+};
+
+const downloadTextKey = computed(() => {
+  const s = state.value;
+  if (s.downloadState === "done") return "SetUpdate.download.done";
+  if (s.downloadState === "downloading") return "SetUpdate.download.downloading";
+  return DOWNLOAD_FAIL_KEYS[s.downloadFailCode] ?? "SetUpdate.download.failed";
+});
+
+/** 校验结论那半句：只在「确实是取回来并验过的那一条」出现时才说，且经镜像取包时才点名来源 */
+const verifyText = computed(() => {
+  const s = state.value;
+  if (!s.downloadSource || (s.downloadState !== "downloading" && s.downloadState !== "done")) return "";
+  return t("SetUpdate.download.verified", { source: s.downloadSource });
+});
 
 /**
  * 失败那行的补充说明。两个片段都可能没有，所以拼不出来就不给 description
@@ -136,6 +156,7 @@ onMounted(refresh);
         <a-descriptions-item v-if="state.downloadedFor" :label="t('SetUpdate.labelPackage')">
           <div class="package-line">
             <span class="plain-text">{{ t(downloadTextKey) }}</span>
+            <span v-if="verifyText" class="plain-text">{{ verifyText }}</span>
             <a-button v-if="state.downloadState === 'done'" type="link" size="small" @click="showDownloadedPackage">
               {{ t("SetUpdate.download.showInFolder") }}
             </a-button>

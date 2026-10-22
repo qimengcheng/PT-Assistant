@@ -13,15 +13,28 @@
  */
 import { REPO_API, REPO_URL } from "~/helper.ts";
 import { extStore } from "@/storage.ts";
-import type { IUpdateCheckState, TUpdateCheckError, TUpdateCheckFallback, TUpdateCheckVia } from "@/shared/types.ts";
+import { UPDATE_PACKAGE_SOURCES } from "@/shared/updatePackage.ts";
+import type {
+  IUpdateCheckState,
+  TUpdateCheckError,
+  TUpdateCheckFallback,
+  TUpdateCheckVia,
+  TUpdateDigestSource,
+} from "@/shared/types.ts";
 
 const LATEST_RELEASE_API = `${REPO_API}/releases/latest`;
 
 /** 备用通道：同一条「最新 Release」的网页版，靠 302 的 Location 带出 tag */
 const LATEST_RELEASE_HTML = `${REPO_URL}/releases/latest`;
 
-/** 一次请求的耐心上限：拿不到就算了，不占着 SW */
-const FETCH_TIMEOUT_MS = 15_000;
+/**
+ * 「版本号那一条链」的总耐心：原链 → 两条镜像 → 网页 302 串在一起共用这一份（原来的单请求上限
+ * 是 15 s，链上只有两档时够用；现在多一档，得整条一起算）。
+ *
+ * 放宽到 30 s 是实测来的（2026-10-22 本机）：原链 0.9 s、gh-proxy.com 3.4 s、
+ * ghproxy.net 那句 403 走了 11 s —— 按 15 s 掐表，第三档会在还能成的时候被掐死。
+ */
+const FETCH_API_CHAIN_TIMEOUT_MS = 30_000;
 
 /** 闹钟的滴答间隔：SW 可能被各种事件频繁唤醒，用一个比"每天"松、比"每次唤醒"紧的档位 */
 export const AUTO_CHECK_TICK_MS = 6 * 60 * 60 * 1000;
@@ -50,21 +63,19 @@ export function emptyUpdateState(): IUpdateCheckState {
     rateLimitResetsAt: 0,
     fallbackOutcome: "",
     downloadedFor: "",
+    // 下面这几把是 v0.122.0 新加的。存量用户那儿它们压根不存在，readUpdateState 会补成这些初始值，
+    // 于是第一次检查之前「没有可信摘要」= 不自动下载 —— 下一次检查成功就从 GitHub 把摘要补上。
+    assetSize: 0,
+    assetSha256: "",
+    digestFrom: "",
+    assetName: "",
+    downloadSource: "",
+    downloadBytes: 0,
+    downloadFailCode: "",
     downloadId: 0,
     downloadState: "",
     downloadError: "",
   };
-}
-
-/**
- * 那条 `downloadUrl` 是不是真的 Release 资产直链。
- *
- * 必须分开判：拿不到资产（或整次走的是备用通道）时，`downloadUrl` 回落成 Release **网页**本身。
- * 把网页交给 `chrome.downloads` 会存下来一个名字像 zip、内容却是 HTML 的文件 ——
- * 那比不下载更糟，用户解压才发现上当。
- */
-export function isReleaseAssetUrl(url: string): boolean {
-  return /^https:\/\/[^/]+\/[^/]+\/[^/]+\/releases\/download\/[^?#]+\.zip$/i.test(url);
 }
 
 /** `v0.42.0` / `0.42.0+abc123` → `0.42.0`；拿不出三段的一律返回空串（当作"不知道"）。 */
@@ -117,6 +128,9 @@ export function deriveUpdateStatus(state: IUpdateCheckState, currentVersion: str
 interface IGithubReleaseAsset {
   name?: string;
   browser_download_url?: string;
+  size?: number;
+  /** GitHub 2025 年起在资产记录里给的那条 `sha256:<hex>`；老响应没有这一项 */
+  digest?: string;
 }
 
 interface IGithubReleaseResponse {
@@ -126,11 +140,120 @@ interface IGithubReleaseResponse {
   assets?: IGithubReleaseAsset[];
 }
 
+/** 一条 API 响应的提取物；`found` 为假时 `code` 说清它为什么不算 */
+interface IReleaseApiHit {
+  found: boolean;
+  latest: string;
+  releaseUrl: string;
+  downloadUrl: string;
+  publishedAt: string;
+  assetSize: number;
+  /** 小写 hex，已剥 `sha256:` 前缀；"" = 这条响应里没有摘要 */
+  assetSha256: string;
+  assetName: string;
+  code: TUpdateCheckError;
+  httpStatus: number;
+  rateLimitResetsAt: number;
+}
+
+const API_MISS: IReleaseApiHit = {
+  found: false,
+  latest: "",
+  releaseUrl: "",
+  downloadUrl: "",
+  publishedAt: "",
+  assetSize: 0,
+  assetSha256: "",
+  assetName: "",
+  code: "network",
+  httpStatus: 0,
+  rateLimitResetsAt: 0,
+};
+
 /** 本浏览器那份产物：`PT-Assistant-<版本>-chrome.zip` / `-firefox.zip`；认不出就回落到 Release 页。 */
-function pickAssetUrl(assets: IGithubReleaseAsset[] | undefined, releaseUrl: string): string {
+function pickAsset(
+  assets: IGithubReleaseAsset[] | undefined,
+  releaseUrl: string,
+): { url: string; size: number; sha256: string; name: string } {
   const suffix = `-${__BROWSER__}.zip`;
   const hit = (assets ?? []).find((asset) => String(asset.name ?? "").toLowerCase().endsWith(suffix));
-  return hit?.browser_download_url || releaseUrl;
+  if (!hit) return { url: releaseUrl, size: 0, sha256: "", name: "" };
+  const digest = String(hit.digest ?? "").trim().toLowerCase();
+  return {
+    url: hit.browser_download_url || releaseUrl,
+    size: Number(hit.size) > 0 ? Number(hit.size) : 0,
+    // 只认 `sha256:<hex>` 这一种写法；认不出就留空，让「没有可信摘要」那一档去挡下载，
+    // 而不是拿一条来路不明的串去比字节。
+    sha256: /^sha256:[0-9a-f]{64}$/.test(digest) ? digest.slice(7) : "",
+    name: String(hit.name ?? ""),
+  };
+}
+
+/**
+ * 向一条「最新 Release」的 REST 接口要数据。`url` 可以是 GitHub 原链，也可以是加了镜像前缀的那一条。
+ *
+ * 限流那三条判据（**先认头、只在 403/429 上认 remaining:0、响应体只当补充**）是 v0.47.1 实测来的，
+ * 留在这支里逐字没动：只靠响应体那条会误报 —— 读体要等整条响应落地，超时/中断时交出空串，
+ * 于是货真价实的限流 403 被判成 `http`，界面就说成「两条路都没能拿到版本号」
+ * （用户 2026-10-08 撞上的正是这句）。实测限流那趟的响应头跨源也读得到（本机出口，浏览器网络栈）：
+ *   403 + x-ratelimit-limit:60 / x-ratelimit-remaining:0 / x-ratelimit-used:60 /
+ *        x-ratelimit-resource:core / x-ratelimit-reset:<unix 秒>
+ * 404 也带这套头，所以配额恰好归零时按头判会把「仓库没发布过」误说成限流 —— 那为什么不放宽到 404。
+ */
+async function fetchReleaseApi(url: string, signal: AbortSignal): Promise<IReleaseApiHit> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/vnd.github+json" },
+      signal,
+      credentials: "omit",
+    });
+  } catch {
+    return { ...API_MISS, code: "network" };
+  }
+  if (!res.ok) {
+    const httpStatus = res.status;
+    const remaining = res.headers.get("x-ratelimit-remaining");
+    const isQuotaCode = httpStatus === 403 || httpStatus === 429;
+    let limited = isQuotaCode && (httpStatus === 429 || remaining === "0");
+    if (isQuotaCode && !limited) {
+      limited = /rate limit/i.test(await res.text().catch(() => ""));
+    }
+    if (limited) {
+      const reset = Number(res.headers.get("x-ratelimit-reset"));
+      return {
+        ...API_MISS,
+        code: "rateLimited",
+        httpStatus,
+        rateLimitResetsAt: Number.isFinite(reset) && reset > 0 ? reset * 1000 : 0,
+      };
+    }
+    return { ...API_MISS, code: "http", httpStatus };
+  }
+  let json: IGithubReleaseResponse | undefined;
+  try {
+    json = (await res.json()) as IGithubReleaseResponse;
+  } catch {
+    return { ...API_MISS, code: "badData", httpStatus: res.status };
+  }
+  const latest = normalizeVersion(json?.tag_name);
+  if (!latest) return { ...API_MISS, code: "badData", httpStatus: res.status };
+  const releaseUrl = json!.html_url || `${REPO_URL}/releases`;
+  const asset = pickAsset(json!.assets, releaseUrl);
+  return {
+    found: true,
+    latest,
+    releaseUrl,
+    downloadUrl: asset.url,
+    publishedAt: json!.published_at ?? "",
+    assetSize: asset.size,
+    assetSha256: asset.sha256,
+    assetName: asset.name,
+    code: "",
+    httpStatus: 0,
+    rateLimitResetsAt: 0,
+  };
 }
 
 /**
@@ -172,94 +295,93 @@ async function fetchLatestViaHtml(
 /**
  * 发一次请求并把结果整块写回 storage。**不抛异常**：失败也写成状态存起来（界面上要显示
  * 「上次检查失败」而不是什么都不变），返回值永远是写进去的那一份。
+ *
+ * 版本号这一路的档序（v0.122.0 起）：**GitHub 原链 API → 镜像代理 API → Release 页那条 302**。
+ * 多出来的那一档只为「拿到版本号」服务，**不改变摘要的可信等级**：只有原链 API 给的那条 sha256
+ * 才当校验锚（`digestFrom:"github"`）；经镜像拿到的摘要记成 `"mirror"`，调用方据此不自动下载 ——
+ * 拿镜像给的摘要去验同一个镜像送来的字节，「换包的镜像 + 假的摘要」这条结构上就检不出来。
+ * 宁可不下，也不能假装验过。
  */
 export async function runUpdateCheck(): Promise<IUpdateCheckState> {
   const state = await readUpdateState();
   const now = Date.now();
 
-  // 两条路共用这一份耐心上限：备用通道只在主路已经失败时才走，不该另起一个 15 秒
+  // 整条链共用这一份耐心上限：后面的档只在前面已经失败时才走，不该另起一个计时器。
+  // 从 15s 放宽到 30s 是实测来的：原链 0.9 s / gh-proxy.com 3.4 s / ghproxy.net 那条 403 走了 11 s，
+  // 三档 API 再串一条网页跳转，15 秒会把还能试的档掐在半路。
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), FETCH_API_CHAIN_TIMEOUT_MS);
 
+  let data: IReleaseApiHit = API_MISS;
+  let via: TUpdateCheckVia = "";
+  let digestFrom: TUpdateDigestSource = "";
   let errorCode: TUpdateCheckError = "";
   let httpStatus = 0;
+  let rateLimitResetsAt = 0;
+  let fallbackOutcome: TUpdateCheckFallback = "";
   let latest = "";
   let releaseUrl = "";
   let downloadUrl = "";
   let publishedAt = "";
-  let via: TUpdateCheckVia = "";
-  let fallbackOutcome: TUpdateCheckFallback = "";
-  let rateLimitResetsAt = 0;
 
   try {
-    const res = await fetch(LATEST_RELEASE_API, {
-      method: "GET",
-      headers: { Accept: "application/vnd.github+json" },
-      signal: controller.signal,
-      credentials: "omit",
-    });
-    if (!res.ok) {
-      httpStatus = res.status;
-      /**
-       * 光看状态码分不开「仓库没发布过」和「这个出口 IP 配额用完了」—— 而这两件事要告诉用户的话
-       * 完全不同（前者是仓库的事，后者他换个节点就好）。
-       *
-       * 判据用**两条**，因为原先只靠响应体那一条会误报：读体要等整条响应落地，超时/中断时
-       * `.catch(() => "")` 交出空串，于是货真价实的限流 403 被判成 `http`，界面就说成
-       * 「两条路都没能拿到版本号」（用户 2026-10-08 撞上的正是这句）。
-       * 实测限流那趟的响应头就带着答案、而且跨源读得到（本机出口，浏览器网络栈）：
-       *   403 + x-ratelimit-limit:60 / x-ratelimit-remaining:0 / x-ratelimit-used:60 /
-       *        x-ratelimit-resource:core / x-ratelimit-reset:<unix 秒>
-       * 所以头先判、体只当补充。**只在 403/429 上认 remaining:0** —— 404 也带这套头，
-       * 配额恰好归零时按头判会把「仓库没发布过」误说成限流。
-       */
-      const remaining = res.headers.get("x-ratelimit-remaining");
-      const isQuotaCode = res.status === 403 || res.status === 429;
-      // 头先判（读得到、不等响应体落地）；体只当补充 —— 429 本身就是"请求过多"，不用再判
-      let limited = isQuotaCode && (res.status === 429 || remaining === "0");
-      if (isQuotaCode && !limited) {
-        const body = await res.text().catch(() => "");
-        limited = /rate limit/i.test(body);
-      }
-      if (limited) {
-        errorCode = "rateLimited";
-        const reset = Number(res.headers.get("x-ratelimit-reset"));
-        rateLimitResetsAt = Number.isFinite(reset) && reset > 0 ? reset * 1000 : 0;
-      } else {
-        errorCode = "http";
-      }
+    // ① 原链：唯一能把摘要升格成校验锚的一档
+    const direct = await fetchReleaseApi(LATEST_RELEASE_API, controller.signal);
+    if (direct.found) {
+      data = direct;
+      via = "api";
+      digestFrom = "github";
     } else {
-      const json = (await res.json()) as IGithubReleaseResponse;
-      latest = normalizeVersion(json?.tag_name);
-      if (!latest) {
-        errorCode = "badData";
-      } else {
-        releaseUrl = json.html_url || `${REPO_URL}/releases`;
-        downloadUrl = pickAssetUrl(json.assets, releaseUrl);
-        publishedAt = json.published_at ?? "";
-        via = "api";
+      // 留着原链那条错误码当「这次为什么没成」的主原因：它才是他要处理的那件事（限流要换出口、
+      // 404 是仓库的事）。镜像档成没成只影响下面版本号拿没拿到，不该把原因覆盖掉。
+      errorCode = direct.code;
+      httpStatus = direct.httpStatus;
+      rateLimitResetsAt = direct.rateLimitResetsAt;
+
+      // ② 镜像代理的 API —— 给得出版本号，给不出可信摘要
+      for (const prefix of UPDATE_PACKAGE_SOURCES) {
+        if (controller.signal.aborted) break;
+        const mirror = await fetchReleaseApi(prefix + LATEST_RELEASE_API, controller.signal);
+        if (mirror.found) {
+          data = mirror;
+          via = "api";
+          digestFrom = "mirror";
+          break;
+        }
+      }
+
+      // ③ 网页那条 302：只给得出版本号，既没有摘要也没有按浏览器分好的直链
+      if (!data.found && !controller.signal.aborted) {
+        try {
+          const fallback = await fetchLatestViaHtml(controller.signal);
+          if (fallback.ok) {
+            via = "html";
+            digestFrom = "html";
+            latest = fallback.latest;
+            releaseUrl = fallback.releaseUrl;
+            downloadUrl = fallback.releaseUrl;
+            publishedAt = fallback.publishedAt;
+            errorCode = "";
+            httpStatus = 0;
+          } else {
+            fallbackOutcome = "noTag";
+          }
+        } catch {
+          // 这一跳自己就没走通（代理只放行 api 那台 / 断网 / 耐心到）。留着前面那条错误码，
+          // 它才是原因；但要把「第二条路试过、且是这么失败的」记下来，否则下次还是只能猜。
+          fallbackOutcome = "threw";
+        }
       }
     }
 
-    if (errorCode) {
-      try {
-        const fallback = await fetchLatestViaHtml(controller.signal);
-        if (fallback.ok) {
-          latest = fallback.latest;
-          releaseUrl = fallback.releaseUrl;
-          downloadUrl = fallback.releaseUrl;
-          publishedAt = fallback.publishedAt;
-          via = "html";
-          errorCode = "";
-          httpStatus = 0;
-        } else {
-          fallbackOutcome = "noTag";
-        }
-      } catch {
-        // 这一跳自己就没走通（代理只放行 api 那台 / 断网 / 15 秒耐心到）。留着主路那条错误码，
-        // 它才是原因；但要把「第二条路试过、且是这么失败的」记下来，否则下次还是只能猜。
-        fallbackOutcome = "threw";
-      }
+    if (data.found) {
+      latest = data.latest;
+      releaseUrl = data.releaseUrl;
+      downloadUrl = data.downloadUrl;
+      publishedAt = data.publishedAt;
+      errorCode = "";
+      httpStatus = 0;
+      rateLimitResetsAt = 0;
     }
   } catch {
     // fetch reject（断网 / DNS / CORS）与超时 abort 都是这里；错误原文是浏览器给的英文句子，
@@ -278,8 +400,22 @@ export async function runUpdateCheck(): Promise<IUpdateCheckState> {
     httpStatus,
     fallbackOutcome,
     rateLimitResetsAt,
-    // 失败时保留上一次的 latestVersion / 链接 / 通道：那次确实是查到的，没必要当作不知道
-    ...(errorCode ? {} : { latestVersion: latest, releaseUrl, downloadUrl, publishedAt, via }),
+    // 失败时保留上一次的 latestVersion / 链接 / 通道：那次确实是查到的，没必要当作不知道。
+    // 摘要与字节数跟着**同一次成功**一起落地：换了版本却留着旧包的 sha256，下一趟必然判成
+    // digestMismatch，而界面会把它说成「包与记录不符」—— 那是我们自己造成的假警报。
+    ...(errorCode
+      ? {}
+      : {
+          latestVersion: latest,
+          releaseUrl,
+          downloadUrl,
+          publishedAt,
+          via,
+          digestFrom,
+          assetSize: data.found ? data.assetSize : 0,
+          assetSha256: data.found ? data.assetSha256 : "",
+          assetName: data.found ? data.assetName : "",
+        }),
   };
 
   await writeUpdateState(next);

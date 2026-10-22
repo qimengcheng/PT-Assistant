@@ -1652,7 +1652,17 @@
       "downloading": "Saving the package to your downloads folder…",
       "done": "The package is in your downloads folder",
       "failed": "Automatic download failed — use \"Open download page\" to get it yourself",
-      "showInFolder": "Show in folder"
+      "showInFolder": "Show in folder",
+      "verified": "Fetched from {source}; SHA-256 matches the GitHub release record"
+    },
+    "downloadFail": {
+      "allSources": "Neither the mirrors nor GitHub returned a complete package — use \"Open download page\"",
+      "digest": "The file did not match the SHA-256 in the GitHub release record and was discarded",
+      "noDigest": "No verification digest came from the GitHub release record, so nothing was downloaded automatically",
+      "notZip": "What came back was not a valid zip archive and was discarded",
+      "save": "The package passed verification, but the browser could not write it to your downloads folder",
+      "size": "The byte count did not match the GitHub release record (partial download) and was discarded",
+      "untrusted": "The digest itself came from a mirror this time, which is not enough to vouch for it — nothing was downloaded"
     },
     "info": {
       "description": "Version info comes from this project's GitHub repository: every release ships a Chrome and a Firefox package, and \"Open download page\" points at the one for your browser.",
@@ -2417,3 +2427,4 @@
     }
   }
 }
+

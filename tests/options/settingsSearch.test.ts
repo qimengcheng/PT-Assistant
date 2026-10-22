@@ -20,7 +20,12 @@ import {
   type ISettingRow,
 } from "@/options/views/Settings/SetBase/settingsSearch.ts";
 
-const read = (rel: string) => readFileSync(new URL(`../../${rel}`, import.meta.url), "utf8");
+/**
+ * 读源码文本做形状断言之前先归一换行符。工作区那份是 LF 还是 CRLF 只取决于最后一个存盘的编辑器，
+ * 而这里钉的是模板形状、不是换行符 —— v0.121.0 那条 `/<a-input\n…/` 就是被一次整片 CRLF 转换
+ * 判成「找不到搜索框那一整块」（不报错的是量具，不是产品）。
+ */
+const read = (rel: string) => readFileSync(new URL(`../../${rel}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 const SRC = "src/options/views/Settings/SetBase/settingsSearch.ts";
 const PAGE = "src/options/views/Settings/SetBase/Index.vue";

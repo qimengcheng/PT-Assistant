@@ -977,6 +977,7 @@
   "SeedValue": {
     "activeTip": "Uploading now",
     "column": {
+      "category": "Category",
       "name": "Name",
       "sites": "Seeding Sites",
       "size": "Disk Used",
@@ -985,6 +986,9 @@
       "weight": "Magic Weight"
     },
     "copiesLine": "{copies} copies · {bytes} on disk",
+    "filter": {
+      "categoryAll": "All categories"
+    },
     "formulaNotice": "The magic weight is folded from the NexusPHP-family formula (age factor x size in GB x seeders factor), computed once per copy that is currently seeding and then summed. Sites use different parameters and cap the total per account, so this number is only comparable within this list — it is not the mana a site actually grants.",
     "idleCopies": "{count} not seeding",
     "loadFailed": "{name} failed to load: {message}",

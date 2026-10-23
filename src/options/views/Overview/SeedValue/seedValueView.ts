@@ -10,9 +10,14 @@
  *    两边各折一套就会出现「列表里说这两条同内容、这一屏把它们当两条算」；
  * ② 每份副本的站点走 Tracker 反查（与行上那枚可辅种标记同一份判据），认不出站点的照算进产出，
  *    只是那一栏报不出；
- * ③ 「在做种」吃的是下载器报的状态，不是「数据下完了」—— 下完但暂停着的不产出魔力。
+ * ③ 「在做种」吃的是下载器报的状态，不是「数据下完了」—— 下完但暂停着的不产出魔力；
+ * ④ 「算哪一类」**不自己折一遍**，走 `sharedCategory` 那一套投票（与辅种任务页、目录预选同一个判据），
+ *    理由见下面 `categoryKindOfGroup` 的注释。
  */
 import { CTorrentState, type CTorrent } from "@ptd/downloader/types.ts";
+import { sharedCategory, type ICategorySource } from "@/options/components/SentToDownloaderDialog/categoryMatch.ts";
+import { CATEGORY_KINDS, type TCategoryKind } from "@/shared/category.ts";
+import type { TSiteCategoryMapOf } from "@/shared/keepUploadTaskFilter.ts";
 import { judgeSeedValue, type ISeedValueCopy, type ISeedValueVerdict } from "@/shared/seedValue.ts";
 import { resolveTrackerHostSite, trackerFieldToHost } from "@/shared/trackerHost.ts";
 import type { IReseedTaskForGroup, IRowForGroup } from "../MyClient/reseedGroups.ts";
@@ -31,6 +36,11 @@ export interface ISeedValueRow extends IRowForGroup {
   seedingSince?: number;
   totalUploaded: number;
   uploadSpeed: number;
+  /**
+   * 下载器自己给这一条挂的分类（qBittorrent 是 category、Transmission 是 labels[0]、Flood 是 tags[0]，
+   * 见 `CTorrent.label` 那段「各家叫法不一」的注释）。报不出留 undefined，不折成空串。
+   */
+  category?: string;
 }
 
 /**
@@ -58,6 +68,7 @@ export function toSeedValueRows(torrents: readonly CTorrent[]): ISeedValueRow[] 
       savePath: row.savePath,
       infoHash: row.infoHash,
       tracker: row.tracker,
+      ...(row.label ? { category: row.label } : {}),
       completed: row.isCompleted === true,
       seeding: row.state === CTorrentState.seeding,
       swarmSeeders: row.swarmSeeders,
@@ -79,6 +90,46 @@ export interface ISeedValueItem {
   verdict: ISeedValueVerdict;
   /** 这一组在下载器列表里的行键，供「跳回去删」那类动作用 */
   memberKeys: string[];
+  /**
+   * 这一组内容算哪一类；**说不清就是 null**（一条都报不出分类、或两档并列）。
+   *
+   * null 的条目在任何具体分类筛选下都不出现，只在「全部分类」里看得到 —— 与辅种任务页同一口径。
+   * 界面那一格留空，不写「其他」：`other` 在折类判据里是「未知」，画成一个类别词会让人以为
+   * 这一条被谁标成了「其他」类（站点分类里真有一个叫「其他」的类别，两者不是一回事）。
+   */
+  categoryKind: TCategoryKind | null;
+}
+
+/**
+ * 这一组内容的分类：把两份原料放进同一个投票池，按 `sharedCategory` 折一次。
+ *
+ * 原料一是**下载器自己挂的分类**（每份副本一条票），原料二是**这些副本对应的辅种台账条目在各站上的
+ * 叫法**（每一条任务只算一次，不按副本重复计票，否则辅了两批的那一条会把自己的票翻倍）。
+ *
+ * 为什么不自己写一套、也不定「谁压过谁」：这条判据早就有了 —— 站点条目的分类怎么折成规范类别、
+ * 各站写法不同时按多的算、并列不猜，全在 `sharedCategory` 里（用户 2026-10-12 定的口径）。
+ * 再写一份就会出现「下拉里说它是综艺、发送时按电视剧建目录」这种两句互相打脸。
+ * 折不出来（`other`）的那几条不参与投票，是 `kindVotes` 本来的规矩：那是「未知」，
+ * 既不该被当成一个类别，也不该去否决别人。
+ */
+function categoryKindOfGroup(
+  members: ISeedValueRow[],
+  taskByHash: Map<string, string>,
+  ledgerOfGroup: Map<string, ICategorySource[]>,
+  siteMapOf: TSiteCategoryMapOf,
+): TCategoryKind | null {
+  const pool: ICategorySource[] = [];
+  const countedTasks = new Set<string>();
+  for (const row of members) {
+    if (row.category) pool.push({ category: row.category });
+    const hash = typeof row.infoHash === "string" ? row.infoHash.trim().toLowerCase() : "";
+    const group = hash ? taskByHash.get(hash) : undefined;
+    if (group && !countedTasks.has(group)) {
+      countedTasks.add(group);
+      pool.push(...(ledgerOfGroup.get(group) ?? []));
+    }
+  }
+  return sharedCategory(pool, siteMapOf).kind;
 }
 
 export function buildSeedValueItems(
@@ -86,9 +137,15 @@ export function buildSeedValueItems(
   hostSiteEntries: Iterable<readonly [string, string]>,
   tasks: IReseedTaskForGroup[],
   now: number,
+  siteMapOf: TSiteCategoryMapOf,
 ): ISeedValueItem[] {
-  const groupOf = assignGroups(rows, buildTaskGroups(tasks));
+  const taskByHash = buildTaskGroups(tasks);
+  const groupOf = assignGroups(rows, taskByHash);
   const entries = hostSiteEntries instanceof Map ? hostSiteEntries : new Map(hostSiteEntries);
+  /** 组键（`t:<任务 id>`）→ 那一条台账里各站的分类叫法 */
+  const ledgerOfGroup = new Map<string, ICategorySource[]>(
+    (tasks ?? []).map((task) => [`t:${String(task.id)}`, (task.items ?? []) as ICategorySource[]]),
+  );
 
   const grouped = new Map<string, ISeedValueRow[]>();
   for (const row of rows) {
@@ -120,9 +177,41 @@ export function buildSeedValueItems(
       bytes: Math.max(...members.map((row) => (Number.isFinite(row.totalSize) ? row.totalSize : 0))),
       verdict: judgeSeedValue({ copies, now }),
       memberKeys: members.map((row) => row.key),
+      categoryKind: categoryKindOfGroup(members, taskByHash, ledgerOfGroup, siteMapOf),
     });
   }
   return items;
+}
+
+/**
+ * 分类下拉里该出现哪些档：**只列这批内容里真有的**，按 `CATEGORY_KINDS` 定序
+ * （不按出现次数、也不按字面 —— 同一份数据两次打开顺序不该变，同辅种任务页那条）。
+ *
+ * 调用方传进来的那份必须是**没按分类筛过**的：拿筛完的算，选了「电影」之后下拉就只剩「电影」一档，
+ * 人再也换不到别的类。那一屏另一条闸（只看低价值）同理不缩候选，两枚控件互不牵制。
+ */
+export function seedValueCategoryChoices(items: readonly ISeedValueItem[]): TCategoryKind[] {
+  const present = new Set<TCategoryKind>();
+  for (const item of items) {
+    if (item.categoryKind) present.add(item.categoryKind);
+  }
+  return CATEGORY_KINDS.filter((kind) => present.has(kind));
+}
+
+/**
+ * 两条闸都是「与」：`lowOnly` = 只看低价值，`kind` 为 null = 不按分类筛。
+ *
+ * 抽成纯函数是因为「筛完只剩几条、分页还停在第 3 页」那一族 bug 只在界面上犯，
+ * 判据本身先钉住，页面那一侧另有按源码文本的接线断言。
+ */
+export function filterSeedValueItems(
+  items: readonly ISeedValueItem[],
+  input: { lowOnly: boolean; kind: TCategoryKind | null },
+): ISeedValueItem[] {
+  return items.filter(
+    (item) =>
+      (!input.lowOnly || item.verdict.tier === "low") && (input.kind === null || item.categoryKind === input.kind),
+  );
 }
 
 /**

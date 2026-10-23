@@ -6,14 +6,20 @@
  *    都不报错，只让某一类内容算歪）；
  * ② 同内容的副本有没有并全（漏一条就少算一份产出，而他读到的是「这一项只剩一站在跑」）；
  * ③ 站点反查有没有按**每一份副本**各算一次（拿组里第一条的站点套整组，就是把 N 份产出报成 1 份）；
- * ④ 默认序的方向（这一屏的用途是「哪些可以不再做种」，排反了人就找不到那几条）。
+ * ④ 默认序的方向（这一屏的用途是「哪些可以不再做种」，排反了人就找不到那几条）；
+ * ⑤ 分类那一档折得对不对、下拉候选与两条闸接得对不对（v0.123.0 加的分类筛选）。
  * 站点、下载器、种子名一律合成，不含任何真实数据。
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { CTorrentState, type CTorrent } from "@ptd/downloader/types.ts";
 import {
   buildSeedValueItems,
+  filterSeedValueItems,
+  seedValueCategoryChoices,
   sortSeedValueItems,
   toSeedValueRows,
   type ISeedValueItem,
@@ -51,13 +57,18 @@ function clean(over: Partial<ISeedValueRow> & { key: string }): ISeedValueRow {
   return row({ seedingSince: NOW - 1000 * WEEK, ...over });
 }
 
-function build(rows: ISeedValueRow[], tasks: Parameters<typeof buildSeedValueItems>[2] = [], now = NOW) {
-  return buildSeedValueItems(rows, hostSiteEntries, tasks, now);
+function build(
+  rows: ISeedValueRow[],
+  tasks: Parameters<typeof buildSeedValueItems>[2] = [],
+  now = NOW,
+  siteMapOf: Parameters<typeof buildSeedValueItems>[4] = () => undefined,
+) {
+  return buildSeedValueItems(rows, hostSiteEntries, tasks, now, siteMapOf);
 }
 
-/** 造一项的骨架，只用来给排序那两条摆权重 */
-function item(key: string, name: string, weight: number): ISeedValueItem {
-  return { key, name, bytes: 0, memberKeys: [], verdict: { weight } as ISeedValueItem["verdict"] };
+/** 造一项的骨架，只用来给排序与筛选那几条摆数据 */
+function item(key: string, name: string, weight: number, over: Partial<ISeedValueItem> = {}): ISeedValueItem {
+  return { key, name, bytes: 0, memberKeys: [], categoryKind: null, verdict: { weight } as ISeedValueItem["verdict"], ...over };
 }
 
 describe("下载器那一份 → 这一屏那一份（toSeedValueRows）", () => {
@@ -119,6 +130,15 @@ describe("下载器那一份 → 这一屏那一份（toSeedValueRows）", () =>
   it("做种人数没报的那一家留 undefined，不许折成 0（0 会丢掉「人数未知」那句说明）", () => {
     const [one] = toSeedValueRows([torrent({ swarmSeeders: undefined })]);
     expect(one!.swarmSeeders).toBeUndefined();
+  });
+
+  it("下载器挂的分类（qBittorrent 的 category）交下来给折类用；没挂的留 undefined", () => {
+    // 这一条钉的是接线：判据本体（sharedCategory）有自己的用例，但 `label` 没搬下来的话
+    // 那一整档原料会安静地消失 —— 反证 ⑨ 第一次就是这么全绿的
+    const [withLabel] = toSeedValueRows([torrent({ label: "电影" })]);
+    expect(withLabel!.category).toBe("电影");
+    const [without] = toSeedValueRows([torrent({ label: undefined })]);
+    expect(without!.category).toBeUndefined();
   });
 });
 
@@ -243,5 +263,185 @@ describe("默认序（sortSeedValueItems）", () => {
     const source = [item("a", "B", 9), item("b", "A", 1)];
     sortSeedValueItems(source);
     expect(source.map((each) => each.key)).toEqual(["a", "b"]);
+  });
+});
+
+describe("这一组算哪一类（categoryKind）", () => {
+  it("下载器自己挂的分类能单独折出一档", () => {
+    const items = build([clean({ key: "qb1:1", category: "电影" })]);
+    expect(items[0]!.categoryKind).toBe("movie");
+  });
+
+  it("台账条目在各站上的叫法一起投票，按多的那档算（与辅种任务页、目录预选同一口径）", () => {
+    // 三份副本都挂在同一条台账上：站点写法 3 综艺 + 1 电视剧 ⇒ 综艺赢
+    const items = build(
+      [
+        clean({ key: "qb1:1", name: "Show A", infoHash: "h1" }),
+        clean({ key: "qb1:2", name: "Show B", infoHash: "h2" }),
+        clean({ key: "qb1:3", name: "Show C", infoHash: "h3" }),
+        clean({ key: "qb1:4", name: "Show D", infoHash: "h4" }),
+      ],
+      [
+        {
+          id: "t1",
+          items: [
+            { hash: "h1", site: "pandapt", category: "综艺" },
+            { hash: "h2", site: "pandapt", category: "电视剧" },
+            { hash: "h3", site: "pandapt", category: "综艺" },
+            { hash: "h4", site: "pandapt", category: "综艺" },
+          ],
+        },
+      ],
+    );
+    expect(items[0]!.categoryKind).toBe("variety");
+  });
+
+  it("站点自己的分类映射（设置页「其他设置 → 分类映射」）参与折类", () => {
+    const items = build(
+      [clean({ key: "qb1:1", name: "Show A", infoHash: "h1", category: undefined })],
+      [{ id: "t1", items: [{ hash: "h1", site: "pandapt", category: "特殊分类" }] }],
+      NOW,
+      (siteId) => (siteId === "pandapt" ? { 特殊分类: "music" } : undefined),
+    );
+    expect(items[0]!.categoryKind).toBe("music");
+    // 反证锚点：覆盖表没读时「特殊分类」折出来是 other（= 说不清，不投票），这一条会跟着变 null
+    expect(
+      build([clean({ key: "qb1:1", name: "Show A", infoHash: "h1" })], [
+        { id: "t1", items: [{ hash: "h1", site: "pandapt", category: "特殊分类" }] },
+      ])[0]!.categoryKind,
+    ).toBeNull();
+  });
+
+  it("一条台账在一组里只算一次票（按副本重复计票会把下载器那一档压掉）", () => {
+    // 组里两条副本都认到 t1；t1 的条目是 2 综艺 + 1 电视剧，两条副本各挂一个「电影」。
+    // 去重：综艺 2 vs 电影 2 → 并列不猜 → null。没去重：综艺 4 vs 电影 2 → variety。
+    const items = build(
+      [
+        clean({ key: "qb1:1", name: "Show A", infoHash: "h1", category: "电影" }),
+        clean({ key: "qb1:2", name: "Show B", infoHash: "h2", category: "电影" }),
+      ],
+      [
+        {
+          id: "t1",
+          items: [
+            { hash: "h1", site: "pandapt", category: "综艺" },
+            { hash: "h2", site: "pandapt", category: "综艺" },
+            { hash: "h2", site: "pandapt", category: "电视剧" },
+          ],
+        },
+      ],
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]!.categoryKind).toBeNull();
+  });
+
+  it("折不出类别的那些（other）不投票，也不否决别人", () => {
+    // 「自制分类X」谁都折不出：它既不该成为一档，也不该把「电影」那一条拖成说不清
+    const items = build([clean({ key: "qb1:1", category: "自制分类X" }), clean({ key: "qb1:2", category: "电影" })]);
+    expect(items[0]!.categoryKind).toBe("movie");
+  });
+
+  it("一条都报不出分类时是 null，不是「其他」", () => {
+    const items = build([clean({ key: "qb1:1" })]);
+    expect(items[0]!.categoryKind).toBeNull();
+  });
+});
+
+describe("分类下拉的候选（seedValueCategoryChoices）", () => {
+  it("只列这批里真有的，按 CATEGORY_KINDS 定序而不是按出现次数", () => {
+    // 出现先后故意摆成 anime → tv → movie，与 CATEGORY_KINDS 的定序正好相反：
+    // 反证 ⑤ 第一次全绿就是因为夹具的插入序恰好等于期望序，`[...present]` 那种改坏测不出来
+    const list = [
+      item("a", "A", 1, { categoryKind: "anime" }),
+      item("b", "B", 1, { categoryKind: "tv" }),
+      item("c", "C", 1, { categoryKind: "tv" }),
+      item("d", "D", 1, { categoryKind: "tv" }),
+      item("e", "E", 1, { categoryKind: "movie" }),
+    ];
+    expect(seedValueCategoryChoices(list)).toEqual(["movie", "tv", "anime"]);
+  });
+
+  it("折不出（null）的那些不进候选", () => {
+    expect(seedValueCategoryChoices([item("a", "A", 1), item("b", "B", 1, { categoryKind: "movie" })])).toEqual(["movie"]);
+  });
+
+  it("一批全是 null 时候选是空表，而不是给一档「其他」兜着", () => {
+    expect(seedValueCategoryChoices([item("a", "A", 1), item("b", "B", 1)])).toEqual([]);
+  });
+});
+
+describe("两条闸（filterSeedValueItems）", () => {
+  const low = (key: string, categoryKind: ISeedValueItem["categoryKind"]): ISeedValueItem => ({
+    ...item(key, key, 1),
+    verdict: { weight: 1, tier: categoryKind === null ? "low" : "high" } as ISeedValueItem["verdict"],
+    categoryKind,
+  });
+  const list = [low("a", "movie"), low("b", "tv"), low("c", null), low("d", "movie")];
+
+  it("两个都不筛时原样全出（顺序也不动）", () => {
+    expect(filterSeedValueItems(list, { lowOnly: false, kind: null }).map((each) => each.key)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("按分类筛：折不出（null）那一条不出现", () => {
+    expect(filterSeedValueItems(list, { lowOnly: false, kind: "movie" }).map((each) => each.key)).toEqual(["a", "d"]);
+    expect(filterSeedValueItems(list, { lowOnly: false, kind: "tv" }).map((each) => each.key)).toEqual(["b"]);
+  });
+
+  it("两条闸是「与」：勾上只看低价值后再按分类筛，两个条件都要满足", () => {
+    expect(filterSeedValueItems(list, { lowOnly: true, kind: "movie" }).map((each) => each.key)).toEqual([]);
+    expect(filterSeedValueItems(list, { lowOnly: true, kind: null }).map((each) => each.key)).toEqual(["c"]);
+  });
+
+  it("不许就地改传进来那一份（下拉的候选要拿同一份未筛过的底再算一次）", () => {
+    filterSeedValueItems(list, { lowOnly: true, kind: "movie" });
+    expect(list).toHaveLength(4);
+  });
+});
+
+/**
+ * 页面那一侧的接线（按源码文本钉）。
+ *
+ * 为什么在这儿钉：上面那些判据改坏了用例会红，但**页面把候选从筛完的那一份算**、
+ * 或者**筛选变了却不回到第 1 页**，纯函数层一个字都不红 —— 而这两条坏起来都是界面上
+ * 「换了个筛选就什么都没有」（v0.112.0 / v0.46.0 各犯过一次）。与 `settingsSearch.test.ts` 同一做法。
+ * ⚠️ 读源码文本前先归一换行符：本仓工作区经 core.autocrlf 是 CRLF，钉的是形状不是换行符。
+ */
+describe("页面那一侧的形状", () => {
+  const page = readFileSync(
+    fileURLToPath(new URL("../../src/options/views/Overview/SeedValue/Index.vue", import.meta.url)),
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+
+  it("候选从不筛过的那一份算（拿筛完的算 = 选了之后换不回去）", () => {
+    const choices = /const categoryOptions = computed\(\(\) => \[[\s\S]*?\n\]\);/.exec(page);
+    expect(choices, "找不到 categoryOptions 那一段").toBeTruthy();
+    expect(choices![0]).toContain("seedValueCategoryChoices(items.value)");
+    expect(choices![0]).not.toContain("visible.value");
+  });
+
+  it("筛选与那一勾都改回第 1 页", () => {
+    expect(page).toMatch(/watch\(\[onlyLow, categoryFilter\], \(\) => \{\n {2}tablePage\.value = 1;/);
+    // 受控分页真接上了：表格的 @change 走 onTableChange，不是直接把 handleTableChange 挂上去
+    expect(page).toMatch(/@change="onTableChange"/);
+    expect(page).toMatch(/current: tablePage\.value/);
+  });
+
+  it("那一列折不出时留空，不画「其他」", () => {
+    const cell = /<template v-else-if="column\.key === 'category'">([\s\S]*?)<\/template>/.exec(page);
+    expect(cell, "找不到分类那一格").toBeTruthy();
+    expect(cell![0]).toMatch(/v-if="record\.categoryKind"/);
+    expect(cell![0]).not.toMatch(/其他|other/);
+  });
+
+  it("表头与下拉的「全部」档都走 i18n，两侧都有键", () => {
+    expect(page).toContain('t("SeedValue.column.category")');
+    expect(page).toContain('t("SeedValue.filter.categoryAll")');
+    for (const file of ["zh_CN", "en"]) {
+      const j = JSON.parse(
+        readFileSync(fileURLToPath(new URL(`../../src/locales/${file}.json`, import.meta.url)), "utf8"),
+      ) as { SeedValue: { column: Record<string, string>; filter: Record<string, string> } };
+      expect(j.SeedValue.column.category, `${file} 缺 SeedValue.column.category`).toBeTypeOf("string");
+      expect(j.SeedValue.filter.categoryAll, `${file} 缺 SeedValue.filter.categoryAll`).toBeTypeOf("string");
+    }
   });
 });

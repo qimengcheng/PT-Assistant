@@ -7,10 +7,11 @@
  * 因为删哪一份副本（同内容往往有几份、在不同站）是有后果的决定，那一屏已经有
  * 「行内删除会把同内容的其余几条一起选上」的确认流程，这里不抄第二套。
  */
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { QuestionCircleOutlined, ReloadOutlined } from "@antdv-next/icons";
+import type { TablePaginationConfig } from "antdv-next";
 import type { CTorrent } from "@ptd/downloader";
 import HoverTip from "@/options/components/HoverTip.vue";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
@@ -18,11 +19,15 @@ import { sendMessage } from "@/messages.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatSize } from "@/options/utils.ts";
+import { categoryKindLabelKey, type TCategoryKind } from "@/shared/category.ts";
+import type { TSiteCategoryMapOf } from "@/shared/keepUploadTaskFilter.ts";
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
 import { SEED_VALUE_TIERS, type ISeedValueVerdict, type TSeedValueTier } from "@/shared/seedValue.ts";
 
 import {
   buildSeedValueItems,
+  filterSeedValueItems,
+  seedValueCategoryChoices,
   sortSeedValueItems,
   toSeedValueRows,
   type ISeedValueItem,
@@ -83,6 +88,20 @@ onMounted(async () => {
 
 const rows = computed<ISeedValueRow[]>(() => toSeedValueRows(torrents.value));
 
+/**
+ * 站点 → 该站的用户覆盖表（设置页「其他设置 → 分类映射」那一栏），与辅种任务页、搜索页「分类」
+ * 那一列同一份来源。派生成 computed，不在挂载钩子里命令式读 —— 那是异步水合的 store（AGENTS §3.4）。
+ */
+const siteCategoryMaps = computed(() => {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [id, cfg] of Object.entries(metadataStore.sites ?? {})) {
+    const map = cfg.categoryMap;
+    if (map && Object.keys(map).length) out[id] = map;
+  }
+  return out;
+});
+const siteMapOf: TSiteCategoryMapOf = (siteId) => siteCategoryMaps.value[siteId];
+
 const items = computed(() =>
   sortSeedValueItems(
     buildSeedValueItems(
@@ -90,14 +109,36 @@ const items = computed(() =>
       Object.entries(metadataStore.siteHostMap),
       reseedTasks.value,
       Math.floor(Date.now() / 1000),
+      siteMapOf,
     ),
   ),
 );
 
-const lowCount = computed(() => items.value.filter((item) => item.verdict.tier === "low").length);
-const visible = computed(() => (onlyLow.value ? items.value.filter((item) => item.verdict.tier === "low") : items.value));
+/**
+ * 分类筛选（用户 2026-10-23：「增加按分类筛选的功能」）。
+ * 空串 = 不按分类筛 —— 用空串而不是 null 是因为 `a-select` 的清除态给的就是空。
+ * 判据本体（这一组算哪一类、下拉里该有哪几档）在 `./seedValueView.ts`，那份能在 Node 里断言。
+ */
+const categoryFilter = ref<TCategoryKind | "">("");
+const kindFilter = computed<TCategoryKind | null>(() => (categoryFilter.value === "" ? null : categoryFilter.value));
 
-const { pagination, handleTableChange } = useTableBehavior("SeedValue", {
+const lowCount = computed(() => items.value.filter((item) => item.verdict.tier === "low").length);
+const visible = computed(() => filterSeedValueItems(items.value, { lowOnly: onlyLow.value, kind: kindFilter.value }));
+
+/**
+ * 候选从**没按分类筛过**的那一份算：拿筛完的算，选了「电影」之后下拉就只剩「电影」一档，换不回去了。
+ * 「只看低价值」那一勾同理不缩候选 —— 两条闸互不牵制（与辅种任务页那两枚下拉同一口径）。
+ * 标签集合必须 computed：里面有 t()，setup 里求值一次的话切语言不重算（AGENTS §3.4）。
+ */
+const categoryOptions = computed(() => [
+  { value: "" as const, label: t("SeedValue.filter.categoryAll") },
+  ...seedValueCategoryChoices(items.value).map((kind) => ({
+    value: kind,
+    label: t(categoryKindLabelKey(kind)),
+  })),
+]);
+
+const { pagination: fittedPagination, handleTableChange } = useTableBehavior("SeedValue", {
   defaultPageSize: 25,
   size: "small",
   totalRows: () => visible.value.length,
@@ -106,8 +147,28 @@ const { pagination, handleTableChange } = useTableBehavior("SeedValue", {
   clearOnEmpty: true,
 });
 
+/**
+ * 分页在这页是受控的：筛选一变就回到第 1 页。
+ * 不控 `current` 的话，筛完只剩几条而人正停在「第 4 页」时那一页是空的 —— 表现成「筛了什么都没有」，
+ * 其实数据在上一页（全站那条口径见 AGENTS §3.4 的分页那两行；他截图里这一页正停在第 4 页 / 共 19 页）。
+ */
+const tablePage = ref(1);
+const pagination = computed<TablePaginationConfig | false>(() =>
+  fittedPagination.value === false ? false : { ...fittedPagination.value, current: tablePage.value },
+);
+
+function onTableChange(page: TablePaginationConfig, filters: unknown, sorter: Parameters<typeof handleTableChange>[2]) {
+  if (typeof page?.current === "number") tablePage.value = page.current;
+  handleTableChange(page, filters, sorter);
+}
+
+watch([onlyLow, categoryFilter], () => {
+  tablePage.value = 1;
+});
+
 const columns = computed(() => [
   { title: t("SeedValue.column.name"), key: "name", dataIndex: "name" },
+  { title: t("SeedValue.column.category"), key: "category", align: "center" as const, width: 110 },
   {
     title: t("SeedValue.column.weight"),
     key: "weight",
@@ -179,6 +240,8 @@ function siteTip(item: ISeedValueItem): string {
         {{ t("SeedValue.onlyLow", { count: lowCount }) }}
       </a-checkbox>
 
+      <a-select v-model:value="categoryFilter" :options="categoryOptions" style="width: 140px" />
+
       <HoverTip :text="t('SeedValue.formulaNotice')">
         <a-flex align="center" gap="small" class="text-body-small">
           <QuestionCircleOutlined />
@@ -196,7 +259,7 @@ function siteTip(item: ISeedValueItem): string {
         :loading="loading"
         :pagination="pagination"
         size="small"
-        @change="handleTableChange"
+        @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -204,6 +267,12 @@ function siteTip(item: ISeedValueItem): string {
             <div class="text-body-small text-no-wrap mt-1">
               {{ t("SeedValue.copiesLine", { copies: record.verdict.copies, bytes: formatSize(record.bytes) }) }}
             </div>
+          </template>
+
+          <!-- 折不出那一档留空，不写「其他」：`other` 在折类判据里是「未知」，
+               画成一个类别词会让人以为这一条被哪个站标成了「其他」类（站点分类里真有这么一类）。 -->
+          <template v-else-if="column.key === 'category'">
+            <span v-if="record.categoryKind" class="text-no-wrap">{{ t(categoryKindLabelKey(record.categoryKind)) }}</span>
           </template>
 
           <template v-else-if="column.key === 'weight'">

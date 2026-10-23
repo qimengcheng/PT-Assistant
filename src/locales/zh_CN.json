@@ -977,6 +977,7 @@
   "SeedValue": {
     "activeTip": "当前正在上传",
     "column": {
+      "category": "分类",
       "name": "名称",
       "sites": "做种站点",
       "size": "占用磁盘",
@@ -985,6 +986,9 @@
       "weight": "时魔权重"
     },
     "copiesLine": "{copies} 份副本 · 占用 {bytes}",
+    "filter": {
+      "categoryAll": "全部分类"
+    },
     "formulaNotice": "时魔权重按 NexusPHP 一族的公式折算（时长因子 × 大小 GB × 做种人数因子），每一份在做种的副本各算一次再求和。各站参数不同，且站点发放时按账号汇总后封顶，所以这个数只用于同一批内容之间比较，不等于站点实际发放的魔力。",
     "idleCopies": "{count} 份未做种",
     "loadFailed": "{name} 加载失败：{message}",

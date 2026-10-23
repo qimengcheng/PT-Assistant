@@ -13,10 +13,16 @@
  * ③ 同一个内容指纹只要已经被某个任务组占走，剩下那几条就并进那个任务组，不留「同一份内容两组」。
  */
 
-/** 台账里这一层只吃三样：任务 id、各条目的 infoHash、基准那条的 infoHash */
+/**
+ * 台账里这一层吃的三样：任务 id、各条目的 infoHash、基准那条的 infoHash。
+ *
+ * `site` / `category` 是给「做种价值」那一屏折分类用的（它拿台账条目当分类的原料之一，
+ * 见 `SeedValue/seedValueView.ts` 的 `categoryKindOfGroup`）—— 判组本身只看 hash，
+ * 多带这两样不改变分组结论，所以这里放宽而不是另开一份类型。
+ */
 export interface IReseedTaskForGroup {
   id: string | number;
-  items?: { hash?: string }[];
+  items?: { hash?: string; site?: string; category?: string | number }[];
   baseLocal?: { hash?: string };
 }
 

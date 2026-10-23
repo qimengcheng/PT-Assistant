@@ -996,6 +996,7 @@
     "refresh": "刷新",
     "siteTipPartial": "{names}；另有 {missing} 份认不出所属站点",
     "siteUnknown": "认不出所属站点",
+    "sizeTip": "{copies} 份副本分布在 {locations} 处；同一目录中的几份只计一次，不同目录各计一次。",
     "summary": "共 {items} 项内容 · {copies} 份副本",
     "tier": {
       "high": "高",

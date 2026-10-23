@@ -92,6 +92,50 @@ describe("一份内容挂多个站 = 多份产出（用户 2026-10-19 纠正的�
   });
 });
 
+/**
+ * v0.123.1：去重的单位是**一份物理数据**，不是「一份内容」。
+ *
+ * 原判据只写「同一份内容不管挂几个站都只占一份」，那成立的前提是这些副本共用同一批字节
+ * （辅种指向同一个目录）。而各站各自一个目录时（qBittorrent 给每个站点建一个分类、分类自带保存路径，
+ * 用户 2026-10-23 那一屏就是 13 份各站各目录）字节是各存一份的，只报最大那一份等于把磁盘占用
+ * 少说 13 倍 —— 而他正是拿这个数决定「还值不值得占着」。
+ */
+describe("磁盘占用按「哪一份物理数据」去重", () => {
+  it("同一目录里挂三个站 → 只算一份", () => {
+    const verdict = judge(
+      copy({ location: "qb1\u0000/data/m" }),
+      copy({ siteId: "siteB", location: "qb1\u0000/data/m" }),
+      copy({ siteId: "siteC", location: "qb1\u0000/data/m" }),
+    );
+    expect(verdict.bytes).toBe(50 * GIB);
+    expect(verdict.locations).toBe(1);
+  });
+
+  it("各站各自一个目录 → 各算一份，不许只报最大的那一份", () => {
+    const verdict = judge(copy({ location: "qb1\u0000/data/a" }), copy({ siteId: "siteB", location: "qb1\u0000/data/b" }));
+    expect(verdict.bytes).toBe(100 * GIB);
+    // 界面上那句「分布在几处」靠这个数，它必须与 bytes 同源（各折一套迟早对不上账）
+    expect(verdict.locations).toBe(2);
+  });
+
+  it("同一目录里大小报得不一样 → 按那一份最大的算，不重复累加", () => {
+    const verdict = judge(
+      copy({ location: "qb1\u0000/data/a" }),
+      copy({ siteId: "siteB", totalSize: 60 * GIB, location: "qb1\u0000/data/a" }),
+    );
+    expect(verdict.bytes).toBe(60 * GIB);
+  });
+
+  it("没报目录的那些（调用方没给这一格）退回「全算同一份」，与 v0.123.0 一字不差", () => {
+    expect(judge(copy(), copy({ siteId: "siteB" })).bytes).toBe(50 * GIB);
+  });
+
+  it("报不出的大小（0 / 非数字）在那一处里按 0 算，不许把整块的合计变成 NaN", () => {
+    const verdict = judge(copy({ location: "qb1\u0000/data/a", totalSize: 0 }), copy({ siteId: "siteB", location: "qb1\u0000/data/b" }));
+    expect(verdict.bytes).toBe(50 * GIB);
+  });
+});
+
 describe("哪些副本不许进合计", () => {
   it("暂停着的那一份不产出时魔：只有它在做种时判 idle，不判 low", () => {
     const verdict = judge(copy({ seeding: false }));

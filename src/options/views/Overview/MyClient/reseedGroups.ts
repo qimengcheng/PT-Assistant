@@ -1,17 +1,29 @@
 /**
  * 「同一个文件的多条副本」怎么认、折叠之后这一页该长什么样。
  *
- * 判据零依赖（不 import store、不发消息、不碰 DOM），这样它能在 Node 里被 Vitest 直接断言
- * —— 这一页原先的判据都长在组件里，改一次要开浏览器点一遍。
+ * 判据零依赖（不 import store、不发消息、不碰 DOM；只借 `@/shared/fingerprint/title` 那一份标题归一），
+ * 这样它能在 Node 里被 Vitest 直接断言 —— 这一页原先的判据都长在组件里，改一次要开浏览器点一遍。
  *
- * 两层判据（用户 2026-10-13 定的口径）：
+ * **这里有两套并组判据，各管各的用途，不许互相顶替**：
+ *
+ * 一、`assignGroups`（折叠用，用户 2026-10-13 定的口径）两层判据：
  * ① 能对上一辅种任务台账的，进那一条任务的组 —— 这是精确的，不看字面像不像；
  * ② 没出现在任何辅种任务里的，按**内容指纹**成组：下载器 + 名称 + 大小 + 保存路径，四项全等才算同一份。
  *    少一项都不并（尤其不许只按名称+大小并）：折叠起来的那几条是**看不见**的，并错一条就等于把一条
  *    他需要看见的种子藏掉了，那比多占一行严重得多。带上下载器是因为这一页第一列就是下载器 ——
  *    跨下载器的同名条目是两件事，不该被一组吃掉。
  * ③ 同一个内容指纹只要已经被某个任务组占走，剩下那几条就并进那个任务组，不留「同一份内容两组」。
+ *
+ * 二、`assignContentGroups`（汇总用，v0.123.1 因用户报「做种站点算错」而加）：
+ * 并的是**内容**，所以保存路径与下载器都不参与 —— 一片内容各站一份目录（qBittorrent 给每个站点
+ * 建一个分类、分类各自带一条保存路径）时，一套按目录算的判据会把一条内容切成 N 项，界面上每一行
+ * 只报「1 份副本 · 1 个站」。汇总不藏任何东西（组里每一条都还在份数与 `memberKeys` 里），
+ * 所以它可以按内容并，也**应当**按内容并。
+ *
+ * 为什么反过来不行（汇总那套不许拿去折叠）：折叠会把组员从列表里摘掉，把两片碰巧同名同大小、
+ * 实际各存一份的内容并起来就是藏掉一条他要找的种子 —— 那才是 `assignGroups` 收紧到四项全等的理由。
  */
+import { buildTitleSizeKey, normalizeTitle } from "@/shared/fingerprint/title.ts";
 
 /**
  * 台账里这一层吃的三样：任务 id、各条目的 infoHash、基准那条的 infoHash。
@@ -124,6 +136,93 @@ export function assignGroups<T extends IRowForGroup>(
   for (const group of groupOf.values()) counts.set(group, (counts.get(group) ?? 0) + 1);
   const out = new Map<string, string | null>();
   for (const [key, group] of groupOf) out.set(key, (counts.get(group) ?? 0) > 1 ? group : null);
+  return out;
+}
+
+/**
+ * 这一份数据**实际落在哪一处**：下载器 + 保存路径。
+ *
+ * 给「做种价值」那一屏算磁盘用：同一处里的几份副本（辅种到同一个目录）只占一份字节，
+ * 不同处各占一份。分隔符与 `contentFingerprint` 同一做法（路径里什么都有，`a:b` 那种串会撞）。
+ */
+export function dataLocationKey(row: IRowForGroup): string {
+  return `${row.clientId}\u0000${row.savePath}`;
+}
+
+/**
+ * 一行属于哪份**内容**：归一化标题 + 字节，与可辅种扫描、一键辅种基准、本地指纹第 1 层
+ * **同一条算式**（`buildTitleSizeKey`）。各处各折一套就会「扫描说查到了，这一屏却分成两条」。
+ *
+ * 名称折不出可用信息时返回 **null** —— 那时这条算式只剩大小，而「大小相同」不等于「内容相同」
+ * （`normalizeTitle` 对纯符号名给空串，本地指纹那一层也专门把这种 key 标成证据更弱的一档）。
+ * null 的这一行谁也不并，只跟自己成一组；它仍然能被台账并上，因为台账是精确证据。
+ */
+export function contentIdentityKey(row: IRowForGroup): string | null {
+  return normalizeTitle(row.name) ? buildTitleSizeKey(row.name, row.totalSize) : null;
+}
+
+/**
+ * 给每一行定「内容组」键（汇总用，见文件头那两套判据的第二套）。
+ *
+ * 两条并组路（与 `assignGroups` 同构，只是单位换成内容）：
+ * ① 名称归一后 + 字节相同的行并一组；
+ * ② 同一条辅种台账里的行并一组 —— 这一条补的是①看不见的形状：站点自己改过标题（加/减一个词）、
+ *    或两片内容字节不完全一样但确属同一批辅种。
+ * 两条叠用所以要走并查集：`A↔B`（台账）而 `B↔C`（同名同大小）时三条是一组，
+ * 不能出现「同一份内容两组」。
+ *
+ * @returns 行 key → 组键。与 `assignGroups` 不同，**每一条都有组键**（汇总不需要「不成组」这一档，
+ *   单条内容的组就是那一条）。组键取组内最小的行键，所以行的先后不影响键本身。
+ */
+export function assignContentGroups<T extends IRowForGroup>(rows: T[], taskByHash: Map<string, string>): Map<string, string> {
+  const parent = new Map<string, string>();
+  for (const row of rows) {
+    if (!parent.has(row.key)) parent.set(row.key, row.key);
+  }
+  /** 找根，顺手做路径减半：几百条种子连成一条链时不让 find 退化成 O(n) */
+  const find = (key: string): string => {
+    let cur = key;
+    let next = parent.get(cur);
+    while (next !== undefined && next !== cur) {
+      const grand = parent.get(next);
+      if (grand !== undefined && grand !== next) parent.set(cur, grand);
+      cur = next;
+      next = parent.get(cur);
+    }
+    return cur;
+  };
+  const union = (a: string, b: string) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent.set(rootB, rootA);
+  };
+
+  const firstOfContent = new Map<string, string>();
+  const firstOfTask = new Map<string, string>();
+  for (const row of rows) {
+    const content = contentIdentityKey(row);
+    if (content) {
+      const anchor = firstOfContent.get(content);
+      if (anchor) union(anchor, row.key);
+      else firstOfContent.set(content, row.key);
+    }
+    const hash = typeof row.infoHash === "string" ? row.infoHash.trim().toLowerCase() : "";
+    const task = hash ? taskByHash.get(hash) : undefined;
+    if (task) {
+      const anchor = firstOfTask.get(task);
+      if (anchor) union(anchor, row.key);
+      else firstOfTask.set(task, row.key);
+    }
+  }
+
+  const repOfRoot = new Map<string, string>();
+  for (const row of rows) {
+    const root = find(row.key);
+    const current = repOfRoot.get(root);
+    if (current === undefined || row.key < current) repOfRoot.set(root, row.key);
+  }
+  const out = new Map<string, string>();
+  for (const row of rows) out.set(row.key, repOfRoot.get(find(row.key))!);
   return out;
 }
 

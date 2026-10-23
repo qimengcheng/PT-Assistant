@@ -62,6 +62,19 @@ describe("同内容的副本要并全", () => {
     expect(withTask.get("k1")).toEqual({ kind: "candidate", pending: 1, covered: 2 });
     expect(withTask.get("k2")).toEqual({ kind: "candidate", pending: 1, covered: 2 });
   });
+
+  it("同一份内容各站各存一个目录 → 已挂的站点要并起来算（v0.123.1，与做种价值页同一个根）", () => {
+    // qBittorrent 给每个站点建一个分类、分类各自带一条保存路径 ⇒ 同一片内容有 N 份、N 个目录。
+    // 「已挂哪些站」原先按**折叠那套**判据并组（含路径），于是每一行只知道自己那一个站：
+    // 标记会报「待查 2 站」而其中一站其实早挂上了。
+    const rows: IReseedRow[] = [
+      { key: "qb1:1", clientId: "qb1", name: "Some.Movie.2024.1080p", totalSize: 8e9, savePath: "/data/pandapt", infoHash: "aaaa", tracker: "https://tracker.pandapt.net/announce", completed: true },
+      { key: "qb1:2", clientId: "qb1", name: "Some.Movie.2024.1080p", totalSize: 8e9, savePath: "/data/novahd", infoHash: "bbbb", tracker: "https://novahd.top/announce", completed: true },
+    ];
+    const facts = buildReseedFacts(rows, hostSiteEntries, usable, []);
+    expect(facts.get("qb1:1")).toEqual({ kind: "candidate", pending: 1, covered: 2 });
+    expect(facts.get("qb1:2")).toEqual({ kind: "candidate", pending: 1, covered: 2 });
+  });
 });
 
 describe("tracker 那一格的各家形态", () => {

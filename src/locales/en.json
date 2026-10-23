@@ -996,6 +996,7 @@
     "refresh": "Refresh",
     "siteTipPartial": "{names}; {missing} copies with an unrecognized site",
     "siteUnknown": "Site unrecognized",
+    "sizeTip": "{copies} copies across {locations} location(s); copies in one directory count once, separate directories count separately.",
     "summary": "{items} items · {copies} copies",
     "tier": {
       "high": "High",

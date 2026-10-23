@@ -226,6 +226,16 @@ function siteTip(item: ISeedValueItem): string {
   const missing = item.verdict.unknownSiteCopies;
   return missing === 0 ? siteNames(item) : t("SeedValue.siteTipPartial", { names: siteNames(item), missing });
 }
+
+/**
+ * 大小那一格的浮层。这个数按**一处物理数据**计一次（同目录的几份副本不重复算，不同目录各算一份），
+ * 而「同一份内容挂在十几个站」这两种形状在界面上长得一样 —— 不说清就会让人以为 13 份也只占一份，
+ * 而这一屏的动作恰恰是「还占不占着磁盘」。只有一份副本时没得解释，那句话不出现（AGENTS §3.4：
+ * 重复摆在旁边的文字不叠浮层）。
+ */
+function sizeTip(item: ISeedValueItem): string {
+  return t("SeedValue.sizeTip", { copies: item.verdict.copies, locations: item.verdict.locations });
+}
 </script>
 
 <template>
@@ -293,7 +303,10 @@ function siteTip(item: ISeedValueItem): string {
           </template>
 
           <template v-else-if="column.key === 'size'">
-            <span class="text-no-wrap">{{ formatSize(record.bytes) }}</span>
+            <HoverTip v-if="record.verdict.copies > 1" :text="sizeTip(record)">
+              <span class="text-no-wrap">{{ formatSize(record.bytes) }}</span>
+            </HoverTip>
+            <span v-else class="text-no-wrap">{{ formatSize(record.bytes) }}</span>
           </template>
 
           <template v-else-if="column.key === 'uploaded'">

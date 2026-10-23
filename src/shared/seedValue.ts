@@ -15,6 +15,14 @@
  *    时魔确实和「做种人数」「种子大小」相关（还和种子存活时长相关），那是 NexusPHP 那一族的公开公式，
  *    不必逐站抓条目页也能折出一个可比的量。见下面 `SEED_VALUE_FORMULA`。
  *
+ * ## v0.123.1 纠正的一处：并组的单位是内容，不是「哪台下载器的哪个目录」
+ *
+ * 用户 2026-10-23 报「做种站点计算不正确」：一片内容在 qBittorrent 里有 13 份副本、各站一个分类、
+ * 分类各自带一条保存路径，而这一屏每一行只报「1 份副本 · 做种站点 1」。取数层原先直接复用
+ * 「我的下载器」**折叠**那套判据（名称+大小+路径+下载器四项全等），路径被当成了身份的一部分。
+ * 折叠要那么严是因为它会把组员**藏掉**；这一屏是汇总，一条都不藏，所以按内容并，
+ * 磁盘另按「一处物理数据」计（见 `judgeSeedValue` 的 ⑤）。
+ *
  * ## 这个数是估算，界面上必须这么说
  *
  * 站点真正发放时，是把**账号下全部做种**的 A 求和之后再折一层上限（`arctan` 那一档），
@@ -55,10 +63,17 @@ export interface ISeedValueCopy {
   totalUploaded: number;
   /** 当前上传速度，字节/秒。只用来分「现在有没有在传」，不参与时魔公式 */
   uploadSpeed: number;
+  /**
+   * 这一份数据**实际落在哪一处**（调用方给「下载器 + 保存路径」，见 `reseedGroups.dataLocationKey`）。
+   * 只有「占用磁盘」那一个数吃它：同一处的几份副本（辅种到同一个目录）只占一份字节，不同处各占一份。
+   * 时魔、站数、份数都不看它 —— 魔力是各站按副本分别发的。
+   * 没报的那些全归到同一个桶，等于退回「这一条内容只占一份」（v0.123.0 之前的行为）。
+   */
+  location?: string;
 }
 
 export interface ISeedValueInput {
-  /** 同一份内容在各站/各下载器里的副本（分组判据与行上那枚标记同源，见 `reseedGroups.ts`） */
+  /** 同一份内容在各站/各下载器/各目录里的副本（并组判据见 `reseedGroups.assignContentGroups`：按内容并，不看路径） */
   copies: readonly ISeedValueCopy[];
   /** 现场时间，unix 秒（不许在判据里自己读时钟，否则断言不可复现） */
   now: number;
@@ -101,8 +116,14 @@ export interface ISeedValueVerdict {
   unknownSiteCopies: number;
   /** 这一份内容挂着的副本总数（含没在做种的） */
   copies: number;
-  /** 合计占用磁盘（字节）：同一份内容不管挂几个站都只占一份，所以取的是**去重后**的大小 */
+  /**
+   * 合计占用磁盘（字节）：按**一处物理数据**算一次，同一处的几份副本不重复计。
+   * 「处」= 调用方给的 `location`（下载器 + 保存路径）。同一片内容各站各存一个目录时这是各份相加，
+   * 全部辅到同一个目录时就是那一份 —— 这一屏报的是「占着多少磁盘」，把 13 份说成 1 份会直接判错方向。
+   */
   bytes: number;
+  /** 这几份副本分布在**几处**物理数据上（`bytes` 就是按它累加的）：给界面那句「13 份副本落在 3 个目录」用 */
+  locations: number;
   /** 累计上传（各份相加） */
   uploaded: number;
   /** 现在有没有在传（任一份速度 > 0） */
@@ -179,6 +200,9 @@ function foldCopy(copy: ISeedValueCopy, now: number): Omit<ISeedValueCopyDetail,
  * ④ **`siteCount` 按站点去重，`seedingCopies` 按份数**：同一站挂两份（两个下载器各一份）时前者是 1、
  *    后者是 2，而 `weight` 是 2 份都算 —— 魔力是各站按副本分别发的。三个数各有各的单位，
  *    所以各起各的名，别合成一个（合成一个就必然有一个是错的）。
+ * ⑤ **`bytes` 按 `location` 去重，不按内容**：一片内容各站各存一个目录时它确实占着 N 份磁盘，
+ *    全辅到同一个目录时只占一份。这一屏的动作是「还占不占着」，把 N 份报成 1 份是往错方向推
+ *    （v0.123.1；原判据写死「同一份内容不管挂几个站都只占一份」，那个前提只在共用目录时成立）。
  */
 export function judgeSeedValue(input: ISeedValueInput): ISeedValueVerdict {
   const counting = input.copies.filter((copy) => copy.completed && copy.seeding);
@@ -190,7 +214,13 @@ export function judgeSeedValue(input: ISeedValueInput): ISeedValueVerdict {
   });
   const weights = details.map((item) => item.weight).filter((item): item is number => item !== null && Number.isFinite(item));
 
-  const bytes = input.copies.length === 0 ? 0 : Math.max(...input.copies.map((copy) => (Number.isFinite(copy.totalSize) ? copy.totalSize : 0)));
+  const bytesByLocation = new Map<string, number>();
+  for (const copy of input.copies) {
+    const size = Number.isFinite(copy.totalSize) ? Math.max(0, copy.totalSize) : 0;
+    const location = copy.location ?? "";
+    bytesByLocation.set(location, Math.max(bytesByLocation.get(location) ?? 0, size));
+  }
+  const bytes = [...bytesByLocation.values()].reduce((sum, one) => sum + one, 0);
   const uploaded = input.copies.reduce((sum, copy) => sum + (Number.isFinite(copy.totalUploaded) ? copy.totalUploaded : 0), 0);
   const active = input.copies.some((copy) => copy.seeding && Number.isFinite(copy.uploadSpeed) && copy.uploadSpeed > 0);
   const sites = new Set(counting.map((copy) => copy.siteId).filter((siteId): siteId is string => !!siteId));
@@ -202,6 +232,7 @@ export function judgeSeedValue(input: ISeedValueInput): ISeedValueVerdict {
     unknownSiteCopies: counting.filter((copy) => !copy.siteId).length,
     copies: input.copies.length,
     bytes,
+    locations: bytesByLocation.size,
     uploaded,
     active,
     details,

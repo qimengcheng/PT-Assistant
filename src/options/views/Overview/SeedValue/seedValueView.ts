@@ -5,9 +5,11 @@
  * （分组并错、站点反查折错、状态认歪），而这一屏的用途恰恰是「哪些还该留」—— 少一条就是
  * 一次没人看见的判断。住在 `.vue` 里就进不了 Node 断言（AGENTS 记过这条），所以拆出来。
  *
- * 三条取数口径：
- * ① **一份内容一行**，用的是「我的下载器」折叠那套同一个分组判据（`assignGroups` + 辅种台账）——
- *    两边各折一套就会出现「列表里说这两条同内容、这一屏把它们当两条算」；
+ * 四条取数口径：
+ * ① **一份内容一行**，用的是 `assignContentGroups`（名称归一 + 字节，再让辅种台账把写法不同的几条串上）。
+ *    v0.123.1 之前这里直接用「我的下载器」**折叠**那套判据（名称+大小+路径+下载器四项全等），
+ *    于是各站各存一个目录的那种内容被切成 N 行、每行只报「1 个站」—— 折叠那套把路径当身份是有理由的
+ *    （折叠会藏行），这一屏不藏东西，所以按内容并；
  * ② 每份副本的站点走 Tracker 反查（与行上那枚可辅种标记同一份判据），认不出站点的照算进产出，
  *    只是那一栏报不出；
  * ③ 「在做种」吃的是下载器报的状态，不是「数据下完了」—— 下完但暂停着的不产出魔力；
@@ -21,7 +23,7 @@ import type { TSiteCategoryMapOf } from "@/shared/keepUploadTaskFilter.ts";
 import { judgeSeedValue, type ISeedValueCopy, type ISeedValueVerdict } from "@/shared/seedValue.ts";
 import { resolveTrackerHostSite, trackerFieldToHost } from "@/shared/trackerHost.ts";
 import type { IReseedTaskForGroup, IRowForGroup } from "../MyClient/reseedGroups.ts";
-import { assignGroups, buildTaskGroups } from "../MyClient/reseedGroups.ts";
+import { assignContentGroups, buildTaskGroups, dataLocationKey } from "../MyClient/reseedGroups.ts";
 
 /** 参与这一屏的一行：分组要的字段 + 时魔公式与状态各样 */
 export interface ISeedValueRow extends IRowForGroup {
@@ -85,7 +87,7 @@ export interface ISeedValueItem {
   key: string;
   /** 代表行的名称 */
   name: string;
-  /** 合计大小（字节，取组内最大值 —— 同一份内容不重复占磁盘） */
+  /** 合计占用磁盘（字节）：按「哪一处物理数据」去重后各算一份，见判据 ⑤ */
   bytes: number;
   verdict: ISeedValueVerdict;
   /** 这一组在下载器列表里的行键，供「跳回去删」那类动作用 */
@@ -140,7 +142,7 @@ export function buildSeedValueItems(
   siteMapOf: TSiteCategoryMapOf,
 ): ISeedValueItem[] {
   const taskByHash = buildTaskGroups(tasks);
-  const groupOf = assignGroups(rows, taskByHash);
+  const groupOf = assignContentGroups(rows, taskByHash);
   const entries = hostSiteEntries instanceof Map ? hostSiteEntries : new Map(hostSiteEntries);
   /** 组键（`t:<任务 id>`）→ 那一条台账里各站的分类叫法 */
   const ledgerOfGroup = new Map<string, ICategorySource[]>(
@@ -165,17 +167,20 @@ export function buildSeedValueItems(
         completed: row.completed,
         seeding: row.seeding,
         totalSize: row.totalSize,
+        location: dataLocationKey(row),
         ...(row.swarmSeeders === undefined ? {} : { swarmSeeders: row.swarmSeeders }),
         ...(row.seedingSince === undefined ? {} : { seedingSince: row.seedingSince }),
         totalUploaded: row.totalUploaded,
         uploadSpeed: row.uploadSpeed,
       };
     });
+    const verdict = judgeSeedValue({ copies, now });
     items.push({
       key,
       name: members[0]!.name,
-      bytes: Math.max(...members.map((row) => (Number.isFinite(row.totalSize) ? row.totalSize : 0))),
-      verdict: judgeSeedValue({ copies, now }),
+      // 磁盘那一个数只由判据算一次：这里再折一遍 `Math.max` 就会与浮层里那句「占用」分成两套口径
+      bytes: verdict.bytes,
+      verdict,
       memberKeys: members.map((row) => row.key),
       categoryKind: categoryKindOfGroup(members, taskByHash, ledgerOfGroup, siteMapOf),
     });

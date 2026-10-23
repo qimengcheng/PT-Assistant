@@ -237,8 +237,8 @@ describe("同内容的副本要并全（buildSeedValueItems）", () => {
     expect(items[0]!.verdict.tier).toBe("idle");
   });
 
-  it("名称、大小、路径任一项不同就各算一项，不许只按名称并", () => {
-    const items = build([clean({ key: "qb1:1", tracker: "https://pandapt.net/announce" }), clean({ key: "qb1:2", savePath: "/elsewhere" })]);
+  it("大小不同就各算一项（同名的两条不同压制版本不许并成一条）", () => {
+    const items = build([clean({ key: "qb1:1" }), clean({ key: "qb1:2", totalSize: 3 * GIB })]);
     expect(items).toHaveLength(2);
   });
 
@@ -247,6 +247,92 @@ describe("同内容的副本要并全（buildSeedValueItems）", () => {
     expect(items.find((each) => each.name === "Some.Show.S01E01.1080p")!.memberKeys).toEqual(["qb1:1", "qb1:2"]);
   });
 });
+
+/**
+ * 并组的单位是**内容**，不是「同一台下载器的同一个目录」（用户 2026-10-23：「做种站点计算不正确」）。
+ *
+ * 原先这一屏直接复用「我的下载器」**折叠**那套判据（名称 + 大小 + 路径 + 下载器四项全等），
+ * 而 qBittorrent 给每个站点建一个分类、分类各自带一条保存路径 ⇒ 同一片内容被折成 N 组，
+ * 每一行都只报「1 份副本 · 做种站点 1」。折叠那边把路径当判据是有理由的（折叠会**藏行**，
+ * 并错一条等于把他需要看见的一条种子藏起来），这一屏不藏任何东西 —— 组里每一条都还在
+ * `memberKeys` 与份数里，所以它可以、也应当按内容并。
+ */
+describe("同内容跨目录 / 跨下载器的副本要并成一项", () => {
+  it("一份内容各站各存一个目录（他那 13 份的形状）→ 一项，站点数按各站算", () => {
+    const items = build([
+      clean({ key: "qb1:1", savePath: "/data/pandapt", tracker: "https://pandapt.net/announce" }),
+      clean({ key: "qb1:2", savePath: "/data/novahd", tracker: "https://novahd.top/announce" }),
+      clean({ key: "qb1:3", savePath: "/data/elsewhere", tracker: "https://tracker.unknown.example/announce" }),
+    ]);
+    expect(items).toHaveLength(1);
+    const verdict = items[0]!.verdict;
+    expect(verdict.copies).toBe(3);
+    expect(verdict.seedingCopies).toBe(3);
+    expect(verdict.siteCount).toBe(2);
+    expect(verdict.unknownSiteCopies).toBe(1);
+    expect(verdict.weight).toBeCloseTo(6, 10);
+    expect(verdict.locations).toBe(3);
+  });
+
+  it("路径不同 ⇒ 磁盘按两处各算一份（这个数是他决定「还占不占着」的依据，少说 13 倍比多说更坏）", () => {
+    const items = build([
+      clean({ key: "qb1:1", savePath: "/data/pandapt" }),
+      clean({ key: "qb1:2", savePath: "/data/novahd" }),
+    ]);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.bytes).toBe(4 * GIB);
+    expect(items[0]!.verdict.bytes).toBe(4 * GIB);
+    expect(items[0]!.verdict.locations).toBe(2);
+  });
+
+  it("路径相同（辅种指向同一个目录）⇒ 磁盘只算一份", () => {
+    const items = build([clean({ key: "qb1:1", tracker: "https://pandapt.net/announce" }), clean({ key: "qb1:2", tracker: "https://novahd.top/announce" })]);
+    expect(items[0]!.bytes).toBe(2 * GIB);
+  });
+
+  it("两家下载器上路径字面相同也算两处（各自占各自的磁盘）", () => {
+    const items = build([clean({ key: "qb1:1", clientId: "qb1" }), clean({ key: "tr1:1", clientId: "tr1" })]);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.verdict.bytes).toBe(4 * GIB);
+    expect(items[0]!.verdict.siteCount).toBe(0);
+  });
+
+  it("标题写法不同但归一后是同一份内容（分隔符 / 压制组尾标的差异）→ 并成一项", () => {
+    // 站点各自重打包 .torrent 时标题写法不一样：`A.B.2024.1080p-WiKi` 与 `A B (2024) 1080p-WiKi`
+    const items = build([
+      clean({ key: "qb1:1", name: "A.B.2024.1080p.WEB-DL.H264-WiKi", tracker: "https://pandapt.net/announce" }),
+      clean({ key: "qb1:2", name: "A B (2024) 1080p WEB-DL H264-WiKi", tracker: "https://novahd.top/announce" }),
+    ]);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.verdict.siteCount).toBe(2);
+  });
+
+  it("名称折不出可用信息的那几行不许只按大小并组（那是把不同内容吹成一条）", () => {
+    // `normalizeTitle` 对纯符号名返回空串，此时内容键只剩大小 —— 同大小不等于同内容
+    const items = build([clean({ key: "qb1:1", name: "???" }), clean({ key: "qb1:2", name: "!!!" })]);
+    expect(items).toHaveLength(2);
+  });
+
+  it("名称折不出时，台账仍能把它们并成一项（台账是精确证据，不看字面）", () => {
+    const items = build(
+      [
+        clean({ key: "qb1:1", name: "???", infoHash: "hashA", tracker: "https://pandapt.net/announce" }),
+        clean({ key: "qb1:2", name: "!!!", infoHash: "hashB", tracker: "https://novahd.top/announce" }),
+      ],
+      [{ id: "t1", items: [{ hash: "hashA" }, { hash: "hashB" }] }],
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]!.verdict.siteCount).toBe(2);
+  });
+
+  it("同一份数据的两条副本（同下载器同目录）不因并组而漏掉任何一行", () => {
+    const items = build([clean({ key: "qb1:1" }), clean({ key: "qb1:2" }), clean({ key: "qb1:3" })]);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.memberKeys).toEqual(["qb1:1", "qb1:2", "qb1:3"]);
+    expect(items[0]!.verdict.copies).toBe(3);
+  });
+});
+
 
 describe("默认序（sortSeedValueItems）", () => {
   it("权重从低到高：最该考虑的排最前", () => {
@@ -442,6 +528,25 @@ describe("页面那一侧的形状", () => {
       ) as { SeedValue: { column: Record<string, string>; filter: Record<string, string> } };
       expect(j.SeedValue.column.category, `${file} 缺 SeedValue.column.category`).toBeTypeOf("string");
       expect(j.SeedValue.filter.categoryAll, `${file} 缺 SeedValue.filter.categoryAll`).toBeTypeOf("string");
+    }
+  });
+
+  it("「占用磁盘」那一格说清按几处计，且只有一份副本时不叠浮层", () => {
+    // 这一屏的磁盘数换了单位（一处物理数据算一次），不说清就会让人以为 13 份也只占一份；
+    // 而只有一份时那句话是把旁边的数字重复一遍（AGENTS §3.4：那种浮层不叠）
+    const cell = /<template v-else-if="column\.key === 'size'">([\s\S]*?)<\/template>\s*\n/.exec(page);
+    expect(cell, "找不到大小那一格").toBeTruthy();
+    expect(cell![0]).toMatch(/<HoverTip v-if="record\.verdict\.copies > 1" :text="sizeTip\(record\)">/);
+    expect(page).toMatch(/function sizeTip\(item: ISeedValueItem\): string \{\n {2}return t\("SeedValue\.sizeTip", \{ copies: item\.verdict\.copies, locations: item\.verdict\.locations \}\);/);
+    for (const file of ["zh_CN", "en"]) {
+      const j = JSON.parse(
+        readFileSync(fileURLToPath(new URL(`../../src/locales/${file}.json`, import.meta.url)), "utf8"),
+      ) as { SeedValue: { sizeTip: string } };
+      expect(j.SeedValue.sizeTip, `${file} 缺 SeedValue.sizeTip`).toBeTypeOf("string");
+      // 插值参数少给一个就是「分布在 {locations} 处」这种半截话（v0.109.7 那一族）
+      for (const token of ["{copies}", "{locations}"]) {
+        expect(j.SeedValue.sizeTip, `${file} 的 sizeTip 应当含 ${token}`).toContain(token);
+      }
     }
   });
 });

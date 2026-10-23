@@ -13,7 +13,7 @@ import { isReseedScanFresh, reseedScanContentKey } from "@/shared/reseedScanPlan
 import type { IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
 import type { IReseedScanResult, IReseedScanTarget, TReseedScanVerdict } from "@/shared/types/storages/reseedScan.ts";
 
-import { assignGroups, buildTaskGroups, type IReseedTaskForGroup, type IRowForGroup } from "./reseedGroups.ts";
+import { assignContentGroups, buildTaskGroups, type IReseedTaskForGroup, type IRowForGroup } from "./reseedGroups.ts";
 
 /** 参与判据的一行：折叠那套分组要的字段（`IRowForGroup`）加两样这一层自己要的 */
 export interface IReseedRow extends IRowForGroup {
@@ -30,7 +30,7 @@ export interface IReseedRow extends IRowForGroup {
   contentPath?: string;
 }
 
-/** 行 key → 组键。没进组（或组里只有一条）的行拿自己当组键 */
+/** 行 key → 内容组键（`assignContentGroups` 给每一条都配一个，单条内容的组就是它自己） */
 type TGroupKeyOf = (row: IReseedRow) => string;
 
 /**
@@ -85,8 +85,11 @@ function scanFactsByContent(results: IReseedScanResult[], now: number): Map<stri
  * 两条对外函数都用它，不许各拼一遍（拼歪一次就是那枚标记与扫描范围两边各说一套）：
  * ① 一份副本挂在哪个站，拿**表里 Tracker 那一列同一份数据**（`row.tracker`）反查，
  *    raw 里那整串 announce 列表不参与；
- * ② 同内容的几份副本并成一个集合，用的是**折叠那套同一份判据**（`assignGroups` + 辅种台账），
- *    所以被折叠起来、这一屏看不见的那些副本也算已挂，缺口不会虚报。
+ * ② 同内容的几份副本并成一个集合，用的是**汇总那套判据**（`assignContentGroups` + 辅种台账：
+ *    名称归一 + 字节，路径与下载器都不参与），所以被折叠起来、这一屏看不见的那些副本也算已挂，
+ *    缺口不会虚报。v0.123.1 之前这里用的是折叠那套（四项全等，含保存路径），于是
+ *    「一片内容各站各存一个目录」（qBittorrent 按站点建分类、分类各带一条路径）时每一行只认得
+ *    自己那一个站，标记会把他早就挂上的站继续算进「待查 N 站」。
  * 没进组的行拿自己当组键：一份都认不出站时并集是空的，判据据此报 `covered: 0` ——
  * 缺口照算（那条内容仍然值得去查），但界面上「已挂哪些站」那一句要换成「认不出来源站点」
  * （v0.117.1；把这一档做成提前返回的静默档，代价是它连扫描范围都进不去）。
@@ -96,7 +99,7 @@ function coverOfGroups(
   hostSiteEntries: Iterable<readonly [string, string]>,
   tasks: IReseedTaskForGroup[],
 ): { groupKeyOf: TGroupKeyOf; covered: Map<string, Set<string>> } {
-  const groupOf = assignGroups(rows, buildTaskGroups(tasks));
+  const groupOf = assignContentGroups(rows, buildTaskGroups(tasks));
   const groupKeyOf: TGroupKeyOf = (row) => groupOf.get(row.key) ?? row.key;
   const entries = hostSiteEntries instanceof Map ? hostSiteEntries : new Map(hostSiteEntries);
 

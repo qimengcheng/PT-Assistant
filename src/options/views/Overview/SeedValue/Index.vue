@@ -10,7 +10,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { QuestionCircleOutlined, ReloadOutlined } from "@antdv-next/icons";
+import { QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from "@antdv-next/icons";
 import type { TablePaginationConfig } from "antdv-next";
 import type { CTorrent } from "@ptd/downloader";
 import HoverTip from "@/options/components/HoverTip.vue";
@@ -122,17 +122,31 @@ const items = computed(() =>
 const categoryFilter = ref<TCategoryKind | "">("");
 const kindFilter = computed<TCategoryKind | null>(() => (categoryFilter.value === "" ? null : categoryFilter.value));
 
-const lowCount = computed(() => items.value.filter((item) => item.verdict.tier === "low").length);
-const visible = computed(() => filterSeedValueItems(items.value, { lowOnly: onlyLow.value, kind: kindFilter.value }));
+/**
+ * 名称搜索（用户 2026-10-23：「做种价值页面增加搜索功能」）。判据同样在 `./seedValueView.ts`；
+ * 吃的是这一组里出现过的**每一种名称写法**，不只是界面上显示的那一个（同一片内容各站标题写法不同）。
+ */
+const searchWord = ref("");
 
 /**
- * 候选从**没按分类筛过**的那一份算：拿筛完的算，选了「电影」之后下拉就只剩「电影」一档，换不回去了。
- * 「只看低价值」那一勾同理不缩候选 —— 两条闸互不牵制（与辅种任务页那两枚下拉同一口径）。
+ * 只按名称筛过的那一份：分类下拉的候选与「只看低价值」括号里那个数都由它算。
+ * 两条各有一条理由（与「我的下载器」「辅种任务」那两页同一口径）：
+ * ① 候选不许被分类或那一勾自己缩掉 —— 选了「电影」之后下拉只剩「电影」就换不回去了；
+ * ② 名称参与缩候选，因为括号里那个数的意思是「勾上会剩下几条」，搜完之后再报全批的低价值条数就是假话。
+ */
+const wordMatched = computed(() => filterSeedValueItems(items.value, { word: searchWord.value, lowOnly: false, kind: null }));
+
+const lowCount = computed(() => wordMatched.value.filter((item) => item.verdict.tier === "low").length);
+const visible = computed(() =>
+  filterSeedValueItems(items.value, { word: searchWord.value, lowOnly: onlyLow.value, kind: kindFilter.value }),
+);
+
+/**
  * 标签集合必须 computed：里面有 t()，setup 里求值一次的话切语言不重算（AGENTS §3.4）。
  */
 const categoryOptions = computed(() => [
   { value: "" as const, label: t("SeedValue.filter.categoryAll") },
-  ...seedValueCategoryChoices(items.value).map((kind) => ({
+  ...seedValueCategoryChoices(wordMatched.value).map((kind) => ({
     value: kind,
     label: t(categoryKindLabelKey(kind)),
   })),
@@ -162,7 +176,7 @@ function onTableChange(page: TablePaginationConfig, filters: unknown, sorter: Pa
   handleTableChange(page, filters, sorter);
 }
 
-watch([onlyLow, categoryFilter], () => {
+watch([onlyLow, categoryFilter, searchWord], () => {
   tablePage.value = 1;
 });
 
@@ -249,6 +263,17 @@ function sizeTip(item: ISeedValueItem): string {
       <a-checkbox v-model:checked="onlyLow">
         {{ t("SeedValue.onlyLow", { count: lowCount }) }}
       </a-checkbox>
+
+      <a-input
+        v-model:value="searchWord"
+        allow-clear
+        :placeholder="t('SeedValue.searchPlaceholder')"
+        style="width: 220px; min-width: 120px"
+      >
+        <template #prefix>
+          <SearchOutlined />
+        </template>
+      </a-input>
 
       <a-select v-model:value="categoryFilter" :options="categoryOptions" style="width: 140px" />
 

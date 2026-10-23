@@ -19,6 +19,7 @@ import { CTorrentState, type CTorrent } from "@ptd/downloader/types.ts";
 import {
   buildSeedValueItems,
   filterSeedValueItems,
+  matchesSeedWord,
   seedValueCategoryChoices,
   sortSeedValueItems,
   toSeedValueRows,
@@ -68,7 +69,16 @@ function build(
 
 /** 造一项的骨架，只用来给排序与筛选那几条摆数据 */
 function item(key: string, name: string, weight: number, over: Partial<ISeedValueItem> = {}): ISeedValueItem {
-  return { key, name, bytes: 0, memberKeys: [], categoryKind: null, verdict: { weight } as ISeedValueItem["verdict"], ...over };
+  return {
+    key,
+    name,
+    names: [name],
+    bytes: 0,
+    memberKeys: [],
+    categoryKind: null,
+    verdict: { weight } as ISeedValueItem["verdict"],
+    ...over,
+  };
 }
 
 describe("下载器那一份 → 这一屏那一份（toSeedValueRows）", () => {
@@ -456,31 +466,71 @@ describe("分类下拉的候选（seedValueCategoryChoices）", () => {
   });
 });
 
-describe("两条闸（filterSeedValueItems）", () => {
+describe("三条闸（filterSeedValueItems）", () => {
   const low = (key: string, categoryKind: ISeedValueItem["categoryKind"]): ISeedValueItem => ({
     ...item(key, key, 1),
     verdict: { weight: 1, tier: categoryKind === null ? "low" : "high" } as ISeedValueItem["verdict"],
     categoryKind,
   });
   const list = [low("a", "movie"), low("b", "tv"), low("c", null), low("d", "movie")];
+  /** 三条闸都不踩的那一份，用来当各条用例的对照 */
+  const none = { word: "", lowOnly: false, kind: null } as const;
 
-  it("两个都不筛时原样全出（顺序也不动）", () => {
-    expect(filterSeedValueItems(list, { lowOnly: false, kind: null }).map((each) => each.key)).toEqual(["a", "b", "c", "d"]);
+  it("三个都不筛时原样全出（顺序也不动）", () => {
+    expect(filterSeedValueItems(list, none).map((each) => each.key)).toEqual(["a", "b", "c", "d"]);
   });
 
   it("按分类筛：折不出（null）那一条不出现", () => {
-    expect(filterSeedValueItems(list, { lowOnly: false, kind: "movie" }).map((each) => each.key)).toEqual(["a", "d"]);
-    expect(filterSeedValueItems(list, { lowOnly: false, kind: "tv" }).map((each) => each.key)).toEqual(["b"]);
+    expect(filterSeedValueItems(list, { ...none, kind: "movie" }).map((each) => each.key)).toEqual(["a", "d"]);
+    expect(filterSeedValueItems(list, { ...none, kind: "tv" }).map((each) => each.key)).toEqual(["b"]);
   });
 
   it("两条闸是「与」：勾上只看低价值后再按分类筛，两个条件都要满足", () => {
-    expect(filterSeedValueItems(list, { lowOnly: true, kind: "movie" }).map((each) => each.key)).toEqual([]);
-    expect(filterSeedValueItems(list, { lowOnly: true, kind: null }).map((each) => each.key)).toEqual(["c"]);
+    expect(filterSeedValueItems(list, { ...none, lowOnly: true, kind: "movie" }).map((each) => each.key)).toEqual([]);
+    expect(filterSeedValueItems(list, { ...none, lowOnly: true }).map((each) => each.key)).toEqual(["c"]);
   });
 
-  it("不许就地改传进来那一份（下拉的候选要拿同一份未筛过的底再算一次）", () => {
-    filterSeedValueItems(list, { lowOnly: true, kind: "movie" });
+  it("名称搜索：大小写不敏感、两侧空白不算；空串等于不筛", () => {
+    const named = [item("a", "Super Mario 2026", 1), item("b", "Some Show S01", 1)];
+    expect(filterSeedValueItems(named, { ...none, word: "super mario" }).map((each) => each.key)).toEqual(["a"]);
+    expect(filterSeedValueItems(named, { ...none, word: "MARIO" }).map((each) => each.key)).toEqual(["a"]);
+    expect(filterSeedValueItems(named, { ...none, word: "  mario  " }).map((each) => each.key)).toEqual(["a"]);
+    expect(filterSeedValueItems(named, { ...none, word: "   " })).toHaveLength(2);
+  });
+
+  it("三个条件是「与」：搜完之后再勾低价值 + 选分类，三样都要满足", () => {
+    expect(filterSeedValueItems(list, { word: "a", lowOnly: true, kind: "movie" }).map((each) => each.key)).toEqual([]);
+    expect(filterSeedValueItems(list, { word: "c", lowOnly: true, kind: null }).map((each) => each.key)).toEqual(["c"]);
+  });
+
+  it("不许就地改传进来那一份（下拉的候选要拿同一份只按名称筛过的底再算一次）", () => {
+    filterSeedValueItems(list, { word: "a", lowOnly: true, kind: "movie" });
     expect(list).toHaveLength(4);
+  });
+});
+
+describe("搜索吃的是组里每一种名称写法（matchesSeedWord）", () => {
+  it("界面上只显示代表行那一个，但同组里别的写法也搜得到", () => {
+    // 台账把「站点自己改过标题」的几条并成一项之后，那一行代表的是同一片内容；
+    // 只按代表行筛的话，他按记忆里那个写法搜就「明明在这一行里却搜不到」
+    const items = build(
+      [
+        clean({ key: "qb1:1", name: "Show.S01E01.1080p.WEB-DL.WiKi", infoHash: "hashA" }),
+        clean({ key: "qb1:2", name: "Show S01E01 1080p WEB-DL PTHome", infoHash: "hashB" }),
+      ],
+      [{ id: "t1", items: [{ hash: "hashA" }, { hash: "hashB" }] }],
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]!.name).toBe("Show.S01E01.1080p.WEB-DL.WiKi");
+    expect(items[0]!.names).toEqual(["Show.S01E01.1080p.WEB-DL.WiKi", "Show S01E01 1080p WEB-DL PTHome"]);
+    expect(matchesSeedWord(items[0]!, "PTHome")).toBe(true);
+    expect(matchesSeedWord(items[0]!, "WiKi")).toBe(true);
+    expect(matchesSeedWord(items[0]!, "别的片子")).toBe(false);
+  });
+
+  it("写法相同的多份副本只留一种，不重复摆进 names", () => {
+    const items = build([clean({ key: "qb1:1" }), clean({ key: "qb1:2" })]);
+    expect(items[0]!.names).toEqual(["Some.Show.S01E01.1080p"]);
   });
 });
 
@@ -498,15 +548,30 @@ describe("页面那一侧的形状", () => {
     "utf8",
   ).replace(/\r\n/g, "\n");
 
-  it("候选从不筛过的那一份算（拿筛完的算 = 选了之后换不回去）", () => {
+  it("候选从「只按名称筛过」的那一份算（拿筛完的算 = 选了之后换不回去）", () => {
     const choices = /const categoryOptions = computed\(\(\) => \[[\s\S]*?\n\]\);/.exec(page);
     expect(choices, "找不到 categoryOptions 那一段").toBeTruthy();
-    expect(choices![0]).toContain("seedValueCategoryChoices(items.value)");
+    expect(choices![0]).toContain("seedValueCategoryChoices(wordMatched.value)");
     expect(choices![0]).not.toContain("visible.value");
+    // 那份底本身只吃 word，另两条闸必须留 null/false，否则分类下拉会被自己缩掉
+    const wordMatchedSrc = /const wordMatched = computed\(\(\) =>[\s\S]*?\n\);/.exec(page);
+    expect(wordMatchedSrc, "找不到 wordMatched 那一段").toBeTruthy();
+    expect(wordMatchedSrc![0]).toContain("lowOnly: false");
+    expect(wordMatchedSrc![0]).toContain("kind: null");
+  });
+
+  it("搜索框接上的是页内那一份状态，且「只看低价值」括号里的数跟着搜索走", () => {
+    expect(page).toMatch(/const searchWord = ref\(""\);/);
+    expect(page).toMatch(/v-model:value="searchWord"/);
+    expect(page).toMatch(/:placeholder="t\('SeedValue\.searchPlaceholder'\)"/);
+    expect(page).toMatch(/<template #prefix>\s*<SearchOutlined \/>\s*<\/template>/);
+    // 括号里那句的意思是「勾上会剩下几条」：拿全批的低价值数配一条筛过的列表就是假话
+    expect(page).toMatch(/const lowCount = computed\(\(\) => wordMatched\.value\.filter/);
+    expect(page).toMatch(/const visible = computed\(\(\) =>\n {2}filterSeedValueItems\(items\.value, \{ word: searchWord\.value, lowOnly: onlyLow\.value, kind: kindFilter\.value \}\),/);
   });
 
   it("筛选与那一勾都改回第 1 页", () => {
-    expect(page).toMatch(/watch\(\[onlyLow, categoryFilter\], \(\) => \{\n {2}tablePage\.value = 1;/);
+    expect(page).toMatch(/watch\(\[onlyLow, categoryFilter, searchWord\], \(\) => \{\n {2}tablePage\.value = 1;/);
     // 受控分页真接上了：表格的 @change 走 onTableChange，不是直接把 handleTableChange 挂上去
     expect(page).toMatch(/@change="onTableChange"/);
     expect(page).toMatch(/current: tablePage\.value/);
@@ -525,9 +590,14 @@ describe("页面那一侧的形状", () => {
     for (const file of ["zh_CN", "en"]) {
       const j = JSON.parse(
         readFileSync(fileURLToPath(new URL(`../../src/locales/${file}.json`, import.meta.url)), "utf8"),
-      ) as { SeedValue: { column: Record<string, string>; filter: Record<string, string> } };
-      expect(j.SeedValue.column.category, `${file} 缺 SeedValue.column.category`).toBeTypeOf("string");
-      expect(j.SeedValue.filter.categoryAll, `${file} 缺 SeedValue.filter.categoryAll`).toBeTypeOf("string");
+      ) as { SeedValue: Record<string, string | object> };
+      const seed = j.SeedValue as { column: Record<string, string>; filter: Record<string, string> };
+      expect(seed.column.category, `${file} 缺 SeedValue.column.category`).toBeTypeOf("string");
+      expect(seed.filter.categoryAll, `${file} 缺 SeedValue.filter.categoryAll`).toBeTypeOf("string");
+      // 搜索框那句占位词：缺了它 antd 画出来是「空框 + 放大镜」，没人知道搜的是名称
+      expect((j.SeedValue as { searchPlaceholder?: string }).searchPlaceholder, `${file} 缺 SeedValue.searchPlaceholder`).toBeTypeOf(
+        "string",
+      );
     }
   });
 

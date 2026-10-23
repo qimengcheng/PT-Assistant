@@ -93,6 +93,14 @@ export interface ISeedValueItem {
   /** 这一组在下载器列表里的行键，供「跳回去删」那类动作用 */
   memberKeys: string[];
   /**
+   * 这一组里出现过的**全部名称写法**（去重，保持首次出现的顺序）。
+   *
+   * 一行显示的是代表行那一个名称，但组里各站的 .torrent 标题写法可能不同（台账把写法不同的几条
+   * 并成一项，见 `assignContentGroups`）。搜索要逐种试：只按界面上那一个筛，他就会「明明在这一行里、
+   * 搜那个写法却说没有」。
+   */
+  names: string[];
+  /**
    * 这一组内容算哪一类；**说不清就是 null**（一条都报不出分类、或两档并列）。
    *
    * null 的条目在任何具体分类筛选下都不出现，只在「全部分类」里看得到 —— 与辅种任务页同一口径。
@@ -178,6 +186,7 @@ export function buildSeedValueItems(
     items.push({
       key,
       name: members[0]!.name,
+      names: [...new Set(members.map((row) => row.name))],
       // 磁盘那一个数只由判据算一次：这里再折一遍 `Math.max` 就会与浮层里那句「占用」分成两套口径
       bytes: verdict.bytes,
       verdict,
@@ -192,8 +201,9 @@ export function buildSeedValueItems(
  * 分类下拉里该出现哪些档：**只列这批内容里真有的**，按 `CATEGORY_KINDS` 定序
  * （不按出现次数、也不按字面 —— 同一份数据两次打开顺序不该变，同辅种任务页那条）。
  *
- * 调用方传进来的那份必须是**没按分类筛过**的：拿筛完的算，选了「电影」之后下拉就只剩「电影」一档，
- * 人再也换不到别的类。那一屏另一条闸（只看低价值）同理不缩候选，两枚控件互不牵制。
+ * 调用方传进来的那份**只能按名称筛过**，不能按分类或「只看低价值」筛过：拿筛完的算，选了「电影」之后
+ * 下拉就只剩「电影」一档，人再也换不到别的类。三枚控件互不缩候选（与辅种任务页那两枚下拉同一口径）；
+ * 名称那一栏参与缩候选是有道理的 —— 搜完剩下那几条里真有的类，才是要让人挑的。
  */
 export function seedValueCategoryChoices(items: readonly ISeedValueItem[]): TCategoryKind[] {
   const present = new Set<TCategoryKind>();
@@ -204,18 +214,30 @@ export function seedValueCategoryChoices(items: readonly ISeedValueItem[]): TCat
 }
 
 /**
- * 两条闸都是「与」：`lowOnly` = 只看低价值，`kind` 为 null = 不按分类筛。
+ * 名称搜索命中什么：这一组里出现过的**每一种写法**，大小写不敏感、两侧空白不算。
+ * 与「辅种任务」那一屏的 `matchesTaskWord` 同一条口径（界面上看得见什么就搜什么，不做模糊/子序列）。
+ */
+export function matchesSeedWord(item: ISeedValueItem, word: string): boolean {
+  const needle = word.trim().toLowerCase();
+  if (!needle) return true;
+  return item.names.some((name) => name.toLowerCase().includes(needle));
+}
+
+/**
+ * 三条闸都是「与」：`word` = 名称搜索（空串 = 不筛），`lowOnly` = 只看低价值，`kind` 为 null = 不按分类筛。
  *
  * 抽成纯函数是因为「筛完只剩几条、分页还停在第 3 页」那一族 bug 只在界面上犯，
  * 判据本身先钉住，页面那一侧另有按源码文本的接线断言。
  */
 export function filterSeedValueItems(
   items: readonly ISeedValueItem[],
-  input: { lowOnly: boolean; kind: TCategoryKind | null },
+  input: { word: string; lowOnly: boolean; kind: TCategoryKind | null },
 ): ISeedValueItem[] {
   return items.filter(
     (item) =>
-      (!input.lowOnly || item.verdict.tier === "low") && (input.kind === null || item.categoryKind === input.kind),
+      matchesSeedWord(item, input.word) &&
+      (!input.lowOnly || item.verdict.tier === "low") &&
+      (input.kind === null || item.categoryKind === input.kind),
   );
 }
 

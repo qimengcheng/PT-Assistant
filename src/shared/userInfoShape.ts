@@ -26,6 +26,10 @@ export interface IPageShape {
   hostPath: string;
   /** 响应头里的 Content-Type；没有则 "?" */
   contentType: string;
+  /** 响应头里的 Server；没有则空串。用来分「站点自己的 nginx」与「Cloudflare 边缘返回」 */
+  server: string;
+  /** 响应头里的 cf-mitigated；没有则空串。Cloudflare 挑战会写 challenge */
+  cfMitigated: string;
   /** 拿回来的到底是不是可选中的文档（false 就是「压根没被解析成 HTML」那一档） */
   isDocument: boolean;
   /** 整页 `<td>` 的个数；不是文档时 -1（未知，不是 0） */
@@ -52,6 +56,8 @@ export type TPageShapeInput = {
   requestUrl?: unknown;
   baseURL?: unknown;
   contentType?: unknown;
+  /** axios 的 response.headers；只读 server / cf-mitigated 两项，别的一概不落进读数 */
+  headers?: unknown;
   data?: unknown;
 };
 
@@ -63,6 +69,35 @@ function safeProp(obj: unknown, key: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * 从响应头里读一项，大小写不敏感。
+ * axios 的 headers 是 AxiosHeaders（带 get()），Node 断言里也可能传普通对象；两边都收。
+ */
+function readHeader(headers: unknown, name: string): string {
+  if (headers === null || typeof headers !== "object") return "";
+  const getter = safeProp(headers, "get");
+  try {
+    if (typeof getter === "function") {
+      const value = (getter as (n: string) => unknown).call(headers, name);
+      if (typeof value === "string") return value;
+    }
+  } catch {
+    // AxiosHeaders.get 在旧版本 / 被替换成普通对象时不保证存在，走下面的逐键兜底
+  }
+  try {
+    const lower = name.toLowerCase();
+    const obj = headers as Record<string, unknown>;
+    for (const key of Object.keys(obj)) {
+      if (key.toLowerCase() !== lower) continue;
+      const value = obj[key];
+      return typeof value === "string" ? value : String(value ?? "");
+    }
+  } catch {
+    // 观测值读不到就当没有
+  }
+  return "";
 }
 
 /** 只有真的能查询元素的对象才算文档；Node 里没有 Document 全局，走这条鸭子判据 */
@@ -120,6 +155,8 @@ export function pageShapeOf(input: TPageShapeInput): IPageShape {
     hostPath: hostPathOf(rawUrl),
     query: queryShapeOf(rawUrl),
     contentType: typeof input.contentType === "string" && input.contentType.length > 0 ? input.contentType : "?",
+    server: readHeader(input.headers, "server"),
+    cfMitigated: readHeader(input.headers, "cf-mitigated"),
     isDocument,
     cells,
     textLength,
@@ -206,6 +243,103 @@ function maskDigits(text: string): string {
 }
 
 /**
+ * 「200 + 一个 td 都没有 + 正文很短」这一档。
+ *
+ * 正常的用户信息页（NexusPHP 的 userdetails.php / mybonus.php）至少有几十个 td，
+ * 所以这个形状不可能是「站点真报了 0」，只可能是拦截页 / 外壳页 / 跳转页。
+ * 判据刻意把 `textLength > 0` 也算进去：完全空白的 200 是另一种坏法（CSP / 网络层），
+ * 不在「换请求形状」能解决的范围内。
+ */
+export function isShellPage(shape: IPageShape): boolean {
+  return (
+    shape.status === 200 &&
+    shape.isDocument &&
+    shape.cells === 0 &&
+    shape.textLength > 0 &&
+    shape.textLength <= SKELETON_MAX_CHARS
+  );
+}
+
+/**
+ * 外壳页里明确像「站点/边缘层拦截」的那一档。
+ *
+ * 探针只对这类页触发：真正的用户页外壳（例如站点维护、空模板）没有理由让插件换四种请求形状
+ * 去打四次；而 Forbidden / Access denied / CF 挑战这些关键字是可判的。骨架里的数字已被遮成
+ * `*`，所以这里只认字母与中文，不认状态码。
+ */
+const BLOCK_SHELL_HINTS = [
+  /forbidden/i,
+  /access denied/i,
+  /just a moment/i,
+  /checking your browser/i,
+  /attention required/i,
+  /cf-error/i,
+  /captcha/i,
+  /人机验证/,
+  /拦截/,
+];
+
+export function isBlockShellPage(shape: IPageShape): boolean {
+  return isShellPage(shape) && BLOCK_SHELL_HINTS.some((hint) => hint.test(shape.skeleton));
+}
+
+export interface IUserInfoRequestVariant {
+  /** 日志里那半句，例如「加 Referer」 */
+  name: string;
+  /** 交给 axios 的 headers；空串是 replaceUnsafeHeader 约定的「移除这一项」 */
+  headers: Record<string, string>;
+  /**
+   * 可选的 body 覆盖。用户信息请求的默认配置带一个 `data: {}`，axios 会给 GET 挂上
+   * `Content-Type: application/json`；「伪装成页面导航」要连这一项一起去掉（用 null）。
+   */
+  data?: unknown;
+}
+
+/**
+ * 外壳页出现后要试的请求形状。
+ *
+ * 现场（2026-10-24）：PTzone 的 userdetails.php / mybonus.php 对插件返回 200 + nginx 的
+ * 403 页（正文 137 字符），而匿名请求是 302 跳登录、站点搜索正常 ⇒ 站点是在**已登录**这条
+ * 请求上做拒绝，且只挑用户页。浏览器导航与插件 XHR 的差别只剩这几项：没有 Referer、
+ * 带 `Origin: chrome-extension://…`、`Sec-Fetch-*` 是 cors/empty。后两项里 Origin 是最像
+ * 扩展的一项；Referer 是最常见的防盗链条件。所以先只试这两项，不一次把所有头都改掉 ——
+ * 否则日志只能告诉我们「某种形状能过」，分不清是哪一项起的作用。
+ */
+export function userInfoRequestVariants(siteUrl: string): IUserInfoRequestVariant[] {
+  let referer = siteUrl;
+  try {
+    const parsed = new URL(siteUrl);
+    parsed.search = "";
+    parsed.hash = "";
+    referer = parsed.toString();
+  } catch {
+    // 不是绝对 URL 就原样用；request() 里它本来也会被当作 baseURL
+  }
+
+  return [
+    { name: "加 Referer", headers: { Referer: referer } },
+    { name: "去 Origin", headers: { Origin: "" } },
+    { name: "加 Referer + 去 Origin", headers: { Referer: referer, Origin: "" } },
+    {
+      // 最后这一种是「整条请求看起来像页面导航」：有些 WAF 不看 Referer/Origin，只看
+      // Sec-Fetch-Dest 是不是 document。`data: null` 顺带去掉 GET 上那个 JSON Content-Type
+      //（默认配置的 `data: {}` 会带出来）。真跑不通也只是探针多一条失败读数，不影响原请求。
+      name: "伪装成页面导航",
+      data: null,
+      headers: {
+        Referer: referer,
+        Origin: "",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-User": "?1",
+      },
+    },
+  ];
+}
+
+/**
  * 「这一步压根没发出去」那一档的读数。
  *
  * process 循环开头有一条 `existField.length === processFields.length → continue`
@@ -217,7 +351,8 @@ function maskDigits(text: string): string {
  * 不进界面（§3.5 只管界面）。
  */
 export function skippedStepLine(step: { url: string; fields: readonly string[] }): string {
-  return `${step.url}（跳过：已有 ${step.fields.join("/")}）`;
+  // 不带「跳过」二字：整串前面已经有「跳过：」在点名这一族了，这里再写一遍会把括号套括号
+  return `${step.url}（已有 ${step.fields.join("/")}）`;
 }
 
 /** 一个观测值算不算「停在默认值」（解析器没命中时落的就是这几样） */
@@ -249,6 +384,8 @@ export function shapeLine(shape: IPageShape): string {
     `HTTP ${shape.status}`,
     `${shape.hostPath}${shape.query}`,
     shape.contentType,
+    ...(shape.server ? [`server=${shape.server}`] : []),
+    ...(shape.cfMitigated ? [`cf-mitigated=${shape.cfMitigated}`] : []),
     shape.isDocument ? "已解析成文档" : "不是文档",
     cells,
     text,

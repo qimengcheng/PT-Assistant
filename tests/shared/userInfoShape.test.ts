@@ -15,13 +15,17 @@ import { describe, expect, it } from "vitest";
 import {
   SILENT_ZERO_FIELDS,
   hostPathOf,
+  isBlockShellPage,
   isDefaultish,
+  isShellPage,
   isSilentZeroRound,
   pageShapeOf,
   pageSkeletonOf,
   queryShapeOf,
   shapeLine,
   skippedStepLine,
+  userInfoRequestVariants,
+  type IPageShape,
 } from "@/shared/userInfoShape.ts";
 
 /** 归一换行符：本仓 `core.autocrlf` 开着，工作区那份是 LF 还是 CRLF 取决于最后一个存盘的编辑器 */
@@ -149,10 +153,16 @@ describe("「拿到的是外壳页」那一档给内容骨架", () => {
 
 describe("被「字段已有」短路掉的那些步也要说出来", () => {
   it("一行里带 url、并点明它本来负责哪几个字段", () => {
-    expect(skippedStepLine({ url: "/index.php", fields: ["id"] })).toBe("/index.php（跳过：已有 id）");
+    expect(skippedStepLine({ url: "/index.php", fields: ["id"] })).toBe("/index.php（已有 id）");
     expect(skippedStepLine({ url: "/userdetails.php", fields: ["name", "uploaded"] })).toBe(
-      "/userdetails.php（跳过：已有 name/uploaded）",
+      "/userdetails.php（已有 name/uploaded）",
     );
+  });
+
+  it("这一串自己不说「跳过」—— 整句前面已经有「；跳过」在点名这一族，两处都写就成括号套括号", () => {
+    expect(skippedStepLine({ url: "/index.php", fields: ["id"] })).not.toContain("跳过");
+    const src = read(SITE);
+    expect(src).toMatch(/；跳过 \$\{skipped\}/);
   });
 });
 
@@ -168,6 +178,8 @@ describe("一次响应折成八个观测值", () => {
       status: 200,
       hostPath: "a.test/i.php",
       contentType: "text/html",
+      server: "",
+      cfMitigated: "",
       isDocument: true,
       cells: 137,
       textLength: -1,
@@ -217,6 +229,100 @@ describe("一次响应折成八个观测值", () => {
     expect(shape.contentType).toBe("?");
     expect(shape.hostPath).toBe("?");
     expect(shape.isDocument).toBe(false);
+  });
+});
+
+describe("响应头只留 server / cf-mitigated（分站点 nginx 与 Cloudflare 用）", () => {
+  it("大小写不敏感，普通对象与 AxiosHeaders 两种形状都收", () => {
+    const plain = pageShapeOf({ headers: { Server: "cloudflare", "CF-Mitigated": "challenge" } });
+    expect(plain.server).toBe("cloudflare");
+    expect(plain.cfMitigated).toBe("challenge");
+
+    const withGet = pageShapeOf({
+      headers: { get: (name: string) => (name.toLowerCase() === "server" ? "nginx" : undefined) },
+    });
+    expect(withGet.server).toBe("nginx");
+  });
+
+  it("没有这两项时是空串，不编一个值；读数行也不写出空项", () => {
+    const empty = pageShapeOf({});
+    expect(empty.server).toBe("");
+    expect(empty.cfMitigated).toBe("");
+    expect(shapeLine(empty)).not.toContain("server=");
+    expect(shapeLine(empty)).not.toContain("cf-mitigated=");
+  });
+
+  it("真拿到时才写进那一行", () => {
+    const line = shapeLine(pageShapeOf({ headers: { server: "cloudflare", "cf-mitigated": "challenge" } }));
+    expect(line).toContain("server=cloudflare");
+    expect(line).toContain("cf-mitigated=challenge");
+  });
+});
+
+describe("外壳页判据与外壳页出现后要试的请求形状", () => {
+  const shellShape = (over: Partial<IPageShape> = {}): IPageShape => ({
+    status: 200,
+    hostPath: "a.test/userdetails.php",
+    query: "?id=有值",
+    contentType: "text/html",
+    server: "cloudflare",
+    cfMitigated: "",
+    isDocument: true,
+    cells: 0,
+    textLength: 137,
+    skeleton: "标题「403 Forbidden」 正文「403 Forbidden nginx」",
+    ...over,
+  });
+
+  it("200 + 文档 + 0 个 td + 短正文才算外壳页（现场那条 137 字符的 403 页）", () => {
+    expect(isShellPage(shellShape())).toBe(true);
+    expect(isShellPage(shellShape({ status: 302 }))).toBe(false);
+    expect(isShellPage(shellShape({ cells: 120 }))).toBe(false);
+    expect(isShellPage(shellShape({ textLength: 0 }))).toBe(false);
+    expect(isShellPage(shellShape({ textLength: 5000 }))).toBe(false);
+    expect(isShellPage(shellShape({ isDocument: false }))).toBe(false);
+  });
+
+  it("只有明确像拦截页的外壳才触发探针（Forbidden / Access denied / challenge）", () => {
+    expect(isBlockShellPage(shellShape())).toBe(true);
+    expect(isBlockShellPage(shellShape({ skeleton: "Access denied" }))).toBe(true);
+    expect(isBlockShellPage(shellShape({ skeleton: "Just a moment..." }))).toBe(true);
+    expect(isBlockShellPage(shellShape({ skeleton: "站点维护中" }))).toBe(false);
+    expect(isBlockShellPage(shellShape({ skeleton: "", status: 302 }))).toBe(false);
+  });
+
+  it("四种形状：只加 Referer / 只去 Origin / 两者都改 / 伪装成页面导航；Referer 用站点根，不带 query 与账号值", () => {
+    const variants = userInfoRequestVariants("https://ptzone.xyz/?x=1#y");
+    expect(variants.map((v) => v.name)).toEqual([
+      "加 Referer",
+      "去 Origin",
+      "加 Referer + 去 Origin",
+      "伪装成页面导航",
+    ]);
+    expect(variants[0].headers.Referer).toBe("https://ptzone.xyz/");
+    expect(variants[1].headers).toEqual({ Origin: "" });
+    expect(variants[2].headers).toEqual({ Referer: "https://ptzone.xyz/", Origin: "" });
+    expect(variants[3].headers).toMatchObject({
+      Referer: "https://ptzone.xyz/",
+      Origin: "",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Sec-Fetch-Site": "same-origin",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Dest": "document",
+    });
+    // 导航形状要连 GET 上那个 JSON body/Content-Type 一起去掉
+    expect(variants[3].data).toBeNull();
+    expect(variants[0].data).toBeUndefined();
+    expect(variants[0].headers.Referer).not.toContain("x=1");
+  });
+
+  it("站点带路径时 Referer 保留那一段（镜像站常常挂在子目录下）", () => {
+    expect(userInfoRequestVariants("https://host/pt/").map((v) => v.headers.Referer)).toEqual([
+      "https://host/pt/",
+      undefined,
+      "https://host/pt/",
+      "https://host/pt/",
+    ]);
   });
 });
 
@@ -297,8 +403,26 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
   const at = (needle: string) => src.indexOf(needle);
 
   it("每一步都折一份形状，且就在拿到响应那一行之后", () => {
-    expect(at("const response = await this.request<any>(requestConfig);")).toBeGreaterThan(-1);
-    expect(at("pageShapes.push(")).toBeGreaterThan(at("const response = await this.request<any>(requestConfig);"));
+    expect(at("let response = await this.request<unknown>(requestConfig);")).toBeGreaterThan(-1);
+    expect(at("pageShapes.push(")).toBeGreaterThan(at("let response = await this.request<unknown>(requestConfig);"));
+  });
+
+  it("外壳页探针：只在 200+0 td 时触发、一轮一次；试出来的形状用于解析，后续步骤沿用", () => {
+    expect(at("isBlockShellPage(shape) && !probedShellPage")).toBeGreaterThan(-1);
+    expect(at("probeUserInfoShellPage(")).toBeGreaterThan(-1);
+    expect(at("userInfoRequestVariants(siteUrl)")).toBeGreaterThan(-1);
+    expect(at("winningVariant = { headers: winner.headers")).toBeGreaterThan(-1);
+    expect(at("requestConfig.headers = {")).toBeGreaterThan(-1);
+    expect(at("requestConfig.data = winningVariant.data")).toBeGreaterThan(-1);
+    // 第二个假设：这一步 /index.php 被 pickLast 短路掉了，站点可能要一次页面访问来刷新反爬状态
+    expect(at('url: "/index.php"')).toBeGreaterThan(-1);
+    expect(at("visitIndexFirst = true")).toBeGreaterThan(-1);
+    expect(at("本轮改为先访问首页再取用户页")).toBeGreaterThan(-1);
+    // 探针在解析字段之前（否则 winner 那份 dataDocument 用不上）
+    expect(at("probeUserInfoShellPage(")).toBeLessThan(at("for (const key of processFields)"));
+    expect(src).toMatch(/const probeConfig: AxiosRequestConfig = \{/);
+    // Cloudflare 挑战页也可能有很多 td，不能被当成「能用的用户页」
+    expect(at("!shape.cfMitigated")).toBeGreaterThan(-1);
   });
 
   it("整轮空手才出声，且不改解析行为：status 那一条仍在 logEvent 之后", () => {
@@ -310,11 +434,21 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
   it("交出去的那份只有站点与形状读数，不带正文 / 请求参数 / 文档本体", () => {
     // 按行取那一条 payload（`data: {}` 在这个文件里还有别的出处 —— 请求配置的默认值就是），
     // 找不到就是空串，下面第一条断言会红（indexOf 那类「-1 也算通过」的坑本仓踩过）
-    const line = src.split("\n").find((l) => l.includes("data: { site: this.metadata.id")) ?? "";
-    expect(line.length).toBeGreaterThan(0);
-    expect(line).toContain("pages: pageShapes");
-    for (const forbidden of ["responseText", "params", "dataDocument", "document.cookie"]) {
-      expect(line).not.toContain(forbidden);
+    const lines = src.split("\n");
+    const silentLine = lines.find((l) => l.includes("data: { site: this.metadata.id")) ?? "";
+    expect(silentLine.length).toBeGreaterThan(0);
+    expect(silentLine).toContain("pages: pageShapes");
+
+    // 探针那条 data 是分行的，按 baseline 定位它那一段，一起验「不带响应对象」
+    const probeStart = lines.findIndex((l) => l.includes("baseline: shape"));
+    expect(probeStart).toBeGreaterThan(-1);
+    const probeBlock = lines.slice(probeStart - 2, probeStart + 8).join("\n");
+    expect(probeBlock).toContain("probes: probes.map");
+    expect(probeBlock).toContain("index: indexShape");
+
+    for (const forbidden of ["responseText", "params", "dataDocument", "document.cookie", "response:"]) {
+      expect(silentLine).not.toContain(forbidden);
+      expect(probeBlock).not.toContain(forbidden);
     }
   });
 
@@ -343,6 +477,6 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
     expect(src).toMatch(/transport:\s*response\.request,/);
     expect(src).not.toMatch(/\?\.(responseText|responseURL)/);
     // 外面那一层 try 是「观测件不许有弄坏被观测那条路的能力」这条规矩的落地
-    expect(src).toMatch(/try \{\s*\n\s*pageShapes\.push\(/);
+    expect(src).toMatch(/try \{\s*\n\s*shape = this\.userInfoShapeOf\(/);
   });
 });

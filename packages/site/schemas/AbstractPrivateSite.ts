@@ -22,13 +22,31 @@ import {
 } from "../types";
 // noinspection ES6PreferShortImport
 import { logEvent } from "../utils/adapter";
-import { isSilentZeroRound, pageShapeOf, shapeLine, skippedStepLine, type IPageShape } from "@/shared/userInfoShape";
+import {
+  isBlockShellPage,
+  isSilentZeroRound,
+  pageShapeOf,
+  shapeLine,
+  skippedStepLine,
+  userInfoRequestVariants,
+  type IPageShape,
+} from "@/shared/userInfoShape";
 
 export const SchemaMetadata: Partial<ISiteMetadata> = {
   version: -1,
   search: {},
   userInfo: {},
 };
+
+/** 外壳页探针的一次结果：要么带回一页形状，要么带回一句失败原因 */
+interface IUserInfoProbeResult {
+  variant: string;
+  headers: Record<string, string>;
+  data?: unknown;
+  response?: AxiosResponse<unknown>;
+  shape?: IPageShape;
+  error?: string;
+}
 
 export default class PrivateSite extends BittorrentSite {
   get allowQueryUserInfo(): boolean {
@@ -141,6 +159,11 @@ export default class PrivateSite extends BittorrentSite {
       // 被「字段已经有了」短路掉的那几步。不记它，一轮里「压根没发 /index.php」这件事
       // 在读数上就是隐形的 —— 而 pickLast 会把上一轮的 id 并进来，所以那种短路恰恰是能发生的。
       const skippedSteps: { url: string; fields: string[] }[] = [];
+      // 探针一轮只打一次：第一次遇到「200 + 0 个 td + 极短正文」时试完四种请求形状就定，
+      // 不逐页反复试。试出能过的那一种后，本轮后续步骤直接沿用它（例如 mybonus.php）。
+      let probedShellPage = false;
+      let winningVariant: { headers: Record<string, string>; data?: unknown } | undefined;
+      let visitIndexFirst = false;
 
       for (const thisUserInfoProcess of this.metadata.userInfo.process) {
         // 该步骤能够获取的字段
@@ -193,38 +216,142 @@ export default class PrivateSite extends BittorrentSite {
         const requestDelay = thisUserInfoProcess.requestDelay ?? this.metadata.userInfo?.requestDelay ?? 0;
         await this.sleepAction(requestDelay);
 
-        const response = await this.request<any>(requestConfig);
-        const dataDocument = response.data;
+        // 上一页已经试出「站点认哪种形状」时，后续步骤直接用这一种，不重跑探针。
+        if (winningVariant) {
+          requestConfig.headers = {
+            ...(requestConfig.headers as Record<string, string> | undefined),
+            ...winningVariant.headers,
+          };
+          if (winningVariant.data !== undefined) {
+            requestConfig.data = winningVariant.data;
+          }
+        }
+
+        // 上一页试出「站点要靠一次页面访问刷新反爬状态」时，后续步骤先顺带访问一次首页。
+        if (visitIndexFirst) {
+          try {
+            await this.request<unknown>({ ...requestConfig, url: "/index.php", params: {}, data: null }, false);
+          } catch {
+            // 刷新失败也照原请求发；探针那一步已经把两页的形状记进日志了
+          }
+        }
+
+        let response = await this.request<unknown>(requestConfig);
+        let dataDocument: unknown = response.data;
 
         // 形状读数：只有这一层还握着响应本体（上层拿到的是已经折好的字段值）。
         // 交出去的是**对象本身**不是它的属性 —— 真 XHR 在 responseType 为 document 时读 `responseText`
         // 会抛 InvalidStateError，在调用点取属性等于把整轮取数炸成 parseError（v0.125.0 就是这么坏的，
         // 用户 2026-10-24：「现在变成解析错误了」）。属性读取归 `@/shared/userInfoShape` 逐条兜。
         // 外面再套一层：观测件不许有弄坏被观测那条路的能力。
+        let shape: IPageShape | undefined;
         try {
-          pageShapes.push(
-            pageShapeOf({
-              status: response.status,
-              transport: response.request,
-              requestUrl: requestConfig.url,
-              baseURL: this.url,
-              contentType: response.headers?.["content-type"],
-              data: dataDocument,
-            }),
-          );
+          shape = this.userInfoShapeOf(response, requestConfig);
         } catch {
           // 少一条读数比整轮取数变成 parseError 好
         }
 
+        // 站点把用户页换成了「200 + 0 个 td」的拦截外壳页时，用当前登录态换请求形状再试一次。
+        // 只试一次、只在第一页试；试出来能过的那一种本轮后续步骤直接沿用。
+        if (shape && isBlockShellPage(shape) && !probedShellPage) {
+          probedShellPage = true;
+          let probes: IUserInfoProbeResult[] = [];
+          try {
+            probes = await this.probeUserInfoShellPage(requestConfig, this.url);
+          } catch {
+            // 探针自己坏了不许把这一轮取数炸成 parseError（观测件不许有弄坏被观测那条路的能力）
+          }
+          const winner = probes.find(
+            (probe) => probe.response && probe.shape && this.isUsableUserInfoShape(probe.shape),
+          );
+
+          // 再试一个假设：这一步 /index.php 被 pickLast 的 id 短路掉了，而站点可能要靠一次
+          // 页面访问刷新反爬状态。先看首页形状，能用就再**原样**重试一次原页 —— 重试不带任何
+          // 特殊头、也不改 body，否则就分不清是「访问首页有用」还是「换头/去 body 有用」。
+          let indexShape: IPageShape | undefined;
+          let indexError: string | undefined;
+          let indexRetry: { response: AxiosResponse<unknown>; shape: IPageShape } | undefined;
+          let indexRetryError: string | undefined;
+          try {
+            const indexConfig: AxiosRequestConfig = { ...requestConfig, url: "/index.php", params: {}, data: null };
+            const indexResponse = await this.request<unknown>(indexConfig, false);
+            indexShape = this.userInfoShapeOf(indexResponse, indexConfig);
+            if (this.isUsableUserInfoShape(indexShape)) {
+              try {
+                const retryConfig: AxiosRequestConfig = { ...requestConfig };
+                const retryResponse = await this.request<unknown>(retryConfig, false);
+                const retryShape = this.userInfoShapeOf(retryResponse, retryConfig);
+                indexRetry = { response: retryResponse, shape: retryShape };
+              } catch (error) {
+                indexRetryError = error instanceof Error ? error.message : String(error);
+              }
+            }
+          } catch (error) {
+            indexError = error instanceof Error ? error.message : String(error);
+          }
+
+          logEvent({
+            module: "userInfo",
+            level: "warn",
+            msg: `站点 ${this.metadata.id} 的用户页返回拦截外壳页（${shapeLine(shape)}），已用当前登录态比对请求形状：${
+              probes.length > 0
+                ? probes
+                    .map(
+                      (probe) =>
+                        `${probe.variant} → ${
+                          probe.error ? `失败（${probe.error}）` : probe.shape ? shapeLine(probe.shape) : "无读数"
+                        }`,
+                    )
+                    .join(" ／ ")
+                : "探针没有拿到任何读数"
+            }；顺带访问 /index.php → ${indexShape ? shapeLine(indexShape) : `失败（${indexError}）`}${
+              indexRetry
+                ? `，随后重试原页 → ${shapeLine(indexRetry.shape)}`
+                : indexRetryError
+                  ? `，随后重试原页 → 失败（${indexRetryError}）`
+                  : ""
+            }${winner ? `；本轮改用「${winner.variant}」` : indexRetry && this.isUsableUserInfoShape(indexRetry.shape) ? "；本轮改为先访问首页再取用户页" : ""}`,
+            data: {
+              site: this.metadata.id,
+              baseline: shape,
+              probes: probes.map((probe) => ({ variant: probe.variant, shape: probe.shape, error: probe.error })),
+              index: indexShape,
+              indexError,
+              indexRetry: indexRetry?.shape,
+              indexRetryError,
+            },
+          });
+
+          if (winner?.response && winner.shape) {
+            response = winner.response;
+            dataDocument = response.data;
+            shape = winner.shape;
+            winningVariant = { headers: winner.headers, data: winner.data };
+          } else if (indexRetry && this.isUsableUserInfoShape(indexRetry.shape)) {
+            response = indexRetry.response;
+            dataDocument = response.data;
+            shape = indexRetry.shape;
+            visitIndexFirst = true;
+          }
+        }
+
+        if (shape) {
+          pageShapes.push(shape);
+        }
+
+        // 取数那一层只保证「拿到了某个响应」，交给解析器时按它本该是的 Document 收窄一次；
+        // 真正的形状差异由 `pageShapeOf` 记，解析器这边行为不变。
+        const parseDocument = dataDocument as Document;
+
         for (const key of processFields) {
           const dynamicParseFuncKey = `parseUserInfoFor${pascalCase(key)}` as keyof this;
           if (dynamicParseFuncKey in this && typeof this[dynamicParseFuncKey] === "function") {
-            flushUserInfo = await this[dynamicParseFuncKey](flushUserInfo, dataDocument, requestConfig);
+            flushUserInfo = await this[dynamicParseFuncKey](flushUserInfo, parseDocument, requestConfig);
           } else {
             // 优先使用本步骤定义的选择器，如果没有则使用 userInfo 全局的选择器
             let elementQuery = thisUserInfoProcess.selectors?.[key] ?? this.metadata.userInfo?.selectors?.[key];
             if (elementQuery) {
-              flushUserInfo[key] = this.getFieldData(dataDocument, elementQuery as IElementQuery);
+              flushUserInfo[key] = this.getFieldData(parseDocument, elementQuery as IElementQuery);
             } else {
               // noinspection ExceptionCaughtLocallyJS
               // throw new Error(`字段 ${key} 未设置 selector 或 ${String(dynamicParseFuncKey)} 方法`);
@@ -255,8 +382,8 @@ export default class PrivateSite extends BittorrentSite {
           module: "userInfo",
           level: "warn",
           msg: `站点 ${this.metadata.id} 这一轮用户信息一格都没命中：共 ${totalCount} 步、实发 ${sentCount} 次${
-            skipped ? `（${skipped}）` : ""
-          } · ${taken}`,
+            skipped ? `；跳过 ${skipped}` : ""
+          }｜${taken}`,
           data: { site: this.metadata.id, totalSteps: totalCount, skippedSteps, pages: pageShapes },
         });
       }
@@ -279,6 +406,70 @@ export default class PrivateSite extends BittorrentSite {
     }
 
     return flushUserInfo;
+  }
+
+  /** 把一次用户信息响应折成形状读数（观测值的读法统一在 @/shared/userInfoShape） */
+  private userInfoShapeOf(response: AxiosResponse<unknown>, requestConfig: AxiosRequestConfig): IPageShape {
+    return pageShapeOf({
+      status: response.status,
+      transport: response.request,
+      requestUrl: requestConfig.url,
+      baseURL: this.url,
+      contentType: response.headers?.["content-type"],
+      headers: response.headers,
+      data: response.data,
+    });
+  }
+
+  /**
+   * 探针拿回来的这一页能不能直接交给解析器。
+   * 不能只看「不是外壳页」：未登录时站点会跳 login.php（td 很多），把它当成功会把登录页解析成用户信息。
+   */
+  private isUsableUserInfoShape(shape: IPageShape): boolean {
+    return (
+      shape.status === 200 &&
+      shape.isDocument &&
+      shape.cells > 0 &&
+      !shape.cfMitigated &&
+      !/login|takelogin/i.test(shape.hostPath)
+    );
+  }
+
+  /**
+   * 用当前登录态依次试几种请求形状，遇到第一个「能用的页」就停。
+   * 每一次都走 `checkLogin: false`：探针的目的是看站点对形状的反应，不该因为登录态判据提前抛错。
+   */
+  private async probeUserInfoShellPage(
+    requestConfig: AxiosRequestConfig,
+    siteUrl: string,
+  ): Promise<IUserInfoProbeResult[]> {
+    const results: IUserInfoProbeResult[] = [];
+
+    for (const variant of userInfoRequestVariants(siteUrl)) {
+      try {
+        const probeConfig: AxiosRequestConfig = {
+          ...requestConfig,
+          ...(variant.data === undefined ? {} : { data: variant.data }),
+          headers: {
+            ...(requestConfig.headers as Record<string, string> | undefined),
+            ...variant.headers,
+          },
+        };
+        const response = await this.request<unknown>(probeConfig, false);
+        const shape = this.userInfoShapeOf(response, probeConfig);
+        results.push({ variant: variant.name, headers: variant.headers, data: variant.data, response, shape });
+        if (this.isUsableUserInfoShape(shape)) break;
+      } catch (error) {
+        results.push({
+          variant: variant.name,
+          headers: variant.headers,
+          data: variant.data,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return results;
   }
 
   // 允许子类覆盖

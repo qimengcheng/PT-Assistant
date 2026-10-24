@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   SILENT_ZERO_FIELDS,
+  headerTraceLine,
   hostPathOf,
   isBlockShellPage,
   isDefaultish,
@@ -301,13 +302,14 @@ describe("外壳页判据与外壳页出现后要试的请求形状", () => {
     expect(read(SHARED)).toMatch(/return isShellPage\(shape\) && looksLikeBlockText\(shape\.skeleton\)/);
   });
 
-  it("四种形状：只加 Referer / 只去 Origin / 两者都改 / 伪装成页面导航；Referer 用站点根，不带 query 与账号值", () => {
+  it("五种形状：只加 Referer / 只去 Origin / 两者都改 / 伪装成页面导航 / 地址栏直开；Referer 用站点根，不带 query 与账号值", () => {
     const variants = userInfoRequestVariants("https://ptzone.xyz/?x=1#y");
     expect(variants.map((v) => v.name)).toEqual([
       "加 Referer",
       "去 Origin",
       "加 Referer + 去 Origin",
       "伪装成页面导航",
+      "地址栏直开",
     ]);
     expect(variants[0].headers.Referer).toBe("https://ptzone.xyz/");
     expect(variants[1].headers).toEqual({ Origin: "" });
@@ -320,8 +322,21 @@ describe("外壳页判据与外壳页出现后要试的请求形状", () => {
       "Sec-Fetch-Mode": "navigate",
       "Sec-Fetch-Dest": "document",
     });
+    // 地址栏直开：没有 Referer、Site=none，导航特有的三项也在
+    expect(variants[4].headers).toEqual({
+      Origin: "",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1",
+      "Cache-Control": "max-age=0",
+      Priority: "u=0, i",
+    });
     // 导航形状要连 GET 上那个 JSON body/Content-Type 一起去掉
     expect(variants[3].data).toBeNull();
+    expect(variants[4].data).toBeNull();
     expect(variants[0].data).toBeUndefined();
     expect(variants[0].headers.Referer).not.toContain("x=1");
   });
@@ -332,7 +347,93 @@ describe("外壳页判据与外壳页出现后要试的请求形状", () => {
       undefined,
       "https://host/pt/",
       "https://host/pt/",
+      undefined,
     ]);
+  });
+});
+
+describe("请求头对照：XHR 与导航并排", () => {
+  const traceAt = (type: string, headers: Record<string, string>, hostPath = "ptzone.xyz/userdetails.php") => ({
+    type,
+    hostPath,
+    headers,
+  });
+
+  it("只取本站读数，分别报 XHR 与导航的末条", () => {
+    const line = headerTraceLine(
+      [
+        traceAt("xmlhttprequest", { "sec-fetch-site": "same-origin" }, "other.xyz/userdetails.php"),
+        traceAt("xmlhttprequest", { "sec-fetch-site": "cross-site", "sec-fetch-mode": "cors" }),
+        traceAt("xmlhttprequest", { "sec-fetch-site": "none", "sec-fetch-mode": "navigate" }, "ptzone.xyz/mybonus.php"),
+        traceAt("main_frame", {
+          "sec-fetch-site": "none",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-dest": "document",
+          "sec-fetch-user": "?1",
+          "upgrade-insecure-requests": "1",
+          "cache-control": "max-age=0",
+          priority: "u=0, i",
+          accept: "text/html,application/xhtml+xml",
+        }),
+      ],
+      "https://ptzone.xyz/",
+    );
+    expect(line).toContain("XHR 2 条、末条：Sec-Fetch=none/navigate/空/空");
+    expect(line).toContain("导航 1 条、末条：Sec-Fetch=none/navigate/document/?1");
+    expect(line).toContain("UIR=1");
+    expect(line).toContain("Cache-Control=max-age=0");
+    expect(line).toContain("Priority=u=0, i");
+    expect(line).toContain("Accept=text/html");
+    expect(line).not.toContain("other.xyz");
+  });
+
+  it("缺什么写「无/空」，并明说哪一侧没有读数", () => {
+    const line = headerTraceLine([traceAt("xmlhttprequest", {})], "https://ptzone.xyz");
+    expect(line).toContain("Origin=无");
+    expect(line).toContain("Cookie=无");
+    expect(line).toContain("Sec-Fetch=空/空/空/空");
+    expect(line).toContain("没有导航读数");
+    expect(headerTraceLine([], "https://ptzone.xyz/")).toBe("没有拿到请求头读数");
+  });
+
+  it("站点地址解析不了时返回空串（观测件不许把这一轮炸掉）", () => {
+    expect(headerTraceLine([], "not a url")).toBe("");
+  });
+});
+
+describe("请求头对照的接线与隐私", () => {
+  const traceSrc = read("src/entrypoints/background/utils/headerTrace.ts");
+  const adapterSrc = read("packages/site/utils/adapter.ts");
+  const srcText = read(SITE);
+  const at = (needle: string) => srcText.indexOf(needle);
+
+  it("只看用户页，且要 extraHeaders 才看得到 Cookie / Origin / Referer", () => {
+    expect(traceSrc).toContain('"*://*/userdetails.php*"');
+    expect(traceSrc).toContain('"*://*/mybonus.php*"');
+    expect(traceSrc).toMatch(/\["requestHeaders", "extraHeaders"\]/);
+  });
+
+  it("值按隐私口径遮：Cookie 只记条数、扩展 Origin 只剩协议、Referer 去掉 query", () => {
+    expect(traceSrc).toMatch(/name === "cookie"[\s\S]*?项/);
+    expect(traceSrc).toContain("chrome-extension://…");
+    expect(traceSrc).toMatch(/parsed\.pathname/);
+    expect(traceSrc).not.toMatch(/console\.(log|debug|warn|error)/);
+  });
+
+  it("后台入口注册、消息协议、权限、adapter 出口四处都在", () => {
+    expect(read("src/entrypoints/background/index.ts")).toContain('import "./utils/headerTrace.ts"');
+    expect(read("wxt.config.ts")).toContain('"webRequest"');
+    expect(read("src/messages.ts")).toMatch(/getHeaderTrace\(\): IHeaderTraceRecord\[\]/);
+    expect(adapterSrc).toMatch(/sendMessage\("getHeaderTrace", undefined\)/);
+    expect(adapterSrc).toMatch(/export async function getHeaderTrace[\s\S]*?try \{[\s\S]*?\} catch \{\s*\n\s*return \[\];/);
+  });
+
+  it("拦截那一段把对照写进日志与 data（读不到也照常继续）", () => {
+    expect(at("const headerTrace = await getHeaderTrace();")).toBeGreaterThan(-1);
+    expect(at("headerTraceLine(headerTrace, this.url)")).toBeGreaterThan(-1);
+    expect(at("headerTraceLine(headerTrace, this.url)")).toBeLessThan(at("logEvent({"));
+    expect(srcText).toMatch(/；请求头对照：\$\{headerLine\}/);
+    expect(srcText).toMatch(/headerTrace,/);
   });
 });
 
@@ -443,7 +544,7 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
     expect(at("new DOMParser().parseFromString(result.html")).toBeGreaterThan(-1);
     expect(at("if (useTabNavigation)")).toBeGreaterThan(-1);
     expect(at("useTabNavigation = true")).toBeGreaterThan(-1);
-    // 已经改走标签页之后不再跑 XHR 探针（那四种形状在这一档必然全失败，白打四次）
+    // 已经改走标签页之后不再跑 XHR 探针（那五种形状在这一档必然全失败，白打五次）
     expect(at("&& !useTabNavigation")).toBeGreaterThan(-1);
     // 标签页那条路坏了不许把这一轮炸成 parseError
     expect(src).toMatch(/try \{\s*\n\s*const viaTab = await this\.fetchUserInfoPageInTab\(requestConfig\);/);

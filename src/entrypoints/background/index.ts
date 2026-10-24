@@ -27,6 +27,8 @@ import "./utils/levelUpNotice.ts";
 import "./utils/nativeMessaging.ts";
 // 真开一个标签页取回被站点 XHR 拦截的用户页（仅兜底，见 userInfoShape 的 isBlockShellPage）
 import "./utils/pageInTab.ts";
+// 只观测：记下用户页 XHR 与标签页导航实际发出的请求头，拦截时写进日志供对照
+import "./utils/headerTrace.ts";
 import { fixAllStoredUserInfo } from "./utils/fixer.ts";
 
 // 只需要「站点定义数量」时，用 import.meta.glob 拿文件名键即可（不会加载任何模块）。

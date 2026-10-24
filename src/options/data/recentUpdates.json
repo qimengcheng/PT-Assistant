@@ -1,8 +1,19 @@
 {
-  "generatedAt": "2026-10-24 18:20:35",
-  "headSha": "85ffce8",
+  "generatedAt": "2026-10-24 19:07:05",
+  "headSha": "eb8fa76",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.126.1",
+      "date": "2026-10-24 19:07:05",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "站点拦截用户信息页时，插件会多试一种「地址栏直开」的请求形状（去掉来源页、按顶层导航的标记发送）。这一种能过就直接用它解析；仍过不去时才走标签页兜底。",
+        "拦截时「运行日志」里会多一行请求头对照：把插件请求与标签页导航实际发出的 Sec-Fetch、Origin、Referer、Cookie 条数等并排列出，便于定位还差哪一项。"
+      ],
+      "improvedTotal": 2
+    },
     {
       "version": "0.126.0",
       "date": "2026-10-24 18:20:35",

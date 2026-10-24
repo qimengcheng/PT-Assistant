@@ -67,6 +67,8 @@ export default defineConfig({
       "offscreen",
       // 兜底取数用：后台真开一个标签页、等加载完后读 DOM（见 background/utils/pageInTab.ts）
       "scripting",
+      // 只观测（不拦截）：记录用户页 XHR 与标签页导航实际发出去的头，供拦截时对照
+      "webRequest",
     ],
     host_permissions: ["*://*/*"],
     // nativeMessaging 为可选权限：用户在「基础设置 → 原生通信桥」里动态授权，

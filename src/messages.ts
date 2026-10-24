@@ -89,6 +89,23 @@ export interface IPageInTabResult {
 }
 
 /**
+ * 一条请求头读数（`getHeaderTrace`）。值已由后台按隐私口径遮过：
+ * Cookie 只留条数、扩展 Origin 只留 `chrome-extension://…`、Referer 去掉 query 与 hash。
+ */
+export interface IHeaderTraceRecord {
+  /** `xmlhttprequest` / `main_frame` 等 */
+  type: string;
+  method: string;
+  /** host + path，不含 query */
+  hostPath: string;
+  /** XHR 来自扩展上下文时是 -1 */
+  tabId: number;
+  headers: Record<string, string>;
+  /** 记录时刻（毫秒），读的时候只留最近三分钟那一批 */
+  at: number;
+}
+
+/**
  * 消息协议（对齐 PT-depiler messages.ts 的全量协议）：
  * 1. background —— chrome cookies / DNR / storage
  * 2. offscreen —— 站点解析、搜索、下载器、用户信息、社交信息、辅种
@@ -155,6 +172,14 @@ export interface ProtocolMap {
    * 读完立刻关；实现见 `background/utils/pageInTab.ts`。
    */
   probePageInTab(data: { url: string; timeoutMs?: number }): IPageInTabResult;
+
+  /**
+   * 读走后台记下的最近若干条 `userdetails.php` / `mybonus.php` 请求头（读一次清空）。
+   *
+   * 只用来回答「同一会话里 XHR 被拦、标签页导航能过，两边实际发出去的头差在哪一项」——
+   * 它是一份观测读数，不参与取数判据；值已在后台遮过（见 `IHeaderTraceRecord`）。
+   */
+  getHeaderTrace(): IHeaderTraceRecord[];
 
   // ===== 1.3 检查更新（background）=====
   /**

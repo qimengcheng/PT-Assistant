@@ -14,7 +14,7 @@
 import axiosRaw from "axios";
 import { get, set } from "es-toolkit/compat";
 
-import { sendMessage, type IPageInTabResult } from "@/messages.ts";
+import { sendMessage, type IHeaderTraceRecord, type IPageInTabResult } from "@/messages.ts";
 import { setupReplaceUnsafeHeader } from "~/extends/axios/replaceUnsafeHeader.ts";
 import { setupRetryWhenCloudflareBlock } from "~/extends/axios/retryWhenCloudflareBlock.ts";
 
@@ -77,6 +77,19 @@ export async function probePageInTab(url: string): Promise<IPageInTabResult | un
     return await sendMessage("probePageInTab", { url });
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * 读走后台记下的最近若干条用户页请求头（读一次清空）。
+ *
+ * 观测件：拿不到就回空数组 —— 调用方照常打完那条日志，不许因为它把这一轮取数炸掉。
+ */
+export async function getHeaderTrace(): Promise<IHeaderTraceRecord[]> {
+  try {
+    return await sendMessage("getHeaderTrace", undefined);
+  } catch {
+    return [];
   }
 }
 

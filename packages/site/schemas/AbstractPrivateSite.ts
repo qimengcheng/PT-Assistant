@@ -21,8 +21,9 @@ import {
   type TUserInfoParseKey,
 } from "../types";
 // noinspection ES6PreferShortImport
-import { axios, logEvent, probePageInTab } from "../utils/adapter";
+import { axios, getHeaderTrace, logEvent, probePageInTab } from "../utils/adapter";
 import {
+  headerTraceLine,
   isBlockShellPage,
   isSilentZeroRound,
   pageShapeOf,
@@ -159,7 +160,7 @@ export default class PrivateSite extends BittorrentSite {
       // 被「字段已经有了」短路掉的那几步。不记它，一轮里「压根没发 /index.php」这件事
       // 在读数上就是隐形的 —— 而 pickLast 会把上一轮的 id 并进来，所以那种短路恰恰是能发生的。
       const skippedSteps: { url: string; fields: string[] }[] = [];
-      // 探针一轮只打一次：第一次遇到「200 + 0 个 td + 极短正文」时试完四种请求形状就定，
+      // 探针一轮只打一次：第一次遇到「200 + 0 个 td + 极短正文」时试完五种请求形状就定，
       // 不逐页反复试。试出能过的那一种后，本轮后续步骤直接沿用它（例如 mybonus.php）。
       let probedShellPage = false;
       let winningVariant: { headers: Record<string, string>; data?: unknown } | undefined;
@@ -325,6 +326,12 @@ export default class PrivateSite extends BittorrentSite {
             }
           }
 
+          // 观测件：把这一轮 XHR 与标签页导航**实际发出去的头**并排放进日志。
+          // 后台只留最近三分钟、只记录这两类用户页；Cookie 只剩条数、Referer 去掉 query。
+          // 读不到就是空数组（adapter 自己兜过），这里不写 try —— 它没有弄坏取数的能力。
+          const headerTrace = await getHeaderTrace();
+          const headerLine = headerTraceLine(headerTrace, this.url);
+
           logEvent({
             module: "userInfo",
             level: "warn",
@@ -347,7 +354,9 @@ export default class PrivateSite extends BittorrentSite {
                   : ""
             }${tabPage ? `；标签页导航 → ${shapeLine(tabPage.shape)}` : tabError ? `；标签页导航 → 失败（${tabError}）` : ""}${
               tabPage && this.isUsableUserInfoShape(tabPage.shape) ? "，本轮后续步骤都改走标签页" : ""
-            }${winner ? `；本轮改用「${winner.variant}」` : indexRetry && this.isUsableUserInfoShape(indexRetry.shape) ? "；本轮改为先访问首页再取用户页" : ""}`,
+            }${headerLine ? `；请求头对照：${headerLine}` : ""}${
+              winner ? `；本轮改用「${winner.variant}」` : indexRetry && this.isUsableUserInfoShape(indexRetry.shape) ? "；本轮改为先访问首页再取用户页" : ""
+            }`,
             data: {
               site: this.metadata.id,
               baseline: shape,
@@ -358,6 +367,7 @@ export default class PrivateSite extends BittorrentSite {
               indexRetryError,
               tab: tabPage?.shape,
               tabError,
+              headerTrace,
             },
           });
 

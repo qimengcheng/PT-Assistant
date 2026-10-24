@@ -263,8 +263,8 @@ export function isShellPage(shape: IPageShape): boolean {
 /**
  * 外壳页里明确像「站点/边缘层拦截」的那一档。
  *
- * 探针只对这类页触发：真正的用户页外壳（例如站点维护、空模板）没有理由让插件换四种请求形状
- * 去打四次；而 Forbidden / Access denied / CF 挑战这些关键字是可判的。骨架里的数字已被遮成
+ * 探针只对这类页触发：真正的用户页外壳（例如站点维护、空模板）没有理由让插件换五种请求形状
+ * 去打五次；而 Forbidden / Access denied / CF 挑战这些关键字是可判的。骨架里的数字已被遮成
  * `*`，所以这里只认字母与中文，不认状态码。
  */
 const BLOCK_SHELL_HINTS = [
@@ -315,6 +315,11 @@ export interface IUserInfoRequestVariant {
  * 带 `Origin: chrome-extension://…`、`Sec-Fetch-*` 是 cors/empty。后两项里 Origin 是最像
  * 扩展的一项；Referer 是最常见的防盗链条件。所以先只试这两项，不一次把所有头都改掉 ——
  * 否则日志只能告诉我们「某种形状能过」，分不清是哪一项起的作用。
+ *
+ * 第四、第五种是「整条请求看起来像页面导航」的两个档次：#4 只改 Sec-Fetch 与 Accept；
+ * #5 再补上地址栏导航才有的 `Upgrade-Insecure-Requests` / `Cache-Control: max-age=0` /
+ * `Priority`，并把 `Sec-Fetch-Site` 置成 `none`（顶层导航是 none，页面内跳转才是 same-origin）。
+ * #5 是照着「真在地址栏敲这个地址」的头逐项对齐的；DNR 改不到哪一项，请求头对照那一行会直接显出来。
  */
 export function userInfoRequestVariants(siteUrl: string): IUserInfoRequestVariant[] {
   let referer = siteUrl;
@@ -332,9 +337,9 @@ export function userInfoRequestVariants(siteUrl: string): IUserInfoRequestVarian
     { name: "去 Origin", headers: { Origin: "" } },
     { name: "加 Referer + 去 Origin", headers: { Referer: referer, Origin: "" } },
     {
-      // 最后这一种是「整条请求看起来像页面导航」：有些 WAF 不看 Referer/Origin，只看
-      // Sec-Fetch-Dest 是不是 document。`data: null` 顺带去掉 GET 上那个 JSON Content-Type
-      //（默认配置的 `data: {}` 会带出来）。真跑不通也只是探针多一条失败读数，不影响原请求。
+      // 这一种只把 Sec-Fetch 改成导航，仍留着 Referer / 同源 Site：有些人会把「同站页面里
+      // 点进来的」当成合法来源，先试这一档比一步跳到「地址栏直开」更容易过。
+      // `data: null` 顺带去掉 GET 上那个 JSON Content-Type（默认配置的 `data: {}` 会带出来）。
       name: "伪装成页面导航",
       data: null,
       headers: {
@@ -347,7 +352,94 @@ export function userInfoRequestVariants(siteUrl: string): IUserInfoRequestVarian
         "Sec-Fetch-User": "?1",
       },
     },
+    {
+      // 最后这一种逐项照着「地址栏敲进去」对齐：没有 Referer、Site 是 none、带上导航特有的
+      // UIR / Cache-Control / Priority。真跑不通也只是探针多一条失败读数，不影响原请求。
+      name: "地址栏直开",
+      data: null,
+      headers: {
+        Origin: "",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "max-age=0",
+        Priority: "u=0, i",
+      },
+    },
   ];
+}
+
+/** 一条请求头读数（各值已由后台按隐私口径遮过：Cookie 只剩条数） */
+export interface IHeaderTraceLike {
+  /** `xmlhttprequest` / `main_frame` 等 */
+  type: string;
+  /** host + path，不含 query */
+  hostPath: string;
+  headers: Record<string, string>;
+}
+
+/** 一行：`Sec-Fetch=site/mode/dest/user｜Origin=…｜Referer=…｜…` */
+function headerTraceOne(trace: IHeaderTraceLike): string {
+  const headers = trace.headers ?? {};
+  const fetchBits = ["sec-fetch-site", "sec-fetch-mode", "sec-fetch-dest", "sec-fetch-user"].map(
+    (key) => headers[key] || "空",
+  );
+  const pick = (label: string, key: string) => `${label}=${headers[key] || "无"}`;
+
+  return [
+    `Sec-Fetch=${fetchBits.join("/")}`,
+    pick("Origin", "origin"),
+    pick("Referer", "referer"),
+    pick("Cookie", "cookie"),
+    pick("UIR", "upgrade-insecure-requests"),
+    pick("Cache-Control", "cache-control"),
+    pick("Priority", "priority"),
+    `Accept=${headers.accept?.split(",")[0] || "无"}`,
+    pick("Content-Type", "content-type"),
+  ].join("｜");
+}
+
+/**
+ * 把一轮里的请求头读数折成一句给人看的话：**XHR 的末条**与**导航的末条**并排。
+ *
+ * 为什么是「末条」：探针是按顺序打的，末条 XHR 就是最后一个变体（地址栏直开），
+ * 拿它跟导航比才能判出「DNR 到底改没改到 Sec-Fetch / Origin」。更早的几条只留在 data 里，
+ * 不挤进这一行 —— 这一行会跟着拦截那条 warn 一起进运行日志。
+ *
+ * 这条是**观测件**：解析不了站点地址就返回空串、没有任何读数就直说，绝不抛。
+ */
+export function headerTraceLine(traces: readonly IHeaderTraceLike[], siteUrl: string): string {
+  let host = "";
+  try {
+    host = new URL(siteUrl).host;
+  } catch {
+    return "";
+  }
+
+  const mine = traces.filter((trace) => host && trace.hostPath.startsWith(`${host}/`));
+  if (mine.length === 0) {
+    return "没有拿到请求头读数";
+  }
+
+  const xhrs = mine.filter((trace) => trace.type === "xmlhttprequest");
+  const navigations = mine.filter((trace) => trace.type === "main_frame");
+  const parts: string[] = [];
+
+  parts.push(
+    xhrs.length > 0
+      ? `XHR ${xhrs.length} 条、末条：${headerTraceOne(xhrs[xhrs.length - 1])}`
+      : "没有 XHR 读数",
+  );
+  parts.push(
+    navigations.length > 0
+      ? `导航 ${navigations.length} 条、末条：${headerTraceOne(navigations[navigations.length - 1])}`
+      : "没有导航读数",
+  );
+
+  return parts.join("；");
 }
 
 /**

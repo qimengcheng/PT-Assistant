@@ -25,6 +25,8 @@ import "./utils/autoReseed.ts";
 import "./utils/levelUpNotice.ts";
 // 原生通信桥（可选权限 nativeMessaging）：本机 ptd CLI ↔ 扩展，未授权时自动休眠
 import "./utils/nativeMessaging.ts";
+// 真开一个标签页取回被站点 XHR 拦截的用户页（仅兜底，见 userInfoShape 的 isBlockShellPage）
+import "./utils/pageInTab.ts";
 import { fixAllStoredUserInfo } from "./utils/fixer.ts";
 
 // 只需要「站点定义数量」时，用 import.meta.glob 拿文件名键即可（不会加载任何模块）。

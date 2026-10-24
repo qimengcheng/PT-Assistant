@@ -279,8 +279,19 @@ const BLOCK_SHELL_HINTS = [
   /拦截/,
 ];
 
+/**
+ * 一段文字（标题 / 正文 / 整页结构）像不像拦截页。
+ *
+ * 单独导出是因为**标签页那条兜底**也要用它：后台拿不到 Document，只能拿标题和
+ * `outerHTML` 去判「这一页是不是挑战页，要不要再等一拍」。两边用同一份关键字，
+ * 否则一处认「Forbidden」、另一处不认，就会出现「后台以为已经加载好了，调用方却判成外壳页」。
+ */
+export function looksLikeBlockText(text: string): boolean {
+  return BLOCK_SHELL_HINTS.some((hint) => hint.test(text));
+}
+
 export function isBlockShellPage(shape: IPageShape): boolean {
-  return isShellPage(shape) && BLOCK_SHELL_HINTS.some((hint) => hint.test(shape.skeleton));
+  return isShellPage(shape) && looksLikeBlockText(shape.skeleton);
 }
 
 export interface IUserInfoRequestVariant {

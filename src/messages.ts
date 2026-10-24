@@ -76,6 +76,18 @@ import type {
 } from "@/shared/types.ts";
 import { isDebug } from "~/helper.ts";
 
+/** `probePageInTab` 的返回：全部是「可能拿不到」的观测值，缺什么就是 undefined */
+export interface IPageInTabResult {
+  /** 加载完成后整页序列化出来的 HTML */
+  html?: string;
+  /** 最终地址（跳转后可能不是请求的那一条） */
+  finalUrl?: string;
+  /** 页面标题（后台用它判「是不是挑战页，要不要再等一拍」） */
+  title?: string;
+  /** 打不开 / 超时 / 标签页被关掉 */
+  error?: string;
+}
+
 /**
  * 消息协议（对齐 PT-depiler messages.ts 的全量协议）：
  * 1. background —— chrome cookies / DNR / storage
@@ -130,6 +142,19 @@ export interface ProtocolMap {
   getCookie(data: chrome.cookies.CookieDetails): chrome.cookies.Cookie | null;
   removeCookie(data: chrome.cookies.CookieDetails | chrome.cookies.SetDetails): chrome.cookies.CookieDetails | null;
   checkAndExtendCookies(arg: { url: string; siteId?: string }): void;
+
+  /**
+   * 在本机浏览器里**真正打开一次标签页**，等它加载完再把 DOM 交回来。
+   *
+   * 为什么需要它：有的站点会把 `userdetails.php` / `mybonus.php` 这类用户页对「扩展发起的
+   * XHR」换成一张 200 + 137 字节的 nginx 403 假页（PTzone 2026-10-24 的现场：换 Referer /
+   * Origin / Sec-Fetch / 请求体六种形状全一字不差，而同一会话请求 `/index.php` 正常拿到
+   * 196 个 td）。拦截认的是「这次请求是不是顶层导航」这个上下文，XHR 侧改头过不去。
+   *
+   * 边界：只在 `isBlockShellPage()` 判定为拦截页时兜底调用；标签页 `active: false`、
+   * 读完立刻关；实现见 `background/utils/pageInTab.ts`。
+   */
+  probePageInTab(data: { url: string; timeoutMs?: number }): IPageInTabResult;
 
   // ===== 1.3 检查更新（background）=====
   /**

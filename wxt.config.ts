@@ -65,6 +65,8 @@ export default defineConfig({
       "unlimitedStorage",
       "notifications",
       "offscreen",
+      // 兜底取数用：后台真开一个标签页、等加载完后读 DOM（见 background/utils/pageInTab.ts）
+      "scripting",
     ],
     host_permissions: ["*://*/*"],
     // nativeMessaging 为可选权限：用户在「基础设置 → 原生通信桥」里动态授权，

@@ -21,7 +21,7 @@ import {
   type TUserInfoParseKey,
 } from "../types";
 // noinspection ES6PreferShortImport
-import { logEvent } from "../utils/adapter";
+import { axios, logEvent, probePageInTab } from "../utils/adapter";
 import {
   isBlockShellPage,
   isSilentZeroRound,
@@ -164,6 +164,9 @@ export default class PrivateSite extends BittorrentSite {
       let probedShellPage = false;
       let winningVariant: { headers: Record<string, string>; data?: unknown } | undefined;
       let visitIndexFirst = false;
+      // 本轮的「只有真导航能过」结论：第一页用标签页取回来之后，后续步骤直接走标签页，
+      // 不再打一轮注定被拦截的 XHR（PTzone 2026-10-24 的现场：连 6 种 XHR 形状全被 403）。
+      let useTabNavigation = false;
 
       for (const thisUserInfoProcess of this.metadata.userInfo.process) {
         // 该步骤能够获取的字段
@@ -236,24 +239,43 @@ export default class PrivateSite extends BittorrentSite {
           }
         }
 
-        let response = await this.request<unknown>(requestConfig);
-        let dataDocument: unknown = response.data;
-
+        let response: AxiosResponse<unknown> | undefined;
+        let dataDocument: unknown;
         // 形状读数：只有这一层还握着响应本体（上层拿到的是已经折好的字段值）。
         // 交出去的是**对象本身**不是它的属性 —— 真 XHR 在 responseType 为 document 时读 `responseText`
         // 会抛 InvalidStateError，在调用点取属性等于把整轮取数炸成 parseError（v0.125.0 就是这么坏的，
         // 用户 2026-10-24：「现在变成解析错误了」）。属性读取归 `@/shared/userInfoShape` 逐条兜。
         // 外面再套一层：观测件不许有弄坏被观测那条路的能力。
         let shape: IPageShape | undefined;
-        try {
-          shape = this.userInfoShapeOf(response, requestConfig);
-        } catch {
-          // 少一条读数比整轮取数变成 parseError 好
+        let loadedViaTab = false;
+
+        // 本轮已证明「只认顶层导航」时，后续步骤直接开标签页，不再发注定被拦截的 XHR。
+        if (useTabNavigation) {
+          try {
+            const viaTab = await this.fetchUserInfoPageInTab(requestConfig);
+            if (viaTab) {
+              dataDocument = viaTab.document;
+              shape = viaTab.shape;
+              loadedViaTab = true;
+            }
+          } catch {
+            // 标签页那条路坏了就退回普通请求；观测件不许把这一轮炸成 parseError
+          }
+        }
+
+        if (!loadedViaTab) {
+          response = await this.request<unknown>(requestConfig);
+          dataDocument = response.data;
+          try {
+            shape = this.userInfoShapeOf(response, requestConfig);
+          } catch {
+            // 少一条读数比整轮取数变成 parseError 好
+          }
         }
 
         // 站点把用户页换成了「200 + 0 个 td」的拦截外壳页时，用当前登录态换请求形状再试一次。
         // 只试一次、只在第一页试；试出来能过的那一种本轮后续步骤直接沿用。
-        if (shape && isBlockShellPage(shape) && !probedShellPage) {
+        if (shape && isBlockShellPage(shape) && !probedShellPage && !useTabNavigation) {
           probedShellPage = true;
           let probes: IUserInfoProbeResult[] = [];
           try {
@@ -290,6 +312,19 @@ export default class PrivateSite extends BittorrentSite {
             indexError = error instanceof Error ? error.message : String(error);
           }
 
+          // 最后一个假设：拦截认的是「这次请求是不是顶层导航」，XHR 侧改头永远过不去。
+          // 只有换头与「先访问首页」都没救回来时才真开一个标签页（不抢焦点、读完立刻关）。
+          let tabPage: { document: Document; shape: IPageShape } | undefined;
+          let tabError: string | undefined;
+          if (!winner && !(indexRetry && this.isUsableUserInfoShape(indexRetry.shape))) {
+            try {
+              tabPage = await this.fetchUserInfoPageInTab(requestConfig);
+              if (!tabPage) tabError = "标签页没有返回内容";
+            } catch (error) {
+              tabError = error instanceof Error ? error.message : String(error);
+            }
+          }
+
           logEvent({
             module: "userInfo",
             level: "warn",
@@ -310,6 +345,8 @@ export default class PrivateSite extends BittorrentSite {
                 : indexRetryError
                   ? `，随后重试原页 → 失败（${indexRetryError}）`
                   : ""
+            }${tabPage ? `；标签页导航 → ${shapeLine(tabPage.shape)}` : tabError ? `；标签页导航 → 失败（${tabError}）` : ""}${
+              tabPage && this.isUsableUserInfoShape(tabPage.shape) ? "，本轮后续步骤都改走标签页" : ""
             }${winner ? `；本轮改用「${winner.variant}」` : indexRetry && this.isUsableUserInfoShape(indexRetry.shape) ? "；本轮改为先访问首页再取用户页" : ""}`,
             data: {
               site: this.metadata.id,
@@ -319,6 +356,8 @@ export default class PrivateSite extends BittorrentSite {
               indexError,
               indexRetry: indexRetry?.shape,
               indexRetryError,
+              tab: tabPage?.shape,
+              tabError,
             },
           });
 
@@ -332,6 +371,10 @@ export default class PrivateSite extends BittorrentSite {
             dataDocument = response.data;
             shape = indexRetry.shape;
             visitIndexFirst = true;
+          } else if (tabPage && this.isUsableUserInfoShape(tabPage.shape)) {
+            dataDocument = tabPage.document;
+            shape = tabPage.shape;
+            useTabNavigation = true;
           }
         }
 
@@ -406,6 +449,35 @@ export default class PrivateSite extends BittorrentSite {
     }
 
     return flushUserInfo;
+  }
+
+  /**
+   * 用一次**真实标签页导航**取一页，折成与 XHR 同口径的形状。
+   *
+   * 只在「直接请求被判定成拦截外壳页、且换头与先访问首页都没救回来」时调用；
+   * 成功一次之后本轮后续步骤直接走这里（`useTabNavigation`），不再发注定被拦的 XHR。
+   * 失败回 undefined，绝不抛 —— 观测件不许把这一轮炸成 parseError。
+   */
+  private async fetchUserInfoPageInTab(
+    requestConfig: AxiosRequestConfig,
+  ): Promise<{ document: Document; shape: IPageShape } | undefined> {
+    const url = axios.getUri({
+      baseURL: this.url,
+      url: requestConfig.url,
+      params: requestConfig.params,
+    });
+    const result = await probePageInTab(url);
+    if (!result?.html) {
+      return undefined;
+    }
+    const document = new DOMParser().parseFromString(result.html, "text/html");
+    const shape = pageShapeOf({
+      status: 200,
+      transport: { responseText: result.html, responseURL: result.finalUrl ?? url },
+      contentType: "text/html",
+      data: document,
+    });
+    return { document, shape };
   }
 
   /** 把一次用户信息响应折成形状读数（观测值的读法统一在 @/shared/userInfoShape） */

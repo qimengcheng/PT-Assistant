@@ -19,6 +19,7 @@ import {
   isDefaultish,
   isShellPage,
   isSilentZeroRound,
+  looksLikeBlockText,
   pageShapeOf,
   pageSkeletonOf,
   queryShapeOf,
@@ -291,6 +292,15 @@ describe("外壳页判据与外壳页出现后要试的请求形状", () => {
     expect(isBlockShellPage(shellShape({ skeleton: "", status: 302 }))).toBe(false);
   });
 
+  it("标签页兜底与页面判据共用同一份关键字（后台拿不到 Document，只拿得到标题 / 整页串）", () => {
+    expect(looksLikeBlockText("403 Forbidden")).toBe(true);
+    expect(looksLikeBlockText("<title>Access denied</title>")).toBe(true);
+    expect(looksLikeBlockText("Checking your browser before accessing")).toBe(true);
+    expect(looksLikeBlockText("<html><body>站点维护中</body></html>")).toBe(false);
+    // 判据本体只能有一份：isBlockShellPage 必须走它，不许再拿自己的关键字判一遍
+    expect(read(SHARED)).toMatch(/return isShellPage\(shape\) && looksLikeBlockText\(shape\.skeleton\)/);
+  });
+
   it("四种形状：只加 Referer / 只去 Origin / 两者都改 / 伪装成页面导航；Referer 用站点根，不带 query 与账号值", () => {
     const variants = userInfoRequestVariants("https://ptzone.xyz/?x=1#y");
     expect(variants.map((v) => v.name)).toEqual([
@@ -403,8 +413,8 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
   const at = (needle: string) => src.indexOf(needle);
 
   it("每一步都折一份形状，且就在拿到响应那一行之后", () => {
-    expect(at("let response = await this.request<unknown>(requestConfig);")).toBeGreaterThan(-1);
-    expect(at("pageShapes.push(")).toBeGreaterThan(at("let response = await this.request<unknown>(requestConfig);"));
+    expect(at("response = await this.request<unknown>(requestConfig);")).toBeGreaterThan(-1);
+    expect(at("pageShapes.push(")).toBeGreaterThan(at("response = await this.request<unknown>(requestConfig);"));
   });
 
   it("外壳页探针：只在 200+0 td 时触发、一轮一次；试出来的形状用于解析，后续步骤沿用", () => {
@@ -423,6 +433,23 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
     expect(src).toMatch(/const probeConfig: AxiosRequestConfig = \{/);
     // Cloudflare 挑战页也可能有很多 td，不能被当成「能用的用户页」
     expect(at("!shape.cfMitigated")).toBeGreaterThan(-1);
+  });
+
+  it("换头与先访问首页都没救回来时，才真开一个标签页；成功一次后本轮后续步骤都走它", () => {
+    expect(at("if (!winner && !(indexRetry && this.isUsableUserInfoShape(indexRetry.shape)))")).toBeGreaterThan(-1);
+    expect(at("fetchUserInfoPageInTab(")).toBeGreaterThan(-1);
+    expect(at("probePageInTab(")).toBeGreaterThan(-1);
+    expect(at("axios.getUri(")).toBeGreaterThan(-1);
+    expect(at("new DOMParser().parseFromString(result.html")).toBeGreaterThan(-1);
+    expect(at("if (useTabNavigation)")).toBeGreaterThan(-1);
+    expect(at("useTabNavigation = true")).toBeGreaterThan(-1);
+    // 已经改走标签页之后不再跑 XHR 探针（那四种形状在这一档必然全失败，白打四次）
+    expect(at("&& !useTabNavigation")).toBeGreaterThan(-1);
+    // 标签页那条路坏了不许把这一轮炸成 parseError
+    expect(src).toMatch(/try \{\s*\n\s*const viaTab = await this\.fetchUserInfoPageInTab\(requestConfig\);/);
+    // 日志里仍然只有形状读数：不写 HTML、不写 Cookie
+    expect(src).toMatch(/tab: tabPage\?\.shape,/);
+    expect(src).toMatch(/标签页导航 → \$\{shapeLine\(tabPage\.shape\)\}/);
   });
 
   it("整轮空手才出声，且不改解析行为：status 那一条仍在 logEvent 之后", () => {
@@ -478,5 +505,31 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
     expect(src).not.toMatch(/\?\.(responseText|responseURL)/);
     // 外面那一层 try 是「观测件不许有弄坏被观测那条路的能力」这条规矩的落地
     expect(src).toMatch(/try \{\s*\n\s*shape = this\.userInfoShapeOf\(/);
+  });
+});
+
+describe("标签页兜底：只在拦截档触发，读完就关，且不碰 Cookie", () => {
+  const tabSrc = read("src/entrypoints/background/utils/pageInTab.ts");
+
+  it("不抢焦点、读完立刻关（连关失败也不能反过来影响取数）", () => {
+    expect(tabSrc).toContain("chrome.tabs.create({ url: data.url, active: false })");
+    expect(tabSrc).toContain("chrome.scripting.executeScript(");
+    expect(tabSrc).toMatch(/finally \{[\s\S]*chrome\.tabs\.remove\(tabId\)\.catch\(\(\) => \{\}\)/);
+  });
+
+  it("挑战页判据与页面那边共用一份关键字，不另写一套", () => {
+    expect(tabSrc).toContain('import { looksLikeBlockText } from "@/shared/userInfoShape.ts"');
+    expect(tabSrc).toMatch(/looksLikeBlockText\(snapshot\.title\)/);
+    expect(tabSrc).toMatch(/looksLikeBlockText\(snapshot\.html\.slice\(0, 2000\)\)/);
+  });
+
+  it("整份实现不读 Cookie、不读请求头、不把 HTML 写日志（只交回调用方）", () => {
+    expect(tabSrc).not.toMatch(/chrome\.cookies|getAllCookies|setCookie|requestHeaders/);
+    expect(tabSrc).not.toMatch(/console\.(log|debug|warn|error)/);
+  });
+
+  it("后台入口真的注册了这条 handler（否则消息发出去没人接）", () => {
+    expect(read("src/entrypoints/background/index.ts")).toContain('import "./utils/pageInTab.ts"');
+    expect(read("wxt.config.ts")).toContain('"scripting"');
   });
 });

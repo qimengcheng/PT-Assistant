@@ -14,7 +14,7 @@
 import axiosRaw from "axios";
 import { get, set } from "es-toolkit/compat";
 
-import { sendMessage } from "@/messages.ts";
+import { sendMessage, type IPageInTabResult } from "@/messages.ts";
 import { setupReplaceUnsafeHeader } from "~/extends/axios/replaceUnsafeHeader.ts";
 import { setupRetryWhenCloudflareBlock } from "~/extends/axios/retryWhenCloudflareBlock.ts";
 
@@ -64,6 +64,20 @@ export async function retrieveStore(store: keyof IExtensionStorageSchema, keyPat
  */
 export async function cookie(detail: chrome.cookies.CookieDetails): Promise<chrome.cookies.Cookie | null> {
   return await sendMessage("getCookie", detail);
+}
+
+/**
+ * 让 background 真开一个标签页把页面取回来（只在「XHR 被站点拦截」时兜底）。
+ *
+ * 这条通道**不交 Cookie / 请求头**，只交回 HTML；失败一律落成 `undefined`，
+ * 调用方不需要为「标签页开不出来」再写一套错误分支（见 background/utils/pageInTab.ts）。
+ */
+export async function probePageInTab(url: string): Promise<IPageInTabResult | undefined> {
+  try {
+    return await sendMessage("probePageInTab", { url });
+  } catch {
+    return undefined;
+  }
 }
 
 /**

@@ -144,7 +144,7 @@ CI=true pnpm build  # 本地复现 CI 那条路径 → .output/chrome-mv3，不�
 PTD_SESSION=<会话标识> pnpm dev    # 开发模式（产物 → dist-<会话标识>-<版本号>/chrome-mv3；不加构建锁、不换指 dist-verify）
 pnpm dev            # 裸 dev 不经构建脚本，仍是 .output，且不碰 dist-verify
 pnpm zip            # wxt zip 的那条路，只打 Chrome 一档 → .output/ 下 *-chrome.zip 与 -sources.zip。
-                    # Firefox 不在本地打：由 CI 的 build job 统一产（AGENTS §2.1）。
+                    # Firefox 不在本地打：由 CI 的 build_firefox job 统一产（AGENTS §2.1）。
                     # 本地跑过一次就明白为什么 —— 那两个包带版本号、wxt build 只清子目录，
                     # 每次 push 前跑一遍就在 .output 根下多攒两个（实测堆到 20.2 GB / 388 个）。
 pnpm compile        # vue-tsc 类型检查

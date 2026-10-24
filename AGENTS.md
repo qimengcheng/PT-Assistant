@@ -388,7 +388,7 @@ WXT 0.21.4 的 `wxt build` **没有 `--output` 参数**（可用项只有 root/c
 filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里的
 `outDir: sessionTag ? \`dist-${tag}-${pkgVersion}\` : ".output"` 实现：会话标识取自环境变量
 `PTD_SESSION`，版本号取自 `package.json`（与注入 manifest 的是同一个值，不会各说一套）。
-`wxt.config.ts` 只看这个变量本身：**没有它就是默认 `.output`**，CI（`ci.yml` 的 build job）依赖
+`wxt.config.ts` 只看这个变量本身：**没有它就是默认 `.output`**，CI（`ci.yml` 的 `build_chrome` / `build_firefox`）依赖
 这个默认值取 `.output/*.zip`，别让 CI 带上 PTD_SESSION（CI 也就不会碰 `dist-verify`）。
 本地裸 build 的 `owner` 默认值是在 `build-verify.mjs` 里补的（判 CI 用 `CI` / `GITHUB_ACTIONS`），
 所以「人自己 build 也拿得到固定加载路径」不需要配环境变量 —— 见 §2.1。
@@ -398,7 +398,7 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 
 ### 2.4 Firefox 产物由 CI 构建
 
-**只有一个 workflow：`.github/workflows/ci.yml`**，三个 job 串起来 `verify → build → release`。
+**只有一个 workflow：`.github/workflows/ci.yml`**，四个 job：`verify → (build_chrome ∥ build_firefox) → release`。
 （没有 `build.yml` / `release.yml` 这两个文件 —— 这是一条长期成立的事实，不是「曾写错」；PLAYBOOK §24 那节已删，编号留着不复用。）
 
 - `verify`：查**提交标题**那三条硬规则（`[agent名]-[模型名]` 前缀、含 `vX.Y.Z`、与 `package.json` 一致），
@@ -407,13 +407,20 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
   版本号守卫自己的回归测试（同 v0.93.4 从 `build` 挪来：它只用 node + git，自己 `git init` 临时仓库）。
   这条线要 `fetch-depth: 0` 的全历史 checkout，浅克隆里 `rev-list` 取不出区间（脚本会 exit 2 出声，不静默放行）。
   它仍然不是静态检查那一段 —— 不装依赖。
-- `build`：`pnpm compile` → **一条 `node scripts/check-all.mjs`**（全部守卫，清单从 `scripts/` 现取，
-  与本地 `pnpm check:all` 同一个入口，见 §3.4）
-  → `wxt zip` + `wxt zip -b firefox`，从 `.output/` 取产物并重命名成
-  `PT-Assistant-<version>-{chrome,firefox,sources}.zip` 三个包，外加 `smoke-background.mjs`。
-  **版本号那条线不在这里了**（在 verify，且 verify 红时 build 因 `needs` + `success()` 根本不会跑）。
-- `release`：`ncipollo/release-action` 按 `package.json` 的 version 打 `v<version>` tag 并挂上
+- `build_chrome`：`pnpm compile` → **一条 `node scripts/check-all.mjs`**（全部守卫，清单从 `scripts/` 现取，
+  与本地 `pnpm check:all` 同一个入口，见 §3.4）→ `node scripts/check-recent-updates.mjs --selftest`
+  → `wxt zip` + `smoke-background.mjs`，产物重命名成 `PT-Assistant-<version>-chrome.zip`，
+  上传为 `build-zip-<version>-chrome`。
+  **编译与全部守卫只在这里跑一次** —— Firefox 那条只构建不校验，两个 job 各跑一遍等于把并行省下的时间还回去。
+  **版本号那条线不在这里了**（在 verify，且 verify 红时两个 build job 因 `needs` + `success()` 根本不会跑）。
+- `build_firefox`：只 `wxt zip -b firefox`，从 `.output/` 取 `-firefox.zip` 与 `-sources.zip`
+  两个包（`zipSources` 只在 firefox / opera 一档默认开），上传为 `build-zip-<version>-firefox`。
+- `release`：`actions/download-artifact` 仍用 `pattern: build-zip-*` + `merge-multiple: true`
+  把两个 job 的产物聚到一起（名字只差后缀，聚合逻辑不用逐档改），然后
+  `ncipollo/release-action` 按 `package.json` 的 version 打 `v<version>` tag 并挂上
   三个产物，随后是 Publish to Chrome Web Store / Publish to Firefox Add-ons 两步。
+  **`needs` 里两个 build job 都要求 `result == 'success'`**（`.ci/early` 那档除外）：任一构建失败就不发版，
+  与拆之前「一个 build job 失败 = 不发版」同语义。
   **`with.commit` 必须钉成 `${{ github.sha }}`**：不钉时 tag 的目标是分支名 `master`，
   而 GitHub 在建 tag 那一刻才解析分支尖 —— 下面「一次 push 只会被打一个 tag」那条纪律在
   **连续两次 push** 时就会被抢（实测：`v0.99.4` 与 `v0.99.5` 两个 tag 一度都指向 `626778d`）。
@@ -691,7 +698,7 @@ v0.32.0 把档案从 9 条补到 112 条（含它自己那条），覆盖 v0.1.0
 判据在 `scripts/check-recent-updates.mjs`（自动进 `check-all` 聚合）：形状与时间戳格式、
 从新到旧排、版本号不重、比 HEAD 少一条就 FAIL、同一版本号的 `date` 有任何改动就 FAIL
 （时间是那次提交的事实，不是措辞，重写文案不许顺手挪它），以及每条 `date` 必须等于该版本
-那次提交的真实时间。最后一条在浅克隆里自动降级（CI 的 build job 是 depth 1，
+那次提交的真实时间。最后一条在浅克隆里自动降级（CI 的 `build_chrome` job 是 depth 1，
 只核对得上 tip 那一条），不会假报错。
 
 界面默认只铺最新 10 个版本，其余走「展开全部 N 条更新记录」（`HomeView.vue` 的

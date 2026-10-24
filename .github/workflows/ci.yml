@@ -23,7 +23,7 @@ permissions:
 jobs:
   # 提交信息必须带版本号，且与 package.json 一致。
   # 独立成一个 job：只需要 checkout + node，不需要装依赖，几秒就能出结论，
-  # 不用等 build 跑完 1 分钟才发现提交信息写错了。
+  # 不用等构建跑完几分钟才发现提交信息写错了。
   #
   # 注意 squash 合并：GitHub 生成的合并 commit message 来自 PR 标题，
   # 所以走 PR 合并时要把 vX.Y.Z 写进 PR 标题，否则这里会拦。
@@ -34,7 +34,7 @@ jobs:
       contents: read
     outputs:
       # 早期阶段标记：仓库根有 .ci/early 就说明「那时还没有工程化体系」，
-      # 此时 build job 整个跳过，但 release 仍然跑（打 tag + 出更新内容），
+      # 此时两个 build job 整个跳过，但 release 仍然跑（打 tag + 出更新内容），
       # 这样历史每个版本都有 tag，gen-release-notes.mjs 才找得到上一次的起点。
       early: ${{ steps.stage.outputs.early }}
       version: ${{ steps.meta.outputs.version }}
@@ -136,19 +136,21 @@ jobs:
         if: steps.stage.outputs.early == 'false'
         run: sh scripts/check-version-test.sh
 
-  build:
+  # Chrome / Firefox 拆成两个并行 job：两次完整构建串行是 CI 墙钟的最大头，
+  # 拆开之后两边各装各的依赖、各建各的包，墙钟只取较慢的那一条。
+  # 校验（编译 + 守卫）只跑一次、留在 build_chrome —— 两边都跑一遍等于把并行省下的时间
+  # 又花回去；Firefox 那边的构建错误会在它自己那条 job 里变红，release 仍要求两边都成功。
+  build_chrome:
     # 两个条件都要显式写：
     #   success() —— job 里一旦出现 `if:`，GitHub 就不再自动附加「所有 needs 必须成功」
-    #                的默认语义。不写这一句，verify 挂了 build 照样跑，
+    #                的默认语义。不写这一句，verify 挂了 build_chrome 照样跑，
     #                版本号不一致的提交会被构建、打包、发版，等于守卫形同虚设。
-    #   early == false —— .ci/early 存在时整job跳过（见下方注释）。
+    #   early == false —— .ci/early 存在时整 job 跳过（见下方注释）。
     needs: verify
     if: success() && needs.verify.outputs.early == 'false'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    outputs:
-      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v7
 
@@ -186,7 +188,7 @@ jobs:
       # 这里不再重复挂一份：
       #   · verify 的区间校验把 HEAD 也包含在内（`--range base..tip` 的终点就是 tip），
       #     拿不到区间时它自己退到 --committed —— 在这里再查一遍是同一个判据跑两次；
-      #   · build 有 `needs: verify` + `success()`，verify 红在这里根本跑不到；
+      #   · build_chrome 有 `needs: verify` + `success()`，verify 红在这里根本跑不到；
       #   · check-version-test.sh 实测只用 node + git（自己 git init 临时仓库），
       #     装不装依赖与它无关，放在 verify 出结论快一分钟。
       # 规则本身没动：feat 进次版本、其余进修订号，见 AGENTS.md §1.2，成因见 PLAYBOOK §30。
@@ -199,22 +201,18 @@ jobs:
       - name: Recent-updates guard self-test
         run: node scripts/check-recent-updates.mjs --selftest
 
-      # 用 WXT 自带的 `wxt zip` 而不是系统 zip：
-      # 1) 不依赖 runner 是否预装 zip；2) 同时产出 -sources.zip，
-      #    那是 Firefox Add-ons 强制要求的源码包；3) 本地已逐条验证过产物命名。
+      # 用 WXT 自带的 `wxt zip` 而不是系统 zip：1) 不依赖 runner 是否预装 zip；
+      # 2) 产物命名与本地/发布侧一致；3) 不碰 Firefox 那条链路（它在 build_firefox 里）。
       # 产物名带上版本号：Release 页面里多个版本的 zip 并排时能一眼分清，
       # 下载到本地也不会和旧版本的包混淆。
-      - name: Build and package
+      - name: Build and package (chrome)
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
           pnpm exec wxt zip
-          pnpm exec wxt zip -b firefox
           mkdir -p build
-          mv .output/pt-assistant-wxt-*-chrome.zip   "build/PT-Assistant-${VERSION}-chrome.zip"
-          mv .output/pt-assistant-wxt-*-firefox.zip  "build/PT-Assistant-${VERSION}-firefox.zip"
-          mv .output/pt-assistant-wxt-*-sources.zip  "build/PT-Assistant-${VERSION}-sources.zip"
+          mv .output/pt-assistant-wxt-*-chrome.zip "build/PT-Assistant-${VERSION}-chrome.zip"
           ls -l build
 
       # 把 MV3 service worker 产物真的 import 一次。v0.4.x 那次「popup 卡住、消息永远无响应」
@@ -225,22 +223,67 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: build-zip-${{ steps.meta.outputs.version }}
+          name: build-zip-${{ steps.meta.outputs.version }}-chrome
+          path: build/*.zip
+
+  # Firefox 只打自己的两个包：`wxt zip -b firefox` 才会顺带产出 -sources.zip
+  # （wxt 的 zipSources 默认只对 firefox/opera 开），所以这两个文件归这条 job。
+  # 这里刻意不重复 compile / 守卫：那是同一个提交上的同一份判据，重复跑只会把并行
+  # 省下的墙钟又花回去，而真正的构建错误在这条 job 自己就会红。
+  build_firefox:
+    needs: verify
+    if: success() && needs.verify.outputs.early == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - id: meta
+        name: Read version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build and package (firefox)
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          pnpm exec wxt zip -b firefox
+          mkdir -p build
+          mv .output/pt-assistant-wxt-*-firefox.zip "build/PT-Assistant-${VERSION}-firefox.zip"
+          mv .output/pt-assistant-wxt-*-sources.zip "build/PT-Assistant-${VERSION}-sources.zip"
+          ls -l build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: build-zip-${{ steps.meta.outputs.version }}-firefox
           path: build/*.zip
 
   release:
-    needs: [verify, build]
+    needs: [verify, build_chrome, build_firefox]
     # PR 只做校验出包，不发版；push 到 master 或手动触发才发。
-    # always() 的唯一作用是覆盖「build 被 .ci/early 跳过」—— 被跳过的 job 会让
+    # always() 的唯一作用是覆盖「两个 build job 被 .ci/early 跳过」—— 被跳过的 job 会让
     # 默认的 success() 判定为失败，不写它早期版本就发不出 tag。
     # 但 always() 会无视**所有** needs 的成败，所以失败必须逐个显式挡：
-    #   needs.verify.result == 'success'                     verify 失败 → 不发版
-    #   needs.build.result == 'success'                      build 失败 → 不发版
-    #   || needs.verify.outputs.early == 'true'               早期阶段 → 允许（但无产物）
+    #   needs.verify.result == 'success'                                verify 失败 → 不发版
+    #   (build_chrome && build_firefox).result == 'success'             任一构建失败 → 不发版
+    #   || needs.verify.outputs.early == 'true'                          早期阶段 → 允许（但无产物）
+    # 括号不能省：`&&` 比 `||` 紧，去掉之后会出现「early 时不看两个 build」以外的错误语义。
     if: >-
       always() && github.event_name != 'pull_request' &&
       needs.verify.result == 'success' &&
-      (needs.build.result == 'success' || needs.verify.outputs.early == 'true')
+      (needs.build_chrome.result == 'success' && needs.build_firefox.result == 'success' ||
+       needs.verify.outputs.early == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -254,7 +297,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download build artifacts
-        if: needs.build.result == 'success'
+        if: needs.build_chrome.result == 'success' && needs.build_firefox.result == 'success'
         uses: actions/download-artifact@v8
         with:
           pattern: build-zip-*
@@ -285,7 +328,7 @@ jobs:
       # 未知输入只会打一行 warning，不会让 job 失败，所以这条只能靠回读 Release 的
       # `target_commitish` 来验，不能靠「CI 绿了」。
       #
-      # version 改从 verify job 取（它只需要 checkout + node，早期阶段 build 被跳过时
+      # version 改从 verify job 取（它只需要 checkout + node，早期阶段两个 build job 被跳过时
       # 仍然有值）；artifacts 在早期阶段没有产物，必须留空 —— 写死文件名会让
       # release-action 因为找不到文件而整步失败。
       - id: gh
@@ -297,12 +340,12 @@ jobs:
           skipIfReleaseExists: true
           bodyFile: release-notes.md
           generateReleaseNotes: true
-          artifacts: ${{ needs.build.result == 'success' && format('PT-Assistant-{0}-chrome.zip,PT-Assistant-{0}-firefox.zip,PT-Assistant-{0}-sources.zip', needs.verify.outputs.version) || '' }}
+          artifacts: ${{ needs.build_chrome.result == 'success' && needs.build_firefox.result == 'success' && format('PT-Assistant-{0}-chrome.zip,PT-Assistant-{0}-firefox.zip,PT-Assistant-{0}-sources.zip', needs.verify.outputs.version) || '' }}
 
       # ── 以下为可选的商店发布：secret 未配置时整段跳过，不影响 GitHub Release ──
       #
       # 早期阶段（.ci/early）没有构建产物，wepub 会找不到 zip 而报错，
-      # 所以两段都要求 needs.build.result == 'success'。
+      # 所以两段都要求两个 build job 的 result 都是 'success'。
       #
       # Chrome Web Store 走 service account 自签 JWT 换 access token：
       # 不用 gcloud，因为 `gcloud auth print-access-token` 不带 --impersonate 时会按
@@ -310,7 +353,7 @@ jobs:
       # 走 access token 模式时不可再设置 WEPUB_CHROME_REFRESH_TOKEN，
       # 且 CLIENT_ID / CLIENT_SECRET 必须一并移除，否则 wepub 会因这两个变量报错。
       - name: Publish to Chrome Web Store
-        if: ${{ steps.gh.outputs.id != '' && needs.build.result == 'success' }}
+        if: ${{ steps.gh.outputs.id != '' && needs.build_chrome.result == 'success' && needs.build_firefox.result == 'success' }}
         continue-on-error: true
         env:
           WEPUB_CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
@@ -369,7 +412,7 @@ jobs:
           wepub chrome PT-Assistant-*-chrome.zip
 
       - name: Publish to Firefox Add-ons
-        if: ${{ steps.gh.outputs.id != '' && needs.build.result == 'success' }}
+        if: ${{ steps.gh.outputs.id != '' && needs.build_chrome.result == 'success' && needs.build_firefox.result == 'success' }}
         continue-on-error: true
         env:
           WEPUB_FIREFOX_ADDON_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}

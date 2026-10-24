@@ -167,6 +167,21 @@ const tableColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
 );
 
 /**
+ * `#bodyCell` 的放行名单：只有这一批列交给 UserInfoCell 画。
+ *
+ * 为什么必须有一道名单（v0.99.4 把逐格渲染搬进 UserInfoCell 时把行首的复选框整列弄没了，
+ * 用户 2026-10-24 报「多选框怎么没有了」）：rc-table 的合成逻辑是**插槽返回了东西就整格替换**
+ * （`antdv-next@1.6.0` 的 `TableCell`：`if (bodyCell && column) { … g = 插槽返回值 }`），
+ * 而 Vue 的 `flattenChildren` 会把注释节点滤掉、把组件 vnode 留下。于是：
+ *   - 插槽里是一串 `v-if="column.key === …"`（各档都不命中 → 只剩注释）→ 长度 0 → 内置那颗复选框留下；
+ *   - 插槽里是 `<UserInfoCell />`（组件 vnode，不管它自己渲染出什么）→ 长度 ≥ 1 → 复选框被顶掉。
+ * 「拿 `v-if="column.key"` 挡一下」救不回来：勾选列也带 key，实测是 antd 自己生成的 `key-0`。
+ * 所以名单只能按**我们声明过的那批 key** 判 —— 不在名单里就一个节点都不返回，让内置渲染赢。
+ * 台架 `.tmp-build/bench-mydata/probe5.{html,mjs}` 三档并排量过（2/2、0/2、0/2）。
+ */
+const cellColumnKeys = computed(() => new Set(tableHeader.value.map((header) => header.key)));
+
+/**
  * 主表上方两块小表（异常 / 低分享率）用的列：**就是主表那一份 tableHeader**，同一批列、
  * 同一顺序、同一标题与对齐（用户 2026-10-13：「单列出来的站点，表头的列要和下面的一样」）。
  * 原先两块各自手写 5 列，与主表的列名、顺序、宽度全不一样，同一个站在两块里像两张表的数据。
@@ -659,6 +674,7 @@ const showLevelProgressDialog = ref(false);
       >
         <template #bodyCell="{ column, record }">
           <UserInfoCell
+            v-if="cellColumnKeys.has(String(column.key))"
             :column="column"
             :record="record"
             @view-messages="openMessagesDialog"
@@ -692,6 +708,7 @@ const showLevelProgressDialog = ref(false);
       >
         <template #bodyCell="{ column, record }">
           <UserInfoCell
+            v-if="cellColumnKeys.has(String(column.key))"
             :column="column"
             :record="record"
             @view-messages="openMessagesDialog"
@@ -716,9 +733,12 @@ const showLevelProgressDialog = ref(false);
       @change="handleTableChange"
     >
       <!-- 每一格的渲染住在 UserInfoCell：主表与上面两块单列表共用同一份 —— 「表头列一样」
-           才不会退化成「列名一样、格子里各画一套」（等级列一边是组件、一边是裸文本就是这样）。 -->
+           才不会退化成「列名一样、格子里各画一套」（等级列一边是组件、一边是裸文本就是这样）。
+           名单外一格都不返回（见 cellColumnKeys 那段）：这一列是行首那颗复选框，返回了任何节点
+           都会把它顶掉。 -->
       <template #bodyCell="{ column, record }">
         <UserInfoCell
+          v-if="cellColumnKeys.has(String(column.key))"
           :column="column"
           :record="record"
           @view-messages="openMessagesDialog"

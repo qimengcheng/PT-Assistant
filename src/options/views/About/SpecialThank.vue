@@ -72,6 +72,9 @@ const BRANDS: Record<string, { vendor?: string; logo: string }> = {
     vendor: "千问",
     logo: "https://img.alicdn.com/imgextra/i4/O1CN01OXv3EM1FN8t9W4P79_!!6000000000474-2-tps-80-80.png",
   },
+  // 官网首页 <link rel=icon> 自己声明的就是这一条（225×225，实测 200 / 209,762 B / 0.15s）。
+  // 另外两条都不适合：`/favicon.svg` 是 404，`chat.deepseek.com/favicon.svg` 实测 429 限流。
+  "DeepSeek-V4.1-Flash": { vendor: "深度求索", logo: "https://www.deepseek.com/favicon.ico" },
   "GLM-5.3-Flash": { vendor: "智谱", logo: "https://www.zhipuai.cn/favicon.png" },
   "Hy4 preview": {
     vendor: "腾讯混元",

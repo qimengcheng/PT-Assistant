@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-24 10:55:29",
-  "headSha": "c9a2631",
+  "generatedAt": "2026-10-24 16:19:41",
+  "headSha": "9b0e86c",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.125.5",
+      "date": "2026-10-24 16:19:41",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "「特别感谢」页的模型榜里，DeepSeek-V4.1-Flash 不再显示成一枚「DV」首字母徽章，换成了深度求索官网声明的品牌图标，与同一栏其余模型一致。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.125.1",
       "date": "2026-10-24 10:55:29",

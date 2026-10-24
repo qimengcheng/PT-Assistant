@@ -322,12 +322,17 @@ export interface IUserInfoRequestVariant {
  * #5 是照着「真在地址栏敲这个地址」的头逐项对齐的。
  *
  * 实测（2026-10-24 PTzone 的运行日志，5 个探针 + 7 条 XHR 读数）：
- *  - **`declarativeNetRequest` 改不到 `Sec-Fetch-*`**：所有 XHR 始终是 `none/cors/empty`，
- *    哪怕同一条规则里写了 set；`Referer` 也一样没出现在最终请求里。同一条规则里的
- *    `Cache-Control` / `Upgrade-Insecure-Requests` / `Priority` 却确实改到了 —— 所以规则本身是生效的。
  *  - 放行的是 #5：#4（Accept html + 去 body）仍拿到 137 字节的 403，#5 才拿到 74 个 td 的完整页。
- *    这家 WAF 认的不是 Referer / Origin / Sec-Fetch，而是导航特有的那几项请求头。
- *    `Sec-Fetch-*` 那几行留着是为了「哪天浏览器允许改了」与其它站点，不指望它在这里起作用。
+ *    #5 比 #4 多出来、且在这份读数里**看得见**的，是 axios 直接设置的
+ *    `Upgrade-Insecure-Requests` / `Cache-Control: max-age=0` / `Priority`（外加去掉了 Referer）。
+ *    所以这家 WAF 认的是导航特有的那几项，不是通常猜的 Referer / Origin。
+ *  - ⚠️ 这份读数**看不见 DNR 的修改**：`webRequest.onBeforeSendHeaders` 里所有 XHR 仍是
+ *    `Sec-Fetch-*=none/cors/empty` 且没有 Referer，而同一条请求里 axios 自己设的 UIR/CC/Priority
+ *    都在 —— `replaceUnsafeHeader` 只把 unsafe / `sec-*` 转给 DNR，所以这只能说明「两套来源混在
+ *    一起时，DNR 那一套不在这个观察点里」，不能据此判 DNR 没生效。要判那件事得换观察点
+ *    （`onSendHeaders` / `getMatchedRules`），这里不下这个结论。
+ *  - `Sec-Fetch-*` 那几行留着不碍事：若 DNR 生效，它们让形状更接近导航；若没生效，也只是几条
+ *    被忽略的规则。别把这份日志当成它们无效的证据。
  */
 export function userInfoRequestVariants(siteUrl: string): IUserInfoRequestVariant[] {
   let referer = siteUrl;
@@ -362,8 +367,8 @@ export function userInfoRequestVariants(siteUrl: string): IUserInfoRequestVarian
     },
     {
       // 2026-10-24 实测：这一种是唯一能过 PTzone 的形状（74 td / 17481 字符，#4 仍是 137 字节 403）。
-      // 真正起作用的是 Cache-Control / UIR / Priority 这几项 + 无 Referer；下面三行 Sec-Fetch
-      // 在当前 Chrome 里改不到（最终请求仍是 cors/empty），留着不碍事，见函数头那一段读数。
+      // 与 #4 相比，确定多出来的（且这份日志看得见的）是 UIR / Cache-Control / Priority 三项，
+      // 外加去掉了 Referer；下面几行 Sec-Fetch 有没有生效，这份日志判不出来（见函数头）。
       name: "地址栏直开",
       data: null,
       headers: {
@@ -414,9 +419,11 @@ function headerTraceOne(trace: IHeaderTraceLike): string {
 /**
  * 把一轮里的请求头读数折成一句给人看的话：**XHR 的末条**与**导航的末条**并排。
  *
- * 为什么是「末条」：探针是按顺序打的，末条 XHR 就是最后一个变体（地址栏直开），
- * 拿它跟导航比才能判出「DNR 到底改没改到 Sec-Fetch / Origin」。更早的几条只留在 data 里，
- * 不挤进这一行 —— 这一行会跟着拦截那条 warn 一起进运行日志。
+ * 为什么是「末条」：它通常是探针的最后一档（地址栏直开）。但**不保证**：探针之后还会
+ * 「先访问首页再原样重试」一次，那条也会进缓冲，于是末条可能是那次重试。逐条形状以
+ * `data.headerTrace` 为准；这一行只用来一眼看出「XHR 与导航差在哪几项」。
+ * 另外这里**看不到 DNR 的修改**（见后台 headerTrace.ts 的文件头），别拿它判 DNR 有没有生效。
+ * 更早的几条只留在 data 里，不挤进这一行 —— 这一行会跟着拦截那条 warn 一起进运行日志。
  *
  * 这条是**观测件**：解析不了站点地址就返回空串、没有任何读数就直说，绝不抛。
  */

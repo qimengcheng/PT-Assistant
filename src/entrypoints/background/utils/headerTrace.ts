@@ -14,10 +14,11 @@
  *  - 其余只收与 `Sec-Fetch-*` / 缓存 / 优先级 / 内容协商有关的白名单头。
  * 观测本身不改请求（`onBeforeSendHeaders` 在 MV3 里只能看、不能改），读不到也不影响取数。
  *
- * 首次实测结论（2026-10-24 PTzone 的那份日志）：同一条 DNR 规则里，
- * `Cache-Control` / `Upgrade-Insecure-Requests` / `Priority` 确实出现在最终请求里，
- * 而 `Sec-Fetch-*` 与 `Referer` 一项都没被改到（始终是浏览器的原值 / 干脆没有）；
- * 真正让站点放行的是「地址栏直开」这一种形状。那份对照就是靠这里记下来的。
+ * 首次实测结论（2026-10-24 PTzone 的那份日志）：放行的是「地址栏直开」这一种形状 ——
+ * 它比前一档多出的、且在这份读数里可见的，是 axios 直接设置的 UIR / Cache-Control / Priority。
+ * ⚠️ 这里**看不到 DNR 的修改**：`onBeforeSendHeaders` 里 Sec-Fetch-* 始终是浏览器原值、
+ * Referer 也一直缺席；要判 DNR 有没有改到，得换观察点（`onSendHeaders` / `getMatchedRules`），
+ * 别把这份读数里的缺项当成 DNR 失效的证据。
  */
 import { onMessage, type IHeaderTraceRecord } from "@/messages.ts";
 

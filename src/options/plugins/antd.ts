@@ -12,9 +12,13 @@
  *   根入口的 `install` 会遍历 components_exports，对每个带 install 的组件调 app.use，
  *   组件自身的 name 是 "ACard" / "ATable" 这类，Vue 会同时接受 <ACard> 和 <a-card>。
  *
- * 样式走 CSS-in-JS（@antdv-next/cssinjs），运行时注入 <style>，不再需要
- * Vuetify 那种「构建期拆 CSS chunk + 动态 <link> 注入」的链路 ——
- * 拆分产物的 CSS 在扩展页里加载并不可靠（表现为页面完全没有表格样式）。
+ * 样式走 CSS-in-JS（@antdv-next/cssinjs），运行时注入 <style>，没有 Vuetify 那种
+ * 「构建期拆 CSS chunk + 动态 <link> 注入」的链路 —— 后者在扩展页里加载并不可靠
+ * （表现为页面完全没有表格样式）。
+ *
+ * 这条只针对**构建期 CSS chunk**，别顺延成「antd 不能拆」：`wxt.config.ts` 的
+ * `ptd-vendor-chunk` 拆的是 JS 模块，产物之间是普通静态 import，样式仍由运行时注入，
+ * 与上面那条失效链路无关。
  */
 import { install } from "antdv-next";
 import zhCN from "antdv-next/locale/zh_CN";

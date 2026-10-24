@@ -200,6 +200,53 @@ export default defineConfig({
           }
         },
       },
+      {
+        /**
+         * options / offscreen 这些扩展页面（多页 esm 构建）把 antd 栈拆成独立 vendor chunk。
+         *
+         * 拆之前 options 入口 chunk 是 1.96 MB（1.87 MiB），其中约 98% 是 antd 栈 ——
+         * 页面脚本只能串行解析这一整块。
+         * 拆出去之后入口只剩应用代码，浏览器可以并行取 vendor；更重要的是 vendor 的内容不随
+         * 业务代码变，哈希稳定，二次打开（扩展更新后也一样）能直接命中缓存。
+         * **总量不变**，这也不是精简组件：实测模板用了 69/70 种组件，没有可裁的肉。
+         *
+         * 只作用于多页构建（`build.lib` 不存在）：content 引导 / content-app 是 lib 构建，
+         * 前者必须保持 IIFE（拆 chunk 直接加载不了），后者是单个 ES 入口、走自己的按需加载路径。
+         *
+         * 用 rolldown 的 `codeSplitting.groups` 而不是 `manualChunks`：后者在 rolldown 里已废弃。
+         * Vite 8 在解析配置时把 `build.rollupOptions` 归一成同一个 `rolldownOptions` 对象
+         * （`node_modules/vite/dist/node/chunks/node.js` 的 `rolldownOptions ??= rollupOptions`），
+         * 所以这里改 output 就是改 WXT 实际用于多页构建的那一份。
+         *
+         * `includeDependenciesRecursively` 必须显式关掉（rolldown 默认 true）：开着会把 antd 的
+         * 依赖闭包一起拖进来 —— vue / @vueuse 等模块本来住在共享 chunk 里、被别的入口复用，
+         * 一旦并进 vendor，任何 import 到其中之一的入口（例如以后的 background）都会被迫
+         * 整包加载 antd。这里只要点名的那几个包，边界写在 test 里。
+         */
+        name: "ptd-vendor-chunk",
+        enforce: "post" as const,
+        configResolved(config) {
+          if (config.build.lib) return;
+          const rolldownOptions = config.build.rolldownOptions;
+          const output = (rolldownOptions.output ??= {});
+          for (const item of Array.isArray(output) ? output : [output]) {
+            item.codeSplitting = {
+              groups: [
+                {
+                  name: "vendor-antd",
+                  test: /node_modules[\\/](?:antdv-next|@antdv-next|@ant-design|@v-c|dayjs)[\\/]/,
+                  includeDependenciesRecursively: false,
+                  // 只收「入口静态依赖链」上的那些（`$initial` 是 rolldown 内置标签）：
+                  // 不加这一条时，路由懒加载 chunk 里才会用到的 antd 组件（color-picker /
+                  // input / collapse…）也会被并进 vendor，而 vendor 是入口的静态依赖
+                  // ⇒ 首屏白白多下几百 KB。加上之后懒加载的那部分仍留在各自路由 chunk 里。
+                  tags: ["$initial"],
+                },
+              ],
+            };
+          }
+        },
+      },
     ],
   }),
 });

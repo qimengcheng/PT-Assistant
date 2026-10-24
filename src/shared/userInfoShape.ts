@@ -319,7 +319,15 @@ export interface IUserInfoRequestVariant {
  * 第四、第五种是「整条请求看起来像页面导航」的两个档次：#4 只改 Sec-Fetch 与 Accept；
  * #5 再补上地址栏导航才有的 `Upgrade-Insecure-Requests` / `Cache-Control: max-age=0` /
  * `Priority`，并把 `Sec-Fetch-Site` 置成 `none`（顶层导航是 none，页面内跳转才是 same-origin）。
- * #5 是照着「真在地址栏敲这个地址」的头逐项对齐的；DNR 改不到哪一项，请求头对照那一行会直接显出来。
+ * #5 是照着「真在地址栏敲这个地址」的头逐项对齐的。
+ *
+ * 实测（2026-10-24 PTzone 的运行日志，5 个探针 + 7 条 XHR 读数）：
+ *  - **`declarativeNetRequest` 改不到 `Sec-Fetch-*`**：所有 XHR 始终是 `none/cors/empty`，
+ *    哪怕同一条规则里写了 set；`Referer` 也一样没出现在最终请求里。同一条规则里的
+ *    `Cache-Control` / `Upgrade-Insecure-Requests` / `Priority` 却确实改到了 —— 所以规则本身是生效的。
+ *  - 放行的是 #5：#4（Accept html + 去 body）仍拿到 137 字节的 403，#5 才拿到 74 个 td 的完整页。
+ *    这家 WAF 认的不是 Referer / Origin / Sec-Fetch，而是导航特有的那几项请求头。
+ *    `Sec-Fetch-*` 那几行留着是为了「哪天浏览器允许改了」与其它站点，不指望它在这里起作用。
  */
 export function userInfoRequestVariants(siteUrl: string): IUserInfoRequestVariant[] {
   let referer = siteUrl;
@@ -353,8 +361,9 @@ export function userInfoRequestVariants(siteUrl: string): IUserInfoRequestVarian
       },
     },
     {
-      // 最后这一种逐项照着「地址栏敲进去」对齐：没有 Referer、Site 是 none、带上导航特有的
-      // UIR / Cache-Control / Priority。真跑不通也只是探针多一条失败读数，不影响原请求。
+      // 2026-10-24 实测：这一种是唯一能过 PTzone 的形状（74 td / 17481 字符，#4 仍是 137 字节 403）。
+      // 真正起作用的是 Cache-Control / UIR / Priority 这几项 + 无 Referer；下面三行 Sec-Fetch
+      // 在当前 Chrome 里改不到（最终请求仍是 cors/empty），留着不碍事，见函数头那一段读数。
       name: "地址栏直开",
       data: null,
       headers: {

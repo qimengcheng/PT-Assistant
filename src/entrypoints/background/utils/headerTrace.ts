@@ -13,6 +13,11 @@
  *  - `Referer` 只留 protocol + host + path，query 与 hash 一律丢掉；
  *  - 其余只收与 `Sec-Fetch-*` / 缓存 / 优先级 / 内容协商有关的白名单头。
  * 观测本身不改请求（`onBeforeSendHeaders` 在 MV3 里只能看、不能改），读不到也不影响取数。
+ *
+ * 首次实测结论（2026-10-24 PTzone 的那份日志）：同一条 DNR 规则里，
+ * `Cache-Control` / `Upgrade-Insecure-Requests` / `Priority` 确实出现在最终请求里，
+ * 而 `Sec-Fetch-*` 与 `Referer` 一项都没被改到（始终是浏览器的原值 / 干脆没有）；
+ * 真正让站点放行的是「地址栏直开」这一种形状。那份对照就是靠这里记下来的。
  */
 import { onMessage, type IHeaderTraceRecord } from "@/messages.ts";
 

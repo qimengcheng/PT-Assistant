@@ -18,7 +18,10 @@ import {
   isDefaultish,
   isSilentZeroRound,
   pageShapeOf,
+  pageSkeletonOf,
+  queryShapeOf,
   shapeLine,
+  skippedStepLine,
 } from "@/shared/userInfoShape.ts";
 
 /** 归一换行符：本仓 `core.autocrlf` 开着，工作区那份是 LF 还是 CRLF 取决于最后一个存盘的编辑器 */
@@ -40,6 +43,17 @@ const throwingTransport = (responseURL: string) => ({
   get responseText(): string {
     throw new Error("InvalidStateError: only accessible if responseType is '' or 'text'");
   },
+});
+
+/**
+ * 一个「外壳页」形状的文档：没有格子、标题/正文可选带着，整页序列化长度由 `html` 控制。
+ * 现场读数里那种「200 + 137 字符 + td 0 个」就是这一档（用户 2026-10-24 贴的那条）。
+ */
+const shellDoc = (opt: { title?: string; body?: string; html?: string }) => ({
+  querySelectorAll: () => ({ length: 0 }),
+  title: opt.title,
+  body: opt.body === undefined ? null : { textContent: opt.body },
+  documentElement: { outerHTML: opt.html ?? "<html></html>" },
 });
 
 const SITE = "packages/site/schemas/AbstractPrivateSite.ts";
@@ -73,7 +87,76 @@ describe("地址只留 host + path（隐私那一半）", () => {
   });
 });
 
-describe("一次响应折成六个观测值", () => {
+describe("参数只报形状，值一个都不留", () => {
+  it("「带没带 id」这一问现在读数自己答得出（用户 2026-10-24：「是不是访问的没带 userid 参数啊」）", () => {
+    expect(queryShapeOf("https://ptzone.xyz/userdetails.php?id=10001")).toBe("?id=有值");
+    expect(queryShapeOf("https://ptzone.xyz/userdetails.php")).toBe("（无参数）");
+    expect(queryShapeOf("https://ptzone.xyz/userdetails.php?id=")).toBe("?id=空");
+  });
+
+  it("多个参数 / 无等号 / hash 之后那段不算 / 只有问号不算", () => {
+    expect(queryShapeOf("https://a.test/p.php?a=1&b=&c&passkey=abc123#frag")).toBe(
+      "?a=有值&b=空&c（无等号）&passkey=有值",
+    );
+    expect(queryShapeOf("https://a.test/p.php?")).toBe("（无参数）");
+    expect(queryShapeOf("https://a.test/p.php#x?id=1")).toBe("（无参数）");
+    expect(queryShapeOf(undefined)).toBe("（无参数）");
+  });
+
+  it("值不进任何出口：读数里只有参数名与「有值」", () => {
+    expect(queryShapeOf("https://a.test/p.php?id=10001&passkey=SECRET")).not.toContain("10001");
+    expect(queryShapeOf("https://a.test/p.php?id=10001&passkey=SECRET")).not.toContain("SECRET");
+    const shape = pageShapeOf({
+      status: 200,
+      transport: { responseURL: "https://a.test/p.php?id=10001&passkey=SECRET" },
+      data: shellDoc({ title: "x" }),
+    });
+    expect(shape.query).toBe("?id=有值&passkey=有值");
+    expect(JSON.stringify(shape)).not.toContain("10001");
+    expect(JSON.stringify(shape)).not.toContain("SECRET");
+  });
+});
+
+describe("「拿到的是外壳页」那一档给内容骨架", () => {
+  const doc = shellDoc({ title: "Loading", body: "please wait 1 seconds", html: "<html>xx</html>" });
+
+  it("小页给标题与正文（数字遮掉）", () => {
+    expect(pageSkeletonOf(doc, 137)).toBe("标题「Loading」 正文「please wait * seconds」");
+  });
+
+  it("标题与正文都空 → 退回整页结构那一串（跳转页常长这样）", () => {
+    const bare = shellDoc({ html: '<html><head><meta http-equiv="refresh" content="0;url=login.php"></head></html>' });
+    expect(pageSkeletonOf(bare, 137)).toContain('整页「<html><head><meta http-equiv="refresh"');
+  });
+
+  it("页面不小（正常页里可能写着用户名）就一律不给", () => {
+    expect(pageSkeletonOf(doc, 5000)).toBe("");
+  });
+
+  it("长度未知 / 压根不是文档时也不给（不编一个骨架）", () => {
+    expect(pageSkeletonOf(doc, -1)).toBe("");
+    expect(pageSkeletonOf("<html>xx</html>", 9)).toBe("");
+    expect(pageSkeletonOf(null, 9)).toBe("");
+  });
+
+  it("那一页真带着 uid 也只留下 * ，不进日志", () => {
+    const leaky = shellDoc({ title: "user 10001", body: "id=10001" });
+    const line = pageSkeletonOf(leaky, 120);
+    expect(line).not.toContain("10001");
+    expect(line).toContain("*");
+  });
+});
+
+describe("被「字段已有」短路掉的那些步也要说出来", () => {
+  it("一行里带 url、并点明它本来负责哪几个字段", () => {
+    expect(skippedStepLine({ url: "/index.php", fields: ["id"] })).toBe("/index.php（跳过：已有 id）");
+    expect(skippedStepLine({ url: "/userdetails.php", fields: ["name", "uploaded"] })).toBe(
+      "/userdetails.php（跳过：已有 name/uploaded）",
+    );
+  });
+});
+
+describe("一次响应折成八个观测值", () => {
   it("文档型：isDocument 为真、格子数照数", () => {
     const shape = pageShapeOf({
       status: 200,
@@ -88,6 +171,8 @@ describe("一次响应折成六个观测值", () => {
       isDocument: true,
       cells: 137,
       textLength: -1,
+      query: "（无参数）",
+      skeleton: "",
     });
   });
 
@@ -159,22 +244,39 @@ describe("什么算「整轮一格都没命中」", () => {
   });
 });
 
-describe("一行读数把六个量都带上", () => {
-  it("状态 / 地址 / 类型 / 正文长度 / 是不是文档 / 格子数", () => {
+describe("一行读数把这八个量都带上", () => {
+  it("状态 / 地址与参数形状 / 类型 / 是不是文档 / 格子数 / 正文长度 / 骨架", () => {
     const line = shapeLine(
       pageShapeOf({
         status: 200,
-        transport: { responseURL: "https://ptzone.xyz/userdetails.php?id=1", responseText: "y".repeat(17680) },
+        transport: { responseURL: "https://ptzone.xyz/userdetails.php?id=10001", responseText: "y".repeat(17680) },
         contentType: "text/html;charset=utf-8",
         data: fakeDoc(0),
       }),
     );
     expect(line).toContain("HTTP 200");
-    expect(line).toContain("ptzone.xyz/userdetails.php");
+    expect(line).toContain("ptzone.xyz/userdetails.php?id=有值");
+    expect(line).not.toContain("10001");
     expect(line).toContain("text/html;charset=utf-8");
     expect(line).toContain("17680 字符");
     expect(line).toContain("已解析成文档");
     expect(line).toContain("td 0 个");
+    // 17680 字符的页给不了骨架，那一格也就不该多出个空括号
+    expect(line).not.toContain("标题");
+  });
+
+  it("小页那一档把骨架接在同一行末尾（现场那种 137 字符就是靠这一条认出是什么页）", () => {
+    const line = shapeLine(
+      pageShapeOf({
+        status: 200,
+        transport: { responseURL: "https://ptzone.xyz/userdetails.php" },
+        contentType: "text/html",
+        data: shellDoc({ title: "Checking your browser", body: "please wait 5 seconds", html: "w".repeat(137) }),
+      }),
+    );
+    expect(line).toContain("137 字符");
+    expect(line).toContain("（无参数）");
+    expect(line).toContain("标题「Checking your browser」 正文「please wait * seconds」");
   });
 
   it("拿不到的那两项明写「未知」，不写成 0", () => {
@@ -214,6 +316,18 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
     for (const forbidden of ["responseText", "params", "dataDocument", "document.cookie"]) {
       expect(line).not.toContain(forbidden);
     }
+  });
+
+  it("被「字段已有」短路掉的那几步记在 continue 之前，且一条都没发时也要出声", () => {
+    // pickLast 会把上一轮的 id 并进本轮 ⇒ 第一步 /index.php 可以整轮一次都不发，
+    // 而界面上那个 id 看着像「本轮取到的」（用户 2026-10-24 问的「是不是没带 userid」正卡在这）。
+    expect(at("skippedSteps.push(")).toBeGreaterThan(-1);
+    expect(at("continue; // 如果全部数据都有则直接跳过本轮")).toBeGreaterThan(-1);
+    expect(at("skippedSteps.push(")).toBeLessThan(at("continue; // 如果全部数据都有则直接跳过本轮"));
+    // 那道门放宽成「至少动过一步」，否则「压根没联网」那一档在读数上是隐形的
+    expect(src).toMatch(/\(pageShapes\.length > 0 \|\| skippedSteps\.length > 0\) && isSilentZeroRound/);
+    expect(src).toMatch(/一次请求都没发/);
+    expect(src).toMatch(/共 \$\{totalCount\} 步、实发 \$\{sentCount\} 次/);
   });
 
   it("出声那条也不许有弄坏取数的能力（连同步抛都要兜住）", () => {

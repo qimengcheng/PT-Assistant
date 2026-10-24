@@ -22,7 +22,7 @@ import {
 } from "../types";
 // noinspection ES6PreferShortImport
 import { logEvent } from "../utils/adapter";
-import { isSilentZeroRound, pageShapeOf, shapeLine, type IPageShape } from "@/shared/userInfoShape";
+import { isSilentZeroRound, pageShapeOf, shapeLine, skippedStepLine, type IPageShape } from "@/shared/userInfoShape";
 
 export const SchemaMetadata: Partial<ISiteMetadata> = {
   version: -1,
@@ -138,6 +138,9 @@ export default class PrivateSite extends BittorrentSite {
       // 每一步拿回的那一页「长什么样」，只在整轮空手时才会被写进运行日志（见下面的那条 logEvent）。
       // 收集它不改任何解析行为：状态、字段、返回值一个都不动。
       const pageShapes: IPageShape[] = [];
+      // 被「字段已经有了」短路掉的那几步。不记它，一轮里「压根没发 /index.php」这件事
+      // 在读数上就是隐形的 —— 而 pickLast 会把上一轮的 id 并进来，所以那种短路恰恰是能发生的。
+      const skippedSteps: { url: string; fields: string[] }[] = [];
 
       for (const thisUserInfoProcess of this.metadata.userInfo.process) {
         // 该步骤能够获取的字段
@@ -148,6 +151,11 @@ export default class PrivateSite extends BittorrentSite {
         // 检查相关元素是否均已有
         const existField = intersection(processFields, Object.keys(flushUserInfo));
         if (existField.length === processFields.length) {
+          // 观测件：url 取自站点定义（这一步还没经过 assertion 填参数），不含账号值
+          skippedSteps.push({
+            url: String(thisUserInfoProcess.requestConfig?.url ?? "?"),
+            fields: processFields.map(String),
+          });
           continue; // 如果全部数据都有则直接跳过本轮
         }
 
@@ -234,12 +242,22 @@ export default class PrivateSite extends BittorrentSite {
       // 出声之前这里什么都不改：status 照旧 success、字段照旧是那些默认值 —— 这条只是把
       // 「界面报 0」与「我们拿到的那一页根本没被解析出格子」分开的观测值写进运行日志。
       // 判据（哪三格算空手、形状怎么折）在 `@/shared/userInfoShape`，那边有 Node 断言。
-      if (pageShapes.length > 0 && isSilentZeroRound(flushUserInfo)) {
+      //
+      // 那道门从「有条响应读数」放宽成「这一轮至少动过一步」：一步都没发（全被「字段已有」短路）
+      // 同样是一轮空手，而原来那种写法让它**完全隐形** —— 界面上那个 id 是 pickLast 从上一轮存档
+      // 带过来的，读数里连一条地址都没有，谁也都判不出「这一轮压根没联网」。
+      if ((pageShapes.length > 0 || skippedSteps.length > 0) && isSilentZeroRound(flushUserInfo)) {
+        const sentCount = pageShapes.length;
+        const totalCount = sentCount + skippedSteps.length;
+        const skipped = skippedSteps.map(skippedStepLine).join(" ／ ");
+        const taken = sentCount > 0 ? pageShapes.map(shapeLine).join(" ／ ") : "一次请求都没发";
         logEvent({
           module: "userInfo",
           level: "warn",
-          msg: `站点 ${this.metadata.id} 这一轮用户信息一格都没命中：${pageShapes.map(shapeLine).join(" ／ ")}`,
-          data: { site: this.metadata.id, pages: pageShapes },
+          msg: `站点 ${this.metadata.id} 这一轮用户信息一格都没命中：共 ${totalCount} 步、实发 ${sentCount} 次${
+            skipped ? `（${skipped}）` : ""
+          } · ${taken}`,
+          data: { site: this.metadata.id, totalSteps: totalCount, skippedSteps, pages: pageShapes },
         });
       }
 

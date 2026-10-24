@@ -1,8 +1,10 @@
 import Sizzle from "sizzle";
+import type { AxiosRequestConfig } from "axios";
 import { mergeWith, toMerged, omit } from "es-toolkit";
 import { set } from "es-toolkit/compat";
 
 import PrivateSite from "./AbstractPrivateSite";
+import { isBlockedUserInfoListResponse, userInfoRequestVariants } from "@/shared/userInfoShape";
 import {
   EResultParseStatus,
   ETorrentStatus,
@@ -23,6 +25,7 @@ import {
   createDocument,
   definedFilters,
   extractContent,
+  logEvent,
   parseSizeString,
   parseTimeToLiveToDate,
   parseValidTimeString,
@@ -1056,16 +1059,62 @@ export default class NexusPHP extends PrivateSite {
    * @protected
    */
   protected async requestUserSeedingPage(userId: number, type: string = "seeding"): Promise<string | null> {
-    const { data } = await this.request<string>({
+    const baseConfig: AxiosRequestConfig = {
       url: "/getusertorrentlistajax.php",
       params: { userid: userId, type },
+      responseType: "text",
+    };
+
+    const first = await this.request<string>(baseConfig);
+    const firstText = first.data || null;
+    if (!isBlockedUserInfoListResponse(firstText)) return firstText;
+
+    // 这条 AJAX 和用户页是两个入口：站点可能已经放行了 userdetails.php，却仍在挡它。
+    // 先按用户页那套形状试（地址栏直开排在最前），哪一种能拿回真正的列表就用哪一种。
+    // 只在「第一发是拦截外壳」时才会走到这里，正常站点一次都不会多发。
+    for (const variant of [...userInfoRequestVariants(this.url)].reverse()) {
+      try {
+        const retry = await this.request<string>(
+          {
+            ...baseConfig,
+            headers: {
+              ...(variant.headers ?? {}),
+            },
+            ...(variant.data === undefined ? {} : { data: variant.data }),
+          },
+          false,
+        );
+        const retryText = retry.data || null;
+        if (!isBlockedUserInfoListResponse(retryText)) {
+          logEvent({
+            module: "userInfo",
+            level: "warn",
+            msg: `站点 ${this.metadata.id} 的${type === "uploaded" ? "发布" : "做种"}列表请求被拦截，已用「${variant.name}」形状取回`,
+          });
+          return retryText;
+        }
+      } catch {
+        // 这一种形状也失败就试下一种；全部失败时由下面那条日志说明
+      }
+    }
+
+    logEvent({
+      module: "userInfo",
+      level: "warn",
+      msg: `站点 ${this.metadata.id} 的${type === "uploaded" ? "发布" : "做种"}列表请求被拦截，${userInfoRequestVariants(this.url).length} 种请求形状都没取回，本轮不把这一项写成 0`,
     });
-    return data || null;
+    return firstText;
   }
 
   protected async parseUserInfoForSeedingStatus(flushUserInfo: Partial<IUserInfo>): Promise<Partial<IUserInfo>> {
     const userId = flushUserInfo.id as number;
     const userSeedingRequestString = await this.requestUserSeedingPage(userId);
+
+    // 站点把这条 AJAX 也挡了（换完形状仍拿不到列表）：不写 0，留着 undefined 让界面显示未知。
+    // 旧行为是把 0 合并进去 —— 那会让「取不到」在界面上长成「确实没有做种」。
+    if (isBlockedUserInfoListResponse(userSeedingRequestString)) {
+      return flushUserInfo;
+    }
 
     let seedStatus = { seeding: 0, seedingSize: 0 };
     if (userSeedingRequestString && userSeedingRequestString?.includes("<table")) {
@@ -1122,6 +1171,12 @@ export default class NexusPHP extends PrivateSite {
   protected async parseUserInfoForUploads(flushUserInfo: Partial<IUserInfo>): Promise<Partial<IUserInfo>> {
     const userId = flushUserInfo.id as number;
     const userUploadsRequestString = await this.requestUserSeedingPage(userId, "uploaded");
+
+    // 同上：拦截外壳不是「发布数 0」的证据，留着 undefined。
+    if (isBlockedUserInfoListResponse(userUploadsRequestString)) {
+      return flushUserInfo;
+    }
+
     flushUserInfo.uploads = 0;
 
     if (

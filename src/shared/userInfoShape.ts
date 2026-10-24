@@ -294,6 +294,28 @@ export function isBlockShellPage(shape: IPageShape): boolean {
   return isShellPage(shape) && looksLikeBlockText(shape.skeleton);
 }
 
+/**
+ * 做种 / 发布列表（`getusertorrentlistajax.php`）的返回是不是拦截外壳。
+ *
+ * 这条接口正常时只会是两种东西：含 `<table>` 的片段，或「No record. / 没有记录」这类
+ * 明确的空列表。两者都不是、又带着 Forbidden / nginx / 挑战页字样时，才是站点把这条
+ * AJAX 也挡了。空串按「没拿到内容」处理，不在这里判成拦截 —— 那是网络层的另一档。
+ *
+ * 为什么要单独判：用户页被拦时我们已经会换请求形状，但做种数/发布数走的是**另一条
+ * AJAX**，它不在用户页那轮 `process` 里。2026-10-24 PTzone 的现场就是主页面已经取回、
+ * 做种数却仍是 0：这条 AJAX 拿到 137 字符的 `*** Forbidden nginx`，旧代码把它当
+ * 「没有做种」写进 0。
+ */
+export function isBlockedUserInfoListResponse(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return false;
+  if (trimmed.includes("<table")) return false;
+  if (/No record|没有记录|沒有記錄|<b>\d+<\/b>\s*(条记录| records|條記錄)/i.test(trimmed)) return false;
+  if (/Just a moment|Enable JavaScript and cookies to continue|Attention Required/i.test(trimmed)) return true;
+  return trimmed.length < 800 && /Forbidden|Access denied|nginx/i.test(trimmed);
+}
+
 export interface IUserInfoRequestVariant {
   /** 日志里那半句，例如「加 Referer」 */
   name: string;

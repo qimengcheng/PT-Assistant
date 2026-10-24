@@ -17,6 +17,7 @@ import {
   headerTraceLine,
   hostPathOf,
   isBlockShellPage,
+  isBlockedUserInfoListResponse,
   isDefaultish,
   isShellPage,
   isSilentZeroRound,
@@ -632,5 +633,51 @@ describe("标签页兜底：只在拦截档触发，读完就关，且不碰 Coo
   it("后台入口真的注册了这条 handler（否则消息发出去没人接）", () => {
     expect(read("src/entrypoints/background/index.ts")).toContain('import "./utils/pageInTab.ts"');
     expect(read("wxt.config.ts")).toContain('"scripting"');
+  });
+});
+
+describe("做种 / 发布列表 AJAX 的拦截外壳", () => {
+  it("PTzone 那种 137 字符的 *** Forbidden nginx → 判成拦截", () => {
+    const shell = "<html><head><title>*** Forbidden</title></head><body><center><h1>*** Forbidden</h1></center><hr><center>nginx</center></body></html>";
+    expect(shell.length).toBeLessThan(800);
+    expect(isBlockedUserInfoListResponse(shell)).toBe(true);
+  });
+
+  it("带表格的片段 → 不是拦截（正常列表、空表都走这一档）", () => {
+    expect(isBlockedUserInfoListResponse("<table><tr><td>1</td></tr></table>")).toBe(false);
+    expect(isBlockedUserInfoListResponse("<div>No record.</div><table></table>")).toBe(false);
+  });
+
+  it("明确的空列表提示 → 不是拦截（否则会为了一个真的 0 白白多发 5 次）", () => {
+    expect(isBlockedUserInfoListResponse("No record.")).toBe(false);
+    expect(isBlockedUserInfoListResponse("没有记录")).toBe(false);
+    expect(isBlockedUserInfoListResponse("<b>0</b>条记录")).toBe(false);
+  });
+
+  it("空串不判拦截（那是网络层没拿到内容，不是站点挡了）", () => {
+    expect(isBlockedUserInfoListResponse("")).toBe(false);
+    expect(isBlockedUserInfoListResponse(null)).toBe(false);
+    expect(isBlockedUserInfoListResponse(undefined)).toBe(false);
+  });
+
+  it("长挑战页按关键字判，不靠长度漏掉", () => {
+    const challenge = `<html><head><title>Just a moment...</title></head><body>Enable JavaScript and cookies to continue ${"x".repeat(2000)}</body></html>`;
+    expect(challenge.length).toBeGreaterThan(800);
+    expect(isBlockedUserInfoListResponse(challenge)).toBe(true);
+  });
+
+  it("长页面里只是出现 Forbidden 字样不误判（长度 >= 800 的普通页不动）", () => {
+    expect(isBlockedUserInfoListResponse(`<div>${"x".repeat(900)} Forbidden</div>`)).toBe(false);
+  });
+
+  it("接线：做种/发布 AJAX 被拦时按用户页那套形状重试，且拦截档不写 0", () => {
+    // NexusPHP.ts import 了 Sizzle，Node 里挂不起来；这一半只能按源码文本钉。
+    const nexus = read("packages/site/schemas/NexusPHP.ts");
+    expect(nexus).toContain('import { isBlockedUserInfoListResponse, userInfoRequestVariants } from "@/shared/userInfoShape"');
+    expect(nexus).toContain("isBlockedUserInfoListResponse(firstText)");
+    expect(nexus).toContain("[...userInfoRequestVariants(this.url)].reverse()");
+    expect(nexus).toContain("已用「${variant.name}」形状取回");
+    expect(nexus).toMatch(/if \(isBlockedUserInfoListResponse\(userSeedingRequestString\)\) \{\s*\n\s*return flushUserInfo;/);
+    expect(nexus).toMatch(/if \(isBlockedUserInfoListResponse\(userUploadsRequestString\)\) \{\s*\n\s*return flushUserInfo;/);
   });
 });

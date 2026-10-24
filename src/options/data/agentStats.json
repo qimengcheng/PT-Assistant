@@ -1,38 +1,42 @@
 {
   "_comment": "本文件由 `node scripts/gen-agent-stats.mjs` 从 git 历史生成，请勿手改；提交历史变了就重跑。",
-  "generatedAt": "2026-10-17",
-  "headSha": "cfd42ff",
-  "headVersion": "0.106.16",
+  "generatedAt": "2026-10-24",
+  "headSha": "597f1f0",
+  "headVersion": "0.125.3",
   "span": {
-    "commits": 450,
-    "matched": 450,
-    "feat": 102,
+    "commits": 497,
+    "matched": 496,
+    "feat": 121,
     "firstDate": "2026-10-02",
-    "lastDate": "2026-10-17",
+    "lastDate": "2026-10-24",
     "versionFrom": "0.1.0",
-    "versionTo": "0.106.16"
+    "versionTo": "0.125.3"
   },
   "totals": {
-    "handAdd": 96843,
-    "handDel": 19315,
-    "bulkAdd": 93178
+    "handAdd": 114621,
+    "handDel": 20639,
+    "bulkAdd": 93352
   },
   "agents": [
     {
       "name": "Qoder",
-      "commits": 358,
-      "feat": 89,
-      "handAdd": 47378,
-      "handDel": 11676,
-      "bulkAdd": 3550,
+      "commits": 403,
+      "feat": 107,
+      "handAdd": 60309,
+      "handDel": 12967,
+      "bulkAdd": 3724,
       "firstDate": "2026-10-03",
-      "lastDate": "2026-10-17",
+      "lastDate": "2026-10-24",
       "versionFrom": "0.19.1",
-      "versionTo": "0.106.16",
+      "versionTo": "0.125.3",
       "partners": [
         {
           "name": "Qwen3.8-Flash",
-          "count": 358
+          "count": 401
+        },
+        {
+          "name": "DeepSeek-V4.1-Flash",
+          "count": 2
         }
       ]
     },
@@ -56,15 +60,15 @@
     },
     {
       "name": "WorkBuddy",
-      "commits": 23,
-      "feat": 5,
-      "handAdd": 22585,
-      "handDel": 1376,
+      "commits": 24,
+      "feat": 6,
+      "handAdd": 27387,
+      "handDel": 1383,
       "bulkAdd": 87573,
       "firstDate": "2026-10-02",
-      "lastDate": "2026-10-03",
+      "lastDate": "2026-10-20",
       "versionFrom": "0.1.0",
-      "versionTo": "0.19.2",
+      "versionTo": "0.120.0",
       "partners": [
         {
           "name": "GLM-5.3-Flash",
@@ -77,6 +81,10 @@
         {
           "name": "Hy4 preview",
           "count": 3
+        },
+        {
+          "name": "DeepSeek-V4.1-Flash",
+          "count": 1
         }
       ]
     },
@@ -138,19 +146,19 @@
   "models": [
     {
       "name": "Qwen3.8-Flash",
-      "commits": 376,
-      "feat": 90,
-      "handAdd": 54131,
-      "handDel": 12258,
-      "bulkAdd": 3553,
+      "commits": 419,
+      "feat": 108,
+      "handAdd": 66917,
+      "handDel": 13505,
+      "bulkAdd": 3727,
       "firstDate": "2026-10-02",
-      "lastDate": "2026-10-17",
+      "lastDate": "2026-10-24",
       "versionFrom": "0.5.0",
-      "versionTo": "0.106.16",
+      "versionTo": "0.125.1",
       "partners": [
         {
           "name": "Qoder",
-          "count": 358
+          "count": 401
         },
         {
           "name": "千问办公",
@@ -217,6 +225,28 @@
         {
           "name": "TraeCode",
           "count": 12
+        }
+      ]
+    },
+    {
+      "name": "DeepSeek-V4.1-Flash",
+      "commits": 3,
+      "feat": 1,
+      "handAdd": 4947,
+      "handDel": 51,
+      "bulkAdd": 0,
+      "firstDate": "2026-10-20",
+      "lastDate": "2026-10-24",
+      "versionFrom": "0.120.0",
+      "versionTo": "0.125.3",
+      "partners": [
+        {
+          "name": "Qoder",
+          "count": 2
+        },
+        {
+          "name": "WorkBuddy",
+          "count": 1
         }
       ]
     },

@@ -22,6 +22,7 @@ export { isCloudflareBlocked } from "~/extends/axios/retryWhenCloudflareBlock.ts
 export { sleep } from "~/helper.ts";
 
 import type { ISiteUserConfig } from "../types";
+import type { ILoggerItem } from "@/shared/types.ts";
 import type { IExtensionStorageSchema } from "@/storage.ts";
 import type { IMetadataPiniaStorageSchema } from "@/shared/types/storages/metadata.ts";
 import { extStore } from "@/storage.ts";
@@ -63,4 +64,16 @@ export async function retrieveStore(store: keyof IExtensionStorageSchema, keyPat
  */
 export async function cookie(detail: chrome.cookies.CookieDetails): Promise<chrome.cookies.Cookie | null> {
   return await sendMessage("getCookie", detail);
+}
+
+/**
+ * 往「运行日志」那一屏记一条（offscreen 里的内存环形缓冲）。
+ *
+ * 为什么走这里：schemas 里唯一伸向 app 的通道就是这个 adapter 文件（同上的 `cookie()` / `store()`
+ * 都经 `sendMessage`），而 logger 的实现住在 offscreen。日志那条注释定的口径就是
+ * 「非 offscreen 上下文用 `sendMessage("logger", …).catch()`」——这里就是那条路。
+ * 记日志失败（offscreen 还没起来、消息没人接）绝不能反过来影响取数，所以既不 await 也不抛。
+ */
+export function logEvent(item: ILoggerItem): void {
+  sendMessage("logger", item).catch(() => {});
 }

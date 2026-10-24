@@ -20,6 +20,9 @@ import {
   type TPatterns,
   type TUserInfoParseKey,
 } from "../types";
+// noinspection ES6PreferShortImport
+import { logEvent } from "../utils/adapter";
+import { isSilentZeroRound, pageShapeOf, shapeLine, type IPageShape } from "@/shared/userInfoShape";
 
 export const SchemaMetadata: Partial<ISiteMetadata> = {
   version: -1,
@@ -132,6 +135,10 @@ export default class PrivateSite extends BittorrentSite {
     }
 
     try {
+      // 每一步拿回的那一页「长什么样」，只在整轮空手时才会被写进运行日志（见下面的那条 logEvent）。
+      // 收集它不改任何解析行为：状态、字段、返回值一个都不动。
+      const pageShapes: IPageShape[] = [];
+
       for (const thisUserInfoProcess of this.metadata.userInfo.process) {
         // 该步骤能够获取的字段
         const processFields = uniq([
@@ -178,7 +185,24 @@ export default class PrivateSite extends BittorrentSite {
         const requestDelay = thisUserInfoProcess.requestDelay ?? this.metadata.userInfo?.requestDelay ?? 0;
         await this.sleepAction(requestDelay);
 
-        const { data: dataDocument } = await this.request<any>(requestConfig);
+        const response = await this.request<any>(requestConfig);
+        const dataDocument = response.data;
+
+        // 形状读数：只有这一层还握着响应本体（上层拿到的是已经折好的字段值）。
+        // 交出去的六个量都不含账号内容 —— 地址去 query（`userdetails.php?id=<他的 uid>` 那一段），
+        // 正文只留字节数（AGENTS.md §3.5）。
+        const transport = response.request as { responseURL?: string; responseText?: string } | undefined;
+        pageShapes.push(
+          pageShapeOf({
+            status: response.status,
+            finalUrl: transport?.responseURL,
+            requestUrl: requestConfig.url,
+            baseURL: this.url,
+            contentType: response.headers?.["content-type"],
+            data: dataDocument,
+            responseText: transport?.responseText,
+          }),
+        );
 
         for (const key of processFields) {
           const dynamicParseFuncKey = `parseUserInfoFor${pascalCase(key)}` as keyof this;
@@ -200,6 +224,19 @@ export default class PrivateSite extends BittorrentSite {
       // 如果前面没有获取到用户等级的id，则尝试通过定义的 levelRequirements 来获取
       if (this.metadata.levelRequirements && flushUserInfo.levelName && typeof flushUserInfo.levelId === "undefined") {
         flushUserInfo.levelId = this.guessUserLevelId(flushUserInfo as IUserInfo);
+      }
+
+      // 整轮空手才出声（用户 2026-10-24：「这两个怎么获取不到这些数据了？前几天都还可以」）。
+      // 出声之前这里什么都不改：status 照旧 success、字段照旧是那些默认值 —— 这条只是把
+      // 「界面报 0」与「我们拿到的那一页根本没被解析出格子」分开的观测值写进运行日志。
+      // 判据（哪三格算空手、形状怎么折）在 `@/shared/userInfoShape`，那边有 Node 断言。
+      if (pageShapes.length > 0 && isSilentZeroRound(flushUserInfo)) {
+        logEvent({
+          module: "userInfo",
+          level: "warn",
+          msg: `站点 ${this.metadata.id} 这一轮用户信息一格都没命中：${pageShapes.map(shapeLine).join(" ／ ")}`,
+          data: { site: this.metadata.id, pages: pageShapes },
+        });
       }
 
       flushUserInfo.status = EResultParseStatus.success;

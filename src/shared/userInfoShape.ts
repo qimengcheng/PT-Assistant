@@ -12,7 +12,7 @@
  * 所以这里只做一件事：把「那一页长什么样」记成一行读数，交给运行日志。
  *
  * 隐私口径（AGENTS.md §3.5 的另一半）：形状里**只允许出现不含账号内容的量** ——
- * 地址去掉 query（`userdetails.php?id=<他的 uid>` 那一段）、正文只留字节数、不带任何选择器文本与页面内容。
+ * 地址去掉 query（`userdetails.php?id=<他的 uid>` 那一段）、正文只留长度、不带任何选择器文本与页面内容。
  */
 
 /** 一次「取回一个页面」的形状读数 */
@@ -27,22 +27,36 @@ export interface IPageShape {
   isDocument: boolean;
   /** 整页 `<td>` 的个数；不是文档时 -1（未知，不是 0） */
   cells: number;
-  /** 正文字节数；拿不到时 -1 */
-  bytes: number;
+  /** 正文长度（字符数）；三条来路都拿不到时 -1 */
+  textLength: number;
 }
 
 /** `pageShapeOf` 的入参：全部是「可能拿不到」的观测值，缺什么就落成 -1 / "?" */
 export type TPageShapeInput = {
   status?: unknown;
-  /** 重定向之后的最终地址（XHR 的 responseURL），拿不到时退回请求配置里那一条 */
-  finalUrl?: unknown;
+  /**
+   * 传输层对象本身（XHR 那类）。**刻意不收 `finalUrl` / `responseText` 两个现成的值**：
+   * 真 XHR 在 `responseType` 为 `document` 时读 `responseText` 会抛 `InvalidStateError`
+   * （实测报错原文：`The value is only accessible if the object's 'responseType' is '' or 'text' (was 'document')`），
+   * 而用户信息那一条请求默认就是 `document` —— 在调用点直接取属性等于把取数整轮炸成 parseError（v0.125.0 就这么坏过一次）。
+   * 交对象进来，读属性的那两下由本文件负责兜住。
+   */
+  transport?: unknown;
   requestUrl?: unknown;
   baseURL?: unknown;
   contentType?: unknown;
   data?: unknown;
-  /** XHR 的原始文本（responseType 为 document 时它还在，是字节数的唯一来源） */
-  responseText?: unknown;
 };
+
+/** 读一个「可能抛」的属性：抛了就当没有，绝不让观测值反过来影响取数 */
+function safeProp(obj: unknown, key: string): unknown {
+  if (obj === null || typeof obj !== "object") return undefined;
+  try {
+    return (obj as Record<string, unknown>)[key];
+  } catch {
+    return undefined;
+  }
+}
 
 /** 只有真的能查询元素的对象才算文档；Node 里没有 Document 全局，走这条鸭子判据 */
 function looksLikeDocument(data: unknown): boolean {
@@ -75,26 +89,30 @@ export function hostPathOf(url: unknown): string {
 export function pageShapeOf(input: TPageShapeInput): IPageShape {
   const isDocument = looksLikeDocument(input.data);
   let cells = -1;
+  let textLength = -1;
   if (isDocument) {
-    const found = (input.data as { querySelectorAll: (s: string) => { length: number } }).querySelectorAll("td");
+    const doc = input.data as {
+      querySelectorAll: (s: string) => { length: number };
+      documentElement?: { outerHTML?: string };
+    };
+    const found = doc.querySelectorAll("td");
     cells = typeof found?.length === "number" ? found.length : -1;
+    // 文档型响应拿不到 XHR 原文，序列化后的长度是同一件事的最近读数
+    const outerHTML = safeProp(safeProp(doc, "documentElement"), "outerHTML");
+    if (typeof outerHTML === "string") textLength = outerHTML.length;
   }
-  const bytes =
-    typeof input.responseText === "string"
-      ? input.responseText.length
-      : typeof input.data === "string"
-        ? input.data.length
-        : -1;
+  const transportText = safeProp(input.transport, "responseText");
+  if (typeof transportText === "string" && transportText.length > 0) textLength = transportText.length;
+  else if (textLength < 0 && typeof input.data === "string") textLength = input.data.length;
 
+  const finalUrl = safeProp(input.transport, "responseURL");
   return {
     status: typeof input.status === "number" ? input.status : -1,
-    hostPath: hostPathOf(
-      typeof input.finalUrl === "string" && input.finalUrl.length > 0 ? input.finalUrl : joinUrl(input.requestUrl, input.baseURL),
-    ),
+    hostPath: hostPathOf(typeof finalUrl === "string" && finalUrl.length > 0 ? finalUrl : joinUrl(input.requestUrl, input.baseURL)),
     contentType: typeof input.contentType === "string" && input.contentType.length > 0 ? input.contentType : "?",
     isDocument,
     cells,
-    bytes,
+    textLength,
   };
 }
 
@@ -127,6 +145,6 @@ export function isSilentZeroRound(record: object): boolean {
 /** 一行读数（运行日志那一列是 ellipsis 的，短句优先，细节在 data 里） */
 export function shapeLine(shape: IPageShape): string {
   const cells = shape.cells >= 0 ? `td ${shape.cells} 个` : "格子数未知";
-  const bytes = shape.bytes >= 0 ? `${shape.bytes} 字节` : "字节数未知";
-  return `HTTP ${shape.status} · ${shape.hostPath} · ${shape.contentType} · ${bytes} · ${shape.isDocument ? "已解析成文档" : "不是文档"} · ${cells}`;
+  const text = shape.textLength >= 0 ? `${shape.textLength} 字符` : "正文长度未知";
+  return `HTTP ${shape.status} · ${shape.hostPath} · ${shape.contentType} · ${text} · ${shape.isDocument ? "已解析成文档" : "不是文档"} · ${cells}`;
 }

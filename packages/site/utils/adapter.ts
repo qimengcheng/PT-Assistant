@@ -75,5 +75,9 @@ export async function cookie(detail: chrome.cookies.CookieDetails): Promise<chro
  * 记日志失败（offscreen 还没起来、消息没人接）绝不能反过来影响取数，所以既不 await 也不抛。
  */
 export function logEvent(item: ILoggerItem): void {
-  sendMessage("logger", item).catch(() => {});
+  try {
+    sendMessage("logger", item).catch(() => {});
+  } catch {
+    // 同上：连「发不出去」这种同步失败也不许反过来影响调用方
+  }
 }

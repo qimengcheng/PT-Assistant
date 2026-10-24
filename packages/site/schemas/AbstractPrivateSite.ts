@@ -189,20 +189,24 @@ export default class PrivateSite extends BittorrentSite {
         const dataDocument = response.data;
 
         // 形状读数：只有这一层还握着响应本体（上层拿到的是已经折好的字段值）。
-        // 交出去的六个量都不含账号内容 —— 地址去 query（`userdetails.php?id=<他的 uid>` 那一段），
-        // 正文只留字节数（AGENTS.md §3.5）。
-        const transport = response.request as { responseURL?: string; responseText?: string } | undefined;
-        pageShapes.push(
-          pageShapeOf({
-            status: response.status,
-            finalUrl: transport?.responseURL,
-            requestUrl: requestConfig.url,
-            baseURL: this.url,
-            contentType: response.headers?.["content-type"],
-            data: dataDocument,
-            responseText: transport?.responseText,
-          }),
-        );
+        // 交出去的是**对象本身**不是它的属性 —— 真 XHR 在 responseType 为 document 时读 `responseText`
+        // 会抛 InvalidStateError，在调用点取属性等于把整轮取数炸成 parseError（v0.125.0 就是这么坏的，
+        // 用户 2026-10-24：「现在变成解析错误了」）。属性读取归 `@/shared/userInfoShape` 逐条兜。
+        // 外面再套一层：观测件不许有弄坏被观测那条路的能力。
+        try {
+          pageShapes.push(
+            pageShapeOf({
+              status: response.status,
+              transport: response.request,
+              requestUrl: requestConfig.url,
+              baseURL: this.url,
+              contentType: response.headers?.["content-type"],
+              data: dataDocument,
+            }),
+          );
+        } catch {
+          // 少一条读数比整轮取数变成 parseError 好
+        }
 
         for (const key of processFields) {
           const dynamicParseFuncKey = `parseUserInfoFor${pascalCase(key)}` as keyof this;

@@ -26,7 +26,21 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const read = (rel: string) => readFileSync(join(repoRoot, rel), "utf8").replace(/\r\n/g, "\n");
 
 /** 一个「像文档」的对象：只要有 querySelectorAll 就够了（Node 里没有 Document 全局） */
-const fakeDoc = (cells: number) => ({ querySelectorAll: () => ({ length: cells }) });
+const fakeDoc = (cells: number, outerHTMLLength?: number) => ({
+  querySelectorAll: () => ({ length: cells }),
+  ...(outerHTMLLength === undefined ? {} : { documentElement: { outerHTML: "z".repeat(outerHTMLLength) } }),
+});
+
+/**
+ * 真 XHR 在 `responseType` 为 `document` 时的形状：读 `responseText` 直接抛 InvalidStateError。
+ * v0.125.0 就是在调用点这么读的，结果整轮取数被外层 catch 盖成 parseError（用户 2026-10-24：「现在变成解析错误了」）。
+ */
+const throwingTransport = (responseURL: string) => ({
+  responseURL,
+  get responseText(): string {
+    throw new Error("InvalidStateError: only accessible if responseType is '' or 'text'");
+  },
+});
 
 const SITE = "packages/site/schemas/AbstractPrivateSite.ts";
 const SHARED = "src/shared/userInfoShape.ts";
@@ -38,12 +52,12 @@ describe("地址只留 host + path（隐私那一半）", () => {
   });
 
   it("那一串 uid 不许从任何出口漏出去", () => {
+    // 夹具用合成 id：真的账号标识不许进仓库（AGENTS.md §3.5）
     const shape = pageShapeOf({
       status: 200,
-      finalUrl: "https://ptzone.xyz/userdetails.php?id=10001",
+      transport: { responseURL: "https://ptzone.xyz/userdetails.php?id=10001", responseText: "x".repeat(10) },
       contentType: "text/html",
       data: fakeDoc(0),
-      responseText: "x".repeat(10),
     });
     expect(shape.hostPath).not.toContain("10001");
     expect(shape.hostPath).not.toContain("?");
@@ -61,27 +75,55 @@ describe("地址只留 host + path（隐私那一半）", () => {
 
 describe("一次响应折成六个观测值", () => {
   it("文档型：isDocument 为真、格子数照数", () => {
-    const shape = pageShapeOf({ status: 200, finalUrl: "https://a.test/i.php", data: fakeDoc(137), contentType: "text/html" });
+    const shape = pageShapeOf({
+      status: 200,
+      transport: { responseURL: "https://a.test/i.php" },
+      data: fakeDoc(137),
+      contentType: "text/html",
+    });
     expect(shape).toEqual({
       status: 200,
       hostPath: "a.test/i.php",
       contentType: "text/html",
       isDocument: true,
       cells: 137,
-      bytes: -1,
+      textLength: -1,
     });
   });
 
   it("不是文档（例如 Content-Type 变了、XHR 按 XML 解析）：格子数是未知而不是 0", () => {
-    const shape = pageShapeOf({ status: 200, finalUrl: "https://a.test/i.php", data: "<html></html>", contentType: "application/xml" });
+    const shape = pageShapeOf({
+      status: 200,
+      transport: { responseURL: "https://a.test/i.php" },
+      data: "<html></html>",
+      contentType: "application/xml",
+    });
     expect(shape.isDocument).toBe(false);
     expect(shape.cells).toBe(-1);
-    expect(shape.bytes).toBe("<html></html>".length);
+    expect(shape.textLength).toBe("<html></html>".length);
   });
 
-  it("字节数优先取 responseText（document 型响应里正文长度只剩它能给）", () => {
-    const shape = pageShapeOf({ data: fakeDoc(3), responseText: "abcdefgh", contentType: "text/html" });
-    expect(shape.bytes).toBe(8);
+  it("传输层读 responseText 会抛（真 XHR 在 responseType=document 时就这样）：不许把异常传出去", () => {
+    const shape = pageShapeOf({ status: 200, transport: throwingTransport("https://a.test/i.php"), data: fakeDoc(12) });
+    expect(shape.hostPath).toBe("a.test/i.php");
+    expect(shape.cells).toBe(12);
+    expect(shape.textLength).toBe(-1);
+  });
+
+  it("文档型拿不到原文时，正文长度退回 documentElement.outerHTML", () => {
+    const shape = pageShapeOf({ transport: throwingTransport("https://a.test/i.php"), data: fakeDoc(3, 4096) });
+    expect(shape.textLength).toBe(4096);
+  });
+
+  it("原文拿得到时以它为准（它比序列化后的 DOM 更接近站点真发的那一份）", () => {
+    const shape = pageShapeOf({ data: fakeDoc(3, 4096), transport: { responseText: "abcdefgh" }, contentType: "text/html" });
+    expect(shape.textLength).toBe(8);
+  });
+
+  it("传输层整个缺席（fetch 型适配器不给 request）：其余读数照给，地址退回请求配置", () => {
+    const shape = pageShapeOf({ status: 200, requestUrl: "userdetails.php", baseURL: "https://a.test/", data: fakeDoc(9) });
+    expect(shape.hostPath).toBe("a.test/userdetails.php");
+    expect(shape.cells).toBe(9);
   });
 
   it("缺什么落成什么：状态 -1、Content-Type ?，都不编一个假数", () => {
@@ -118,27 +160,26 @@ describe("什么算「整轮一格都没命中」", () => {
 });
 
 describe("一行读数把六个量都带上", () => {
-  it("状态 / 地址 / 类型 / 字节 / 是不是文档 / 格子数", () => {
+  it("状态 / 地址 / 类型 / 正文长度 / 是不是文档 / 格子数", () => {
     const line = shapeLine(
       pageShapeOf({
         status: 200,
-        finalUrl: "https://ptzone.xyz/userdetails.php?id=1",
+        transport: { responseURL: "https://ptzone.xyz/userdetails.php?id=1", responseText: "y".repeat(17680) },
         contentType: "text/html;charset=utf-8",
         data: fakeDoc(0),
-        responseText: "y".repeat(17680),
       }),
     );
     expect(line).toContain("HTTP 200");
     expect(line).toContain("ptzone.xyz/userdetails.php");
     expect(line).toContain("text/html;charset=utf-8");
-    expect(line).toContain("17680 字节");
+    expect(line).toContain("17680 字符");
     expect(line).toContain("已解析成文档");
     expect(line).toContain("td 0 个");
   });
 
   it("拿不到的那两项明写「未知」，不写成 0", () => {
     const line = shapeLine(pageShapeOf({}));
-    expect(line).toContain("字节数未知");
+    expect(line).toContain("正文长度未知");
     expect(line).toContain("格子数未知");
   });
 });
@@ -175,7 +216,19 @@ describe("接线：AbstractPrivateSite 真的用了这份判据", () => {
     }
   });
 
-  it("最终地址取重定向之后的那一条（这才分得开「拿到的是不是登录页」）", () => {
-    expect(src).toMatch(/finalUrl:\s*transport\?\.responseURL/);
+  it("出声那条也不许有弄坏取数的能力（连同步抛都要兜住）", () => {
+    const adapter = read("packages/site/utils/adapter.ts");
+    const body = adapter.slice(adapter.indexOf("export function logEvent"));
+    expect(body).toMatch(/try \{[\s\S]*sendMessage\("logger"[\s\S]*\} catch/);
+  });
+
+  it("调用点交的是传输层对象本身，不在那里读它的属性", () => {
+    // v0.125.0 坏在 `transport?.responseText`：真 XHR 在 responseType=document 时读它会抛
+    // InvalidStateError，而这一句在 try 里 ⇒ 整轮取数被外层 catch 盖成 parseError。
+    // 读属性归判据管（那边逐条 try 过），所以这一条按「调用点不出现属性读」来钉。
+    expect(src).toMatch(/transport:\s*response\.request,/);
+    expect(src).not.toMatch(/\?\.(responseText|responseURL)/);
+    // 外面那一层 try 是「观测件不许有弄坏被观测那条路的能力」这条规矩的落地
+    expect(src).toMatch(/try \{\s*\n\s*pageShapes\.push\(/);
   });
 });

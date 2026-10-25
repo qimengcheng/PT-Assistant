@@ -4,17 +4,33 @@
 
 import { onMessage } from "@/messages.ts";
 import { mergeTaskPreservingAutoState } from "@/shared/keepUploadTaskSave.ts";
+import { createSerialQueue } from "@/shared/serialQueue.ts";
 import type { IKeepUploadTask, TKeepUploadTaskKey, TKeepUploadTaskStorageSchema } from "@/shared/types.ts";
 import { extStore } from "@/storage.ts";
 
 const STORAGE_KEY = "keepUploadTask" as const;
 
 /**
+ * 这个键的每一次「读—改—写」都排进同一条队列。
+ *
+ * 为什么必须串行（用户 2026-10-25：「这个把他删除之后又自己跑出来了」）：任务都装在同一个 blob 里，
+ * 更新是「读整份 → 改一条 → 写回整份」，而删除也是同一份 blob 的读—改—写。一次删除若落在
+ * 某次在途更新的读与写之间，更新写回的那份**旧快照**会把刚删掉的任务原样带回来（创建时间都还是旧的）。
+ * 「进页面自动回查」就会在挂载那几秒里写整条任务（认亲 / 刷新基准路径），所以这个窗口是真实存在的。
+ *
+ * storage.ts 里那条写队列只能把「写」串起来，读在它外面 —— 挡不住「读完之后、写之前」插进来的删除。
+ * 所以这一层自己按调用顺序串起来：删除要么整段跑在更新之前，要么整段跑在它之后，不存在夹在中间。
+ */
+const enqueue = createSerialQueue();
+
+/**
  * 获取所有辅种任务
  */
-export async function getKeepUploadTasks(): Promise<IKeepUploadTask[]> {
-  const tasks = await extStore.getItem(STORAGE_KEY);
-  return tasks ? Object.values(tasks as TKeepUploadTaskStorageSchema) : [];
+export function getKeepUploadTasks(): Promise<IKeepUploadTask[]> {
+  return enqueue(async () => {
+    const tasks = await extStore.getItem(STORAGE_KEY);
+    return tasks ? Object.values(tasks as TKeepUploadTaskStorageSchema) : [];
+  });
 }
 
 onMessage("getKeepUploadTasks", getKeepUploadTasks);
@@ -22,9 +38,11 @@ onMessage("getKeepUploadTasks", getKeepUploadTasks);
 /**
  * 根据ID获取辅种任务
  */
-export async function getKeepUploadTaskById(taskId: TKeepUploadTaskKey): Promise<IKeepUploadTask | undefined> {
-  const tasks = await extStore.getItem(STORAGE_KEY);
-  return (tasks as TKeepUploadTaskStorageSchema)?.[taskId];
+export function getKeepUploadTaskById(taskId: TKeepUploadTaskKey): Promise<IKeepUploadTask | undefined> {
+  return enqueue(async () => {
+    const tasks = await extStore.getItem(STORAGE_KEY);
+    return (tasks as TKeepUploadTaskStorageSchema)?.[taskId];
+  });
 }
 
 onMessage("getKeepUploadTaskById", async ({ data: taskId }) => {
@@ -35,10 +53,12 @@ onMessage("getKeepUploadTaskById", async ({ data: taskId }) => {
 /**
  * 创建辅种任务
  */
-export async function createKeepUploadTask(task: IKeepUploadTask): Promise<void> {
-  const tasks = ((await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema) || {};
-  tasks[task.id] = task;
-  await extStore.setItem(STORAGE_KEY, tasks);
+export function createKeepUploadTask(task: IKeepUploadTask): Promise<void> {
+  return enqueue(async () => {
+    const tasks = ((await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema) || {};
+    tasks[task.id] = task;
+    await extStore.setItem(STORAGE_KEY, tasks);
+  });
 }
 
 onMessage("createKeepUploadTask", async ({ data: task }) => {
@@ -54,12 +74,14 @@ onMessage("createKeepUploadTask", async ({ data: task }) => {
  * 「辅种已停止发送」就是这么来的，`othersSent` 被抹掉还会把已发出去的那几条再发一次）。
  * 判据与理由在 `@/shared/keepUploadTaskSave.ts`。
  */
-export async function updateKeepUploadTask(task: IKeepUploadTask): Promise<void> {
-  const tasks = ((await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema) || {};
-  if (tasks[task.id]) {
-    tasks[task.id] = mergeTaskPreservingAutoState(tasks[task.id], task);
-    await extStore.setItem(STORAGE_KEY, tasks);
-  }
+export function updateKeepUploadTask(task: IKeepUploadTask): Promise<void> {
+  return enqueue(async () => {
+    const tasks = ((await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema) || {};
+    if (tasks[task.id]) {
+      tasks[task.id] = mergeTaskPreservingAutoState(tasks[task.id], task);
+      await extStore.setItem(STORAGE_KEY, tasks);
+    }
+  });
 }
 
 onMessage("updateKeepUploadTask", async ({ data: task }) => {
@@ -78,9 +100,11 @@ onMessage("updateKeepUploadTask", async ({ data: task }) => {
  */
 onMessage("patchKeepUploadTaskAutoState", async ({ data }) => {
   const { taskId, autoState } = data;
-  const tasks = (await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema | null;
-  if (!tasks || !tasks[taskId]) return;
-  await extStore.patchItem(STORAGE_KEY, `${taskId}.autoState`, autoState);
+  await enqueue(async () => {
+    const tasks = (await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema | null;
+    if (!tasks || !tasks[taskId]) return;
+    await extStore.patchItem(STORAGE_KEY, `${taskId}.autoState`, autoState);
+  });
 });
 
 /**
@@ -89,9 +113,11 @@ onMessage("patchKeepUploadTaskAutoState", async ({ data }) => {
  */
 onMessage("patchKeepUploadTaskVerify", async ({ data }) => {
   const { taskId, verify } = data;
-  const tasks = (await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema | null;
-  if (!tasks || !tasks[taskId]) return;
-  await extStore.patchItem(STORAGE_KEY, `${taskId}.verify`, verify);
+  await enqueue(async () => {
+    const tasks = (await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema | null;
+    if (!tasks || !tasks[taskId]) return;
+    await extStore.patchItem(STORAGE_KEY, `${taskId}.verify`, verify);
+  });
 });
 
 /**
@@ -100,18 +126,22 @@ onMessage("patchKeepUploadTaskVerify", async ({ data }) => {
  */
 onMessage("patchKeepUploadTaskBaseLocal", async ({ data }) => {
   const { taskId, baseLocal } = data;
-  const tasks = (await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema | null;
-  if (!tasks || !tasks[taskId]) return;
-  await extStore.patchItem(STORAGE_KEY, `${taskId}.baseLocal`, baseLocal);
+  await enqueue(async () => {
+    const tasks = (await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema | null;
+    if (!tasks || !tasks[taskId]) return;
+    await extStore.patchItem(STORAGE_KEY, `${taskId}.baseLocal`, baseLocal);
+  });
 });
 
 /**
  * 删除辅种任务
  */
-export async function deleteKeepUploadTask(taskId: TKeepUploadTaskKey): Promise<void> {
-  const tasks = ((await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema) || {};
-  delete tasks[taskId];
-  await extStore.setItem(STORAGE_KEY, tasks);
+export function deleteKeepUploadTask(taskId: TKeepUploadTaskKey): Promise<void> {
+  return enqueue(async () => {
+    const tasks = ((await extStore.getItem(STORAGE_KEY)) as TKeepUploadTaskStorageSchema) || {};
+    delete tasks[taskId];
+    await extStore.setItem(STORAGE_KEY, tasks);
+  });
 }
 
 onMessage("deleteKeepUploadTask", async ({ data: taskId }) => {
@@ -121,8 +151,10 @@ onMessage("deleteKeepUploadTask", async ({ data: taskId }) => {
 /**
  * 清空所有辅种任务
  */
-export async function clearKeepUploadTasks(): Promise<void> {
-  await extStore.setItem(STORAGE_KEY, {});
+export function clearKeepUploadTasks(): Promise<void> {
+  return enqueue(async () => {
+    await extStore.setItem(STORAGE_KEY, {});
+  });
 }
 
 onMessage("clearKeepUploadTasks", clearKeepUploadTasks);

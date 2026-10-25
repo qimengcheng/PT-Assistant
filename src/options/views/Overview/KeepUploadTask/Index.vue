@@ -618,10 +618,18 @@ onMounted(() => {
  * 不走 `loadTasks`：那颗 `loading` 是给整张表套一层 Spin（AGENTS §3.4「轮询的表不许翻 loading」），
  * 每分钟把整页暗一下、遮罩期间还点不动，比迟一分钟看到更新更糟。
  * 回包先比一次，内容没变就不换数组引用，免得每分钟白重排一遍整张表。
+ *
+ * `listEpoch`：删除/清空这类**本地动作**开始时把轮次 +1，一趟在这之前发出的读取即使回来得晚，
+ * 也不再拿它铺回列表 —— 否则「读到了删除前的那份、删除后才回包」会让刚删掉的那一行在界面上复活
+ * （不会写回存储，但看上去就是「又自己跑出来了」）。
  */
+let listEpoch = 0;
+
 async function refreshTasksFromStorage() {
+  const epoch = listEpoch;
   try {
     const next = await sendMessage("getKeepUploadTasks", undefined);
+    if (epoch !== listEpoch) return;
     if (JSON.stringify(next) === JSON.stringify(tasks.value)) return;
     tasks.value = next;
   } catch {
@@ -673,6 +681,8 @@ async function deleteTask(task: IKeepUploadTask) {
 
   try {
     await sendMessage("deleteKeepUploadTask", task.id);
+    // 删除前发出的那份列表读取，回来得再晚也不许把这一行铺回来（见 refreshTasksFromStorage 的注释）
+    listEpoch += 1;
     tasks.value = tasks.value.filter((item) => item.id !== task.id);
     runtimeStore.showSnakebar(t("KeepUploadTask.deleteSuccess"), { color: "success" });
   } catch (e) {
@@ -698,6 +708,7 @@ async function deleteTasksByIds(ids: TKeepUploadTaskKey[]): Promise<number> {
     }
   }
   tasks.value = tasks.value.filter((item) => !removed.includes(item.id));
+  listEpoch += 1;
   return removed.length;
 }
 
@@ -742,6 +753,7 @@ async function clearAllTasks() {
 
   try {
     await sendMessage("clearKeepUploadTasks", undefined);
+    listEpoch += 1;
     tasks.value = [];
     runtimeStore.showSnakebar(t("KeepUploadTask.clearSuccess"), { color: "success" });
   } catch (e) {

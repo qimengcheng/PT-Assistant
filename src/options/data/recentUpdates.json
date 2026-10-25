@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-10-25 10:21:03",
-  "headSha": "5e6c330",
+  "generatedAt": "2026-10-25 13:33:34",
+  "headSha": "a1bed59",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.126.6",
+      "date": "2026-10-25 13:33:34",
+      "added": [],
+      "addedTotal": 0,
+      "improved": [
+        "辅种任务删除后不会再自己出现：删除那一刻正好有一轮状态回查在跑时，它会把旧的任务快照又写回去；现在删除与这些写回按先后顺序执行，删除后旧列表也不会把这一行短暂铺回来。"
+      ],
+      "improvedTotal": 1
+    },
     {
       "version": "0.126.5",
       "date": "2026-10-25 10:21:03",

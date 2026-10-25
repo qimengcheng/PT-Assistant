@@ -339,8 +339,14 @@ const tableRows = computed<ITaskRow[]>(() =>
   })),
 );
 
-/** 条目行不给复选框：批量删除删的是任务，勾选一条子种子没有对应动作 */
-const rowCheckboxProps = (row: TTableRow) => (row.kind === "item" ? { style: { display: "none" } } : {});
+/**
+ * 条目行不给复选框：批量删除删的是任务，勾选一条子种子没有对应动作。
+ * `display: none` 只藏住了那颗框，**挡不住表头全选** —— rc-table 的全选吃的是 flattenData，
+ * 树形数据连子行一起收，子行 key 会照样进 selectedTasks，批量删除就变成拿条目 key 去删任务
+ * （台架 .tmp-build/bench-antd17 实测：不加 disabled 时全选得到 5 个 key，加了只剩 2 个任务 key）。
+ */
+const rowCheckboxProps = (row: TTableRow) =>
+  row.kind === "item" ? { disabled: true, style: { display: "none" } } : {};
 
 // —— 两种行共用的取值：条目行取自己那条，任务行取任务本身 ——
 const rowTitle = (row: TTableRow) => (row.kind === "item" ? row.item.title : row.task.title);

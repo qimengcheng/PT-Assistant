@@ -7,7 +7,7 @@
  * 修一处 bug 要改八九个文件，且很容易漏（MyClient 就是因为漏抄，表格完全没有排序功能）。
  * 这里收敛成单一实现，各页面只提供自己的表头定义与 key。
  */
-import type { TableColumnsType, TablePaginationConfig } from "antdv-next";
+import type { TableColumnsType, TablePaginationConfig } from "@zboson/ui";
 
 /** vuetify 的 order 是 asc/desc，antd 的 SortOrder 是 ascend/descend */
 export function toAntdSortOrder(order: "asc" | "desc" | undefined | null): "ascend" | "descend" | null {

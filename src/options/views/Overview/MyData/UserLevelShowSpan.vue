@@ -32,7 +32,7 @@ import {
   ThunderboltOutlined,
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 const {
   userInfo,

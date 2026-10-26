@@ -1,14 +1,18 @@
 <script setup lang="ts">
 /**
- * 备份基础设置：自动备份总闸 + 备份加密密钥 + PT-Plugin-Plus 旧数据导入入口。
+ * 备份设置：自动备份总闸 + 备份加密密钥 + PT-Plugin-Plus 旧数据导入入口。
+ *
+ * v0.121.0 从 `SetBase/BackupWindow.vue` 搬来，与同一页的备份服务器列表、恢复入口并在一处。
+ * 起因是这三样在语义上是一件事却分了两个入口：密钥与总闸在「基础设置」里，服务器与恢复在
+ * 左侧「数据备份」里 —— 而恢复失败最常见的原因就是密钥在 A 处、包在 B 处。
  */
 import JSZip from "jszip";
 import { nanoid } from "nanoid";
 import { ref, shallowRef, watch } from "vue";
 import { useThrottledRefHistory } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
-import { message } from "antdv-next";
-import { InboxOutlined, KeyOutlined, RollbackOutlined } from "@antdv-next/icons";
+import { message } from "@zboson/ui";
+import { InboxOutlined, KeyOutlined, RollbackOutlined } from "@zboson/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import type { IPtppDumpUserInfo } from "@/shared/types.ts";
@@ -21,8 +25,9 @@ const configStore = useConfigStore();
 /**
  * ⚠️ configStore 是 persistWebExt 的 store，取数走 chrome.storage.local.get，
  * **异步水合**。在 setup 里同步读 configStore.backup.encryptionKey 拿到的是
- * 初始值（空串），不是用户真正的密钥 —— 这一节不是点开才挂的：SetBase/Index.vue:300
- * 的 v-for 一次性把九节全挂上，所以冷启动进「常规设置」的那一刻就会读到空串。
+ * 初始值（空串），不是用户真正的密钥 —— 这一块挂在 `a-collapse` 里，**必须**
+ * 由调用方给 `force-render`，让内容在收起状态下也已挂载：面板懒渲染的话，
+ * 下面那个 `$onReady` 回调要等用户展开才注册，而那时输入框已经带着空串画出来过一次了。
  *
  * 后果有两条：
  *  1. 输入框是空的，看着像「这个备份没有密钥」；
@@ -72,7 +77,7 @@ async function loadPTPPBackupFile(file: File) {
     parsedPtppUserData.value = JSON.parse(ptppUserDataFileRawContent);
     showRestorePtppUserDataDialog.value = true;
   } catch {
-    message.error(t("SetBase.BackupWindow.invalidFileFormat"));
+    message.error(t("SetBackup.settings.invalidFileFormat"));
   }
 }
 
@@ -92,38 +97,38 @@ function pickPtppFile(file: File) {
   <div class="backup-window">
     <a-form layout="vertical" class="compact-form">
       <div class="group">
-        <div class="group-title">{{ t("SetBase.BackupWindow.groupEncryption") }}</div>
+        <div class="group-title">{{ t("SetBackup.settings.groupEncryption") }}</div>
         <a-form-item
-          :label="t('SetBase.BackupWindow.encryptionKey')"
-          :extra="t('SetBase.BackupWindow.encryptionKeyHint')"
+          :label="t('SetBackup.settings.encryptionKey')"
+          :extra="t('SetBackup.settings.encryptionKeyHint')"
         >
           <!-- 水合回来之前整组不可用：此刻输入框是空的（不是「没设密钥」），
                点「随机密钥」会生成新密钥盖掉真实密钥，已有备份就再也解不开了。 -->
           <a-alert v-if="!isKeyReady" type="info" show-icon class="mb-2">
-            <template #message>{{ t("SetBase.BackupWindow.loadingKey") }}</template>
+            <template #message>{{ t("SetBackup.settings.loadingKey") }}</template>
           </a-alert>
           <a-space-compact>
             <a-input-password
               v-model:value="encryptionKey"
               class="key-input"
-              :placeholder="t('SetBase.BackupWindow.encryptionKeyPlaceholder')"
+              :placeholder="t('SetBackup.settings.encryptionKeyPlaceholder')"
               autocomplete="new-password"
               :disabled="!isKeyReady"
             />
-            <a-tooltip :title="t('SetBase.BackupWindow.randomKeyTooltip')">
+            <a-tooltip :title="t('SetBackup.settings.randomKeyTooltip')">
               <a-button :disabled="!isKeyReady" @click="randomEncryptionKey">
                 <template #icon>
                   <KeyOutlined />
                 </template>
-                {{ t("SetBase.BackupWindow.randomKey") }}
+                {{ t("SetBackup.settings.randomKey") }}
               </a-button>
             </a-tooltip>
-            <a-tooltip v-if="history.length > 1" :title="t('SetBase.BackupWindow.undoKeyTooltip')">
+            <a-tooltip v-if="history.length > 1" :title="t('SetBackup.settings.undoKeyTooltip')">
               <a-button @click="undoEncryptionKey">
                 <template #icon>
                   <RollbackOutlined />
                 </template>
-                {{ t("SetBase.BackupWindow.undo") }}
+                {{ t("SetBackup.settings.undo") }}
               </a-button>
             </a-tooltip>
           </a-space-compact>
@@ -131,26 +136,26 @@ function pickPtppFile(file: File) {
       </div>
 
       <div class="group">
-        <div class="group-title">{{ t("SetBase.BackupWindow.groupAutoBackup") }}</div>
+        <div class="group-title">{{ t("SetBackup.settings.groupAutoBackup") }}</div>
         <!-- 这是自动备份的总闸（v0.106.13 起）：关上之后后台那一轮定时检查直接不干活，
              每台服务器自己的 enabled + backupInterval 只在它开着时才起作用。 -->
         <div class="switch-item">
           <a-switch v-model:checked="configStore.backup.enabledAutoBackup" size="small" />
-          <span class="label">{{ t("SetBase.BackupWindow.enabledAutoBackup") }}</span>
+          <span class="label">{{ t("SetBackup.settings.enabledAutoBackup") }}</span>
         </div>
-        <div class="auto-backup-hint">{{ t("SetBase.BackupWindow.enabledAutoBackupHint") }}</div>
+        <div class="auto-backup-hint">{{ t("SetBackup.settings.enabledAutoBackupHint") }}</div>
       </div>
 
       <div class="group">
-        <div class="group-title">{{ t("SetBase.BackupWindow.groupImportPtpp") }}</div>
+        <div class="group-title">{{ t("SetBackup.settings.groupImportPtpp") }}</div>
         <a-alert class="import-alert" type="info" show-icon>
-          <template #message>{{ t("SetBase.BackupWindow.importPtppMessage") }}</template>
+          <template #message>{{ t("SetBackup.settings.importPtppMessage") }}</template>
           <template #description>
-            <div class="steps-lead">{{ t("SetBase.BackupWindow.importPtppStepsLead") }}</div>
+            <div class="steps-lead">{{ t("SetBackup.settings.importPtppStepsLead") }}</div>
             <ol class="import-steps">
-              <li>{{ t("SetBase.BackupWindow.importPtppStep1") }}</li>
-              <li>{{ t("SetBase.BackupWindow.importPtppStep2") }}</li>
-              <li>{{ t("SetBase.BackupWindow.importPtppStep3") }}</li>
+              <li>{{ t("SetBackup.settings.importPtppStep1") }}</li>
+              <li>{{ t("SetBackup.settings.importPtppStep2") }}</li>
+              <li>{{ t("SetBackup.settings.importPtppStep3") }}</li>
             </ol>
           </template>
         </a-alert>
@@ -164,8 +169,8 @@ function pickPtppFile(file: File) {
           <p class="drop-icon">
             <InboxOutlined />
           </p>
-          <p class="drop-title">{{ t("SetBase.BackupWindow.dropTitle") }}</p>
-          <p class="drop-hint">{{ t("SetBase.BackupWindow.dropHint") }}</p>
+          <p class="drop-title">{{ t("SetBackup.settings.dropTitle") }}</p>
+          <p class="drop-hint">{{ t("SetBackup.settings.dropHint") }}</p>
         </a-upload-dragger>
       </div>
     </a-form>
@@ -175,8 +180,42 @@ function pickPtppFile(file: File) {
 </template>
 
 <style scoped>
-/* 这一节原先自己收在 720 并由 SetBase/Index.vue 居中；八节并成一条长页之后，
-   右边那一列只有约 1080，跟其余五节同宽，不再单开一档（口径见 Index.vue 末尾那条注释）。 */
+/* 分组标题与开关行这一族原先不用在这里写：`SetBase/Index.vue` 的样式块**不带 scoped**，
+   里面那几条 `.set-base .group` / `.set-base .group-title` / `.set-base .switch-item`
+   会伸进各窗口内部。搬出那一页之后它们全都够不着了（选择器带 `.set-base` 前缀），
+   所以在本组件的 scoped 块里重写一份。写在这里而不是往宿主再挂一条全局规则：
+   这份样式的归属就是这个组件，别让它继续依赖「必须先加载过 SetBase 那个 chunk」。 */
+.group {
+  margin-bottom: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pt-color-border-light);
+}
+
+/* 折叠面板的正文第一行不再需要那条上分隔线 —— 面板 header 下面已经有一条了 */
+.group:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.group-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 12px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.switch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 标签允许换行：截断一个设置名比让它占两行严重（AGENTS §3.5） */
+.switch-item .label {
+  margin-left: 0;
+  font-size: 13px;
+}
 
 .key-input {
   flex: 1 1 auto;

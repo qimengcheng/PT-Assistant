@@ -16,7 +16,7 @@
  * 不再从存下来的档里猜 —— 所以「重新进来」在这套判据里就是同一份档配 `picked: false` 那一次调用。
  */
 import { describe, expect, it } from "vitest";
-import type { TablePaginationConfig } from "antdv-next";
+import type { TablePaginationConfig } from "@zboson/ui";
 
 import { toPagination } from "@/options/components/tableSorters.ts";
 

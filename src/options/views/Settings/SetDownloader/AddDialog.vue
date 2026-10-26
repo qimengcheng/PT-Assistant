@@ -9,7 +9,7 @@ import {
   LeftOutlined,
   QuestionCircleOutlined,
   RightOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import type { IDownloaderMetadata } from "@/shared/types.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

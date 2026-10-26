@@ -10,7 +10,7 @@ import {
   SyncOutlined,
   ThunderboltOutlined,
   UnorderedListOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { EResultParseStatus, type TSiteID } from "@ptd/site";
 
 import { useConfigStore } from "@/options/stores/config.ts";

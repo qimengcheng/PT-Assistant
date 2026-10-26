@@ -3,8 +3,8 @@ import { computed, inject, onMounted, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { set } from "es-toolkit/compat";
 import { toMerged } from "es-toolkit";
-import { DeleteOutlined, ExportOutlined, InfoCircleOutlined, PlusOutlined } from "@antdv-next/icons";
-import type { SelectProps } from "antdv-next";
+import { DeleteOutlined, ExportOutlined, InfoCircleOutlined, PlusOutlined } from "@zboson/icons";
+import type { SelectProps } from "@zboson/ui";
 
 import type { ISiteMetadata, ISiteUserConfig, timezoneOffset, TSiteID, TSiteUrl } from "@ptd/site";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

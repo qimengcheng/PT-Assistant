@@ -10,8 +10,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from "@antdv-next/icons";
-import type { TablePaginationConfig } from "antdv-next";
+import { QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from "@zboson/icons";
+import type { TablePaginationConfig } from "@zboson/ui";
 import type { CTorrent } from "@ptd/downloader";
 import HoverTip from "@/options/components/HoverTip.vue";
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";

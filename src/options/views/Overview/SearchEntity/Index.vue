@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { message } from "antdv-next";
+import { message } from "@zboson/ui";
 import {
   AlertOutlined,
   CameraOutlined,
@@ -16,7 +16,7 @@ import {
   SearchOutlined,
   SettingOutlined,
   SyncOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { EResultParseStatus, ETorrentStatus } from "@ptd/site";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";

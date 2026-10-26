@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { App } from "antdv-next";
+import { App } from "@zboson/ui";
 import { useI18n } from "vue-i18n";
 import * as estoolkit from "es-toolkit";
 import * as datefns from "date-fns";

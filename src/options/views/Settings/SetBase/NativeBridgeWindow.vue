@@ -7,7 +7,7 @@
  */
 import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { ApiOutlined } from "@antdv-next/icons";
+import { ApiOutlined } from "@zboson/icons";
 
 import { sendMessage } from "@/messages.ts";
 import type { BridgeState, BridgeStatus } from "@/shared/types.ts";

@@ -19,8 +19,8 @@ import {
   QuestionCircleOutlined,
   SearchOutlined,
   ThunderboltOutlined,
-} from "@antdv-next/icons";
-import type { TablePaginationConfig } from "antdv-next";
+} from "@zboson/icons";
+import type { TablePaginationConfig } from "@zboson/ui";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";

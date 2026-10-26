@@ -12,7 +12,7 @@ import { useI18n } from "vue-i18n";
 import { addDays, startOfDay } from "date-fns";
 import { refDebounced } from "@vueuse/core";
 import { preDefinedTorrentTagNameSet, sortTorrentTags } from "@ptd/site";
-import { PushpinOutlined } from "@antdv-next/icons";
+import { PushpinOutlined } from "@zboson/icons";
 
 import { formatDate, formatSize } from "@/options/utils.ts";
 import { useConfigStore } from "@/options/stores/config.ts";

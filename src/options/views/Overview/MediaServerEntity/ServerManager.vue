@@ -6,14 +6,14 @@
  */
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { message, Modal } from "antdv-next";
+import { message, Modal } from "@zboson/ui";
 import { errorText } from "@/shared/errorText.ts";
 import {
   ApiOutlined,
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { computedAsync } from "@vueuse/core";
 import {
   entityList,

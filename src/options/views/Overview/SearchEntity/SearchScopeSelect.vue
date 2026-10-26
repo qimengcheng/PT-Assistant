@@ -9,7 +9,7 @@
  */
 import { computed, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { CheckOutlined, DownOutlined, HolderOutlined, PushpinOutlined, SearchOutlined } from "@antdv-next/icons";
+import { CheckOutlined, DownOutlined, HolderOutlined, PushpinOutlined, SearchOutlined } from "@zboson/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";

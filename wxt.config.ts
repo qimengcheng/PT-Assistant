@@ -238,7 +238,7 @@ export default defineConfig({
               groups: [
                 {
                   name: "vendor-antd",
-                  test: /node_modules[\\/](?:antdv-next|@antdv-next|@ant-design|@v-c|dayjs)[\\/]/,
+                  test: /node_modules[\\/](?:@zboson|antdv-next|@antdv-next|@ant-design|@v-c|dayjs)[\\/]/,
                   includeDependenciesRecursively: false,
                   // 只收「入口静态依赖链」上的那些（`$initial` 是 rolldown 内置标签）：
                   // 不加这一条时，路由懒加载 chunk 里才会用到的 antd 组件（color-picker /

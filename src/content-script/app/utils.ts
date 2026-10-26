@@ -9,7 +9,7 @@
  * 阻塞主线程，且在 MV3 扩展页面被禁用）。
  */
 import { computed, ref, shallowRef, type Component } from "vue";
-import { Modal, notification } from "antdv-next";
+import { Modal, notification } from "@zboson/ui";
 import { uniq } from "es-toolkit";
 import type { TSupportSocialSite } from "@ptd/social";
 import { getSite as createSiteInstance } from "@ptd/site";

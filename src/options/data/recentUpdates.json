@@ -1,8 +1,20 @@
 {
-  "generatedAt": "2026-10-25 13:33:34",
-  "headSha": "a1bed59",
+  "generatedAt": "2026-10-26 14:57:08",
+  "headSha": "ba4b236",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.127.0",
+      "date": "2026-10-26 14:57:08",
+      "added": [
+        "辅种进展那条通知卡片换成新组件：鼠标停在上面会暂停倒计时，右上角还能按类型调各条显示时长（设置存在本地，下次打开自动恢复）；多条任务的明细收进「详情」弹窗"
+      ],
+      "improved": [
+        "界面框架换成自带几处修正的 fork 版（@zboson/ui），页面里的表格、弹窗、浮层外观与交互不变；技术栈页的依赖清单现在列的是新包名"
+      ],
+      "addedTotal": 1,
+      "improvedTotal": 1
+    },
     {
       "version": "0.126.6",
       "date": "2026-10-25 13:33:34",

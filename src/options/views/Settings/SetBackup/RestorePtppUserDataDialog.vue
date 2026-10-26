@@ -7,7 +7,7 @@
  */
 import { computed, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { Modal } from "antdv-next";
+import { Modal } from "@zboson/ui";
 import {
   definitionList,
   EResultParseStatus,
@@ -115,10 +115,10 @@ function archiveCountOf(data: Record<string, unknown>): number {
 
 function statusInfo(host: string) {
   if (!allSupportedSiteHost.value.includes(host)) {
-    return { color: "default", title: t("SetBase.RestorePtppUserDataDialog.statusUnsupported") };
+    return { color: "default", title: t("SetBackup.restorePtpp.statusUnsupported") };
   }
   if (toImportSite.value.includes(host)) {
-    return { color: "blue", title: t("SetBase.RestorePtppUserDataDialog.statusSelected") };
+    return { color: "blue", title: t("SetBackup.restorePtpp.statusSelected") };
   }
   return { color: "default", title: "" };
 }
@@ -153,17 +153,17 @@ async function doImport() {
   // 下次再来一遍还是「成功」—— 纯误导。
   if (isImporting.value) return;
   if (toImportSite.value.length === 0) {
-    runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.noSelection"), { color: "warning" });
+    runtimeStore.showSnakebar(t("SetBackup.restorePtpp.noSelection"), { color: "warning" });
     return;
   }
 
   if (isEmpty(metadataStore.sites)) {
     // ⚠️ MV3 扩展页面原生 confirm() 静默失效，改用 antdv Modal.confirm
     Modal.confirm({
-      title: t("SetBase.RestorePtppUserDataDialog.noSiteTitle"),
-      content: t("SetBase.RestorePtppUserDataDialog.noSiteContent"),
-      okText: t("SetBase.RestorePtppUserDataDialog.noSiteOk"),
-      cancelText: t("SetBase.RestorePtppUserDataDialog.cancelText"),
+      title: t("SetBackup.restorePtpp.noSiteTitle"),
+      content: t("SetBackup.restorePtpp.noSiteContent"),
+      okText: t("SetBackup.restorePtpp.noSiteOk"),
+      cancelText: t("SetBackup.restorePtpp.cancelText"),
       onOk: () => doImportInternal(),
     });
     return;
@@ -216,7 +216,7 @@ async function doImportInternal() {
     await replaceArchive(userInfoStorage);
     await metadataStore.$save();
 
-    runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.importSuccess"), { color: "success" });
+    runtimeStore.showSnakebar(t("SetBackup.restorePtpp.importSuccess"), { color: "success" });
 
     // ⚠️ 原来这个 setTimeout 不保存句柄：组件在 5 秒内卸载（用户手动关窗 /
     // 切路由）后再回来，回调照样把 showDialog 置 false —— 那是**新**一次打开的
@@ -224,7 +224,7 @@ async function doImportInternal() {
     closeTimer = setTimeout(() => (showDialog.value = false), 5e3);
   } catch (e) {
     console.error("导入失败", e);
-    runtimeStore.showSnakebar(t("SetBase.RestorePtppUserDataDialog.importFailed"), { color: "error" });
+    runtimeStore.showSnakebar(t("SetBackup.restorePtpp.importFailed"), { color: "error" });
   } finally {
     // ⚠️ 恢复自动刷新状态这一步自己也会 $save，它 reject 时下面那行
     // isImporting = false 永远执行不到 —— 弹窗卡在 confirm-loading 不消失，
@@ -287,20 +287,20 @@ function toggleAll(checked: boolean) {
 <template>
   <a-modal
     v-model:open="showDialog"
-    :title="t('SetBase.RestorePtppUserDataDialog.dialogTitle')"
+    :title="t('SetBackup.restorePtpp.dialogTitle')"
     width="800px"
     :confirm-loading="isImporting"
     :ok-button-props="{ disabled: toImportSite.length === 0 || isImporting }"
-    :ok-text="t('SetBase.RestorePtppUserDataDialog.okText')"
-    :cancel-text="t('SetBase.RestorePtppUserDataDialog.cancelText')"
+    :ok-text="t('SetBackup.restorePtpp.okText')"
+    :cancel-text="t('SetBackup.restorePtpp.cancelText')"
     :after-open-change="(open: boolean) => open && entryDialog()"
     @ok="doImport"
   >
     <a-space class="mb-2" style="width: 100%; justify-content: space-between">
-      <a-alert type="info" show-icon :title="t('SetBase.RestorePtppUserDataDialog.selectSitesTip')" style="flex: 1" />
+      <a-alert type="info" show-icon :title="t('SetBackup.restorePtpp.selectSitesTip')" style="flex: 1" />
       <a-space>
-        <a-button size="small" @click="toggleAll(true)">{{ t("SetBase.RestorePtppUserDataDialog.selectAll") }}</a-button>
-        <a-button size="small" @click="toggleAll(false)">{{ t("SetBase.RestorePtppUserDataDialog.selectNone") }}</a-button>
+        <a-button size="small" @click="toggleAll(true)">{{ t("SetBackup.restorePtpp.selectAll") }}</a-button>
+        <a-button size="small" @click="toggleAll(false)">{{ t("SetBackup.restorePtpp.selectNone") }}</a-button>
       </a-space>
     </a-space>
 
@@ -325,7 +325,7 @@ function toggleAll(checked: boolean) {
             </template>
             <a-tooltip :title="statusInfo(host as string).title">
               <a-tag :color="statusInfo(host as string).color" style="margin-left: auto">
-                {{ t("SetBase.RestorePtppUserDataDialog.recordCount", { n: archiveCountOf(data) }) }}
+                {{ t("SetBackup.restorePtpp.recordCount", { n: archiveCountOf(data) }) }}
               </a-tag>
             </a-tooltip>
           </div>
@@ -335,7 +335,7 @@ function toggleAll(checked: boolean) {
 
     <div class="overwrite-row">
       <a-switch v-model:checked="overwriteExistUserInfo" size="small" :disabled="isImporting" />
-      <span class="label">{{ t("SetBase.RestorePtppUserDataDialog.overwriteExist") }}</span>
+      <span class="label">{{ t("SetBackup.restorePtpp.overwriteExist") }}</span>
     </div>
   </a-modal>
 </template>

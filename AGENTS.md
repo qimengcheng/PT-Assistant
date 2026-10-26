@@ -6,7 +6,7 @@
 ## 0. 项目一句话
 
 PT-Plugin-Plus / PT-depiler 的**重写版**：旧版是 Vue 3 + Vuetify 4 + vite-plugin-web-extension，
-本仓库是 **WXT 0.21 + Vue 3 + antdv-next**，产物为 Chrome/Firefox MV3 扩展。
+本仓库是 **WXT 0.21 + Vue 3 + @zboson/ui**（antdv-next 的 fork，2026-10-26 起用它），产物为 Chrome/Firefox MV3 扩展。
 站点包 `packages/site`（340 个站点定义）、`packages/social`、`packages/downloader` 等从旧版**整目录平移**
 （目录结构与文件划分没重排；内容后来改过 96 个文件 —— 实测口径见 README「架构决策」的站点定义行。
 所以那条规矩是「不做批量改写」，不是「不许改」）。
@@ -18,12 +18,18 @@ PT-Plugin-Plus / PT-depiler 的**重写版**：旧版是 Vue 3 + Vuetify 4 + vit
 ### 1.1 commit 消息前缀（硬性）
 
 ```
-[WorkBuddy]-[Hy4 preview] v0.16.0 feat: xxx
+[agent名]-[模型名] v0.16.0 feat: xxx
 ```
 
-- 方括号**各自独立**：`[agent名]` + `-` + `[模型名]`。不是 `[WorkBuddy-Hy4 preview]`。
-- **模型名逐字照抄当次会话 system prompt 顶部**「This conversation is powered by X」，
-  不缩写、不改大小写、**不沿用上次会话的记忆快照**（模型会中途切换，记忆会过期）。
+- 方括号**各自独立**：`[agent名]` + `-` + `[模型名]`。不是 `[agent名-模型名]`。
+- **两个方括号都在当次会话里现查，不沿用上次会话的记忆快照**（模型会中途切换，记忆会过期）：
+  - `[agent名]` = 你**运行所在的那个应用**。不是工作目录名，也不是 `git log` 里别人的名字 ——
+    两者都只是「看起来像身份」，照抄会把这笔工作记到别人名下（统计按前缀字面算）。
+  - `[模型名]` = 当次会话自报的模型名，逐字照抄，不缩写、不改大小写。
+  各宿主自报身份的位置和句式都不一样（会话开头一行、设置页、环境变量都有可能），
+  **按你那边怎么写的照抄即可，本条不规定句式**。
+- **不确定自己是哪个 agent、模型名该怎么写，就问用户**。不要猜、不要挑环境里最像的那个字符串：
+  写错不会报错，只会把工作静默记到别人名下，事后改不回来（前缀已进历史、统计按字面算）。
 - 仓库里可能出现别的 agent 写的前缀（如 `[DeepSeek Harness]-[Space Bunny]`），那是别人的，
   不要顺手改写别人的提交。
 
@@ -476,18 +482,18 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 `app.use(i18nInstance)` —— 必须传 i18n 插件**本体**，传 `i18nInstance.global`（Composer）会抛
 `NOT_INSTALLED(27)`，表现为整个页面白屏。
 
-### 3.4 antdv-next 组件用法约定（Vuetify 迁移对照）
+### 3.4 @zboson/ui 组件用法约定（antdv-next 的 fork；Vuetify 迁移对照）
 
 | 坑 | 现象 | 正解 |
 |---|---|---|
-| `:footer="null"` + `<template #footer>` 并存 | **弹窗底部按钮整个消失** | 别写 `:footer="null"`。antdv-next 源码 `footer: d !== null && ...` 会把 slot 一起吞掉 |
+| `:footer="null"` + `<template #footer>` 并存 | **弹窗底部按钮整个消失** | 别写 `:footer="null"`。@zboson/ui 源码 `dist/modal/PurePanel.js:42` 是 `props.footer !== null && createVNode(Footer, …)`，会把 slot 一起吞掉（2026-10-26 在 0.0.1 上重测仍在） |
 | `a-auto-complete` 的 options 传 `string[]` | 输入框**渲染成空控件**（只剩 label） | 传 `[{ value, label }]` 对象数组 |
 | `a-auto-complete` 选中后 | 输入框显示的是 **value**（如下载器随机 id），`option-label-prop` 不生效 | 固定列表选择一律用 `a-select`（单选固定显示 label）+ `show-search` + `option-filter-prop="label"` |
-| `a-select` 用 `<a-select-option>` **子节点**列选项 | 下拉打开是**「暂无数据」**。antdv-next 的 Select 完全不读默认插槽：`dist/select/index.js` 里 `children` 与 `slots.default` 各 0 处命中，整个包也找不到旧版那套 `convertChildrenToData`；`ASelectOption` 只是还注册着名字，渲染进去的节点被静默丢掉。2026-10-07 添加备份服务器对话框就是这么空的，而同一条流程的下载器对话框一直用 `:options`，所以只有这一处坏 | 一律 `:options="{ value, label }[]"`，带图标的选项走 `<template #option="{ value }">`（`SetDownloader/AddDialog.vue` 是参照实现）。全仓已扫过，`a-select-option` 现在只剩注释里那一处 |
+| `a-select` 用 `<a-select-option>` **子节点**列选项 | 下拉打开是**「暂无数据」**。@zboson/ui 的 Select 完全不读默认插槽：`dist/select/index.js` 里 `children` 与 `slots.default` 各 0 处命中（2026-10-26 在 0.0.1 上重测：两个都还是 0，**这条绕行不许撤**），整个包也找不到旧版那套 `convertChildrenToData`；`ASelectOption` 只是还注册着名字，渲染进去的节点被静默丢掉。2026-10-07 添加备份服务器对话框就是这么空的，而同一条流程的下载器对话框一直用 `:options`，所以只有这一处坏 | 一律 `:options="{ value, label }[]"`，带图标的选项走 `<template #option="{ value }">`（`SetDownloader/AddDialog.vue` 是参照实现）。全仓已扫过，`a-select-option` 现在只剩注释里那一处 |
 | `a-table` 的 `sorter: true` | 排序箭头动、**数据不排** | antd `getSortFunction` 静默跳过无 compare 的 sorter，必须给真正 compare 函数 |
 | `a-list` 传 `:data-source="[]"` | 渲染内置「暂无数据」占位 | 不用 data-source，直接渲染子项 |
-| `<a-step>` 等注册表里不存在的 `a-*` 标签 | 被当原生未知元素，**内容静默丢失**（带对象插槽时整块空白） | antdv-next 全量 install 实测只有 139 个注册名，**没有** `AStep`/`AList`；Steps 只有 `:items` 数组写法。CI 的 check-antd-tags 会拦 |
-| 图标 `import * as Icons from "@antdv-next/icons"` | 1760 个图标模块**全进包** | 只具名导入用到的：`import { DeleteOutlined } from "@antdv-next/icons"` |
+| `<a-step>` 等注册表里不存在的 `a-*` 标签 | 被当原生未知元素，**内容静默丢失**（带对象插槽时整块空白） | @zboson/ui 全量 install 实测 144 个注册名（2026-10-26 重跑防线①，比换包前多 5 个：ANotice / ANoticeGroup / ARefInput / ARefTable 等），**没有** `AStep`/`AList`；Steps 只有 `:items` 数组写法。CI 的 check-antd-tags 会拦 |
+| 图标 `import * as Icons from "@zboson/icons"` | 1760 个图标模块**全进包** | 只具名导入用到的：`import { DeleteOutlined } from "@zboson/icons"` |
 | 删除类按钮只写 `danger`（红描边 + 红字） | 在白底工具条上跟背景融成一片，看着像没强调；用户 2026-10-06 明确要求改实心 | **删除/清空数据的按钮一律 `type="primary" danger`（实心红）**。判据：动作真是删数据才算 —— 取消、关闭、重置、清空输入框、撤销授权**不算**，它们保留 `danger` 描边或 `variant="text"`。全站 19 颗已按此收口（含表格行内的单条删除、`DeleteDialog` 的确认键、以及原本标成蓝色 primary 的「我的数据 → 历史数据」删除） |
 | 确认框那颗键写 `okType: "danger"`（`modal.confirm` / `Modal.confirm` / `a-popconfirm` 的 `ok-type`） | **它出来是红描边，不是实心红**：确认框走的是 legacy 映射 `convertLegacyProps`（`dist/button/button.js:24`），`"danger"` 只折成 `{ danger: true }`、**不给 type** → `mergedType` 停在 default → `button.js:65` 算出 `["danger", "outlined"]`。class 里照样挂着 `.ant-btn-dangerous`，所以**只看 class 会判成已经对了**；不报错、不进 vue-tsc。2026-10-11 用户指着「确认删除该辅种任务吗？」那张框报的 | 一律给最终那两个 prop：`okButtonProps: { type: "primary", danger: true }`（`ConfirmOkBtn` 把它 merge 在 legacy 映射之后，所以它说了算；`type` + `danger` 才走到 `["danger", "solid"]`）。全站四处已收口：`appDialog.makeConfirmDanger`（所有确认框的总入口）、`Debugger.vue` 插件重置、`ServerManager.vue` 删除服务器、`AllSiteMessagesDialog.vue` 批量删除站内信的 popconfirm。防线 ⑪ 已于 v0.90.5 撤下，改由 ESLint 接手：脚本侧 `no-restricted-syntax` 选 `Property[key.name='okType']`，模板侧 `vue/no-restricted-static-attribute` + `vue/no-restricted-v-bind`（`ok-type="danger"` / `:ok-type` / `:okType` / `v-bind:ok-type` 四种写法都覆盖）。所以那条形参现在叫 `tone` |
 | 列表页给 `a-table` 写 `:scroll="{ y: 'calc(100vh - Npx)' }"` | 面板（`.page-panel`）自己已经是滚动容器，两层滚动会露出一条常驻的滚动条轨道 —— 哪怕只有一行，右边也挂着带箭头的经典滚动条；那个 N 还是目测的，外壳内衬一改就失准 | **不要写视口常数。** 列表页让 `.page-panel` 自己滚就行。真要表头吸顶，走 SearchEntity 那套**实测**容器高度算 `scroll.y`（见 PLAYBOOK，那个公式错过两次：拿会漂的量当基准会自指死循环） |
@@ -505,7 +511,7 @@ filter-entrypoint/mv3/mv2/analyze/debug/level），隔离靠 `wxt.config.ts` 里
 | 列表页**无条件**渲染分页条（只有一条数据也挂着 `1 ‹ 1 › 25 条/页`） | 用户 2026-10-07 指着搜索快照页说「条数少的时候不要启用分页」。原先这条只有站点管理页单独实现（一份抄在页面里的 `chosen/pageSize` 判断），其余 8 页各自为政 | **`toPagination` 传 `extras.totalRows` 就启用「默认档下条目全放得下 → 返回 `false`，整条分页条不出」**，`useTableBehavior` 那边对应 `totalRows` 选项（`MaybeRefOrGetter<number>`）。判"用户挑过一档"= 存下来的正数**不等于本页默认档**：挑过就常驻，否则他挑一档大到放得下全部，分页条连同尺寸选择器一起消失、再也切不回小档。所以**没接实测的那几页**传给 `toPagination` 的 `fallback` **必须等于 `config.ts` 里那页的 `itemsPerPage` 默认值**，不然「挑没挑过」判错（接了实测的那几页把 `picked` 明给出来，不再靠这一条猜，见下一行）。弹窗里的表格不套这条（`HistoryDataViewDialog` 保持 10 条一页）；行为断言的跑法见 PLAYBOOK |
 | 每页条数写死成常数（10 / 25 / 50），高屏下面板下半截全是空白、矮屏下又拖出滚动条 | 用户 2026-10-08：「要根据页面高度自动计算最佳的每页条数，既不能出现滚动条又要把页面铺满」（下载历史 10 条/页、表格下面一大片空白） | **`useAutoFitPageSize`（实测条数）+ `toPagination` 的 `extras.fitSize`**：`useTableBehavior` 传 `autoFit: { container, rows }` 就接上，手写分页的页自己传 `fitSize` / `picked`。判据是「可用高（面板内容高 − 同级块 − 表头 − 分页器 − 横滚条厚度）÷ 实测行高」，行高用**平均定初值、写回后按真实累计高收敛**（只按最高行算会白留将近一行，台架量到 64px；**退行不看「这一页满不满」，加行才看** —— 满页那道判据是为了不在末页一路加；退那一半不许加这道门，因为 ① 的初值是按平均行高铺的，真实累计高可能已经超了，而那一刻渲染条数不一定等于当前档位）。四条别再改回去：① **他在本次进入这一页里挑过一档，就照他挑的，容量压不住它**（`pageSize = picked ? 挑的 : 容量`；「挑过」= 页内那份状态，**不持久** —— 重新进来又回到实测铺满那一档，用户 2026-10-18：「用户如果手动调整过就按手动调整的来。但是每次重新进去还是默认是不出滚动条的条目数」。这一档前后改过两次：最早写的是「挑过一档就永久让位」，于是存过的 20 条在一屏只放得下 15 时把面板撑出滚动条，他 2026-10-08 指着站点管理页说「没有分页的时候当然是可以有滚动条，但是有分页的时候不要出现滚动条」；改成「容量是硬上限、挑过的档被 `min(挑的, 容量)` 压着」之后又被驳回 —— 收起条目之后容量停在退下去的那一档，把他挑的 50 一路压成 9，即「现在手动选择每页的条数没有效果了」（v0.109.4 为这个写过一套「上限自己过期」，已随下面那条 ④ 一起删掉 —— 展开不再退档，就没有要涨回来的东西；而「压得住」这件事本身被他推翻了）。**挑得比容量小仍照他的**，那是他觉得好读，不是我们的容量算错了）；② 判「他改了尺寸」只能用「报回来的档 ≠ 界面上显示的那一档」—— 翻页与排序也带着当前档回来，照老写法 `!== itemsPerPage` 会在第一次翻页就把实测档锁成自选档；③ 下限是 **1** 不是 3，「不出滚动条」是硬要求；④ **展开出来的子行压根不进算式**（`useAutoFitPageSize` 只收 `recordHeights`，v0.109.6）—— 原先让子行参与「超没超」的判定，表现为**每展开一条任务、这一页就少排一条**（台架 A/B 量过：展开两条，改前从 11 条/页一路退到 6，改后停在 11 不动、scrollHeight 1062 > 面板 794 就让它出滚动条），用户 2026-10-18：「如果是因为展开造成的高度变化出现的滚动条也不用管」。覆盖面 = 表格挂在 `.page-panel` 直接子节点的那 6 页（下载历史、我的数据、辅种任务、我的下载器、站点设置、搜索方案定义）；**搜索页不做**（它的表体高已由 `scroll.y` 实测铺满），机制与三条边界见 PLAYBOOK §34。**同一条 `toPagination` 上另有一个按页给的硬档 `maxSinglePage`**（v0.44.0 起「我的数据」、v0.44.2 起「站点管理」传 50）：总条数不超过它就直接 `false`（整页放完、由 `.page-panel` 自己滚），**排在 fitSize 前面判**。两条问的不是同一件事 —— fitSize 问「这一屏放得下几条」（那页实高只量到 13，于是 19 个站被切成两页），硬档问「这么点值不值得分页」。**这条只管分页条出不出，也压不住他挑的那一档**（挑过一档时分页条留着，硬档让位；那一档本身照上面那条 ① 走）。**别把它当成 fitSize 的替代品推广到全仓**：那是按页的取向，不是全站口径 |
 | 给一张 fixed 布局的表**每一列**都写 `width` | 容器比列宽合计宽时，浏览器把所有列**按比例一起放大**去填满，写了的宽度一个都不作数（2026-10-07 下载历史实测：容器 1812 CSS px、列宽合计 1026 → 1.77 倍，96 的站点列变 169、120 的状态列变 211），而最该宽的标题列被钉成定值 | **必须留一列不带 `width`** 当自适应列吃剩余宽度（通常是标题列）。判 fixed 的依据是 `@v-c/table` 的 `mergedTableLayout`：`scroll.y` / `sticky` / 有 `resizable` / **任一列带 `ellipsis`** 都会进 fixed —— 带 ellipsis 的表最容易不知不觉踩到 |
-| 把 `useBreakpoint()` 的 `sm` 当「窄屏」用（判成 `screens.xs` 或 `screens.sm`） | antd 的断点是**累积式**的：`sm` 是 `(min-width: 576px)` 而不是 576~767 那一档，所以桌面宽度下 `sm` 恒真 → 那个「窄屏才生效」的分支其实永远生效（下载历史的标题列 `width: 260` 就是这么钉死的） | 判「比某档窄」要**取反高档位**：`!screens.lg` / `!screens.md`（参照 `SearchEntity/QuickFilterNotice.vue` 的 `smAndDown = !screens.value?.lg`）。断点表在 `node_modules/antdv-next/dist/_util/responsiveObserver.js` 的 `getResponsiveMap` |
+| 把 `useBreakpoint()` 的 `sm` 当「窄屏」用（判成 `screens.xs` 或 `screens.sm`） | antd 的断点是**累积式**的：`sm` 是 `(min-width: 576px)` 而不是 576~767 那一档，所以桌面宽度下 `sm` 恒真 → 那个「窄屏才生效」的分支其实永远生效（下载历史的标题列 `width: 260` 就是这么钉死的） | 判「比某档窄」要**取反高档位**：`!screens.lg` / `!screens.md`（参照 `SearchEntity/QuickFilterNotice.vue` 的 `smAndDown = !screens.value?.lg`）。断点表在 `node_modules/@zboson/ui/dist/_util/responsiveObserver.js` 的 `getResponsiveMap`（2026-10-26 重测：该函数在 :15） |
 | `a-tag` 里把图标写成**默认插槽**的第一个子节点（`<a-tag><Icon /> {{ text }}</a-tag>`） | Tag 的实现是 `const children = filterEmpty(slots?.default?.())[0]` —— **只取默认插槽的第一个子节点**，图标活着、后面的文字被静默丢掉（2026-10-07 下载历史「下载状态」列只剩个圈）。和 `a-select` 不读默认插槽是同一族 | 图标一律 `<template #icon><Icon /></template>`，文字留作唯一的默认子节点（`MyClient/TorrentStateTd.vue`、`TorrentTitleTd.vue` 就是这个写法）；文字本身有多段（v-if 分支/前后缀）时外面再包一层 `<span>`，否则只有第一段能活下来。**要在一格里做「图标 + 文字」的垂直居中，走「整包包成一个元素 + 那层 flex」而不是 `#icon`** —— `#icon` 只是把图标塞进 antd 自己那套 inline 排版，居中仍然得靠 flex（`SearchEntity/QuickFilterNotice.vue` 的站点 chip 是这第二条的范本）。包的那层若是 `inline-flex`，有两条实测来的必须写：`vertical-align: middle`（inline-flex 的基线取第一个 flex 子项的下沿，而图标是被块化的替换元素 → 整包被抬起，同一排会分成 19.6 与 20.8 两种高度）和钉死的 `height`（不钉就跟着各颗自己最高的孩子走，实测 10 / 11.7 / 14 三种、top 差 ~2px）。台架 `.tmp-build/bench-chips` 撤掉任一条都能当场复现，两条都在时 8 颗 chip 全是 `20.9+14`、图标与站名盒中心差 0px；`line-height: 1` 在这套里是空转（撤掉后数字一模一样），别加 |
 | 把 `a-alert` 的正文写在**默认插槽**里（`<a-alert>{{ x }}</a-alert>`） | Alert **一个插槽都不读默认插槽**：`dist/alert/Alert.js` 取的是 `getSlotPropsFnRun(slots, props, "message")` → 内部取的是 `slots[key]` 或 `props[key]`，键只有 `title`/`message`/`description`/`action`/`icon`/`closeIcon` 这几个具名，默认插槽从头到尾没被调用 → 整条只剩图标和底色，文字静默丢掉（2026-10-09 台架把两种写法并排挂进真组件实测：默认插槽那条 `.ant-alert` 的 `textContent` 是空串，`#message` 那条正常出字）。仓里曾有 6 处这么写，含「正在发送」「没有可用下载器」和种子详情三张表的空态 | 正文一律 `<template #message>`，要两行说明就再补 `<template #description>`（`MyClient/SpeedLimitDialog.vue` 一直写对，那处的注释就是这条）。用 a-popover / CSS 找它时记一句：**Alert 把 `#message` 渲染成 `.ant-alert-title`，不是 `.ant-alert-message`**。这条目前没有守卫 —— 判"正文在哪个插槽"要看模板结构，静态扫会把注释里的反例一起误伤（台架那份扫描第一版就栽在注释上） |
 | 带 `:row-selection` 的表把 `#bodyCell` **整格交给子组件**（`<template #bodyCell="{ column, record }"><UserInfoCell …/></template>`） | **每一行行首那颗复选框都没了**（表头那颗「选择全部」还在，所以看上去只是「点不了全选」）。 机制是两处源码叠出来的：rc-table 的合成逻辑「插槽返回了东西就整格替换内置渲染」（`antdv-next@1.6.0` 的 `TableCell`：`if (bodyCell && column) { … g = 插槽返回值 }`）， 而 Vue 的 `flattenChildren` **把注释节点滤掉、把组件 vnode 留下** —— 于是同一句 `v-if` 写在页面上（各档不命中只剩注释 → 长度 0 → 内置那颗留着） 和交给子组件（组件 vnode → 长度 ≥1 → 顶掉）**结果相反**；不报错、不进 vue-tsc、不进构建（v0.99.4 把逐格渲染搬进 `UserInfoCell.vue` 就是这么把「我的数据」的勾选列弄没的，用户 2026-10-24「多选框怎么没有了」）。 | 名单挡在**页面那一层**：`<UserInfoCell v-if="cellColumnKeys.has(String(column.key))" …/>`，名单从这份表头派生（`new Set(tableHeader.map(h => h.key))`）。 ⚠️ 拿 `v-if="column.key"` 挡**不行**：勾选列也带 key，实测是 antd 内部生成的 `key-0`（台架 `.tmp-build/bench-mydata/probe5` 三档并排量过：2/2、0/2、0/2）。 判据 `tests/options/bodyCellSelection.test.ts`（含全仓扫描：顶层裸组件 / 顶层 `v-else` / 顶层裸文本都报）。 |
@@ -569,7 +575,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 
 | # | 脚本 | 防的静默失效 |
 |---|---|---|
-| 1 | `check-antd-tags` | antdv-next 里不存在的 `a-*` 标签（内容静默丢失） |
+| 1 | `check-antd-tags` | @zboson/ui 里不存在的 `a-*` 标签（内容静默丢失） |
 | 2 | `check-content-antd-lite` | content 按需清单没覆盖依赖闭包里的标签（线上静默空白） |
 | 3 | `check-locale-keys` | 字面 `t("a.b.c")` 在某侧解析不到（键路径被当文案渲染）；**以及文案带 `{占位符}` 而调用点没传参**（占位符被插成空串，界面表现为「一键辅种（）」，v0.109.7） |
 | 4 | `check-dead-props` | 传给 `a-*` 的死 prop / 死插槽（`inheritAttrs` 原样塞进 DOM） |
@@ -602,7 +608,7 @@ CI 的 `build` job 现在也调这条聚合命令（不再逐条挂 step），�
 同一个键在一处传了参、另一处没传，没传那处照样是 bug。传了第二参的一律不查（`t(k, { ...args })`
 那种展开静态判不准），转义写法 `{'{'}` 也不算占位符。反证三处在 `.tmp-build/prove-locale-keys.mjs`。
 
-第四条防的是 antdv-next 的 `inheritAttrs` 默认行为：没声明的 prop 被当普通属性原样塞进根 DOM，
+第四条防的是 @zboson/ui 的 `inheritAttrs` 默认行为：没声明的 prop 被当普通属性原样塞进根 DOM，
 不报错、不警告、生产环境完全静默；没匹配的命名插槽则直接渲染成空。`vue-tsc` 抓不到它
 （`a-*` 的类型来自 `GlobalComponents`，允许任意 attr），`check-antd-tags.mjs` 也抓不到
 （那条只看标签名存不存在）。判定依据同样是在 Node 里实跑 `install()` 取 props、读 `dist` 下的

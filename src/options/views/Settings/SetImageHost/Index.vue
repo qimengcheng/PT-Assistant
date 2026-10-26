@@ -8,8 +8,8 @@
  */
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { TableColumnsType } from "antdv-next";
-import { DeleteOutlined, EditOutlined, MinusOutlined, PlusOutlined, ThunderboltOutlined } from "@antdv-next/icons";
+import type { TableColumnsType } from "@zboson/ui";
+import { DeleteOutlined, EditOutlined, MinusOutlined, PlusOutlined, ThunderboltOutlined } from "@zboson/icons";
 
 import type { IImageHostMetadata } from "@/shared/imageHost/types.ts";
 import { getImageHostPreset } from "@/shared/imageHost/providers.ts";

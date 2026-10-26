@@ -9,7 +9,7 @@ import {
   QuestionCircleOutlined,
   ReloadOutlined,
   UploadOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { type CTorrent, CTorrentState } from "@ptd/downloader";
 

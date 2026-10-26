@@ -21,7 +21,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 |---|---|---|
 | 扩展框架 | vite-plugin-web-extension（手写 manifest 构建） | **WXT 0.21**（entrypoints 约定、自动 manifest、跨浏览器） |
 | 构建内核 | Vite 6（rollup） | **Vite 8（rolldown 内核）**，靠 `import type` + `verbatimModuleSyntax` 过 missing-export 硬错误（§1） |
-| UI | Vue 3 + **Vuetify 4**（主 chunk ~444KB） | Vue 3 + **antdv-next**（Ant Design Vue 3，CSS-in-JS） |
+| UI | Vue 3 + **Vuetify 4**（主 chunk ~444KB） | Vue 3 + **@zboson/ui**（antdv-next 的 fork，CSS-in-JS） |
 | service worker | — | **module SW**：`defineBackground({ type: "module" })` 是硬要求，改回 classic 即启动即崩（§6，规则见 AGENTS.md §3.2） |
 | 消息层 | @webext-core/messaging + 自建 wrapper（269 行协议） | 同一套 wrapper（同一条「本地 handler 优先命中、数据进通道前深拷贝挡 DataCloneError」），协议表随功能平移扩充 —— 现 445 行 / 上游 269 行 |
 | 扩展存储 | @webext-core/storage（经 background 代理读写） | **wxt/storage**（官方推荐，键名/格式不变，见 `src/storage.ts`）。`extStore` 按上下文二选一：SW / options / content **直连**，**offscreen 直连不了** —— Chrome 硬限制：offscreen 文档只有 `chrome.runtime`（连 `getManifest` 都不给），所以那一路自动改走 SW 的 get/set/patch 三条代理消息，调用方无感知。（§15 记的是「三条 RPC 全删、处处直连」那一版，v0.5.19 已改回这个形状） |
@@ -31,7 +31,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | i18n | vue-i18n 双语言全量注册（~118KB） | 同为双语言**全量预注册**，但按上下文分档：options 那份 `main.ts` 把 `en.json` / `zh_CN.json` **两份都静态 import**（CSP 环境里 vue-i18n 11 无法运行时编译模板，取不到就整页不显示，所以必须预注册）；省体积的是 content 侧 —— `src/content-script/i18n-lite.ts` 只注册实际用到的 6 个顶层命名空间，靠 JSON 具名导入 + tree-shake 把约 84% 的语言包挡在 content chunk 外。**没有「切换语言时动态 import」这条路** |
 | 测试 | 无 | 类型检查（`pnpm compile`）+ CI 守卫（静态扫描 + 行为断言，条数见「工程化体系」）+ 产物 smoke test + ESLint 10（扁平配置，只有 error 与「我方 warning」判失败）+ **Vitest**（v0.92.7 起：`tests/` 下的行为断言，判据是纯函数那一批直接 import 真源码；跑法 `pnpm test`，门禁入口是防线 ⑭） |
 
-> **UI 栈是 antdv-next**，走 CSS-in-JS **运行时注入样式**，
+> **UI 栈是 @zboson/ui**（antdv-next 的 fork），走 CSS-in-JS **运行时注入样式**，
 > 没有「构建期拆 CSS chunk + 动态 `<link>` 注入」那条链路 ——
 > 后者在扩展页里加载不可靠，表现为懒加载路由的页面完全没有样式。
 >
@@ -55,7 +55,7 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 | 提交消息守卫 | `.githooks/commit-msg` → `check-version.mjs --message-file` | 查标题里的 `vX.Y.Z` 与暂存的 `package.json` 一致，并按标题类型词**定档**（`feat` 必须进次版本，其余进修订号）；`[agent名]-[模型名]` 前缀是 AGENTS.md §1.1 的约定，没有任何脚本强制它 |
 | 版本号进位 | `scripts/check-version.mjs` | `pre-commit` 拦跳号（两档都放行，因为它这时拿不到提交消息）、`prepare-commit-msg` 拦没展开的 `@next`、`commit-msg` 钉档位、CI 用 `--range $before..$after` **逐条查这次 push 区间的每一条**（v0.93.4 起；拿不到区间——force push 的全 0 基线、dispatch——自己退成 `--committed` 只查 HEAD）。为什么事后还要逐条查：clone 出的仓库可能没启用本地 hook，`--no-verify` 也能绕过，而这两种情况下只查 tip 会放过中段那几条。规则见 AGENTS.md §1.2，成因见 PLAYBOOK §30 |
 | 提交时自动算号 | `scripts/versioned-commit.mjs` → `check-version.mjs --resolve` | `git commit` 的包装：首行写 `@next` 就按类型词算出号、写 `package.json` 并只暂存这一个路径，再把展开后的消息交给 git。**没做成纯 hook** 是实测出来的（git 2.45.1）：`pre-commit` 改索引进得了提交对象，但那时看不到这次的消息；`prepare-commit-msg` 看得到消息，改的索引却进不去（tree 用更早读进内存的那份快照）——算号两半分别只有前后两个阶段拿得到，所以放在调 git 之前 |
-| 防线 ① | `scripts/check-antd-tags.mjs` | 全仓扫描写错的 `a-*` 标签（antdv-next 没有的组件写错不报错，只是静默丢内容） |
+| 防线 ① | `scripts/check-antd-tags.mjs` | 全仓扫描写错的 `a-*` 标签（@zboson/ui 没有的组件写错不报错，只是静默丢内容） |
 | 防线 ② | `scripts/check-content-antd-lite.mjs` | content 侧 antd 按需注册的覆盖度比对 |
 | 防线 ③ | `scripts/check-locale-keys.mjs` | i18n 键在 zh/en 两侧都能解析（取不到时 vue-i18n 不报错，而是把键路径渲染到界面） |
 | 防线 ④ | `scripts/check-dead-props.mjs` | 传给 `a-*` 的死 prop / 死插槽（`GlobalComponents` 声明允许任意 attr，vue-tsc 抓不到，运行时不报错） |
@@ -81,8 +81,8 @@ PT-depiler（PT-Plugin-Plus 继任者）的 **WXT + Vue 3 全新架构重写版*
 > `check-dead-props.mjs` 就因此从 `@vue/compiler-sfc` 换成 `vue/compiler-sfc`（换布局当场被它自己报出来）；
 > ② 未声明的裸包名 `import` 现在会**直接报模块找不到**，而这正是这一档的用处：
 > 「import 了但没声明」在 hoisted 下一直静默蒙对（PLAYBOOK §4 的 `tinyexec`、§11 的 `dayjs` 都属于这类）。
-> 防线 ② ④ 要在 Node 里实跑 `install()` 取 antdv-next 的 props，它的传递依赖
-> （`@ant-design/fast-color` 等）由 antdv-next 自己在 `dependencies` 里声明，isolated 下照常解析得到。
+> 防线 ② ④ 要在 Node 里实跑 `install()` 取 @zboson/ui 的 props，它的传递依赖
+> （`@ant-design/fast-color` 等）由 @zboson/ui 自己在 `dependencies` 里声明（2026-10-26 核：`@ant-design/fast-color` 仍是 `^3.0.1`），isolated 下照常解析得到。
 
 ## 目录结构
 

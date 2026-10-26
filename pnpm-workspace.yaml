@@ -56,3 +56,9 @@ overrides:
 allowBuilds:
   esbuild: true
   "@parcel/watcher": true
+
+# 这两个包是 2026-10-26 当天发的，不带这两条就会被 pnpm 的「发布年龄」闸拦在安装之外；
+# CI 的 `pnpm install --frozen-lockfile` 吃同一道闸，所以这两行要入库（不是本机绕法）。
+minimumReleaseAgeExclude:
+  - "@zboson/icons@1.1.2"
+  - "@zboson/ui@0.0.1"

@@ -2,8 +2,8 @@
 import { computed, ref, watch } from "vue";
 import PQueue from "p-queue";
 import { useI18n } from "vue-i18n";
-import { FireOutlined, ReloadOutlined, StarFilled } from "@antdv-next/icons";
-import { Empty } from "antdv-next";
+import { FireOutlined, ReloadOutlined, StarFilled } from "@zboson/icons";
+import { Empty } from "@zboson/ui";
 import type { ISocialRecommendationItem, TSocialRecommendationCategory } from "@ptd/social";
 
 import { sendMessage } from "@/messages.ts";

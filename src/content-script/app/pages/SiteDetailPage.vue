@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
-import { CloudDownloadOutlined, CopyOutlined, DownloadOutlined, SearchOutlined } from "@antdv-next/icons";
+import { CloudDownloadOutlined, CopyOutlined, DownloadOutlined, SearchOutlined } from "@zboson/icons";
 
 import { sendMessage } from "@/messages.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";

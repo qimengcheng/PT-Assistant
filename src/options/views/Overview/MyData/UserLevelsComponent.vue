@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { type ILevelRequirement, type IUserInfo } from "@ptd/site";
-import { TableOutlined } from "@antdv-next/icons";
+import { TableOutlined } from "@zboson/icons";
 
 import UserLevelShowSpan from "./UserLevelShowSpan.vue";
 

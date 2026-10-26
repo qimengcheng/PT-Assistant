@@ -7,7 +7,7 @@ import {
   CopyOutlined,
   DownloadOutlined,
   SaveOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { sendMessage } from "@/messages.ts";
 import type { ISearchResultTorrent } from "@/shared/types.ts";

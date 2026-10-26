@@ -13,8 +13,8 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useDraggable } from "@vueuse/core";
-import { message as antdMessage } from "antdv-next";
-import { HomeOutlined } from "@antdv-next/icons";
+import { message as antdMessage } from "@zboson/ui";
+import { HomeOutlined } from "@zboson/icons";
 import { type ITorrent } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";

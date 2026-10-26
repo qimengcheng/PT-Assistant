@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, shallowRef, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { SearchOutlined } from "@antdv-next/icons";
+import { SearchOutlined } from "@zboson/icons";
 import { type ISocialSitePageInformation, socialPageParserMatchesMap } from "@ptd/social";
 
 import { useConfigStore } from "@/options/stores/config.ts";

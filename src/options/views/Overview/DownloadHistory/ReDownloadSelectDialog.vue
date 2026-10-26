@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { CloudDownloadOutlined, ReloadOutlined, SaveOutlined } from "@antdv-next/icons";
-import { message } from "antdv-next";
+import { CloudDownloadOutlined, ReloadOutlined, SaveOutlined } from "@zboson/icons";
+import { message } from "@zboson/ui";
 import type { Component } from "vue";
 
 import type { CAddTorrentOptions } from "@ptd/downloader";

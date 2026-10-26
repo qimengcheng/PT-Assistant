@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, wa
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 // 注意：antdv-next 根入口把这几个类型做了别名再导出（ColumnType -> TableColumnType 等）
-import type { TableColumnsType } from "antdv-next";
+import type { TableColumnsType } from "@zboson/ui";
 import {
   AlertOutlined,
   BarChartOutlined,
@@ -19,7 +19,7 @@ import {
   StopOutlined,
   SyncOutlined,
   TrophyOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { EResultParseStatus, type TSiteID } from "@ptd/site";
 
 import { useConfigStore } from "@/options/stores/config.ts";

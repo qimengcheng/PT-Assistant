@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useBreakpoint } from "antdv-next";
-import { AimOutlined, BranchesOutlined, CheckCircleFilled, GlobalOutlined, HddOutlined, UnorderedListOutlined } from "@antdv-next/icons";
+import { useBreakpoint } from "@zboson/ui";
+import { AimOutlined, BranchesOutlined, CheckCircleFilled, GlobalOutlined, HddOutlined, UnorderedListOutlined } from "@zboson/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { formatSize } from "@/options/utils.ts";

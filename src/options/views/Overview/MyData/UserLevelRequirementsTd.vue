@@ -3,8 +3,8 @@ import { computed, nextTick, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { computedAsync } from "@vueuse/core";
 import { isEmpty } from "es-toolkit/compat";
-import { useBreakpoint } from "antdv-next";
-import { CheckOutlined, MinusCircleOutlined, SafetyOutlined, ToolOutlined, UserOutlined } from "@antdv-next/icons";
+import { useBreakpoint } from "@zboson/ui";
+import { CheckOutlined, MinusCircleOutlined, SafetyOutlined, ToolOutlined, UserOutlined } from "@zboson/icons";
 import { getNextLevelUnMet, guessUserLevelGroupType, type IUserInfo, type TLevelGroupType } from "@ptd/site";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
@@ -102,7 +102,7 @@ const showAllLevels = ref(false);
 /**
  * 悬停开合与「展开了所以要钉住」分开记：`mergedOpen` 才是交给浮层的那个开合。
  *
- * 为什么非要钉：这一层默认 `mouseLeaveDelay` 只有 0.1s（antdv-next/dist/tooltip/index.js:48），
+ * 为什么非要钉：这一层默认 `mouseLeaveDelay` 只有 0.1s（@zboson/ui/dist/tooltip/index.js:48），
  * 而框里放着一颗要点、点完还会变高的键 —— 悬停链一被打断，框就当众消失（用户报的「马上消失」）。
  * 具体是哪一下打断的，本机量不出来（隐藏标签里合成 mouseenter 叫不出浮层，真指针操作又报
  * viewport=0x0 不可用），所以这里不赌成因，直接把「展开态不许自己关」做成判据：

@@ -27,7 +27,7 @@ import {
   StopOutlined,
   UndoOutlined,
   UnlockOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { formatDate, formatTimeAgo } from "@/options/utils.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

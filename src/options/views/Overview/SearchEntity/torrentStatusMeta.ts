@@ -6,7 +6,7 @@ import {
   CheckOutlined,
   DisconnectOutlined,
   QuestionCircleOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 /**
  * 做种状态（`ITorrent.status`）的五档元数据：图标、颜色、i18n 键。

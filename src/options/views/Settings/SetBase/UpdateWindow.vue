@@ -8,7 +8,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { format } from "date-fns";
-import { CloudDownloadOutlined, SyncOutlined } from "@antdv-next/icons";
+import { CloudDownloadOutlined, SyncOutlined } from "@zboson/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { sendMessage } from "@/messages.ts";

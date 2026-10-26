@@ -25,8 +25,8 @@ import {
   ThunderboltOutlined,
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
-} from "@antdv-next/icons";
-import type { TableColumnsType, TablePaginationConfig, TableRowSelection } from "antdv-next";
+} from "@zboson/icons";
+import type { TableColumnsType, TablePaginationConfig, TableRowSelection } from "@zboson/ui";
 
 import {
   CTorrentState,

@@ -9,7 +9,7 @@ import { nanoid } from "nanoid";
 import { cloneDeep, isEqual } from "es-toolkit";
 import { find, isEmpty } from "es-toolkit/compat";
 import { refDebounced } from "@vueuse/core";
-import { SearchOutlined } from "@antdv-next/icons";
+import { SearchOutlined } from "@zboson/icons";
 
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

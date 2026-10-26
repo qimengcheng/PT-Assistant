@@ -13,7 +13,7 @@ import {
   MinusOutlined,
   PlusOutlined,
   SearchOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";

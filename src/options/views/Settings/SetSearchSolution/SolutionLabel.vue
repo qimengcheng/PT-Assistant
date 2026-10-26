@@ -4,7 +4,7 @@
  * 展示形式：站点名 -> 方案详情；closable 时标签可关闭并向父组件抛出移除事件。
  * groupProps.column=true 时纵向排列（用于编辑对话框右侧已选列表）。
  */
-import { CloseOutlined } from "@antdv-next/icons";
+import { CloseOutlined } from "@zboson/icons";
 
 import type { ISearchSolution } from "@/shared/types.ts";
 

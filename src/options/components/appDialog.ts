@@ -14,7 +14,7 @@
  * 选项页喂 App 上下文的 modal（见那两个 use* 文件），content 喂静态 Modal +
  * shadowRoot 容器（见 src/content-script/app/utils.ts）。
  */
-import { Input } from "antdv-next";
+import { Input } from "@zboson/ui";
 import { h, type VNode } from "vue";
 
 /** App 上下文的 modal 与静态 Modal 都满足这个形状 */

@@ -8,7 +8,7 @@
  */
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { DownOutlined } from "@antdv-next/icons";
+import { DownOutlined } from "@zboson/icons";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { doKeywordSearch } from "../utils.ts";
 

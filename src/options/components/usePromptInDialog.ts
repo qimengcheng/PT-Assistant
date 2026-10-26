@@ -10,7 +10,7 @@
  * 模块作用域里调（没有当前实例）同样拿不到。
  * 上下文无关的实现在 ./appDialog.ts —— content 侧那两处在模块作用域触发，只能走那条路。
  */
-import { App } from "antdv-next";
+import { App } from "@zboson/ui";
 import { useI18n } from "vue-i18n";
 
 import { makePromptInDialog } from "./appDialog.ts";

@@ -8,7 +8,7 @@ import {
   DownloadOutlined,
   SaveOutlined,
   SearchOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { type ITorrent } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";

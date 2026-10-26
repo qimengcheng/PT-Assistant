@@ -13,7 +13,7 @@
 import { computed, h, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { computedAsync } from "@vueuse/core";
-import { DownOutlined, UpOutlined } from "@antdv-next/icons";
+import { DownOutlined, UpOutlined } from "@zboson/icons";
 import type { ILevelRequirement, TSiteID } from "@ptd/site";
 
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";

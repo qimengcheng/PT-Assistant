@@ -12,7 +12,7 @@ const {
   transition = { name: "fade-transition", appear: true, mode: "out-in" },
 } = defineProps<{
   title: string;
-  /** 图标组件（从 @antdv-next/icons 具名导入后传入） */
+  /** 图标组件（从 @zboson/icons 具名导入后传入） */
   icon: Component;
   color?: string;
   transition?: TransitionProps;

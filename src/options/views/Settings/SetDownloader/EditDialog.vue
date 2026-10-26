@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { cloneDeep } from "es-toolkit";
-import { message } from "antdv-next";
+import { message } from "@zboson/ui";
 
 import type { IDownloaderMetadata, TDownloaderKey } from "@/shared/types.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { FileSearchOutlined } from "@antdv-next/icons";
-import type { TableColumnsType, TablePaginationConfig } from "antdv-next";
-import { message } from "antdv-next";
+import { FileSearchOutlined } from "@zboson/icons";
+import type { TableColumnsType, TablePaginationConfig } from "@zboson/ui";
+import { message } from "@zboson/ui";
 
 import { sendMessage } from "@/messages.ts";
 import { type ILoggerItem } from "@/shared/types.ts";

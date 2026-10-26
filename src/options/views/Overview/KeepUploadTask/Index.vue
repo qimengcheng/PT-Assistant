@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { debounce } from "es-toolkit";
-import { type TableColumnsType, type TablePaginationConfig, type TableSorterResult } from "antdv-next";
+import { type TableColumnsType, type TablePaginationConfig, type TableSorterResult } from "@zboson/ui";
 import {
   CopyOutlined,
   DeleteOutlined,
@@ -13,7 +13,7 @@ import {
   QuestionCircleOutlined,
   SearchOutlined,
   SyncOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import type { CTorrent } from "@ptd/downloader";
 import type { TSiteID } from "@ptd/site";

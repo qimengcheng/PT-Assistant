@@ -109,7 +109,7 @@ const showBypassCsrf = computed(() => clientMeta.value?.feature?.BypassCSRF?.all
 <template>
   <!-- 重新校验挂在三个带 rules 的输入控件上，不挂在 a-form 上：a-form 声明的 emits 是
        finish / finishFailed / submit / reset / validate / valuesChange / fieldsChange，
-       没有 change（antdv-next/dist/form/Form.js 的 emits 数组），而它又 inheritAttrs:false，
+       没有 change（@zboson/ui/dist/form/Form.js:559-567 的 emits 数组），而它又 inheritAttrs:false，
        所以 @change 落不到任何地方 —— 那样 formValid 会永远停在 false，
        AddDialog 的「确定」永久禁用，等于加不了下载器。本仓 SetBackup/Editor 一直是
        挂在控件上的，照它写。 -->

@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { EResultParseStatus } from "@ptd/site";
-import { ArrowUpOutlined, SyncOutlined } from "@antdv-next/icons";
+import { ArrowUpOutlined, SyncOutlined } from "@zboson/icons";
 
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

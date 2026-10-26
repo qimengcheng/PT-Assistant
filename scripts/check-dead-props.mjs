@@ -43,7 +43,7 @@ const { createApp } = createRequire(path.join(ROOT, "noop.js"))("vue");
 // 顶层 node_modules 里没有它（pnpm 的 isolated 布局只放直接声明过的包），
 // 原先在 hoisted 布局下是蒙对的。2026-10-12 换布局时被这条防线自己当场报了出来。
 const { parse: parseSfc } = createRequire(path.join(ROOT, "noop.js"))("vue/compiler-sfc");
-const antd = await import(toUrl("node_modules/antdv-next/dist/index.js"));
+const antd = await import(toUrl("node_modules/@zboson/ui/dist/index.js"));
 
 const app = createApp({ render: () => null });
 app.use(antd.install);
@@ -81,7 +81,13 @@ function walkFiles(dir, ext, out = []) {
   return out;
 }
 
-const dtsFiles = walkFiles("node_modules/antdv-next/dist", ".d.ts");
+const dtsFiles = walkFiles("node_modules/@zboson/ui/dist", ".d.ts");
+// walkFiles 对读不到的目录返回空数组，而空索引等于「一个死插槽都报不出来」的假 PASS ——
+// 包名换掉那一次正好撞得上这个形状，所以在这里当场出声，不靠人去数文件数。
+if (dtsFiles.length === 0) {
+  console.error("FAIL：读不到 node_modules/@zboson/ui/dist 下的 .d.ts —— 插槽索引是空的，PASS 不可信。");
+  process.exit(1);
+}
 
 /** 组件名 -> Set<slot 名>，启动时一次性建好 */
 const slotIndex = new Map();
@@ -374,13 +380,13 @@ if (!findings.size) {
   process.exit(0);
 }
 
-console.error("FAIL：以下属性 / 插槽 antdv-next 对应组件并不认识，运行时静默失效（写了等于没写）：");
+console.error("FAIL：以下属性 / 插槽 @zboson/ui 对应组件并不认识，运行时静默失效（写了等于没写）：");
 for (const [key, lines] of findings) {
   const [file, tag, what] = key.split("|");
   console.error(`  ${file}:${[...lines].sort((a, b) => a - b).join(",")}  <${tag} ${what}>`);
 }
 console.error(
-  "改法：① 查 node_modules/antdv-next/dist/<组件>/<组件>.d.ts 里真实的 props / Slots；" +
+  "改法：① 查 node_modules/@zboson/ui/dist/<组件>/<组件>.d.ts 里真实的 props / Slots；" +
     "② 若属性已废弃，换成现役 API 并核对视觉是否变化；" +
     "③ 确实要透传的 HTML 属性会走脚本白名单，不会出现在这里。",
 );

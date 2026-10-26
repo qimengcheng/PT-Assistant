@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="Id extends string | number">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { message } from "antdv-next";
+import { message } from "@zboson/ui";
 
 const showDialog = defineModel<boolean>();
 const { toDeleteIds, confirmDelete: confirmDeleteFn, width, okDisabled = false } = defineProps<{

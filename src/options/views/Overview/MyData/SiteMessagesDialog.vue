@@ -8,7 +8,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useDebounceFn } from "@vueuse/core";
-import { CheckOutlined, ExportOutlined, InboxOutlined, SyncOutlined } from "@antdv-next/icons";
+import { CheckOutlined, ExportOutlined, InboxOutlined, SyncOutlined } from "@zboson/icons";
 import { EResultParseStatus, type ISiteMessage, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";

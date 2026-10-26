@@ -1,5 +1,5 @@
 /**
- * antdv-next（Ant Design Vue 3）接入。
+ * @zboson/ui（antdv-next 的 fork，2026-10-26 起用它）接入。
  *
  * 替换掉原先的 Vuetify。
  *
@@ -20,9 +20,9 @@
  * `ptd-vendor-chunk` 拆的是 JS 模块，产物之间是普通静态 import，样式仍由运行时注入，
  * 与上面那条失效链路无关。
  */
-import { install } from "antdv-next";
-import zhCN from "antdv-next/locale/zh_CN";
-import enUS from "antdv-next/locale/en_US";
+import { install } from "@zboson/ui";
+import zhCN from "@zboson/ui/locale/zh_CN";
+import enUS from "@zboson/ui/locale/en_US";
 
 import { type TLangCode } from "./i18n.ts";
 

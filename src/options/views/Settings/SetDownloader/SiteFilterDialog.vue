@@ -5,7 +5,7 @@
  */
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { EyeInvisibleOutlined, EyeOutlined } from "@antdv-next/icons";
+import { EyeInvisibleOutlined, EyeOutlined } from "@zboson/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";

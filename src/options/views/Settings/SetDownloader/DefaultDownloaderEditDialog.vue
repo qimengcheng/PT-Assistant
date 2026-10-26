@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { message } from "antdv-next";
+import { message } from "@zboson/ui";
 
 import type { IDefaultDownloaderConfig, TDownloaderKey } from "@/shared/types/storages/metadata.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

@@ -13,7 +13,7 @@
  *   // <a-table :pagination="pagination" @change="handleTableChange" />
  */
 import { computed, ref, toValue, type ComputedRef, type MaybeRefOrGetter } from "vue";
-import type { TablePaginationConfig, TableSorterResult } from "antdv-next";
+import type { TablePaginationConfig, TableSorterResult } from "@zboson/ui";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { toPagination } from "@/options/components/tableSorters.ts";

@@ -1,5 +1,5 @@
 /**
- * 全仓扫描：把模板里写的 `a-*` 标签对着 antdv-next 的真实注册名表比一遍。
+ * 全仓扫描：把模板里写的 `a-*` 标签对着 @zboson/ui 的真实注册名表比一遍。
  *
  * 为什么需要：Vuetify 的 `v-list` / `v-stepper` 系列照搬成 `a-list` / `a-step` 时，
  * antdv-next 里根本没有这些组件（List 只有虚拟滚动的 `AListy`，Steps 走 `:items`），
@@ -20,7 +20,7 @@ const ROOT = process.cwd();
 const toUrl = (p) => "file:///" + path.join(ROOT, p).split(path.sep).join("/");
 
 const { createApp } = createRequire(path.join(ROOT, "noop.js"))("vue");
-const antd = await import(toUrl("node_modules/antdv-next/dist/index.js"));
+const antd = await import(toUrl("node_modules/@zboson/ui/dist/index.js"));
 
 const app = createApp({ render: () => null });
 app.use(antd.install);
@@ -62,12 +62,12 @@ for (const file of walk("src")) {
   }
 }
 
-console.log(`扫描 ${walk("src").length} 个 .vue，antdv-next 实际注册名 ${registered.size} 个`);
+console.log(`扫描 ${walk("src").length} 个 .vue，@zboson/ui 实际注册名 ${registered.size} 个`);
 if (!bad.size) {
-  console.log("PASS：没有发现 antdv-next 里不存在的 a-* 标签。");
+  console.log("PASS：没有发现 @zboson/ui 里不存在的 a-* 标签。");
   process.exit(0);
 }
-console.error("FAIL：以下 a-* 标签在 antdv-next 里不存在，会被当成原生未知元素渲染（内容静默丢失）：");
+console.error("FAIL：以下 a-* 标签在 @zboson/ui 里不存在，会被当成原生未知元素渲染（内容静默丢失）：");
 for (const [tag, files] of bad) console.error(`  ${tag} → ${[...files].join(", ")}`);
 console.error("改法：换成普通 div + 样式（参考 SentToDownloaderDialog、HomeView 的处理），或改用存在的组件 API。");
 process.exit(1);

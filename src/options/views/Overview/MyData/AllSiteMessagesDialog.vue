@@ -22,7 +22,7 @@ import {
   ExportOutlined,
   InboxOutlined,
   SyncOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { EResultParseStatus, type ISiteMessage, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";

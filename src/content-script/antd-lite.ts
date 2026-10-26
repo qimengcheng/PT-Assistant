@@ -2,7 +2,7 @@
  * content script 侧的 antdv-next **按需注册**。
  *
  * 为什么不用 `@/options/plugins/antd.ts` 的全量 `install`：
- * 全量 install 会遍历 `antdv-next/dist/components.js` 里全部 70 个可安装组件
+ * 全量 install 会遍历 `@zboson/ui/dist/components.js` 里全部 76 个可安装组件
  * （`app.use(component)`），一个都摇不掉 —— 结果 content-app 单个 chunk 4.3MB
  * （占全部产物 JS 的 65%），每个 PT 站点都要背这份 Vue + 全量 antd。
  * 巨型单文件还会触发 PLAYBOOK §13 的 esbuild >512KB 写 Temp 被杀软句柄卡住。
@@ -51,7 +51,7 @@ import {
   Table,
   Tag,
   Tooltip,
-} from "antdv-next";
+} from "@zboson/ui";
 import type { App as VueApp, Plugin } from "vue";
 
 /** 模板直接用到的父组件；各自的 install 顺带注册子组件 */
@@ -109,7 +109,7 @@ export const antdLiteInstance = {
   install(app: VueApp) {
     /**
      * `as Plugin` 不是随手写的：withInstall 在运行时给每个组件挂了 `install`，
-     * 但 antdv-next 的 .d.ts 把组件声明成裸 DefineComponent（见 dist/components.d.ts），
+     * 但 @zboson/ui 的 .d.ts 把组件声明成裸 DefineComponent（见 dist/components.d.ts），
      * 类型上看不出来。运行时确实存在 —— scripts/check-content-antd-lite.mjs 会在 Node 里
      * 逐个实跑 install()，跑不通就非零退出，所以这里只做类型断言，不加运行时判断。
      */

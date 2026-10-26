@@ -12,8 +12,8 @@
  */
 import { computed, h, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ClearOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, BranchesOutlined } from "@antdv-next/icons";
-import type { TableColumnsType } from "antdv-next";
+import { ClearOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, BranchesOutlined } from "@zboson/icons";
+import type { TableColumnsType } from "@zboson/ui";
 
 import { sendMessage } from "@/messages.ts";
 import { formatDate, formatSize } from "@/options/utils.ts";

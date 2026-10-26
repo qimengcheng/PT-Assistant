@@ -7,7 +7,7 @@ import {
   LeftOutlined,
   QuestionCircleOutlined,
   RightOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { type ISiteMetadata, type ISiteUserConfig, type TSiteID } from "@ptd/site";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";

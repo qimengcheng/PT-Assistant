@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="T">
 import { useI18n } from "vue-i18n";
-import { BorderOutlined, CheckSquareOutlined, MinusSquareOutlined } from "@antdv-next/icons";
+import { BorderOutlined, CheckSquareOutlined, MinusSquareOutlined } from "@zboson/icons";
 
 const { t } = useI18n();
 

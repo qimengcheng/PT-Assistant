@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { type TableColumnsType } from "antdv-next";
-import { BranchesOutlined } from "@antdv-next/icons";
+import { type TableColumnsType } from "@zboson/ui";
+import { BranchesOutlined } from "@zboson/icons";
 import { ETorrentStatus } from "@ptd/site";
 
 import { formatSize } from "@/options/utils.ts";

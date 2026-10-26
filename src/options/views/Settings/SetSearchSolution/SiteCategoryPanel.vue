@@ -6,7 +6,7 @@
  */
 import { onMounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { ArrowRightOutlined, ClearOutlined, EditOutlined } from "@antdv-next/icons";
+import { ArrowRightOutlined, ClearOutlined, EditOutlined } from "@zboson/icons";
 import type { ISearchCategories, TSiteID } from "@ptd/site";
 
 import CustomSolutionDialog from "./CustomSolutionDialog.vue";

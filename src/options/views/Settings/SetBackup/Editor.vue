@@ -3,8 +3,8 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { computedAsync } from "@vueuse/core";
 import { cloneDeep } from "es-toolkit";
-import type { FormInstance } from "antdv-next";
-import { FilterOutlined } from "@antdv-next/icons";
+import type { FormInstance } from "@zboson/ui";
+import { FilterOutlined } from "@zboson/icons";
 import { getBackupServer, getBackupServerMetaData, type IBackupConfig, type IBackupMetadata } from "@ptd/backupServer";
 import type { IBackupRetention } from "@ptd/backupServer";
 import { DEFAULT_BACKUP_RETENTION_SAMPLE_RULES, hasBackupRetentionToApply } from "@ptd/backupServer/utils.ts";
@@ -228,7 +228,7 @@ async function checkConnect() {
 <template>
   <!-- 用户 2026-10-13 要的「这个不要 border」指的是这一块（弹窗里的表单），不是弹窗后面那张列表：
        a-card 默认带 0.8px #f0f0f0 的边框 + 8px 圆角，套在弹窗里像给表单又画了一层表框。
-       ⚠️ 写法用 `variant="borderless"`：`bordered` 在 `antdv-next/dist/card/Card.d.ts` 里明写
+       ⚠️ 写法用 `variant="borderless"`：`bordered` 在 `@zboson/ui/dist/card/Card.d.ts:44` 里明写
        `@deprecated Please use 'variant' instead`，而仓里另外三张卡（ExportUserInfoDialog、
        UserDataStatistic、UserDataTimeline）已经都写 `variant="outlined"`。台架
        .tmp-build/bench-tcell 实测两种写法产出完全相同：边框都归 0，但都换上 antd 那三层

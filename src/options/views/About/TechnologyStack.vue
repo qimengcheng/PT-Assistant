@@ -13,7 +13,7 @@ import axios from "axios";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useLocalStorage } from "@vueuse/core";
-import type { TablePaginationConfig } from "antdv-next";
+import type { TablePaginationConfig } from "@zboson/ui";
 
 import pkg from "../../../../package.json";
 import { REPO_URL } from "~/helper.ts";

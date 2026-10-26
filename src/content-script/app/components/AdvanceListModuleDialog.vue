@@ -8,9 +8,9 @@ import {
   InboxOutlined,
   MinusCircleOutlined,
   SaveOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { ETorrentStatus, type ITorrent } from "@ptd/site";
-import type { TableColumnsType } from "antdv-next";
+import type { TableColumnsType } from "@zboson/ui";
 
 import { formatDate, formatSize, sizeText } from "@/options/utils.ts";
 import { countText } from "@/shared/torrentCount.ts";

@@ -2,8 +2,8 @@
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { cloneDeep } from "es-toolkit";
-import { message } from "antdv-next";
-import { CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
+import { message } from "@zboson/ui";
+import { CheckCircleOutlined, CloseCircleOutlined } from "@zboson/icons";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import type { IBackupServerMetadata, TBackupServerKey } from "@/shared/types.ts";

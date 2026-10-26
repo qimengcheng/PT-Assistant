@@ -1,35 +1,27 @@
 /**
- * 后台一轮写来的辅种进展 → 界面右上角那张 notification 卡片。
+ * 后台一轮写来的辅种进展 → 界面右上角那张通知卡片。
  *
  * 判据与文案都在 `src/shared/reseedNotice.ts`（那份能直接拿 Node 跑断言），这一层只管摆成什么样：
- * 一条任务时正文里已经写了任务名，所以没有明细行；多条时正文只说「N 个任务」，是哪几条列在下面。
+ * 一条任务时正文里已经写了任务名，所以没有明细行；多条时正文只说「N 个任务」，是哪几条在「详情」里。
  *
- * `key` 按 kind 给：同一个 kind 下一轮再来一次是**替换**当前这张卡片，而不是再堆一张 ——
- * 判据在 `@v-c/notification` 的 `open` 里（`findIndex((item) => item.key === config.key)` 命中就原地换掉）。
+ * 2026-10-26 从 `notification` 换成 @zboson/ui 新加的 Notice：卡片挂在 App.vue 里那个
+ * `<a-notice-group>` 上（同 id 覆盖、明细进详情弹窗这两条语义的实测出处写在 `./noticeHost.ts`）。
+ * 换过来多出来的两件事是**悬停暂停倒计时**与各类型时长的本地设置；代价是明细从「卡片里直接列」
+ * 变成「点详情才展开」—— Notice 的 `message` 只有一个纯文本节点、也没有插槽，多行展不开。
  *
- * 为什么单独成模块而不是写在 `App.vue` 的 setup 里：这段逻辑住在那儿就没法拿真代码验，
- * 而这次要改掉的正是「四条并排堆着」—— 得能在台架里把 `showReseedNoticeCard` 真调一次才算数。
+ * 为什么单独成模块而不是写在 `App.vue` 的 setup 里：这段逻辑住在那儿就没法拿真代码验。
  */
-import { h } from "vue";
-import { notification } from "antdv-next";
-
+import { openNoticeCard } from "@/options/noticeHost.ts";
 import { reseedNoticeColor, reseedNoticeGroupDetails, reseedNoticeGroupText, type IReseedNoticeGroup } from "@/shared/reseedNotice.ts";
 
 export function showReseedNoticeCard(group: IReseedNoticeGroup, lang: string | undefined): void {
   const { title, message } = reseedNoticeGroupText(group, lang);
-  const details = reseedNoticeGroupDetails(group, lang);
-  notification[reseedNoticeColor(group.kind)]({
-    key: `reseed-${group.kind}`,
+  openNoticeCard({
+    id: `reseed-${group.kind}`,
+    type: reseedNoticeColor(group.kind),
     title,
-    description:
-      details.length === 0
-        ? message
-        : h(
-            "div",
-            { style: { overflowWrap: "anywhere" } },
-            [h("div", message), ...details.map((line) => h("div", { style: { marginTop: "4px" } }, line))],
-          ),
+    message,
+    details: reseedNoticeGroupDetails(group, lang),
     duration: 8,
-    placement: "topRight",
   });
 }

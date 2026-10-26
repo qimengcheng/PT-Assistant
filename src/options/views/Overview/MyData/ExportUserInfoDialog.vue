@@ -2,7 +2,7 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { saveAs } from "file-saver";
-import { CodeOutlined, ExportOutlined, FileTextOutlined } from "@antdv-next/icons";
+import { CodeOutlined, ExportOutlined, FileTextOutlined } from "@zboson/icons";
 
 import type { IUserInfo, TSiteID } from "@ptd/site";
 

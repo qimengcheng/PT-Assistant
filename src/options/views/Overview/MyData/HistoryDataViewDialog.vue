@@ -3,14 +3,14 @@ import { ref, shallowRef, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { saveAs } from "file-saver";
 import { EResultParseStatus, type IUserInfo, type TSiteID } from "@ptd/site";
-import type { TableColumnsType } from "antdv-next";
+import type { TableColumnsType } from "@zboson/ui";
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   DeleteOutlined,
   ExportOutlined,
   EyeOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { sendMessage } from "@/messages.ts";
 import { formatNumber, formatSize, formatDate } from "@/options/utils.ts";

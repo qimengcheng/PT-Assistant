@@ -12,8 +12,8 @@ import {
   ReloadOutlined,
   SearchOutlined,
   ToolOutlined,
-} from "@antdv-next/icons";
-import type { TableColumnsType, TablePaginationConfig, TableSorterResult } from "antdv-next";
+} from "@zboson/icons";
+import type { TableColumnsType, TablePaginationConfig, TableSorterResult } from "@zboson/ui";
 
 import type { TSiteID } from "@ptd/site";
 

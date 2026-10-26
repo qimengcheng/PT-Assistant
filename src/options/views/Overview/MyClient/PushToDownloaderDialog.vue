@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, h, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { UploadFile } from "antdv-next";
+import type { UploadFile } from "@zboson/ui";
 import {
   CloseCircleOutlined,
   CloudUploadOutlined,
   InboxOutlined,
   LinkOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { type ITorrent, getHostFromUrl } from "@ptd/site";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

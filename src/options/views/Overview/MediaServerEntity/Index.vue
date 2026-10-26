@@ -19,7 +19,7 @@ import {
   InfoCircleOutlined,
   PlaySquareOutlined,
   SettingOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { getMediaServerIcon, type IMediaServerItem } from "@ptd/mediaServer";
 
 import { useRuntimeStore } from "@/options/stores/runtime.ts";

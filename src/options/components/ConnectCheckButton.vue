@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onUnmounted, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
-import { ApiOutlined, CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
+import { ApiOutlined, CheckCircleOutlined, CloseCircleOutlined } from "@zboson/icons";
 
 const { checkFn, resetTimeout } = defineProps<{
   checkFn: () => Promise<boolean>;

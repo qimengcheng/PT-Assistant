@@ -5,7 +5,7 @@ import { isEmpty } from "es-toolkit/compat";
 import { jsZipBlobToBackupData } from "@ptd/backupServer/utils.ts";
 import type { IBackupData } from "@ptd/backupServer";
 import { useRouter } from "vue-router";
-import { CloseCircleOutlined, ImportOutlined, LeftOutlined, RightOutlined, SyncOutlined, UploadOutlined } from "@antdv-next/icons";
+import { CloseCircleOutlined, ImportOutlined, LeftOutlined, RightOutlined, SyncOutlined, UploadOutlined } from "@zboson/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
@@ -222,11 +222,11 @@ function resetDialog() {
 }
 
 function goToPtppImport() {
-  // 路由名只有 "SetBase"（plugins/router.ts:84），"SetBaseBackup" 从未存在过。
-  // vue-router 按 name 查不到 matcher 会**同步 throw**，连下面这行都执行不到
-  //（症状是弹窗关不掉，不只是"不开页"）。定位到备份 tab 靠 query.tab
-  // —— SetBase/Index.vue:34 读的正是它。
-  router.push({ name: "SetBase", query: { tab: "backup" } });
+  // v0.121.0 起「备份设置」（密钥 / 自动备份总闸 / PTPP 旧数据导入）整块在「数据备份」页顶部，
+  // 不再挂在「基础设置」的某一个 tab 下 —— 所以这里直接跳本页并让那块展开。
+  // 跳不过去的话症状是「弹窗关不掉」，所以 push 之后仍照旧关弹窗，
+  // 且只按 name 跳：name 拼错时 vue-router 会同步 throw，连下一行都执行不到。
+  router.push({ name: "SetBackup", query: { panel: "settings" } });
   showDialog.value = false;
 }
 

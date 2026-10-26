@@ -8,7 +8,7 @@
  * 判据与文案都不在这里，在 `@/shared/ratioGuard.ts` / `@/shared/ratioGuardUi.ts`，
  * 两个入口共用一份。
  */
-import { App, notification } from "antdv-next";
+import { App, notification } from "@zboson/ui";
 import { useI18n } from "vue-i18n";
 import type { ITorrent } from "@ptd/site";
 

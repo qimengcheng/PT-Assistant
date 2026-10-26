@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
+import { CheckCircleOutlined, CloseCircleOutlined } from "@zboson/icons";
 
 import type { CTorrent } from "@ptd/downloader";
 import { sendMessage } from "@/messages.ts";

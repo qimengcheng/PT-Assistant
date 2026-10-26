@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { message } from "antdv-next";
+import { message, type NoticeGroupRef } from "@zboson/ui";
 import {
   BarChartOutlined,
   CloudUploadOutlined,
@@ -22,10 +22,11 @@ import {
   SettingOutlined,
   TeamOutlined,
   ToolOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { sendMessage } from "@/messages.ts";
 import { showReseedNoticeCard } from "@/options/reseedNoticeCard.ts";
+import { setNoticeHost } from "@/options/noticeHost.ts";
 import HoverTip from "@/options/components/HoverTip.vue";
 import LevelUpCelebration from "@/options/components/LevelUpCelebration.vue";
 import { startPresenceHeartbeat, watchReseedNotice, watchLevelUpGreeting, type ILevelUpGreeting } from "@/shared/reseedPresence.ts";
@@ -43,7 +44,11 @@ const configStore = useConfigStore();
 
 const backgroundOk = ref<boolean | null>(null);
 
+/** 右上角那张通知卡片的实例（模板里的 <a-notice-group>），交出去给非组件模块用 */
+const noticeGroupRef = ref<NoticeGroupRef | null>(null);
+
 onMounted(async () => {
+  setNoticeHost(noticeGroupRef.value);
   // SW 冷启动（module SW 加载 + offscreen 创建）实测约 3s，一次性 ping 会撞上启动窗口误报「未响应」，
   // 因此带重试：成功或拿到 definitionCount>0 即终止，全部失败才判定为未响应
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -94,6 +99,7 @@ const stopLevelUpWatch = watchLevelUpGreeting((greeting) => {
 });
 
 onUnmounted(() => {
+  setNoticeHost(null);
   stopPresence();
   stopReseedNoticeWatch();
   stopLevelUpWatch();
@@ -344,6 +350,9 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
       <!-- 挂在 a-app 之内、整棵布局之外：它要的是全屏覆盖层，但不该跟着路由切换被换掉。
            留在 a-app 里面才吃得到 ConfigProvider 的 token 与 antdLocale。 -->
       <LevelUpCelebration :greeting="levelUpGreeting" :lang="configStore.lang" @close="levelUpGreeting = null" />
+      <!-- 通知卡片的宿主，与上面那条同一档理由：要全屏覆盖层、不该随路由换掉。
+           卡片本身由 @/options/noticeHost.ts 那份实例方法推出来（辅种进展那一族走它）。 -->
+      <a-notice-group ref="noticeGroupRef" />
     </a-app>
   </a-config-provider>
 </template>

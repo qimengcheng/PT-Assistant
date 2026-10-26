@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { definitionList, getDefinedSiteMetadata } from "@ptd/site";
 import type { ISiteMetadata } from "@ptd/site";
-import type { TableColumnsType } from "antdv-next";
+import type { TableColumnsType } from "@zboson/ui";
 
 /**
  * 开发调试视图：展示全部站点定义 id（同步，零开销），

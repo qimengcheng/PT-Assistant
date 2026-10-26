@@ -12,7 +12,7 @@ import {
   QuestionCircleOutlined,
   SearchOutlined,
   ToolOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { EResultParseStatus, type ISiteMetadata, type ISiteUserConfig, type TSiteID } from "@ptd/site";
 
 import { sendMessage } from "@/messages.ts";

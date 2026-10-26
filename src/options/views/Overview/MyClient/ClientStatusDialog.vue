@@ -7,7 +7,7 @@ import {
   ExportOutlined,
   ReloadOutlined,
   StopOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { getDownloaderIcon, type TorrentClientStatus } from "@ptd/downloader";
 import { sendMessage } from "@/messages.ts";

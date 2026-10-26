@@ -8,8 +8,8 @@ import {
   FileSearchOutlined,
   MinusOutlined,
   SearchOutlined,
-} from "@antdv-next/icons";
-import type { TableColumnsType } from "antdv-next";
+} from "@zboson/icons";
+import type { TableColumnsType } from "@zboson/ui";
 
 import { useTableBehavior } from "@/options/directives/useTableBehavior.ts";
 import { formatDate } from "@/options/utils.ts";

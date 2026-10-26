@@ -2,7 +2,7 @@
 import { reactive, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { ExportOutlined, MoreOutlined, SearchOutlined } from "@antdv-next/icons";
+import { ExportOutlined, MoreOutlined, SearchOutlined } from "@zboson/icons";
 
 import { socialBuildUrlMap } from "@ptd/social";
 import type { ITorrent } from "@ptd/site";

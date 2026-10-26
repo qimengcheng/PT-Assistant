@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { CloseCircleOutlined, ExportOutlined } from "@antdv-next/icons";
-import { message } from "antdv-next";
+import { CloseCircleOutlined, ExportOutlined } from "@zboson/icons";
+import { message } from "@zboson/ui";
 
 import { BackupFields, type TBackupFields } from "@/shared/types.ts";
 import { sendMessage } from "@/messages.ts";

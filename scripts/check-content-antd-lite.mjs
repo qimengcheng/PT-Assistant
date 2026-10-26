@@ -27,7 +27,7 @@ const toUrl = (p) => "file:///" + path.join(ROOT, p).split(path.sep).join("/");
 
 const require_ = createRequire(path.join(ROOT, "noop.js"));
 const { createApp } = require_("vue");
-const antd = await import(toUrl("node_modules/antdv-next/dist/index.js"));
+const antd = await import(toUrl("node_modules/@zboson/ui/dist/index.js"));
 
 // —— 1) 权威名单：实跑全量 install，看它到底注册了哪些组件名 ——
 const fullApp = createApp({ render: () => null });
@@ -115,7 +115,7 @@ const liteApp = createApp({ render: () => null });
 for (const name of liteComponents) {
   const component = antd[name];
   if (!component) {
-    console.error(`FAIL：antdv-next 根入口没有导出 ${name}`);
+    console.error(`FAIL：@zboson/ui 根入口没有导出 ${name}`);
     process.exit(1);
   }
   if (typeof component.install !== "function") {
@@ -138,7 +138,7 @@ console.log(
 );
 
 if (nonexistent.size) {
-  console.log("\n提示：以下 a-* 标签在 antdv-next 里并不存在（全量 install 也注册不出来），与本次改动无关：");
+  console.log("\n提示：以下 a-* 标签在 @zboson/ui 里并不存在（全量 install 也注册不出来），与本次改动无关：");
   for (const [tag, files] of nonexistent) {
     console.log(`  ${tag} → ${[...files].map((f) => f.replace(/^src\//, "")).join(", ")}`);
   }

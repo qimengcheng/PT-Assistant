@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { type TableColumnsType } from "antdv-next";
+import { type TableColumnsType } from "@zboson/ui";
 import {
   CheckOutlined,
   CloseOutlined,
@@ -10,7 +10,7 @@ import {
   QuestionCircleOutlined,
   SaveOutlined,
   SyncOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import type { ITorrent } from "@ptd/site";
 

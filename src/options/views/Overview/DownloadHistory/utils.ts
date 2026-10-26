@@ -8,7 +8,7 @@ import {
   QuestionCircleOutlined,
   RobotOutlined,
   UserOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { provide, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { CheckCircleOutlined, CloseCircleOutlined } from "@antdv-next/icons";
+import { CheckCircleOutlined, CloseCircleOutlined } from "@zboson/icons";
 
 import { type ISiteUserConfig, type TSiteID } from "@ptd/site";
 

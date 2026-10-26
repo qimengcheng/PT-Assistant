@@ -12,11 +12,11 @@ import {
   LockOutlined,
   QuestionCircleOutlined,
   SyncOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 // 这一页的提示一律走 runtimeStore.showSnakebar（同文件原有的复制磁链反馈就是它），
 // 不在同一个弹窗里混两种浮层。
-import type { TableColumnsType } from "antdv-next";
+import type { TableColumnsType } from "@zboson/ui";
 import type {
   CTorrent,
   CTorrentFile,

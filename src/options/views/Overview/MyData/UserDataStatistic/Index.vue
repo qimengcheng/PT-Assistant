@@ -27,7 +27,7 @@ import {
   LockOutlined,
   SaveOutlined,
   UnlockOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { NO_IMAGE } from "@ptd/site";
 

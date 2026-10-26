@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 基础设置页容器：九组设置项排在同一条长页里，左边一列目录点哪条滚到哪条，目录自己按
+ * 基础设置页容器：八组设置项排在同一条长页里，左边一列目录点哪条滚到哪条，目录自己按
  * 「天天用得上 / 按需调整 / 一次配好」分三档。
  *
  * 为什么不再是 a-tabs：八档各开一页时，「改一处要跳三页」，而且每一页的宽度口径不一样
@@ -21,10 +21,11 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { MutationType } from "pinia";
 import { useDebounceFn } from "@vueuse/core";
-import { App } from "antdv-next";import { SearchOutlined } from "@antdv-next/icons";
+import { App } from "@zboson/ui";
+import { SearchOutlined } from "@zboson/icons";
 
 import { useConfigStore } from "@/options/stores/config.ts";
 
@@ -36,13 +37,13 @@ import {
   type ISettingSegment,
   type TSettingHit,
 } from "./settingsSearch.ts";
+
 import AppearanceWindow from "./AppearanceWindow.vue";
 import SitePageWindow from "./SitePageWindow.vue";
 import AdvancedWindow from "./AdvancedWindow.vue";
 import UserInfoWindow from "./UserInfoWindow.vue";
 import SearchEntityWindow from "./SearchEntityWindow.vue";
 import DownloadWindow from "./DownloadWindow.vue";
-import BackupWindow from "./BackupWindow.vue";
 import SocialInformationWindow from "./SocialInformationWindow.vue";
 import UpdateWindow from "./UpdateWindow.vue";
 
@@ -60,8 +61,9 @@ const { t } = useI18n();
  *     而「开发者选项」这种低频又带风险的档一直排在第一节，跟语言并列；
  *  3. 相邻两节读起来是一条路（搜索 → 下载 → 页面助手 → 账号 …），不是字典序。
  *
- * `key` 只有 `backup` 被别处深链用到（SetBackup/RestoreDialog 推 `?tab=backup`），认不出来的
- * 键由 `pickKey` 落回第一条，所以旧链接不会白屏。
+ * `key` 目前没有任何一处被外部深链引用（v0.121.0 之前 `backup` 被 RestoreDialog 推过来，
+ * 那一节搬走之后改为直接跳「数据备份」页，见下面那条兼容跳转）。认不出来的键由 `pickKey`
+ * 落回第一条，所以旧链接至少不会白屏。
  */
 const sections = computed(
   () =>
@@ -109,13 +111,6 @@ const sections = computed(
         component: SocialInformationWindow,
       },
       {
-        key: "backup",
-        tier: t("SetBase.Index.tierOnce"),
-        label: t("SetBase.Index.secBackup"),
-        desc: t("SetBase.Index.descBackup"),
-        component: BackupWindow,
-      },
-      {
         key: "update",
         tier: t("SetBase.Index.tierOnce"),
         label: t("SetBase.Index.secUpdate"),
@@ -133,7 +128,19 @@ const sections = computed(
 );
 
 const route = useRoute();
+const router = useRouter();
 const scroller = ref<HTMLElement | null>(null);
+
+/**
+ * 老深链兼容：`?tab=backup` 原先落到本页的「备份与数据迁移」一节。
+ * v0.121.0 起那一节整块搬到了左侧「数据备份」页 —— 密钥与恢复必须在同一屏。
+ * 本页已经没有这一节，`pickKey` 认不出会把人生生扔回「搜索」，所以这里显式转走。
+ * 用 `replace`：别让「后退」再回到这个转不过去的地址。
+ */
+if (route.query.tab === "backup") {
+  void router.replace("/set-backup");
+}
+
 /** 当前高亮的那一条。初值取地址栏的 ?tab=，认不出来就落回第一条 */
 const activeKey = ref<string>(pickKey(route.query.tab));
 
@@ -145,7 +152,7 @@ function pickKey(q: unknown): string {
 const sectionId = (key: string) => `set-${key}`;
 
 /**
- * 目录按档位分段（`分组` 这一列原先是一条平铺的八条，现在三条档名 + 九节）。
+ * 目录按档位分段（`分组` 这一列原先是一条平铺的八条，现在三条档名 + 八节）。
  * 连续同档归成一块，所以档与档之间只由数据决定，不用手数有几条。
  */
 const tocTiers = computed(() => {
@@ -269,7 +276,7 @@ function spy() {
 
 onMounted(() => {
   scroller.value?.addEventListener("scroll", spy, { passive: true });
-  // 从别处跳进来（RestoreDialog 推 ?tab=backup）：直接落到位，不要来一段平滑滚动
+  // 带 ?tab=xxx 进来时直接落到位，不要来一段平滑滚动
   const key = pickKey(route.query.tab);
   if (key !== sections.value[0].key) nextTick(() => jumpTo(key, false));
 });
@@ -411,8 +418,8 @@ onUnmounted(() => {
             class="set-section"
           >
             <h2 class="set-section-title">{{ s.label }}</h2>
-            <!-- 每一节先说清「这一节管什么、在哪儿改不了」：九节重排之后，靠标题本身
-                 判断不出边界（比如「备份与数据迁移」不含备份服务器 —— 那在左侧那一页）。 -->
+            <!-- 每一节先说清「这一节管什么、在哪儿改不了」：八节重排之后，靠标题本身
+                 判断不出边界（比如「账号与流量」管刷新与显示，站点列表本身在左侧那一页）。 -->
             <p class="set-section-desc">{{ s.desc }}</p>
             <component :is="s.component" />
           </section>
@@ -594,7 +601,7 @@ onUnmounted(() => {
   padding: 0 12px 32px;
 }
 
-/* 九节排一列：每节一个标题 + 一行说明 + 一条下分隔线，节与节之间 28px。
+/* 八节排一列：每节一个标题 + 一行说明 + 一条下分隔线，节与节之间 28px。
    原来这层分隔是 a-tabs 的卡片头给的，现在由标题自己承担。 */
 .set-section {
   padding-top: 4px;
@@ -615,7 +622,7 @@ onUnmounted(() => {
 }
 
 /* 标题下那一行说明：写在标题与内容之间，是因为重排之后节与节的边界靠名字判不准
-   （「备份与数据迁移」里没有备份服务器，「账号与流量」里没有站点列表）。
+   （「账号与流量」管的是刷新与显示，站点列表本身在左侧那一页）。
    字号跟 .task-subtitle 同档，颜色比正文淡一档，不跟设置项的标签抢注意力。 */
 .set-section-desc {
   margin: 0 0 12px;

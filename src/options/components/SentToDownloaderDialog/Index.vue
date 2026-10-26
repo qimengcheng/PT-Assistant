@@ -11,7 +11,7 @@ import {
   EditOutlined,
   EllipsisOutlined,
   LinkOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 
 import { type ITorrent } from "@ptd/site";
 import {

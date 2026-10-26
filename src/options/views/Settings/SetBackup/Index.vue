@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { TableColumnsType, TableRowSelection } from "antdv-next";
+import { useRoute, useRouter } from "vue-router";
+import type { TableColumnsType, TableRowSelection } from "@zboson/ui";
 import {
   CloudUploadOutlined,
   DatabaseOutlined,
@@ -12,10 +13,11 @@ import {
   MinusOutlined,
   PlusOutlined,
   UnorderedListOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import { getBackupServerIcon } from "@ptd/backupServer";
 import { hasBackupRetentionToApply } from "@ptd/backupServer/utils.ts";
 
+import { useConfigStore } from "@/options/stores/config.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { formatDate } from "@/options/utils.ts";
@@ -25,14 +27,52 @@ import { sendMessage } from "@/messages.ts";
 import DeleteDialog from "@/options/components/DeleteDialog.vue";
 import HoverTip from "@/options/components/HoverTip.vue";
 import AddDialog from "./AddDialog.vue";
+import BackupSettings from "./BackupSettings.vue";
 import EditDialog from "./EditDialog.vue";
 import LocalExportConfirmDialog from "./LocalExportConfirmDialog.vue";
 import HistoryDialog from "./HistoryDialog.vue";
 import RestoreDialog from "./RestoreDialog.vue";
 
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const runtimeStore = useRuntimeStore();
 const metadataStore = useMetadataStore();
+const configStore = useConfigStore();
+
+/**
+ * 顶部那块「备份设置」的展开状态。
+ *
+ * 默认收起：这一页天天来的是那份服务器列表，密钥与总闸配一次就不动了。
+ * 但从恢复流程跳进来时（`?panel=settings`，RestoreDialog 的「去配置密钥」）必须直接展开 ——
+ * 那次跳转的目的就是改密钥，落地看到一条收起的标题等于没跳。
+ */
+const settingsActiveKey = ref<string[]>(route.query.panel === "settings" ? ["settings"] : []);
+
+/**
+ * 同一个 path 只变 query **不会重挂组件**，所以上面那个初始值只管第一次进来；
+ * 人已经站在本页时再点一次「去配置密钥」要靠这里接住。
+ *
+ * 展开之后顺手把标记从地址栏抹掉，否则第二次点过来 query 还是那个值、watch 不触发，
+ * 面板会静悄悄地不展开 —— 而这一次点击的意图明明就是「把密钥给我打开」。
+ */
+function applySettingsPanelQuery() {
+  if (route.query.panel !== "settings") return;
+  settingsActiveKey.value = ["settings"];
+  void router.replace({ query: {} });
+}
+watch(() => route.query.panel, applySettingsPanelQuery);
+onMounted(applySettingsPanelQuery);
+
+/**
+ * 折叠标题右侧那行状态。**就绪前不显示**：`configStore` 是异步水合的，
+ * 冷启动那一刻读到的是初始值 `false`，照它渲染就是先给人看一句「自动备份：已关闭」，
+ * 而用户其实开着 —— 与密钥输入框空着是同一个坑（见 BackupSettings.vue 顶部那段）。
+ */
+const configReady = ref<boolean>(false);
+configStore.$onReady(() => {
+  configReady.value = true;
+});
 
 const showAddDialog = ref<boolean>(false);
 const showLocalExportConfirmDialog = ref<boolean>(false);
@@ -173,6 +213,29 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
     </a-flex>
 
     <div class="page-panel">
+    <!-- 备份设置（自动备份总闸 / 加密密钥 / 旧数据导入）与下面那份服务器列表是同一条链上的：
+         配服务器 → 设间隔 → 到点发送 → 出事时用密钥恢复。v0.121.0 之前密钥那一块在
+         「基础设置」里，而恢复失败最常见的原因就是「密钥在那边、包在这边」，所以并到同一屏。
+         收起是默认态：这一页天天来的是列表，这一块配一次就不动了。
+         `force-render` 不能去掉：面板懒渲染的话，BackupSettings 里那条 `$onReady` 水合修复
+         要等用户展开才注册，而输入框已经带着空串画出来过一次了（原注释见该文件顶部）。 -->
+    <a-collapse v-model:active-key="settingsActiveKey" ghost class="settings-collapse">
+      <a-collapse-panel key="settings" :header="t('SetBackup.settingsTitle')" force-render>
+        <template #extra>
+          <span v-if="configReady" class="settings-summary">
+            {{
+              configStore.backup.enabledAutoBackup
+                ? t("SetBackup.settingsSummaryOn")
+                : t("SetBackup.settingsSummaryOff")
+            }}
+          </span>
+        </template>
+        <BackupSettings />
+      </a-collapse-panel>
+    </a-collapse>
+
+    <div class="server-list-title">{{ t("SetBackup.serverListTitle") }}</div>
+
     <!-- 全站口径是「列表页的 a-table 一律带 bordered」（AGENTS.md §3.4，用户 2026-10-06 定的）。
          v0.96.1 曾把这张的 bordered 删掉，那是**删错了对象**：用户 2026-10-13 那张截图点的是
          「添加备份服务器」弹窗（`Editor.vue`，里面是 a-form + 5 处 a-divider，压根没有 a-table），
@@ -305,6 +368,30 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
 </template>
 
 <style scoped lang="scss">
+/* 顶部那块「备份设置」：一条下分隔线与服务器列表断开，收起时只占一行标题 */
+.settings-collapse {
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--pt-color-border-light);
+}
+
+.settings-collapse :deep(.ant-collapse-header) {
+  padding-inline: 4px;
+}
+
+/* 折叠标题右侧那行状态：只有「自动备份开着还是关着」一位信息，够判断要不要展开 */
+.settings-summary {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 列表小标题：上面多了一块设置之后，不给这张表起个名字就分不清上半屏下半屏各是什么 */
+.server-list-title {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
 /* 竖向分隔线（原来是 <v-divider inset vertical>） */
 .toolbar-divider {
   width: 1px;

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { CloseCircleOutlined, ImportOutlined } from "@antdv-next/icons";
-import { message } from "antdv-next";
+import { CloseCircleOutlined, ImportOutlined } from "@zboson/icons";
+import { message } from "@zboson/ui";
 
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useResetableRef } from "@/options/directives/useResetableRef.ts";

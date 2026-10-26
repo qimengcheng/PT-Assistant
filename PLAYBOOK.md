@@ -319,7 +319,7 @@ v0.90.5 起另有一条 `no-restricted-imports` 点名禁它，并把「改用 d
 不加这条会一路加到把整份数据并成一页。
 
 **第二条实测来自读库，不是猜**：`@change` 回调里 `page.pageSize` 在**翻页和排序**时也会带着
-「当前那一档」回来（`antdv-next/dist/table/InternalTable.js:207-220` 把 `getPaginationParam(mergedPagination)`
+「当前那一档」回来（`@zboson/ui/dist/table/InternalTable.js:207-220` 把 `getPaginationParam(mergedPagination)`（2026-10-26 重测：该行在 :210，仍落在引用的区间里）
 原样递出来，`hooks/usePagination.js:25-31` 里 merged 的 pageSize 取的是我们传进去的那一档）。
 所以「他挑过一档」不能照老写法判 `page.pageSize !== itemsPerPage.value` —— 开了实测之后
 界面上显示的就是实测档，他一翻页就被误判成「他挑了实测那一档」，从此永久锁死。
@@ -410,7 +410,7 @@ SSR 环境下 `vite:css-post` 那张 `cssModulesCache` 没被填，任何 `?vue&
 **没做到的**：**像素层面没验**（首页那张卡片会不会把欢迎语挤成第三行、那一页的间距节奏），
 `updateAvailable` 那一支也没渲染到 —— SSR 不跑 `onMounted`，读不到缓存就永远停在 initial 态。
 浏览器台架那条路走不通：以仓库根为 root 时 vite 的冷启动预打包要把整条 options 图
-（antdv-next + `@ptd/site` 工具桶 + social/sizzle + downloader/backupServer 包）收一遍，
+（@zboson/ui + `@ptd/site` 工具桶 + social/sizzle + downloader/backupServer 包）收一遍，
 在本机的隐藏页里始终不收敛，`#app` 一直是空的。所以这两处按「构建产物交给他肉眼验收」收尾。
 
 ---

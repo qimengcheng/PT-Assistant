@@ -17,7 +17,7 @@ import {
   SoundOutlined,
   TagsOutlined,
   VideoCameraOutlined,
-} from "@antdv-next/icons";
+} from "@zboson/icons";
 import type { IMediaServerItem } from "@ptd/mediaServer";
 
 import { formatSize } from "./utils.ts";

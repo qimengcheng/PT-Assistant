@@ -7,7 +7,7 @@
  *   antdv-next 走 CSS-in-JS，官方提供了 `<a-style-provider :container="shadowRoot">`
  *   （@antdv-next/cssinjs 的 StyleContext.container 类型是 `Element | ShadowRoot`），
  *   直接指定注入目标即可，不需要再搬运任何样式表。
- * - mdi webfont 那段 FontFace 逻辑随之删除，图标统一用 @antdv-next/icons 的 SVG 组件。
+ * - mdi webfont 那段 FontFace 逻辑随之删除，图标统一用 @zboson/icons 的 SVG 组件。
  * - ⚠️ 但「样式不再走构建期产物」这句是错的，见下方 injectSfcStyles：
  *   `<a-style-provider :container>` 只管 antd 的 CSS-in-JS，管不到 Vite 抽离出去的
  *   SFC `<style>`，那部分一直是零引用的孤立产物，content 侧组件样式从未生效过。
@@ -15,7 +15,7 @@
 import appCss from "./app.css?inline";
 
 import { createApp, h } from "vue";
-import { ConfigProvider, message, notification, StyleProvider } from "antdv-next";
+import { ConfigProvider, message, notification, StyleProvider } from "@zboson/ui";
 
 import App from "./App.vue";
 import { contentOverlay } from "./utils.ts";

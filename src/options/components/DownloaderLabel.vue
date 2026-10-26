@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type Component } from "vue";
 import { useI18n } from "vue-i18n";
-import { CloudOutlined, DownloadOutlined } from "@antdv-next/icons";
+import { CloudOutlined, DownloadOutlined } from "@zboson/icons";
 
 import { getDownloaderIcon } from "@ptd/downloader";
 import { useMetadataStore } from "@/options/stores/metadata.ts";

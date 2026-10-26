@@ -11,7 +11,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { FireOutlined } from "@antdv-next/icons";
+import { FireOutlined } from "@zboson/icons";
 
 import { levelUpDetailLines, levelUpLead, levelUpTitle, type ILevelUpItem } from "@/shared/levelUp.ts";
 import type { ILevelUpGreeting } from "@/shared/reseedPresence.ts";

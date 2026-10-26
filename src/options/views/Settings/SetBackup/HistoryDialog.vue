@@ -2,8 +2,8 @@
 import { useI18n } from "vue-i18n";
 import { computed, ref, shallowRef } from "vue";
 import type { IBackupFileInfo } from "@ptd/backupServer";
-import type { TableColumnsType, TableRowSelection } from "antdv-next";
-import { CloudDownloadOutlined, DeleteOutlined } from "@antdv-next/icons";
+import type { TableColumnsType, TableRowSelection } from "@zboson/ui";
+import { CloudDownloadOutlined, DeleteOutlined } from "@zboson/icons";
 
 import { sendMessage } from "@/messages.ts";
 import { formatDate, formatSize } from "@/options/utils.ts";

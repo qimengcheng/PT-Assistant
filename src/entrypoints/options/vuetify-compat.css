@@ -95,6 +95,7 @@
 .text-disabled { color: #bfbfbf; }
 
 /* ---- 表格相关（原先挂在 v-data-table 的 class 上）----
-   .table-stripe 已删：斑马纹改成 style.css 里的全站一条规则，不再靠每页挂 class。 */
+   .table-stripe 已删，而且 2026-10-26 起 style.css 里那条全站斑马纹也删了 ——
+   现在用的是 @zboson/ui 自带那一档（判据与实测数字写在 style.css 那一段）。 */
 .table-header-no-wrap th { white-space: nowrap; }
 .table-action { display: inline-flex; }

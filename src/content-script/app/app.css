@@ -38,14 +38,12 @@
   z-index: 9999999;
 }
 
-/* 表格斑马纹，与 options 侧 style.css 里那条同值同判据（含"底色落在 td 而不是 tr"、
-   悬停改由 :hover 驱动这两条，改一处要两处同改）。
-   content 侧此前挂的是 class="table-stripe"，但那条规则只存在于
-   `src/entrypoints/options/vuetify-compat.css`（只有 options 的 main.ts 引入），
-   所以注入 UI 里那张表的 class 从来没生效过 —— 现在改成默认就有，class 也删了。 */
-.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) > td {
-  background: #fafafa;
-}
+/* 斑马纹这一档与 options 侧同处置（2026-10-26 删掉我方那条，改用 @zboson/ui 自带的
+   45° 斜纹，判据与实测数字写在 style.css 那一段）。
+   content 侧的组件样式走 CSS-in-JS 注入进 shadowRoot（`<a-style-provider :container>`，
+   init.ts:103 / App.vue:296），所以 fork 那条 `dist/table/style/yon.js` 里的规则也在
+   这棵影域里生效 —— 台架 .tmp-build/bench-zebra 的 shadow 那一档量的就是这件事。
+   下面两条悬停规则仍要留着：它们落在 <td> 上，压得住 tr 上的斜纹（v0.37.4 的理由）。 */
 
 .ant-table-wrapper .ant-table-tbody .ant-table-row > td.ant-table-cell-row-hover {
   background: transparent;

@@ -231,21 +231,23 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
 
 <template>
   <!-- Table.rowHoverBg：表格行悬停底色改成很淡的蓝（antd 默认是 colorFillAlterSolid≈#fafafa，
-       而斑马纹的奇数行底色就是 #fafafa —— 悬停在奇数行上等于没反应）。
+       而当时我方那条斑马纹的奇数行底色就是 #fafafa —— 悬停在奇数行上等于没反应。
+       那条斑马纹已于 2026-10-26 删掉，现在用的是 fork 自带的第 2/4/6 行斜纹，
+       比 #f0f7ff 浅得多，所以这一档的理由仍然成立）。
        #f0f7ff 比选中态 colorPrimaryBg #e6f4ff 浅一档，两态能分开。
-       Table.headerBg：表头底色。antd 默认同样是 colorFillAlterSolid≈#fafafa，跟斑马纹的奇数行
+       Table.headerBg：表头底色。antd 默认同样是 colorFillAlterSolid≈#fafafa，跟当时那条斑马纹
        一个色 —— 表头和表体糊成一片，只有靠那条边框分隔。#eef2f7 是偏冷的蓝灰，和
        --pt-color-bg-content(#f5f6f8) / --pt-color-border-light(#eaeef2) 同一家族，比它们深一档，
-       又能和白底偶数行、#fafafa 奇数行、#f0f7ff 悬停行四档都拉开。
+       又能和白底行、fork 那条浅斜纹、#f0f7ff 悬停行几档都拉开。
        headerSortHoverBg / headerSortActiveBg 必须跟着改：这两档默认是 colorFillContentSolid /
        colorFillSecondarySolid（从白色容器算出来的**灰**实心色），底色换成蓝灰后它们会退色成
        另一套色板，点一下排序表头就看见色差。hover 那档按 #eef2f7 往深取一档；
        active（当前排好序的那一列表头）v0.37.5 起直接等于 headerBg —— 用户口径「排序的时候
        表头列的颜色不要变」，那一列靠排序箭头已经标出来了，不需要再刷一层底色。
        bodySortBg（排好序那一列的**表体**格）v0.40.4 起给 transparent：它默认 colorFillAlterSolid
-       ≈#fafafa，于是白底偶数行上会刷出一条灰带（下载历史按「下载时间」排序，他截图量到同一行里
-       那一列 #fafafa、左右两列 #ffffff）。给 transparent 之后斑马纹与悬停都从行自己透出来，
-       不会再盖一层。
+       ≈#fafafa，于是白底行上会刷出一条灰带（下载历史按「下载时间」排序，他截图量到同一行里
+       那一列 #fafafa、左右两列 #ffffff）。给 transparent 之后行底（fork 的斜纹）与悬停都从
+       行自己透出来，不会再盖一层。
        headerColor 没动：antd 默认 colorTextHeading(≈rgba(0,0,0,.88)) 在这个底色上对比足够。
        content 侧同值另配一份（见 src/content-script/app/App.vue）：那边的样式注入在
        shadow root 里，读不到这侧的 ConfigProvider。 -->

@@ -398,21 +398,18 @@ body {
   min-height: 0;
 }
 
-/* ===== 表格斑马纹：全站一条，不按页挂 class =====
-   原先是 compat 里的 `.table-stripe` + 每张表自己加 class，20 张表只有 8 张加了，
-   剩下 12 张没人会想起来补 —— 所以判据从"记得挂 class"改成"默认就有"。
-   只认 tr.ant-table-row：空态占位行、展开行、测量行都拿不到这个类，
-   免得「暂无数据」那一整行也被刷成灰底。
+/* ===== 表格斑马纹：交给 @zboson/ui 自带那条，我方不再叠一条 =====
+   2026-10-26 删掉自那一条（原先是 `.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) > td`
+   给 #fafafa）。换 fork 版之后实测它自己就有：`dist/table/style/yon.js:31` 给
+   `${componentCls}-tbody > tr:nth-child(even of :not(...))` 上了两层 45° / −45° 斜纹，
+   是无条件生成的（`dist/table/style/index.js:266`，不看任何 prop），所以每张表默认就有。
+   台架 .tmp-build/bench-zebra 读回的真数：fork 那条落在**第 2/4/6 行**（tr 上的 background-image，
+   最深一档 alpha 0.02 合成约 #fbfbfb），我方那条落在**第 1/3/5 行**（td 上的实色 #fafafa）——
+   两条同时在场的界面上其实是"奇数行实灰 + 偶数行斜纹"两种纹理交替，不是同一套斑马纹。
+   留哪一条是他的决定，这条按他 2026-10-26 那句删我方。
 
-   底色落在 <td> 而不是 <tr>（v0.37.4 改的）：antd 的悬停/选中都是给 <td> 上底色，
-   条纹在 <tr> 上时被它们盖住就整行变白或变蓝，而那个悬停底色是 rc-table 用 React 状态
-   加在 td 上的（`.ant-table-cell-row-hover`，带 0.2s 背景过渡 + 去抖），鼠标快速划过时
-   会留下几行没退干净的 —— 用户口径「隔行样式在 hover 过后会消失，不稳定」。
-   条纹和悬停同落在 td 上之后，两者只比特异度，过渡变成灰↔蓝的同元素交叉淡化，
-   任何一刻都不会出现"既不是灰也不是蓝"的白行。 */
-.ant-table-tbody > tr.ant-table-row:nth-of-type(odd) > td {
-  background: #fafafa;
-}
+   下面那两条悬停规则仍落在 <td>，理由没变（v0.37.4）：antd 的悬停/选中底色都是给 <td> 上的，
+   而 fork 的条纹在 <tr> 上 —— 悬停档若也落在 tr 就与条纹同层比优先级，落在 td 才一定盖得住。 */
 
 /* 悬停底色改由 CSS `:hover` 驱动，并关掉 antd 那个 JS 类：`:hover` 由浏览器维护，
    不存在"移开了还留着"。`:not(.ant-table-row-selected)` 是把选中行的两档底色让给 antd

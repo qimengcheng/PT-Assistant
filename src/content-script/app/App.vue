@@ -296,7 +296,9 @@ onBeforeUnmount(() => stopSnakebarWatch());
   <a-style-provider :container="shadowRoot">
     <!-- 浮层容器指向 shadowRoot 内的 #ptd-content-script-overlay，否则弹窗挂到 body 上拿不到样式 -->
     <!-- rowHoverBg / headerBg / headerSort*Bg 与 options 侧 entrypoints/options/App.vue 同值
-         （很淡的蓝悬停 + 蓝灰表头，替代 antd 默认那两档 #fafafa —— 表头会和斑马纹奇数行同色）。
+         （很淡的蓝悬停 + 蓝灰表头，替代 antd 默认那两档 #fafafa —— 表头会和当时那条奇数行
+         斑马纹同色；那条已于 2026-10-26 删掉，行底改成 fork 自带的第 2/4/6 行浅斜纹，
+         这几档的理由仍然成立）。
          那边改这几个色值时这里要跟着改，两处的 ConfigProvider 互相读不到。
          字号仍走 antd 默认，不跟着 options 的 fontSize:13 改。 -->
     <a-config-provider

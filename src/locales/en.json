@@ -446,7 +446,9 @@
       "paused": "Paused",
       "queued": "Queued",
       "seeding": "Seeding",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "unknownRaw": "The downloader reported the state \"{raw}\", which our mapping doesn't cover, so it can only show Unknown.",
+      "unknownNoRaw": "The plugin doesn't read this client's raw state string, so the unrecognized value can't be named."
     },
     "stateFilterAll": "All",
     "reseedCandidate": {

@@ -155,6 +155,23 @@ export interface CTorrent<RAW = any> {
   state: CTorrentState;
 
   /**
+   * 客户端**原样**报出的那一格状态，不做任何归一。
+   *
+   * 为什么要有这一格：上面的 `state` 是归一表的产物，表里没有的名字一律落 `unknown`，
+   * 界面上就只剩「未知」两个字 —— 而「到底是哪个值没进表」这件事只有下载器自己知道。
+   * 没有这一格时界面只能去读 `raw`，`raw` 的键名是各家的（本文件上面那条口径正是
+   * 「不许在界面里再去读 raw 的各家键名」），所以「把原文留一份」要由产出方各做各的。
+   * qBittorrent 5.0 把 `pausedUP` / `pausedDL` 改名成 `stoppedUP` / `stoppedDL` 那一次，
+   * 排查全程只能靠猜（用户 2026-10-26 那一屏）。
+   *
+   * 只有 qBittorrent 接了（`torrent.state`，逐字转）。其余七家没核对过各自那一格的键名
+   * 与取值形状（uTorrent / ruTorrent 报的是数字码，群晖同时有 `status` 与 `state` 两格），
+   * 留 undefined，界面按「这一家的原文插件没取到」说，不替它编一个。
+   * 与 `swarmSeeders`、`contentPath` 同一档处置：报不出的留 undefined，不是 0、不是空串。
+   */
+  stateRaw?: string;
+
+  /**
    * total size of the torrent, in bytes
    */
   totalSize: number;

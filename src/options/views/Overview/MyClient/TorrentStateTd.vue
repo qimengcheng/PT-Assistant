@@ -13,6 +13,9 @@ import {
 
 import { type CTorrent, CTorrentState } from "@ptd/downloader";
 
+import HoverTip from "@/options/components/HoverTip.vue";
+import { unknownStateTipOf } from "./stateTip.ts";
+
 const { item } = defineProps<{
   item: CTorrent;
 }>();
@@ -41,15 +44,27 @@ const stateDisplay: Record<CTorrentState, { color: TTagColor; icon: Component; l
 const stateColor = computed<TTagColor>(() => stateDisplay[item.state]?.color ?? "default");
 const stateIcon = computed<Component>(() => stateDisplay[item.state]?.icon ?? QuestionCircleOutlined);
 const stateLabel = computed(() => t(stateDisplay[item.state]?.label ?? "MyClient.state.unknown"));
+
+/**
+ * 「未知」那一档要说出下载器**原样报的是哪个串**（判据本体在 `stateTip.ts`，
+ * 那里写了为什么只有这一档、以及为什么认不出的时候这颗格子还会带走操作列两颗键）。
+ * 原文由驱动逐字转进 `stateRaw`，界面不读 `raw` 的各家键名（types.ts 那条口径）。
+ */
+const stateTip = computed(() => unknownStateTipOf(item.state, item.stateRaw));
+const rawStateText = computed(() =>
+  stateTip.value ? t(stateTip.value.key, stateTip.value.args ?? {}) : "",
+);
 </script>
 
 <template>
-  <a-tag :color="stateColor" class="state-tag">
-    <template #icon>
-      <component :is="stateIcon" />
-    </template>
-    {{ stateLabel }}
-  </a-tag>
+  <HoverTip :text="rawStateText" :delay="0.2">
+    <a-tag :color="stateColor" class="state-tag">
+      <template #icon>
+        <component :is="stateIcon" />
+      </template>
+      {{ stateLabel }}
+    </a-tag>
+  </HoverTip>
 </template>
 
 <style scoped lang="scss">

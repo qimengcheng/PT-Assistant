@@ -446,7 +446,9 @@
       "paused": "已暂停",
       "queued": "排队中",
       "seeding": "做种中",
-      "unknown": "未知"
+      "unknown": "未知",
+      "unknownRaw": "下载器报的状态是「{raw}」，我们的识别表里没有这一档，所以只能显示为未知。",
+      "unknownNoRaw": "这一家下载器的状态原文插件没有读取，说不出具体是哪个值没被识别。"
     },
     "stateFilterAll": "全部",
     "reseedCandidate": {

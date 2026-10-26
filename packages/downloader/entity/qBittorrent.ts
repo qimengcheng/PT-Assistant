@@ -129,6 +129,17 @@ enum QbittorrentTorrentState {
   Error = "error", // Some error occurred, applies to paused torrents
   PausedUP = "pausedUP", // Torrent is paused and has finished downloading
   PausedDL = "pausedDL", // Torrent is paused and has NOT finished downloading
+  /**
+   * qBittorrent 5.0（WebAPI 2.11.0）把上面两个改名成 stopped*，4.x 的写法仍在报 —— 两套都要认。
+   * 少认一套的后果不是"标签难看"：这一格落到 `switch` 的 default 就成 `unknown`，
+   * 界面画成「未知」，而操作列那颗暂停/恢复的 `v-if` 只认 downloading/seeding/paused/error，
+   * 于是那一行**两颗键都没有**（用户 2026-10-26 那张截图正是这一档）。
+   * 同一次改名在 `pauseTorrent` 那一步是处理过的（端点换成 /torrents/stop），状态这一半漏了。
+   */
+  StoppedUP = "stoppedUP",
+  StoppedDL = "stoppedDL",
+  /** 5.0 新增强制拉元数据那一档（`metaDL` 早就归在下载中里，这一档同一件事） */
+  ForcedMetaDL = "forcedMetaDL",
   QueuedUP = "queuedUP", // Queuing is enabled and torrent is queued for upload
   QueuedDL = "queuedDL", // Queuing is enabled and torrent is queued for download
   Uploading = "uploading", // Torrent is being seeded and data is being transferred
@@ -671,6 +682,7 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
         case QbittorrentTorrentState.ForcedDL:
         case QbittorrentTorrentState.Downloading:
         case QbittorrentTorrentState.MetaDL:
+        case QbittorrentTorrentState.ForcedMetaDL:
         case QbittorrentTorrentState.StalledDL:
           state = CTorrentState.downloading;
           break;
@@ -684,9 +696,11 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
           state = CTorrentState.seeding;
           break;
         case QbittorrentTorrentState.PausedDL:
+        case QbittorrentTorrentState.StoppedDL:
           state = CTorrentState.paused;
           break;
         case QbittorrentTorrentState.PausedUP:
+        case QbittorrentTorrentState.StoppedUP:
           // state = 'completed';
           state = CTorrentState.paused;
           break;
@@ -717,6 +731,9 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
         infoHash: hash,
         name: torrent.name,
         state,
+        // 逐字留一份下载器报的原样串：归一表没命中时，界面要能说出是哪个值没进表
+        // （见 types.ts 里 `stateRaw` 的注释 —— 只有这一家接了）
+        stateRaw: torrent.state,
         dateAdded: torrent.added_on,
         isCompleted,
         progress: torrent.progress * 100,

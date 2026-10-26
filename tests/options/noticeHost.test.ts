@@ -8,6 +8,8 @@
  *     只给一个就是一颗点了开不出东西的死键；
  *  3. 宿主还没挂上时要**响**，而不是静默把通知丢掉。
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoticeGroupItem, NoticeGroupItemInput, NoticeGroupRef } from "@zboson/ui";
 
@@ -84,6 +86,13 @@ describe("通知卡片宿主", () => {
     expect(sent.modalText).toBeUndefined();
   });
 
+  it("「详情」那颗链接的文字由调用方给（组件默认值是硬编码中文）", () => {
+    const { host, calls } = makeFakeGroup();
+    setNoticeHost(host);
+    openNoticeCard({ ...card, details: ["A 站"], detailText: "Details" });
+    expect((calls[1].arg as NoticeGroupItemInput).detailText).toBe("Details");
+  });
+
   it("宿主没挂上：console.error 响一条，且不许抛异常打断调用方", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => openNoticeCard(card)).not.toThrow();
@@ -97,5 +106,50 @@ describe("通知卡片宿主", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     openNoticeCard(card);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 上面第三条把明细折成**一串带换行的纯文本**交给组件，而组件就把它画成一个文本节点
+ * （`@zboson/ui/dist/notice/Notice.js:129`），它自带的样式表对 `.ant-notice-modal-text`
+ * 一条规则都没有 —— 浏览器默认 `white-space: normal` 会把那些换行折叠，四条明细并成一行。
+ * 所以「明细分行」这件事由我方那份全局样式负责，这里钉住它还在：
+ * 少这一条不报错、不进 vue-tsc，只在界面上变成一坨（台架 bench-notice2 实测到的就是这个）。
+ */
+describe("详情弹窗里的明细分行", () => {
+  // 工作区换行符不是常量（core.autocrlf），按源码文本判的形状断言一律先归一化
+  const css = readFileSync(fileURLToPath(new URL("../../src/entrypoints/options/style.css", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
+  const blockOf = (selector: string) => {
+    const at = css.indexOf(`${selector} {`);
+    return at < 0 ? "" : css.slice(at, css.indexOf("}", at));
+  };
+
+  it("全局样式给那一格开了保留换行", () => {
+    expect(blockOf(".ant-notice-modal-text")).toContain("white-space: pre-wrap");
+  });
+
+  it("长种子名（没有空格的长串）也要能拆行，不许把弹窗顶出横向滚动", () => {
+    expect(blockOf(".ant-notice-modal-text")).toContain("overflow-wrap: anywhere");
+  });
+});
+
+/**
+ * `showReseedNoticeCard` 取那句链接文字走的是 `tOutside("common.noticeDetail")` ——
+ * 键名是运行时字符串，防线③那种「查字面 `t("…")`」的扫描看不见它，写错了界面直接画出键路径。
+ * 所以在这里点名核对两侧都有这一句。
+ */
+describe("详情链接的文案", () => {
+  const read = (f: string) => JSON.parse(readFileSync(fileURLToPath(new URL(f, import.meta.url)), "utf8"));
+  const zh = read("../../src/locales/zh_CN.json");
+  const en = read("../../src/locales/en.json");
+
+  it("中英两侧都有 common.noticeDetail", () => {
+    expect(zh.common.noticeDetail).toBe("详情");
+    expect(en.common.noticeDetail).toBe("Details");
+  });
+
+  it("调用点确实在给这个键（不是又写死一份中文）", () => {
+    const src = readFileSync(fileURLToPath(new URL("../../src/options/reseedNoticeCard.ts", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
+    expect(src).toContain('tOutside("common.noticeDetail")');
   });
 });

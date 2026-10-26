@@ -2109,7 +2109,8 @@
     "lock": "锁定",
     "unlock": "解锁",
     "filter": "筛选",
-    "more": "更多"
+    "more": "更多",
+    "noticeDetail": "详情"
   },
   "connectCheck": {
     "default": "检查连接性",

@@ -2109,7 +2109,8 @@
     "lock": "Lock",
     "unlock": "Unlock",
     "filter": "Filter",
-    "more": "More"
+    "more": "More",
+    "noticeDetail": "Details"
   },
   "connectCheck": {
     "default": "Check Connect",

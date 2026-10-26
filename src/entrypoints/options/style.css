@@ -681,3 +681,13 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
 }
+
+/* Notice 详情弹窗里那份多行正文。
+   组件把它画成一个纯文本节点（@zboson/ui/dist/notice/Notice.js:129），而它自带的样式表
+   （dist/notice/style/index.js）对 .ant-notice-modal-text 一条规则都没有 —— 实测计算值
+   white-space: normal，所以明细里那些换行被当普通空白折叠，四条并成一行。
+   overflow-wrap 那条挡的是没有空格的长种子标题：pre-wrap 只保留换行、不拆长串。 */
+.ant-notice-modal-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

@@ -25,7 +25,21 @@ export interface INoticeCard {
   message: string;
   /** 明细，逐条列在「详情」弹窗里；空数组等于不给详情链接 */
   details?: string[];
-  /** 秒；0 = 不自动关。组件默认的 5 秒比原先那张 8 秒短，所以调用点显式给 */
+  /**
+   * 「详情」那颗链接的文字。
+   *
+   * 必须我方给：组件里的默认值是**硬编码的中文**（实测 `dist/notice/Notice.js:91`
+   * `props.detailText ?? "详情"`），它不吃 antd 的 locale —— 英文界面下界面上会漏出「详情」两个字
+   * （台架 bench-notice2 的英文那一趟实测到的就是这个）。
+   */
+  detailText?: string;
+  /**
+   * 秒；0 = 不自动关。
+   *
+   * ⚠️ 传了它就等于绕开组件那颗「各类型停留时长」设置键 —— 实测
+   * `dist/notice-group/NoticeGroup.js:91` 取的是 `config.duration ?? settings[...] ?? 5`，
+   * 显式值排在最前。辅种那一条按「不许改动已验收过的 8 秒」显式给着，代价写在那页的注释里。
+   */
   duration?: number;
 }
 
@@ -56,5 +70,6 @@ export function openNoticeCard(card: INoticeCard): void {
     // 两个字段都要非空，组件才画那颗「详情」链接（见 Notice 的 props 注释）
     modalTitle: details.length > 0 ? card.title : undefined,
     modalText: details.length > 0 ? details.join("\n") : undefined,
+    detailText: card.detailText,
   });
 }

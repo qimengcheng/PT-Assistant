@@ -26,7 +26,7 @@ import {
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
 } from "@zboson/icons";
-import type { TableColumnsType, TablePaginationConfig, TableRowSelection } from "@zboson/ui";
+import type { TableColumnsType, TableRowSelection } from "@zboson/ui";
 
 import {
   CTorrentState,
@@ -47,17 +47,19 @@ import type { IReseedScanResult } from "@/shared/types/storages/reseedScan.ts";
 import type { ITransferSourceRow } from "@/shared/upload/types.ts";
 import { reseedHandoffLabelOf } from "@/shared/reseedScanHandoff.ts";
 import { countAutoTagSkips, planAutoTagRows } from "@/shared/torrentAutoTag.ts";
-import { useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
+import { SUB_ROW_FLAG, useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
 import PushToDownloaderDialog from "./PushToDownloaderDialog.vue";
 import {
   assignGroups,
   buildTaskGroups,
+  clampUnitPage,
   collapseGroups,
   groupSiblingsOf,
   type IGroupMeta,
   type IRowForGroup,
+  sliceUnitsToPage,
 } from "./reseedGroups.ts";
 import { buildReseedFacts, buildReseedLocalBases, buildReseedScanScope, type IReseedRow, type IReseedScanScope } from "./reseedCandidateView.ts";
 import ReseedScanDialog from "./ReseedScanDialog.vue";
@@ -338,8 +340,9 @@ interface IGroupEntry extends IRowForGroup {
 }
 
 /**
- * 折叠后的那一列行，连同两组附属信息：
- * `meta` 给名称那一格挂「N 条同内容」那颗标记，`members` 给勾选代表行时连着整组一起算。
+ * 折叠后的那一列行，连同三组附属信息：
+ * `meta` 给名称那一格挂「N 条同内容」那颗标记，`members` 给勾选代表行时连着整组一起算，
+ * `units` 是分页的单位（一组不许被页边界劈开，理由见 `ICollapseResult.units` 那节注释）。
  */
 const grouped = computed(() => {
   const taskByHash = buildTaskGroups(reseedTasks.value);
@@ -356,6 +359,7 @@ const grouped = computed(() => {
   const result = collapseGroups<IGroupEntry>(entries, (e) => groupMap.get(e.key) ?? null, shownGroups.value);
   return {
     rows: result.rows.map((e) => e.row),
+    units: result.units.map((list) => list.map((e) => e.row)),
     meta: result.meta,
     members: result.members,
   };
@@ -599,12 +603,21 @@ function toggleGroupFor(record: CTorrent) {
 function torrentRowClass(record: CTorrent) {
   const meta = grouped.value.meta.get(torrentKey(record));
   if (!meta) return "";
+  /**
+   * 组员行一律再带一条 `SUB_ROW_FLAG`（那个串从 `useAutoFitPageSize` 里导出来，两边读同一份）：
+   * 这一条**没有任何样式**，只是给那条判据的读数用 —— 它要的是「一页几条记录」，
+   * 而组员行不是记录行（它是分页单位内部的那几行，单位自己才算一条）。少了这一条就会
+   * 出现他 2026-10-18 已经撤过的那个坏法：每展开一组，这一页就少排一条。
+   * 这里不用 rc-table 自己的 `ant-table-row-level-N`：这一页的组员不是树形 children
+   * （平铺进列表是展开/收起动画的载体），拿不到那个标记，也不该假装有。
+   */
+  const tail = meta.anchor ? "" : ` ${SUB_ROW_FLAG}`;
   // 正在收起：整组（含代表行）先退底色，组员再连行一起滑走
   if (collapsingGroups.value.has(meta.group)) {
-    return meta.anchor ? "torrent-group-exit" : "torrent-group-exit torrent-group-member-exit";
+    return meta.anchor ? "torrent-group-exit" : `torrent-group-exit torrent-group-member-exit${tail}`;
   }
   if (!expandedGroups.value.has(meta.group)) return "";
-  return meta.anchor ? "torrent-group-row" : "torrent-group-member torrent-group-row";
+  return meta.anchor ? "torrent-group-row" : `torrent-group-member torrent-group-row${tail}`;
 }
 
 /**
@@ -984,29 +997,84 @@ const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 const sessionSize = ref<number | null>(null);
 const { fitted: fitPageSize } = useAutoFitPageSize({
   container: () => pagePanel.value,
-  // 量的是**折叠后真正出现**的那些行：每页条数要按看得见的行数铺满，不是按台账条数
-  rows: () => grouped.value.rows,
+  /**
+   * 喂进去的是**分页单位那份列表**（那条判据只取它的长度当结构身份），不是表格里画出来的行数。
+   *
+   * 两件事各管一半：「这一屏放得下几条」的行高那半截由 `table-row-not-a-record` 标记把组员行
+   * 排除掉（见 `useAutoFitPageSize` 文件头那一节）；单位数不随展开变化，所以它同时当
+   * 那条判据的结构身份 —— 点开一组不会再重开一轮，也不会因为多出的行而把这一页少排一条。
+   */
+  rows: () => grouped.value.units,
 });
 
-// 分页统一走 toPagination：它兜底 Vuetify 遗留的 -1/0（原先这页直接把 -1 交给 antd，
-// 会让 slice(0,-1) 吃掉最后一行），并带上「一页放得下就不出分页条」（用户 2026-10-07）。
-// 总数用折叠后的行数 —— 折叠的意义就是「一屏放得下的条目变多了」，还按 523 条算会白切页。
-const tablePagination = computed(() =>
+/** 分页的单位数：折叠的组算一条，展开的组**也**只算一条（组员跟着代表行走） */
+const unitCount = computed(() => grouped.value.units.length);
+
+/**
+ * 分页条现在是**独立**挂的（`<a-pagination>`，见模板），不再交给 a-table 的 `:pagination`。
+ *
+ * 理由只有一条：antd 的前端分页是「按固定步长切 dataSource」，而展开一组会让一个单位占掉好几行 ——
+ * 页边界一旦落在组的中间，「6 条同内容」点开只画出 4 条，剩下两条跑到下一页去
+ * （用户 2026-10-26：「6条相同内容,但是展开只显示一部分,这个要全部展示」）。
+ * 改成按单位切，一组就结构上劈不开了：单位 = 必须同页出现的那些行，切完再摊平交给表格。
+ *
+ * 代价也说清，正是他那句话的后半「这种情况不受不能出现滚动条的约束」：展开的那一页可能比面板高，
+ * 于是 `.page-panel` 自己出滚动条。**没有展开时与改动前一字不差** —— 单位数就等于折叠后的行数，
+ * 「分页条出不出 / 每页几条 / 共几页」用的是同一个判据。
+ */
+const pagerCfg = computed(() =>
   toPagination(sessionSize.value ?? pageSize.value, 25, {
     size: "small",
-    totalRows: grouped.value.rows.length,
+    totalRows: unitCount.value,
     fitSize: fitPageSize.value,
     picked: sessionSize.value !== null,
-    extraConfig: { current: tablePage.value, total: grouped.value.rows.length },
   }),
 );
+
+/** 这一页装几个**单位**；不出分页条时等于全部（一次摊平交给表格） */
+const unitPageSize = computed(() => {
+  const cfg = pagerCfg.value;
+  if (cfg === false) return Math.max(1, unitCount.value);
+  return typeof cfg.pageSize === "number" && cfg.pageSize > 0 ? cfg.pageSize : 25;
+});
+
+/**
+ * 页码夹回范围内。筛选与删除都会让单位数变小，而 `tablePage` 是受控状态（只由翻页回调写），
+ * 停在第 5 页而只剩 2 页时不夹就会切出一个空数组 —— 表现为「筛到什么都没有」，看着像筛坏了。
+ */
+const safePage = computed(() => clampUnitPage(tablePage.value, unitCount.value, unitPageSize.value));
+
+/** 交给表格的那些行 = 这一页的单位摊平（一组绝不跨页；放不下就整组画出来并让面板出滚动条） */
+const pageRows = computed(() =>
+  pagerCfg.value === false ? grouped.value.rows : sliceUnitsToPage(grouped.value.units, safePage.value, unitPageSize.value),
+);
+
+/** `<a-pagination>` 的 props：`toPagination` 那份配置，加受控的 current / total */
+const pagerProps = computed(() => {
+  const cfg = pagerCfg.value;
+  if (cfg === false) return null;
+  return { ...cfg, current: safePage.value, total: unitCount.value };
+});
+
+function onPagerChange(page: number, size: number) {
+  // 只有「报回来的档 ≠ 界面上正在显示的那一档」才算他改了尺寸：翻页同样带着当前那一档回来，
+  // 照 `if (size)` 判会在他第一次翻页时就把实测档锁成自选档（AGENTS §3.4 分页那一条的 ②）
+  if (size && size !== unitPageSize.value) sessionSize.value = size;
+  tablePage.value = page;
+}
 
 const tableSortOrder = computed(() => buildSortOrderMap(configStore.tableBehavior["MyClient"]?.sortBy));
 
 /** a-table 的 @change 第三参：开多列排序时是数组。这里只吃 order 与 columnKey 两件 */
 type TSorterItem = { order?: "ascend" | "descend"; columnKey?: string | number };
 
-function handleTableChange(pagination: TablePaginationConfig, _filters: unknown, sorter: TSorterItem | TSorterItem[]) {
+/**
+ * 这一页的 @change 只管排序。
+ *
+ * 分页不在这里：分页条是独立挂的，页码与档位都从 `onPagerChange` 那一路来（这一页自己排序、
+ * 自己按单位切页，a-table 拿到的 `dataSource` 已经就是这一页的那些行，`pagination` 是 false）。
+ */
+function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSorterItem | TSorterItem[]) {
   const s = Array.isArray(sorter) ? sorter : [sorter];
   const next: { key: string; order: "asc" | "desc" }[] = [];
   for (const item of s) {
@@ -1015,14 +1083,6 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
     }
   }
   configStore.updateTableBehavior("MyClient", "sortBy", next);
-  // 只有「报回来的档 ≠ 界面上正在显示的那一档」才算他改了尺寸：翻页与排序同样带着
-  // 当前那一档回来，照 `if (pagination?.pageSize)` 判会把他第一次翻页就误判成挑档。
-  const displayed = tablePagination.value === false ? 0 : tablePagination.value?.pageSize ?? 0;
-  if (pagination?.pageSize && displayed && pagination.pageSize !== displayed) {
-    // 挑档只活在本次进入里：不写 store（写了也没人读），重新进来又是实测那一档
-    sessionSize.value = pagination.pageSize;
-  }
-  tablePage.value = pagination?.current ?? 1;
 }
 </script>
 
@@ -1205,17 +1265,21 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
       </a-flex>
     </a-flex>
 
-    <div ref="pagePanel" class="page-panel">
+    <!-- 独立分页条在场时给面板补一条标记：下面 `.page-panel-own-pager` 那条 flex 判据吃它。
+         为什么需要：表格那条「撑满面板」的链会把可用高整个吃掉（台架量到 wrapper 502），
+         分页条那 36px 就被顶到面板外面 —— 折叠态（根本没展开）也多出一条滚动条，
+         正好撞在他定的「既铺满又不出滚动条」上。 -->
+    <div ref="pagePanel" class="page-panel" :class="{ 'page-panel-own-pager': pagerProps !== null }">
     <a-table
       bordered
       :columns="tableHeader"
-      :data-source="grouped.rows"
+      :data-source="pageRows"
       :row-key="(record: CTorrent) => torrentKey(record)"
       :row-class-name="torrentRowClass"
       :on-row="torrentRowAttrs"
       :row-selection="rowSelection"
       :loading="loading"
-      :pagination="tablePagination"
+      :pagination="false"
       size="small"
       class="table-header-no-wrap"
       @change="handleTableChange"
@@ -1468,6 +1532,14 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
         </template>
       </template>
     </a-table>
+    <!-- 分页条：独立挂的一份，**不**复用 antd 那个 `.ant-table-pagination` 类 ——
+         那个类是 `useAutoFitPageSize` 用来减掉分页器高度的判据（它在 `.ant-table-wrapper` 里面），
+         而这一条是 `.page-panel` 的直接子节点，会被同一段里那句「同级其它块」的循环减一次、
+         这里再被那条 querySelector 减一次 = 白扣一整行。所以让它只带自己的排版类，
+         竖向空间由那条同级循环如实算。 -->
+    <div v-if="pagerProps" class="torrent-pager">
+      <a-pagination v-bind="pagerProps" @change="onPagerChange" />
+    </div>
     </div>
   </div>
 
@@ -1636,6 +1708,30 @@ function handleTableChange(pagination: TablePaginationConfig, _filters: unknown,
   margin-inline-end: 0;
   font-size: inherit;
   line-height: 16px;
+}
+
+/* ===== 独立挂的那条分页条（为什么独立挂见 script 里 `pagerCfg` 那一段） =====
+   排版照 antd 自己在表格里那条 `.ant-table-pagination`：`display: flex` + 靠右 —— 组件默认给
+   那个 `<ul>` 的是行内排布、不自带靠右。上边距 12px（面板自己有内衬，不再叠一份 16px）。
+   `style.css` 里那条 `.page-panel > :not(.ant-table-wrapper)` 已经给它 `flex-shrink: 0`，
+   所以展开一组把表体撑超之后不会把分页条压扁，而是面板出滚动条 —— 那正是
+   「展开的一组必须整组画全」要付的代价（用户 2026-10-26 明说这种情况不受「不许出滚动条」约束）。 */
+.torrent-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+/* 分页条挂在自己这一栏时，表格那条「撑满面板」的链要让出分页条那一格。
+   台架 `.tmp-build/bench-myclientpage` 量到的两档：不改这一条时 wrapper 502（把面板可用高吃干）
+   + 分页条 36 = 538 > 502，**没展开也**多出一条滚动条；改成 `flex: 0 1 auto` 之后
+   wrapper 466 + 36 = 502，正好铺满、不出滚动条，实测每页条数仍然与表格自带分页条那一档一致（12）。
+   保留 shrink 是故意的：展开一组真超高的那一档，收缩下限是 min-content（整张表的高），
+   所以它仍然溢出 + 面板出滚动条（他要的那一条），而不是把表压扁。
+   特异度 (0,3,0) 顶过 style.css 里那条 `.page-panel > .ant-table-wrapper`（0,2,0），
+   不靠两份样式表的加载顺序。 */
+.page-panel.page-panel-own-pager > :deep(.ant-table-wrapper) {
+  flex: 0 1 auto;
 }
 
 /* ===== 展开一组同内容：入场动画 + 整组底色 =====

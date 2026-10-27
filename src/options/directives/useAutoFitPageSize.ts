@@ -42,6 +42,9 @@
  * 所以现在只剩一个用途上的区分：**只有记录行进入算式**，展开把整屏撑超就让它出滚动条。
  * 顺带这一圈少吃一个外部输入（子行数是他点出来的、原先又反过来决定写回值），
  * 「行」与「条」混单位那一族从结构上没有了 —— 剩下的收敛问题只有「同一页里记录行不等高」。
+ * 同一件事在「我的下载器」那一页有**另一种载体**：那里的组员行是平铺进列表的（展开/收起动画
+ * 需要节点留在列表里），拿不到 rc-table 那个 level 标记，所以由调用点挂 `table-row-not-a-record`
+ * 一并排除 —— 两条判据的用途完全相同，见下面 `SUB_ROW_FLAG`。
  *
  * ## avail 不许当「换轮」的等值判据
  * 上一段那个来回还有一条放大器：avail 里减掉了横向滚动条厚度，而那个厚度随渲染行数
@@ -87,6 +90,23 @@ const ROW_SELECTOR = ".ant-table-tbody > tr.ant-table-row";
  * 「带不带 level-0」判，任何一处没打上这个类就会把整页记录数读成 0，那比混单位更难查。
  */
 const SUB_ROW_CLASS = /ant-table-row-level-[1-9]/;
+
+/**
+ * 「这一行不是分页单位」的自有标记。
+ *
+ * 为什么还要第二条判据、不满足于上面那条 rc-table 的类名：「我的下载器」那一页的同内容折叠
+ * **不是**树形 children —— 组员是摊平进 dataSource 的行（那是展开/收起动画的载体，改成就没有
+ * 退场那 180ms 了）。「我的下载器」把分页改成按「单位」切（一组不许被页边界劈开）之后，
+ * 展开的那几条组员仍然只是 level-0 的行，只认 rc-table 那个类名就会把它们当记录行数 ——
+ * 表现为「每展开一组，这一页就少排一条」，正是上面那一节已经撤掉过的坏法换了个载体复发。
+ * 所以由调用点给组员行挂这一条；它**不带任何样式**，只是给这里的一个读数用的标记。
+ *
+ * 两条判据是"或"的关系：树形的子行（rc-table 自己打标）与平铺的组员行（我们打标）都不参与。
+ *
+ * 导出是为了让**挂这一条类的调用点**与这里读的是同一个串 —— 两边各写字面量的话，
+ * 改了一处另一处只是"少减几行"，界面表现为「每展开一组就少排一条」，不报错也不进类型检查。
+ */
+export const SUB_ROW_FLAG = "table-row-not-a-record";
 
 /**
  * 「avail 相对上一轮变了多少才算换一轮」（px）。两个实测数字定的这一档：
@@ -252,7 +272,7 @@ export function useAutoFitPageSize({ container, rows, min = 1 }: IAutoFitPageSiz
     // 只认记录行：展开出来的子行整个不进算式（文件头那一节），所以点开一条条目
     // 不会让这一页少排一条，撑超了就直接出滚动条。
     const recordHeights = Array.from(el.querySelectorAll<HTMLElement>(ROW_SELECTOR))
-      .filter((tr) => !SUB_ROW_CLASS.test(tr.className))
+      .filter((tr) => !SUB_ROW_CLASS.test(tr.className) && !tr.classList.contains(SUB_ROW_FLAG))
       .map((tr) => tr.getBoundingClientRect().height);
     if (recordHeights.length === 0) return; // 空表没有行可量，撑满那件事归 style.css 那条全站规则
 

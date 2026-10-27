@@ -60,6 +60,18 @@ export interface IGroupMeta {
 export interface ICollapseResult<T> {
   /** 该交给表格的行：折叠的组只留代表行，展开的组整组连着出现 */
   rows: T[];
+  /**
+   * 分页的**单位**：每项是一组必须同页出现的行。
+   *
+   * 为什么不直接拿 `rows` 分页（这一条就是用户 2026-10-26 报的那个坏法）：表格按固定步长切
+   * 摊平后的数组，展开一组会一次多出 N 行，页边界落在组中间 ⇒ 「6 条同内容」点开只画出 4 条，
+   * 剩下两条在下一页。单位切法结构上劈不开一组。
+   *
+   * 折叠的组 = 1 个单位（只有代表行）、展开的组 = 1 个单位（含全部组员，行数不止一行）、
+   * 不成组的行 = 1 个单位（一行）。所以**没有展开时 `units.length === rows.length`**，
+   * 分页总数与改动前一字不差；展开也不改变单位数 —— 这正是「一屏放得下的条目变多了」那句话。
+   */
+  units: T[][];
   /** 行 key → 组信息；不属于任何组（或组里只有一条）的行不在里面 */
   meta: Map<string, IGroupMeta>;
   /** 组键 → 组内全部行 key，勾选代表行时要连着这些一起算 */
@@ -272,18 +284,50 @@ export function collapseGroups<T extends IRowForGroup>(
 
   const emitted = new Set<string>();
   const rows: T[] = [];
+  const units: T[][] = [];
   for (const row of sorted) {
     const info = meta.get(row.key);
     if (!info) {
       rows.push(row);
+      units.push([row]);
       continue;
     }
     if (!info.anchor) continue; // 组员由代表行那一次一起放出
     if (emitted.has(info.group)) continue;
     emitted.add(info.group);
     const list = byGroup.get(info.group) ?? [row];
-    if (expanded.has(info.group)) rows.push(...list);
-    else rows.push(row);
+    // 展开的组放整组、折叠的只放代表行 —— 两者都是**一个**分页单位（见 ICollapseResult.units）
+    const unit = expanded.has(info.group) ? list : [row];
+    rows.push(...unit);
+    units.push(unit);
   }
-  return { rows, meta, members };
+  return { rows, units, meta, members };
+}
+
+/**
+ * 这一页该出现第几页：把越界的页码夹回来。
+ *
+ * 为什么需要单独一步：筛条件、删条目都会让单位数变小，而页码是受控状态（只由翻页回调写）。
+ * 停在第 5 页而只剩 2 页时，不夹就会切出一个空数组 —— 界面表现为「筛到什么都没有」，
+ * 看着像筛坏了。与这一页原本那句「换筛选条件要回到第 1 页」是同一族，只是那条管的是主动筛，
+ * 这一条管「单位数自己变小了」（展开一组不改变单位数，所以不会走到这里）。
+ */
+export function clampUnitPage(current: number, unitCount: number, pageSize: number): number {
+  const size = Number.isFinite(pageSize) && pageSize >= 1 ? Math.floor(pageSize) : 1;
+  const pages = Math.max(1, Math.ceil(unitCount / size));
+  const page = Number.isFinite(current) ? Math.floor(current) : 1;
+  return Math.min(Math.max(1, page), pages);
+}
+
+/**
+ * 切出某一页要交给表格的那些行。
+ *
+ * 一条硬判据：**一个单位绝不跨页**，哪怕这一组有 19 条、一页容量只有 11 条 —— 放不下就整组
+ * 画出来并让面板出滚动条（用户 2026-10-26：「这种情况不受不能出现滚动条的约束」，
+ * 与他 2026-10-18 那句「展开造成的滚动条不用管」同一条取向）。
+ */
+export function sliceUnitsToPage<T>(units: readonly T[][], current: number, pageSize: number): T[] {
+  const size = Number.isFinite(pageSize) && pageSize >= 1 ? Math.floor(pageSize) : 1;
+  const page = clampUnitPage(current, units.length, size);
+  return units.slice((page - 1) * size, page * size).flat();
 }

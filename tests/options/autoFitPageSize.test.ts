@@ -23,9 +23,11 @@
  * DOM 那半截（量 rect、把子行滤掉、挂观察者）Node 里造不出来，归台架 `.tmp-build/bench-taskexpand`；
  * 这里只测纯算术，所以夹具用的是台架量到的真实数（行高 59、可用高 672）。
  */
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
-import { isNewEpoch, nextAutoFitOf } from "@/options/directives/useAutoFitPageSize.ts";
+import { isNewEpoch, nextAutoFitOf, SUB_ROW_FLAG } from "@/options/directives/useAutoFitPageSize.ts";
 
 /** 一行的实测高（辅种任务那一页 59px 那一档） */
 const H = 59;
@@ -186,5 +188,56 @@ describe("换轮判据：avail 只当「结构变了」的信号，不当等值�
     for (const key of ["900|45|10", "793|6|10", "793|45|12"]) {
       expect(isNewEpoch({ key, prevKey: "793|45|10", avail: AVAIL, prevAvail: AVAIL })).toBe(true);
     }
+  });
+});
+
+/**
+ * 接线形状。上面那句「DOM 那半截 Node 里造不出来」仍然成立 —— 这几条**钉的是源码，不是行为**，
+ * 它们只保证三种静默坏法当场报红：滤掉非记录行那一半被删掉、两边各写一份字面量串而漂掉、
+ * 以及这一页的分页被交回 a-table（那样表格会对已经切好的那一页**再切一遍**，
+ * 「展开一组只画出一半」就回来了，而且不报错、不进 vue-tsc）。
+ * 真行为（展开一组画全没画全、这一页有没有少排一条）只有台架量得到：`.tmp-build/bench-myclientpage`。
+ */
+describe("非记录行那一半的接线", () => {
+  /** 读源码文本前先归一换行符：这一条钉的是形状，不是「谁最后存盘」（工作区 LF/CRLF 不是常量） */
+  const read = (rel: string) =>
+    readFileSync(new URL(rel, new URL("../../", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
+  const directive = read("src/options/directives/useAutoFitPageSize.ts");
+  const page = read("src/options/views/Overview/MyClient/Index.vue");
+
+  it("算式里那道过滤同时认 rc-table 的子行标记与自有标记", () => {
+    const filter = /const recordHeights = Array\.from[\s\S]*?\.map\(/.exec(directive);
+    expect(filter, "找不到 recordHeights 那一段过滤").not.toBe(null);
+    expect(filter![0]).toContain("SUB_ROW_CLASS");
+    expect(filter![0]).toContain("SUB_ROW_FLAG");
+  });
+
+  it("调用点用导出来的那个串，不自己再写一份字面量", () => {
+    expect(page).toContain("${SUB_ROW_FLAG}");
+    // 自己写一份就会漂：改了导出那处，界面只是「每展开一组少排一条」，什么错都不报
+    expect(page).not.toContain('" table-row-not-a-record"');
+    expect(SUB_ROW_FLAG).toBe("table-row-not-a-record");
+  });
+
+  it("这一页交给表格的是切好的那一页，且不再让表格自己分页", () => {
+    expect(page).toContain(':data-source="pageRows"');
+    expect(page).toContain(':pagination="false"');
+    expect(page).toContain("<a-pagination");
+  });
+
+  /** 「共几页」吃的必须是单位数：写成摊平行数就回到「展开一组、页数自己涨」那个形状 */
+  it("分页总数用单位数而不是摊平行数", () => {
+    expect(page).toContain("totalRows: unitCount.value");
+    expect(page).toContain("total: unitCount.value");
+  });
+
+  /**
+   * 独立挂的那条分页条会让表格那条「撑满面板」的链把可用高整个吃掉（台架量到 wrapper 502 +
+   * 分页条 36 = 538 > 502，**没展开也多出一条滚动条**）。这一条就是那条 flex 判据的接线，
+   * 删掉它的表现不是报错，是折叠态凭空多一条滚动条 —— 所以他定的「铺满且不出滚动条」会被悄悄破掉。
+   */
+  it("分页条在场时面板补了那条让格的 flex 判据（两边名字对得上）", () => {
+    expect(page).toContain("'page-panel-own-pager'");
+    expect(page).toMatch(/\.page-panel\.page-panel-own-pager\s*>\s*:deep\(\.ant-table-wrapper\)\s*\{\s*flex:\s*0 1 auto/);
   });
 });

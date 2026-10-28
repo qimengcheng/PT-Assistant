@@ -26,6 +26,7 @@ import {
   reseedScanLocalGroup,
   reseedScanResultId,
   reseedScanScreen,
+  reseedScanTargetOfSeed,
   reseedScanVerdict,
 } from "@/shared/reseedScanPlan.ts";
 import { RESEED_SCAN_CONCURRENCY, RESEED_SCAN_MAX_PAIRS } from "@/shared/types/storages/reseedScan.ts";
@@ -255,6 +256,21 @@ async function scanOnePair(input: {
 }
 
 /**
+ * 选中的那几台下载器里的本地指纹条目，摊平成一片。
+ *
+ * 两处要用同一份：一轮扫描要靠它给候选验文件清单，任务行那颗「查其他站点」要靠它把任务给的
+ * 线索对回本地那一份（判据 `reseedScanTargetOfSeed`）。两边各读各的会折出两套结论。
+ */
+async function readLocalEntries(downloaderIds: readonly string[]): Promise<ILocalTorrentFingerprintEntry[]> {
+  const entries: ILocalTorrentFingerprintEntry[] = [];
+  for (const downloaderId of downloaderIds) {
+    const index = await getLocalFingerprintIndex(downloaderId);
+    entries.push(...(index?.entries ?? []));
+  }
+  return entries;
+}
+
+/**
  * 一轮扫描的全部过程。发起方不 await 它（一次扫描是几十到几百次站点请求，消息不能挂那么久），
  * 进度一路写进 `reseedScan` 那个键，由界面轮询。
  */
@@ -266,11 +282,7 @@ async function runRound(request: IReseedScanRequest, isCancelled: () => boolean)
 
   try {
     const cache = await readCache();
-    const entries: ILocalTorrentFingerprintEntry[] = [];
-    for (const downloaderId of request.downloaderIds) {
-      const index = await getLocalFingerprintIndex(downloaderId);
-      entries.push(...(index?.entries ?? []));
-    }
+    const entries = await readLocalEntries(request.downloaderIds ?? []);
 
     const targets: IReseedScanTarget[] = request.targets ?? [];
     const plan = planReseedScan({
@@ -381,7 +393,37 @@ onMessage("getReseedScanResults", async ({ data }) => {
   return keys?.length ? all.filter((item) => keys.includes(item.contentKey)) : all;
 });
 
-onMessage("clearReseedScanCache", async () => {
-  await (await ptdIndexDb()).clear("reseed_scan");
-  logger({ msg: "已清空可辅种扫描的结果缓存" });
+/**
+ * 只删**传进来的那些内容**的结论。
+ *
+ * 表键是 `内容键\0站点键`，所以按内容删要先读一遍再逐条删 —— 不能整表 clear：
+ * 界面上那句确认说的是「删除 N 条」（N 数的是当前范围），从辅种任务那一行进来时 N=1，
+ * 整表 clear 会把别的范围攒下的结论一起抹掉，而那正是缓存存在的意义（七天新鲜期内不必重查）。
+ */
+onMessage("clearReseedScanCache", async ({ data }) => {
+  const keys = new Set(data.contentKeys);
+  if (keys.size === 0) return;
+  const db = await ptdIndexDb();
+  const all = await db.getAll("reseed_scan");
+  let cleared = 0;
+  for (const item of all) {
+    if (!keys.has(item.contentKey)) continue;
+    await db.delete("reseed_scan", item.id);
+    cleared += 1;
+  }
+  logger({ msg: `已清除 ${cleared} 条可辅种扫描的结果缓存` });
+});
+
+/**
+ * 把一条辅种任务给的线索对回本地那一份，折成一个可扫描的目标。
+ *
+ * 必须由 offscreen 来做：内容键是 `归一标题|字节`，任务里存的是站点列表页的**约数**与发布名，
+ * 下载器里那条报的是真字节与种子名 —— 界面自己折一份就会给同一颗种子造出第二个 contentKey，
+ * 于是与「我的下载器」已查过的结论互不复用、`has-it` 那一档永远够不到（判据本体见
+ * `reseedScanTargetOfSeed`）。而本地指纹索引只能在这里读到。
+ * 一条消息一次请求，界面按回包的 `resolved` 决定要不要说明「本地已没有这份数据」。
+ */
+onMessage("resolveReseedScanTarget", async ({ data }) => {
+  const entries = await readLocalEntries(data.downloaderIds ?? []);
+  return reseedScanTargetOfSeed(data.seed, entries);
 });

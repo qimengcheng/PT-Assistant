@@ -11,6 +11,7 @@ import {
   LinkOutlined,
   NumberOutlined,
   QuestionCircleOutlined,
+  ScanOutlined,
   SearchOutlined,
   SyncOutlined,
 } from "@zboson/icons";
@@ -27,9 +28,12 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import HoverTip from "@/options/components/HoverTip.vue";
 import SiteFavicon from "@/options/components/SiteFavicon/Index.vue";
 import KeepUploadUsageDialog from "@/options/components/KeepUploadUsageDialog.vue";
+import ReseedScanDialog from "@/options/views/Overview/MyClient/ReseedScanDialog.vue";
+import type { IReseedScanScope } from "@/options/views/Overview/MyClient/reseedCandidateView.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
+import { reseedScanSeedOfTask } from "@/shared/reseedScanPlan.ts";
 import { decideOldBaseRemoval } from "@/shared/rebaseOldBase.ts";
 import {
   detectBasePathMismatch,
@@ -82,6 +86,75 @@ const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 type TSendKind = "base" | "other" | "all" | `one:${number}`;
 const sending = ref<Record<string, TSendKind | undefined>>({});
 const sendingOf = (id: string) => sending.value[id];
+
+/**
+ * 「查其他站点有没有这条」：把这一行的内容拿去**逐个站点真查一遍**
+ * （用户 2026-10-28：「在这个界面增加针对单个辅助任务的其他网站是否有这个种子的查询」）。
+ *
+ * 面板复用「我的下载器」那一屏那一张，不另做：结论落在同一张 IndexedDB 表、同一个内容键上，
+ * 两处各查各的就是对同一批站点打两遍请求。建任务那一半在这里不画（`queryOnly`）—— 一键辅种
+ * 的入口留在那一屏，这一行只回答「那个站上到底有没有」。
+ *
+ * 点下去先问一次 offscreen 再开面板（`resolveReseedScanTarget`）：任务里存的标题与大小是**站点
+ * 列表页报的那一份**（约数大小 + 发布名），与下载器里的种子名/真字节对不上号；界面自己折内容键
+ * 会给同一颗种子造出第二个键，于是与那一屏查过的结论互不复用、且永远到不了「确有这条」那一档。
+ * 判据与后果都写在 `reseedScanTargetOfSeed` 头上。
+ */
+const scanDialog = ref(false);
+const scanScopes = ref<IReseedScanScope[]>([]);
+const scanDownloaderIds = ref<string[]>([]);
+const scanResolved = ref(true);
+/** 正在解析的那一条（任务 id）：被点那颗转圈、其余行按住，与上面 `sending` 那一族同一写法 */
+const scanningId = ref<string>("");
+
+/** 查的目标站：已添加且没标离线 —— 与「我的下载器」那一屏同一份口径，两处不许各筛一套 */
+const scanUsableSites = computed(() =>
+  Object.keys(metadataStore.sites).filter((siteId) => metadataStore.sites[siteId]?.isOffline !== true),
+);
+
+async function openReseedScan(task: IKeepUploadTask) {
+  if (scanningId.value || scanDialog.value) return;
+  const seed = reseedScanSeedOfTask(task);
+  // 标题折不出搜索词（空 / 全是噪声词）：发出去只会得到一个假的「没搜到相符条目」
+  if (!seed) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.reseedScan.noName"), { color: "warning" });
+    return;
+  }
+  if (scanUsableSites.value.length === 0) {
+    runtimeStore.showSnakebar(t("MyClient.reseedScan.noSite"), { color: "warning" });
+    return;
+  }
+
+  // 任务自己那台排最前，其余启用的兜上：基准那份一般在它发过去的那台里，但换过下载器、
+  // 或基准是从别台挑来的那些，只有全查一遍才对得回本地那一份。多给的那几台只多建一次
+  // 30 分钟的索引缓存，不影响结论（比对是按内容键找的）。
+  const downloaderIds = [
+    ...new Set([task.downloadOptions.downloaderId, ...metadataStore.getEnabledDownloaders.map((item) => item.id)]),
+  ];
+
+  scanningId.value = task.id;
+  try {
+    const resolvedTarget = await sendMessage("resolveReseedScanTarget", { seed, downloaderIds });
+    scanScopes.value = [
+      {
+        key: task.id,
+        // 只有一档时那排按钮整块不画（面板自己判），这一句只是把类型摆全
+        label: resolvedTarget.target.name,
+        targets: [{ ...resolvedTarget.target, memberKeys: [resolvedTarget.target.contentKey] }],
+      },
+    ];
+    scanDownloaderIds.value = downloaderIds;
+    scanResolved.value = resolvedTarget.resolved;
+    scanDialog.value = true;
+  } catch (error) {
+    runtimeStore.showSnakebar(
+      `${t("KeepUploadTask.reseedScan.resolveFailed")}：${error instanceof Error ? error.message : String(error)}`,
+      { color: "error" },
+    );
+  } finally {
+    scanningId.value = "";
+  }
+}
 
 const {
   sortOrderOf,
@@ -279,13 +352,14 @@ const columns = computed<TableColumnsType<ITaskRow>>(() => [
     title: t("common.action"),
     key: "action",
     align: "center",
-    // 140 是量出来的，不是估的（台架 ?m=row，真 DOM）：这一格最宽的是**父行**那 5 颗图标键 = 120px，
-    // 加左右内衬 8+8 是 136，再留 4px 给亚像素取整；条目行那三颗只有 72px。
-    // 这一条从 180 → 210 → 140 的来回都是同一件事的两端：内容比格子宽时，居中对齐会把两侧一起
-    // 推到列外，而 `.ant-table-content` 是 overflow:auto —— 伸出去的那截直接把它撑出一条横向滚动条
-    // （v0.61.1 那次事故就是「↑」伸出去 21px）。那时那一格要装三个汉字的文字键（194px），
-    // 2026-10-10 换成图标键之后就只需要装图标了。
-    width: 140,
+    // 164 是量出来的，不是估的（台架 ?bench-taskexpand，真 DOM、改后那份 6 颗键）：
+    // 这一格最宽的是**父行**那 6 颗图标键的自然宽 = 144（每颗 24，v0.127 那版 5 颗量的 120 一字不差
+    // 地对上「一颗 24」），加左右内衬 8+8 是 160，再留 4px 给亚像素取整。
+    // 少给那 4px 会当场把内容顶出格子：实测 152 那一档 `td.scrollWidth − clientWidth` 还剩 1px，
+    // 而 140（v0.127 那一版刚好够 5 颗）溢 13px。居中对齐 + `.ant-table-content` 是 overflow:auto，
+    // 伸出去的那截直接把它撑成横向滚动条（v0.61.1 那次事故就是「↑」伸出去 21px）。
+    // 条目行那三颗只有 72px，不参与这一档。
+    width: 164,
   },
 ]);
 
@@ -1817,6 +1891,21 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                 </template>
               </a-button>
             </a-tooltip>
+            <!-- 「查其他站点有没有这条」：图标与「我的下载器」那一屏的扫描入口用同一个（ScanOutlined），
+                 同一件事在两个页面不许各挑一颗glyph。它只查、不建任务。 -->
+            <a-tooltip :title="t('KeepUploadTask.reseedScan.tip')">
+              <a-button
+                size="small"
+                type="text"
+                :loading="scanningId === record.task.id"
+                :disabled="!!sendingOf(record.task.id) || !!scanningId"
+                @click="openReseedScan(record.task)"
+              >
+                <template #icon>
+                  <ScanOutlined />
+                </template>
+              </a-button>
+            </a-tooltip>
             <a-tooltip :title="t('KeepUploadTask.copyLinks')">
               <a-button size="small" type="text" @click="copyLinksToClipboard(record.task)">
                 <template #icon>
@@ -1884,6 +1973,15 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
   <!-- 弹窗是 portal，不参与 .page 网格布局，所以挂在根级而不是 .page 直接子节点 ——
        后者会被排进隐式第三行、把面板那一行挤窄（同 MyData/Index.vue 的写法） -->
   <KeepUploadUsageDialog v-model="showUsageDialog" />
+  <!-- 逐站真查那一屏（从「我的下载器」复用）：`queryOnly` 让它只给结论、不画一键辅种那排 -->
+  <ReseedScanDialog
+    v-model="scanDialog"
+    :scopes="scanScopes"
+    :downloader-ids="scanDownloaderIds"
+    :usable-sites="scanUsableSites"
+    :query-only="true"
+    :resolved="scanResolved"
+  />
 </template>
 
 <style scoped lang="scss">

@@ -67,6 +67,115 @@ export function reseedScanResultId(contentKey: string, siteId: string): string {
 }
 
 /**
+ * 一条辅种任务能给出的最少线索（v0.128.0：任务行那颗「查其他站点」）。
+ *
+ * 参数按**结构**收、不 import 任务类型：这份判据要能在 Node 里直接断言（同上面那条分法），
+ * 而 `IKeepUploadTask` 那边牵着一片存储类型。
+ */
+export interface IReseedScanSeed {
+  /** 搜索词与内容键都按它折（任务级标题 = 第一条站点种子的发布名） */
+  name: string;
+  /** 字节。⚠️ 任务里这一格是**站点列表页报的约数**，与下载器报的真字节会差几 MB */
+  size: number;
+  /** 这条内容的 infoHash（同一份内容挂在各站上都是同一个 hash）*/
+  hash?: string;
+  /** 这个任务已经挂了哪些站 —— 那些站不必再查 */
+  knownSites: string[];
+}
+
+/** 本地那一份能提供的提示；`ILocalTorrentFingerprintEntry` 的四个字段子集 */
+export interface IReseedScanLocalHint {
+  hash: string;
+  name: string;
+  size: number;
+  /** 由 tracker 主机名反查出的「这一份已经挂在哪些站上」 */
+  sites?: string[];
+}
+
+/**
+ * 任务 → 扫描线索。标题折不出可用搜索词时返回 null（宁可不给查，也不要得到一个假的「没搜到」，
+ * 与 `planReseedScan` 里「一个词都折不出来就别发请求」是同一条判据）。
+ *
+ * hash 的取法有先后：`baseLocal.hash` 就是「基准在下载器里那一条」的 hash，语义上最准；
+ * 没有它才退到 items 里第一条报了 hash 的（辅种出去的副本与基准同一颗种子、同一个 hash）。
+ */
+export function reseedScanSeedOfTask(task: {
+  title?: string;
+  size?: number;
+  baseLocal?: { hash?: string };
+  items?: { site?: string | number; hash?: string }[];
+}): IReseedScanSeed | null {
+  const name = (task.title ?? "").trim();
+  if (!name) return null;
+  const size = typeof task.size === "number" && Number.isFinite(task.size) && task.size > 0 ? Math.round(task.size) : 0;
+  const itemHash = (task.items ?? []).find((item) => !!item?.hash)?.hash;
+  const hash = (task.baseLocal?.hash || itemHash || "").trim() || undefined;
+  const knownSites = [
+    ...new Set(
+      (task.items ?? [])
+        .map((item) => (item?.site === undefined || item.site === null ? "" : String(item.site)))
+        .filter((site) => site !== ""),
+    ),
+  ];
+  return { name, size, hash, knownSites };
+}
+
+/**
+ * 把任务给的那点线索**对回本地那一份**，再折成扫描目标。
+ *
+ * 为什么必须先对回来（这一条是本功能成不成立的关）：内容键是 `归一标题|字节`，而任务里存的
+ * 是**站点列表页的约数大小**与**发布名**，下载器里那条报的是真字节与种子名 —— 两边直接各折一份
+ * 键，同一颗种子就会得到两个不同的 contentKey。后果不是报错，而是：
+ * ① 与「我的下载器」那一屏已经查过的结论**互不复用**（同一份内容查两遍、还各说一套）；
+ * ② `reseedScanLocalGroup` 按 contentKey 找本地副本，找不到就没有文件清单可比 ⇒
+ *    那一档永远只能停在 `suspect`，「确有这条」在这个入口上系统性拿不到。
+ * 所以命中本地那一份时，**name / size / contentKey 一律改用本地那一份的**，并把 tracker
+ * 反查出的 `sites` 并进 `knownSites`（那些站已经挂着，查了是白查）。
+ *
+ * 对不上（数据已删、那台下载器没在索引里、hash 没记下来）就照任务那一份原样折，
+ * 并如实回 `resolved: false` —— 界面上据此说明「本地已没有这份数据，结论最多到标题与大小相符」，
+ * 不假装查得准。
+ */
+export function reseedScanTargetOfSeed(
+  seed: IReseedScanSeed,
+  locals: readonly IReseedScanLocalHint[],
+): { target: IReseedScanTarget; resolved: boolean } {
+  const fallback = (): { target: IReseedScanTarget; resolved: boolean } => ({
+    target: {
+      contentKey: reseedScanContentKey(seed.name, seed.size),
+      name: seed.name,
+      size: seed.size,
+      knownSites: [...new Set(seed.knownSites)],
+    },
+    resolved: false,
+  });
+  const hash = (seed.hash ?? "").trim();
+  if (!hash) return fallback();
+
+  const wanted = hash.toLowerCase();
+  const hits = locals.filter((entry) => (entry.hash ?? "").toLowerCase() === wanted);
+  if (hits.length === 0) return fallback();
+
+  // 同一个 hash 在下载器里可能有好几份副本（一站一份，正是辅种辅出来的形状）：
+  // 名字与大小取第一条就够（同一颗种子必然相同），已挂站点要取**并集**。
+  const first = hits[0];
+  return {
+    target: {
+      contentKey: reseedScanContentKey(first.name, first.size),
+      name: first.name,
+      size: first.size,
+      knownSites: [
+        ...new Set([
+          ...seed.knownSites,
+          ...hits.flatMap((entry) => entry.sites ?? []),
+        ]),
+      ],
+    },
+    resolved: true,
+  };
+}
+
+/**
  * 上次查过的结论还在新鲜期里吗。
  *
  * `failed` 那一档单独用一条短得多的间隔（`RESEED_SCAN_FAILED_RETRY_MS`）：它没有产出任何结论，

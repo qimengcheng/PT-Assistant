@@ -9,6 +9,10 @@
  *
  * 四档不许并成两档：「没查成」（要登录 / 超时 / 解析歪了）与「没搜到相符条目」是两种事实，
  * 说成一句会让人以为那个站确实没有这条，从此不去辅 —— 那是假阴性，比不报更糟。
+ *
+ * 两个入口共用这一屏（v0.128.0）：「我的下载器」按范围批量查并就地一键辅种；辅种任务页那一行的
+ * 那颗键只查一条、`queryOnly` 把建任务那一半藏掉。结论落在同一张 IndexedDB 表、同一个内容键上，
+ * 所以从任一处查过的，另一处都直接复用 —— 分成两套界面各查各的只会对同一批站点打两遍请求。
  */
 import { computed, h, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -44,7 +48,20 @@ const props = defineProps<{
   /** 目标站点：已添加、没标离线 */
   usableSites: string[];
   /** 下载器里那些已下完的副本 = 一键辅种时的基准来源（按内容键对得上扫描那一侧） */
-  bases: IReseedHandoffBase[];
+  bases?: IReseedHandoffBase[];
+  /**
+   * 只查不建（辅种任务行那颗键）：藏掉「一键辅种」与它下面那句为什么点不动。
+   *
+   * 为什么用一道闸而不是让调用方别传 `bases`：`bases` 为空时那排键会带着「下载器里找不到基准」
+   * 一句灰在那里 —— 那是给这一屏自己的用途准备的解释，从任务页进来的人没打算在这儿建任务，
+   * 看到那句只会去找下载器哪儿错了。
+   */
+  queryOnly?: boolean;
+  /**
+   * 这一条有没有对回本地那一份（`reseedScanTargetOfSeed` 回的那个 `resolved`）。
+   * 明确传 false 才多说一句：那一档下「确有这条」结构上够不到，界面上得说得出为什么。
+   */
+  resolved?: boolean;
 }>();
 
 const { t } = useI18n();
@@ -283,7 +300,8 @@ async function clearCache() {
   const hit = results.value.filter((item) => keys.has(item.contentKey)).length;
   if (hit === 0) return;
   if (!(await confirmDanger(t("MyClient.reseedScan.clearConfirm", { count: hit }), "danger", t("common.remove")))) return;
-  await sendMessage("clearReseedScanCache", undefined);
+  // 传的就是确认框里数的那一批：这一句说什么、那一边就删什么（见 messages.ts 那条注释）
+  await sendMessage("clearReseedScanCache", { contentKeys: [...keys] });
   await loadResults();
 }
 
@@ -299,7 +317,7 @@ const handoff = computed(() => {
   return planReseedHandoff({
     results: results.value.filter((item) => keys.has(item.contentKey)),
     targets: activeTargets.value,
-    bases: props.bases,
+    bases: props.bases ?? [],
     existingTasks: existingTasks.value,
   });
 });
@@ -323,6 +341,8 @@ const handoffWhy = computed(() =>
 );
 
 async function loadExistingTasks() {
+  // 只查不建那一档没有重复闸要过：这一条消息整趟是给「一键辅种」用的，别白读一遍任务表
+  if (props.queryOnly) return;
   // 拿不到就当没有重复：不能把「查不了」变成「建不了」（与弹窗那条同一口径）
   existingTasks.value = await sendMessage("getKeepUploadTasks", undefined).catch(() => [] as IKeepUploadTask[]);
 }
@@ -390,7 +410,7 @@ async function reseedNow() {
   try {
     for (const task of tasks) {
       // 建之前先按基准的实际数据目录定一次目标（判据 `reseedTargetDirOf`，见上面那三行）
-      const base = props.bases.find((item) => !!item.hash && item.hash === task.baseLocal?.hash);
+      const base = (props.bases ?? []).find((item) => !!item.hash && item.hash === task.baseLocal?.hash);
       await sendMessage("createKeepUploadTask", applyReseedTargetDir(task, await reseedTargetDirFor(base)));
       created += 1;
     }
@@ -435,7 +455,8 @@ onUnmounted(stopPolling);
   <a-modal v-model:open="showDialog" :title="t('MyClient.reseedScan.title')" :width="1080" :mask-closable="false">
     <div class="reseed-scan">
       <div class="reseed-scan__row">
-        <a-radio-group v-model:value="scopeKey" name="reseed-scan-scope" button-style="solid">
+        <!-- 只剩一档时不摆这一排：一颗永远选中的按钮 + 一句「本条」只会让人以为还有别的范围没选对 -->
+        <a-radio-group v-if="props.scopes.length > 1" v-model:value="scopeKey" name="reseed-scan-scope" button-style="solid">
           <a-radio-button v-for="scope in props.scopes" :key="scope.key" :value="scope.key" :disabled="scope.targets.length === 0">
             {{ scope.label }}
           </a-radio-button>
@@ -461,6 +482,13 @@ onUnmounted(stopPolling);
         </template>
       </a-alert>
 
+      <!-- 本地那一份没对回来（数据已删 / 不在这几台下载器里 / 任务没记下 hash）：
+           「确有这条」那一档靠文件清单验，没有清单就最多只能说到「标题与大小相符」。
+           这句必须说在前头，否则一屏 `suspect` 会被读成「查得不认真」。 -->
+      <a-alert v-if="props.resolved === false" type="warning" class="reseed-scan__plan">
+        <template #message>{{ t("MyClient.reseedScan.localMissing") }}</template>
+      </a-alert>
+
       <div class="reseed-scan__row">
         <a-button type="primary" :loading="running || starting" @click="startScan">
           <template #icon><PlayCircleOutlined /></template>
@@ -476,8 +504,10 @@ onUnmounted(stopPolling);
         </a-button>
         <!-- 一键辅种：只吃「该站有这条」那一档，基准取下载器里那一份、目录取它所在目录。
              它不绕过那张「辅种检测」弹窗，只是把这一屏已经问出来的信息直接送进去 ——
-             要逐条挑目录/标签，仍然走搜索页那颗。 -->
-        <HoverTip :text="t('MyClient.reseedScan.reseedTip')" placement="top" :delay="0.4">
+             要逐条挑目录/标签，仍然走搜索页那颗。
+             从辅种任务那一行进来时这一整块不画（`queryOnly`）：建任务的入口在「我的下载器」那一屏，
+             两处各建一套只会多一条「同一件事两个地方做出来不一样」的路。 -->
+        <HoverTip v-if="!props.queryOnly" :text="t('MyClient.reseedScan.reseedTip')" placement="top" :delay="0.4">
           <a-button type="primary" :disabled="handoff.tasks.length === 0" :loading="handoffBusy" @click="reseedNow">
             <template #icon><BranchesOutlined /></template>
             {{ t("MyClient.reseedScan.reseed", { count: handoff.tasks.length }) }}
@@ -490,7 +520,7 @@ onUnmounted(stopPolling);
           </a-button>
         </HoverTip>
         <!-- 点不动的原因写在按钮下面（灰键悬停不出浮层，见 handoffWhy 那条注释） -->
-        <span v-if="handoffWhy" class="reseed-scan__hint text-grey">{{ handoffWhy }}</span>
+        <span v-if="!props.queryOnly && handoffWhy" class="reseed-scan__hint text-grey">{{ handoffWhy }}</span>
       </div>
 
       <div class="reseed-scan__progress">

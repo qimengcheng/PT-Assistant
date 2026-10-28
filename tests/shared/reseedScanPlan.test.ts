@@ -17,6 +17,8 @@ import {
   reseedScanLocalGroup,
   reseedScanResultId,
   reseedScanScreen,
+  reseedScanSeedOfTask,
+  reseedScanTargetOfSeed,
   reseedScanVerdict,
 } from "@/shared/reseedScanPlan.ts";
 import type { ILocalTorrentFingerprintEntry } from "@/shared/fingerprint/types.ts";
@@ -349,5 +351,143 @@ describe("reconcileReseedScanJob · 孤儿轮次", () => {
   it("判过一次之后不会反复改判：第二次读进来已经是 stopped", () => {
     const once = reconcileReseedScanJob(orphan(), false, NOW)!;
     expect(reconcileReseedScanJob(once, false, NOW + 1)).toBe(once);
+  });
+});
+
+/**
+ * 辅种任务那一行 → 可扫描的线索（v0.128.0：任务行那颗「查其他站点」）。
+ *
+ * 全部用合成标题与合成 hash，不带任何真实种子名或账号数据。
+ */
+describe("reseedScanSeedOfTask：任务能给的那点线索", () => {
+  it("基准在下载器里时，hash 取基准那一条（语义上最准）", () => {
+    const seed = reseedScanSeedOfTask({
+      title: "Some.Show.S01E01.1080p.WEB-DL",
+      size: 1234.6,
+      baseLocal: { hash: "AAAA1111" },
+      items: [{ site: "nova", hash: "BBBB2222" }],
+    })!;
+    expect(seed.hash).toBe("AAAA1111");
+    // 字节数取整：与本地指纹索引那第 1 层同一个取法，不round 两边 key 就不相等
+    expect(seed.size).toBe(1235);
+  });
+
+  it("没有基准时才退到 items 里第一条报了 hash 的", () => {
+    const seed = reseedScanSeedOfTask({
+      title: "X",
+      size: 10,
+      items: [{ site: "a" }, { site: "b" }, { site: "c", hash: "CC" }],
+    })!;
+    expect(seed.hash).toBe("CC");
+  });
+
+  it("标题折不出搜索词（空 / 纯空格）时返回 null：宁可不给查", () => {
+    expect(reseedScanSeedOfTask({ title: "   ", size: 10 })).toBeNull();
+    expect(reseedScanSeedOfTask({ size: 10 })).toBeNull();
+  });
+
+  it("大小报不出（undefined / 负 / NaN）时记 0，不拿一个假字节进内容键", () => {
+    for (const size of [undefined, -1, Number.NaN, Number.POSITIVE_INFINITY] as const) {
+      expect(reseedScanSeedOfTask({ title: "X", size: size as number | undefined })!.size).toBe(0);
+    }
+  });
+
+  it("已挂站点：数字 id 要收得进来、去重、忽略缺值", () => {
+    const seed = reseedScanSeedOfTask({
+      title: "X",
+      size: 10,
+      items: [{ site: 12 }, { site: "nova" }, { site: 12 }, {}, { site: undefined }],
+    })!;
+    expect(seed.knownSites.sort()).toEqual(["12", "nova"]);
+  });
+});
+
+describe("reseedScanTargetOfSeed：对回本地那一份再折内容键", () => {
+  const LOCAL_NAME = "Some Show S01E01";
+  const LOCAL_SIZE = Math.round(11 * GIB);
+  const TASK_NAME = "Some.Show.S01E01.1080p.WEB-DL.H264-GRP";
+  const TASK_SIZE = Math.round(10.8 * GIB);
+
+  const localCopy = (patch: { hash: string; name?: string; size?: number; sites?: string[] }) => ({
+    hash: patch.hash,
+    name: patch.name ?? LOCAL_NAME,
+    size: patch.size ?? LOCAL_SIZE,
+    sites: patch.sites,
+  });
+
+  const taskSeed = (patch: Partial<{ hash: string; knownSites: string[] }> = {}) => ({
+    name: TASK_NAME,
+    size: TASK_SIZE,
+    hash: "ABCDEF",
+    knownSites: ["march"],
+    ...patch,
+  });
+
+  it("命中本地时 name/size/内容键一律改用本地那一份 —— 这是与「我的下载器」复用同一份结论的前提", () => {
+    const { target, resolved } = reseedScanTargetOfSeed(taskSeed(), [localCopy({ hash: "abcdef" })]);
+    expect(resolved).toBe(true);
+    expect(target.name).toBe(LOCAL_NAME);
+    expect(target.size).toBe(LOCAL_SIZE);
+    expect(target.contentKey).toBe(reseedScanContentKey(LOCAL_NAME, LOCAL_SIZE));
+    // 反面对账：界面要是自己按任务那一份折，得到的会是**另一个**键（同一颗种子两个键 = 互不复用）
+    expect(target.contentKey).not.toBe(reseedScanContentKey(TASK_NAME, TASK_SIZE));
+  });
+
+  it("hash 比的是大小写归一：站点那边常写大写", () => {
+    expect(reseedScanTargetOfSeed(taskSeed({ hash: "AbCdEf" }), [localCopy({ hash: "abcdef" })]).resolved).toBe(true);
+  });
+
+  it("已挂站点取并集：任务 items 的 + 本地那份 tracker 反查出来的", () => {
+    const { target } = reseedScanTargetOfSeed(taskSeed(), [
+      localCopy({ hash: "abcdef", sites: ["nova", "march"] }),
+      localCopy({ hash: "ABCDEF", name: "另一份副本", size: LOCAL_SIZE, sites: ["ptzone"] }),
+    ]);
+    expect(target.knownSites.sort()).toEqual(["march", "nova", "ptzone"]);
+  });
+
+  it("对不回本地时就照任务那一份原样折，并如实回 resolved=false（界面上要据此说结论的上限）", () => {
+    const { target, resolved } = reseedScanTargetOfSeed(taskSeed(), [localCopy({ hash: "999999" })]);
+    expect(resolved).toBe(false);
+    expect(target.contentKey).toBe(reseedScanContentKey(TASK_NAME, TASK_SIZE));
+    expect(target.name).toBe(TASK_NAME);
+    // 这时已知站点只有任务那一份：没有本地副本，就没有 tracker 可反查
+    expect(target.knownSites).toEqual(["march"]);
+  });
+
+  it("任务压根没记下 hash（老记录）时不去猜：直接按原样折", () => {
+    const { target, resolved } = reseedScanTargetOfSeed(taskSeed({ hash: undefined }), [localCopy({ hash: "abcdef" })]);
+    expect(resolved).toBe(false);
+    expect(target.name).toBe(TASK_NAME);
+  });
+
+  it("两条已知站点重合时不写两遍（否则计划里那一站会被跳两次、界面上的数也对不上）", () => {
+    const { target } = reseedScanTargetOfSeed(taskSeed({ knownSites: ["nova", "nova"] }), [
+      localCopy({ hash: "abcdef", sites: ["nova"] }),
+    ]);
+    expect(target.knownSites).toEqual(["nova"]);
+  });
+
+  it("对回来才复用得上缓存：同一颗种子，resolved 的那条排 0 对，对不上的那条照样重查", () => {
+    const now = 2_000_000_000_000;
+    const hit = reseedScanTargetOfSeed(taskSeed(), [localCopy({ hash: "abcdef" })]).target;
+    const miss = reseedScanTargetOfSeed(taskSeed({ hash: undefined }), []).target;
+    // 现场：hit 那一对在「我的下载器」那一屏已经查过、且还在七天新鲜期里
+    const earlier: IReseedScanResult = {
+      id: reseedScanResultId(hit.contentKey, "ptzone"),
+      contentKey: hit.contentKey,
+      siteId: "ptzone",
+      verdict: "has-it",
+      at: now - 60_000,
+      site: { id: "42", title: LOCAL_NAME, url: "https://ptzone/details.php?id=42", link: "https://ptzone/download.php?id=42", size: LOCAL_SIZE },
+    };
+    const plan = planReseedScan({
+      targets: [hit, miss],
+      usableSites: ["ptzone"],
+      cache: new Map([[earlier.id, earlier]]),
+      now,
+    });
+    // 只有没对回本地那一条要重查 —— 对回来的那条复用得上，这正是「必须由本地折键」这一跳换来的
+    expect(plan.pairs.map((pair) => pair.contentKey)).toEqual([miss.contentKey]);
+    expect(plan.cached).toBe(1);
   });
 });

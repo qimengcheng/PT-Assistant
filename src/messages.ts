@@ -73,7 +73,9 @@ import type {
   IReseedScanJob,
   IReseedScanRequest,
   IReseedScanResult,
+  IReseedScanTarget,
 } from "@/shared/types.ts";
+import type { IReseedScanSeed } from "@/shared/reseedScanPlan.ts";
 import { isDebug } from "~/helper.ts";
 
 /** `probePageInTab` 的返回：全部是「可能拿不到」的观测值，缺什么就是 undefined */
@@ -437,7 +439,28 @@ export interface ProtocolMap {
   getReseedScanJob(): IReseedScanJob | null;
   stopReseedScan(): IReseedScanJob | null;
   getReseedScanResults(data?: { contentKeys?: string[] }): IReseedScanResult[];
-  clearReseedScanCache(): void;
+  /**
+   * 只清**给的那些内容**的结论。
+   *
+   * 原先这条整表 `clear()`，而弹窗里那句确认写的是「删除 N 条」（N = 当前范围内查过的条数）——
+   * 从辅种任务那一行进来时范围只有 1 条，按下去却把「我的下载器」攒下的几百条结论一起清了。
+   * 确认框说什么就删什么，不是新取向，是把实现补成它自己承诺的那样。
+   */
+  clearReseedScanCache(data: { contentKeys: string[] }): void;
+  /**
+   * 把一条辅种任务给的线索**对回下载器里那一份**，折成一个扫描目标（v0.128.0 任务行那颗查询键）。
+   *
+   * 为什么这一步不能在界面里算：本地指纹索引只有 offscreen 读得到（那份 30 分钟缓存），
+   * 而内容键**必须由本地那一份折** —— 界面手上只有站点报的约数大小与发布名，两边各折一套会让
+   * 同一颗种子得到两个 key，于是与「我的下载器」那一屏查过的结论互不复用、且这一路永远到不了
+   * 「确有这条」那一档。判据与后果都写在 `reseedScanPlan.ts` 的 `reseedScanTargetOfSeed` 头上。
+   * `resolved: false` = 本地没找到那一份（数据已删 / 不在给的那几台里 / 任务没记下 hash），
+   * 目标照任务那一份原样折，界面要据此说一句「最多只能到标题与大小相符」。
+   */
+  resolveReseedScanTarget(data: { seed: IReseedScanSeed; downloaderIds: string[] }): {
+    target: IReseedScanTarget;
+    resolved: boolean;
+  };
 
   // ===== 1.2 background：打开扩展选项页（content-script 搜索跳转等使用）=====
   openOptionsPage(data?: string | { path: string; query?: Record<string, unknown> }): void;

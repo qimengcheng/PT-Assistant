@@ -166,6 +166,11 @@
     "removeDone": "Remove Completed",
     "removeDoneConfirm": "Remove these {count} 'All seeded' tasks? This only drops them from the assistant's list - torrents still seeding in your downloader are untouched. Managing them again means creating a new task.",
     "removeDoneSuccess": "Removed {count} completed task(s)",
+    "reseedScan": {
+      "tip": "Check whether other sites have this torrent",
+      "noName": "This task's title cannot form a search term; no query was sent",
+      "resolveFailed": "Could not start the query"
+    },
     "savePath": "Save Path: ",
     "seeders": "Seeders: ",
     "sendAllDone": "Every entry of this task is already seeding — nothing left to send",
@@ -506,6 +511,7 @@
       },
       "emptyScope": "No torrents to scan in this range",
       "noSite": "No usable site: add sites in Site Management, or turn off Offline",
+      "localMissing": "This torrent is no longer in the downloader, so a result can only be \"title and size match\"",
       "noDownloader": "The list has no torrents yet; choose a downloader first",
       "startFailed": "Could not start the scan",
       "reseed": "Reseed found ({count})",

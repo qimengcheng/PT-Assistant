@@ -166,6 +166,11 @@
     "removeDone": "移除已完成",
     "removeDoneConfirm": "确认移除这 {count} 条「辅种完成」的任务吗？只是把它们从助手的列表里去掉，下载器里那些还在做种的种子不受影响；以后要再管它们得重新建任务。",
     "removeDoneSuccess": "已移除 {count} 条已完成任务",
+    "reseedScan": {
+      "tip": "查询其他站点是否有这条种子",
+      "noName": "该任务标题无法生成搜索词，未发起查询",
+      "resolveFailed": "查询未能发起"
+    },
     "savePath": "保存路径：",
     "seeders": "上传：",
     "sendAllDone": "这一批条目都已经在做种，没有要发的了",
@@ -506,6 +511,7 @@
       },
       "emptyScope": "该范围内没有可扫描的种子",
       "noSite": "没有可用站点：请先在站点管理添加站点，或取消该站点的「已离线」",
+      "localMissing": "下载器里已没有这份数据，结论最多只能到「标题与大小相符」",
       "noDownloader": "列表里还没有种子，请先选择下载器",
       "startFailed": "扫描未能发起",
       "reseed": "一键辅种（{count}）",

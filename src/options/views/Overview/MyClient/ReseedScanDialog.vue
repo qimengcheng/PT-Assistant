@@ -16,7 +16,7 @@
  */
 import { computed, h, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ClearOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, BranchesOutlined } from "@zboson/icons";
+import { ClearOutlined, PauseOutlined, PlayCircleOutlined, PlusOutlined, QuestionCircleOutlined, ReloadOutlined, BranchesOutlined, CloseOutlined } from "@zboson/icons";
 import type { TableColumnsType } from "@zboson/ui";
 
 import { sendMessage } from "@/messages.ts";
@@ -26,7 +26,14 @@ import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import HoverTip from "@/options/components/HoverTip.vue";
 import ReseedHandoffConfirm from "./ReseedHandoffConfirm.vue";
-import { planReseedScan } from "@/shared/reseedScanPlan.ts";
+import {
+  isReseedScanRowCurrent,
+  planReseedScan,
+  reseedScanKeywords,
+  reseedScanKeywordsOf,
+  reseedScanLastKeywordsByContent,
+  sameReseedScanKeywords,
+} from "@/shared/reseedScanPlan.ts";
 import { planReseedHandoff, handoffBlocksOf, type IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
 import { applyReseedTargetDir, reseedTargetDirOf, type IReseedTargetDir } from "@/shared/reseedTargetDir.ts";
 import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts";
@@ -110,12 +117,94 @@ const allContentKeys = computed(() => {
 const cacheMap = computed(() => new Map(results.value.map((item) => [item.id, item])));
 
 /**
+ * 「这一条内容实际拿哪些词去搜」—— 面板上摆的就是逐站发出去的那一份，可以直接改
+ * （用户 2026-10-28：「这个界面能不能显示实际搜索的关键词，如果用户发现不合适可以自己改」）。
+ * 默认折法只有一条算式（`reseedScanKeywords`），而站点那边的写法千奇百怪：带着 `[站点名]` 前缀、
+ * 点分隔发布名的那一串经常一个站都搜不到 —— 那一屏「未搜到 16」说的其实是「我的词不对」。
+ *
+ * 三层取数，顺序不许换：① 这一屏里人改过的（`keywordEdits`，**原样**，正在输入的空串也得留着）；
+ * ② 这条内容上次**真查**用的那一份（随结论落库，所以关掉弹窗再开还在）；③ 按名字折出来的默认。
+ * ② 那一层是承重的：没有它，改过的词一关弹窗就丢，而默认折法与库里结论用的词不一致会把整批
+ * `no-match` 判成过期 —— 白打几百次站点请求（一次扫描就是几百次，代价不能摊给用户）。
+ */
+const keywordEdits = ref<Record<string, string[]>>({});
+const keywordsExpanded = ref(false);
+const storedKeywords = computed(() => reseedScanLastKeywordsByContent(results.value));
+
+/** 发出去的那一份（排计划与 `startReseedScan` 都只认它，界面上摆的与真发的不许分家） */
+function keywordsOf(target: IReseedScanTarget): string[] {
+  return reseedScanKeywordsOf({
+    name: target.name,
+    keywords: keywordEdits.value[target.contentKey] ?? storedKeywords.value.get(target.contentKey),
+  });
+}
+
+/** 界面上那一排输入框摆的那一份：人改过的那一格原样给，空行不许被吞 */
+function termsOf(target: IReseedScanTarget): string[] {
+  return keywordEdits.value[target.contentKey] ?? keywordsOf(target);
+}
+
+/** 与默认折法不一致才给「恢复默认」那一句（一致时那颗键点下去什么都不变，是噪声） */
+function isKeywordsEdited(target: IReseedScanTarget): boolean {
+  return !sameReseedScanKeywords(keywordsOf(target), reseedScanKeywords(target.name));
+}
+
+/** 拿到这一条**可写**的那一份：第一次动它才从当前生效值拷一份出来，之后都改这一份 */
+function editList(target: IReseedScanTarget): string[] {
+  const hit = keywordEdits.value[target.contentKey];
+  if (hit) return hit;
+  const copy = [...termsOf(target)];
+  keywordEdits.value = { ...keywordEdits.value, [target.contentKey]: copy };
+  return keywordEdits.value[target.contentKey];
+}
+
+function setTerm(target: IReseedScanTarget, index: number, value: string): void {
+  editList(target)[index] = value;
+}
+
+function addTerm(target: IReseedScanTarget): void {
+  editList(target).push("");
+}
+
+function removeTerm(target: IReseedScanTarget, index: number): void {
+  editList(target).splice(index, 1);
+}
+
+/**
+ * 退回默认折法。写成一份**显式**的默认，而不是把这一档删掉：删掉会退回 ②「上次真查用的那一份」，
+ * 而那一份恰恰可能就是上一次改过的词 —— 那句「恢复默认」按下去没生效。
+ */
+function resetTerms(target: IReseedScanTarget): void {
+  keywordEdits.value = { ...keywordEdits.value, [target.contentKey]: reseedScanKeywords(target.name) };
+}
+
+/** 批量那一档（「我的下载器」按范围扫）能有几十条内容，全铺会把结果表整个挤出弹窗 */
+const KEYWORD_PREVIEW = 4;
+const shownKeywordTargets = computed(() =>
+  keywordsExpanded.value ? activeTargets.value : activeTargets.value.slice(0, KEYWORD_PREVIEW),
+);
+
+/**
+ * 这一行的「未搜到」是不是**现在这一栏的词**问出来的。
+ *
+ * 不是就得说一句：那一格写的「未搜到相符条目」当时问的是别的词，而现在这一栏已经换了 ——
+ * 两句并排摆着不解释，界面上就是「我改了词，结论却一动不动」。判据与新鲜期同一条
+ * （`isReseedScanRowCurrent`），这里只负责把它标出来。
+ */
+function isStaleRow(item: IReseedScanResult): boolean {
+  if (item.verdict !== "no-match") return false;
+  const target = activeTargets.value.find((one) => one.contentKey === item.contentKey);
+  return !!target && !isReseedScanRowCurrent(item, { name: target.name, keywords: keywordsOf(target) });
+}
+
+/**
  * 这一轮会排多少对 —— 用**与执行侧同一份纯判据**算，不另写一套。
  * 于是界面上说的「跳过 N 对」「还有 M 对没查」和后台真的跳了/真的没查，是同一个函数折出来的。
+ * 词表走上面那一份：人一改，`no-match` 那几对立刻重新排进来（否则改了等于没改）。
  */
 const plan = computed(() =>
   planReseedScan({
-    targets: activeTargets.value,
+    targets: activeTargets.value.map((target) => ({ ...target, keywords: keywordsOf(target) })),
     usableSites: props.usableSites,
     cache: refresh.value ? new Map() : cacheMap.value,
     now: Date.now(),
@@ -267,12 +356,14 @@ async function startScan() {
 
   starting.value = true;
   try {
-    // 只发这一条消息要的四个字段：`memberKeys` 是界面侧回查判据用的，不该进消息体
+    // 只发这一条消息要的五个字段：`memberKeys` 是界面侧回查判据用的，不该进消息体。
+    // `keywords` 走 `keywordsOf` —— 界面上那一栏摆什么，发出去的就是什么（两处不许各折一套）
     const targets = activeTargets.value.map((target) => ({
       contentKey: target.contentKey,
       name: target.name,
       size: target.size,
       knownSites: target.knownSites,
+      keywords: keywordsOf(target),
     }));
     job.value = await sendMessage("startReseedScan", {
       downloaderIds: props.downloaderIds,
@@ -439,6 +530,9 @@ async function reseedNow() {
 
 /** 打开时读一次现场；在跑就接着轮询（扫描可能是上一次没关完的那一轮，进度是落在存储里的） */
 async function onOpen() {
+  // 没发出去的改动不留着：这一份只在当前这一次开面板里有效，落库的那一份由扫描结果自己带
+  keywordEdits.value = {};
+  keywordsExpanded.value = false;
   await Promise.all([loadJob(), loadResults(), loadExistingTasks()]);
   if (running.value) startPolling();
 }
@@ -488,6 +582,61 @@ onUnmounted(stopPolling);
       <a-alert v-if="props.resolved === false" type="warning" class="reseed-scan__plan">
         <template #message>{{ t("MyClient.reseedScan.localMissing") }}</template>
       </a-alert>
+
+      <!-- 搜索词：这一屏唯一「插件替人决定、而人可能不同意」的输入，所以摆出来并且可以改。
+           上面那句计划里的「跳过 N 组」吃的就是这一栏 —— 改了词，那几组用旧词得到的「未搜到」
+           当场重新排进本轮（判据 isReseedScanRowCurrent，与后台复用缓存用的是同一条）。 -->
+      <div v-if="activeTargets.length" class="reseed-scan__keywords">
+        <div class="reseed-scan__kw-head">
+          <span>{{ t("MyClient.reseedScan.keywords.title") }}</span>
+          <HoverTip :text="t('MyClient.reseedScan.keywords.tip')" placement="topLeft">
+            <QuestionCircleOutlined class="reseed-scan__kw-icon" />
+          </HoverTip>
+        </div>
+        <div v-for="target in shownKeywordTargets" :key="target.contentKey" class="reseed-scan__kw-row">
+          <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
+            <template #content>
+              <div class="reveal-text">{{ target.name }}</div>
+            </template>
+            <div class="text-truncate reseed-scan__kw-name">{{ target.name }}</div>
+          </a-popover>
+          <div class="reseed-scan__kw-terms">
+            <div v-for="(term, index) in termsOf(target)" :key="index" class="reseed-scan__kw-term">
+              <a-input
+                :value="term"
+                :placeholder="t('MyClient.reseedScan.keywords.placeholder')"
+                :disabled="running"
+                style="width: 300px"
+                @update:value="(value: string) => setTerm(target, index, value)"
+              />
+              <HoverTip :text="t('MyClient.reseedScan.keywords.remove')">
+                <a-button type="text" :disabled="running" @click="removeTerm(target, index)">
+                  <template #icon><CloseOutlined /></template>
+                </a-button>
+              </HoverTip>
+            </div>
+            <a-button type="text" :disabled="running" @click="addTerm(target)">
+              <template #icon><PlusOutlined /></template>
+              {{ t("MyClient.reseedScan.keywords.add") }}
+            </a-button>
+            <!-- 只在真的与默认折法不一致时出现：一致时点下去什么都不变，那句是噪声 -->
+            <a-button v-if="isKeywordsEdited(target)" type="link" :disabled="running" @click="resetTerms(target)">
+              {{ t("MyClient.reseedScan.keywords.reset") }}
+            </a-button>
+            <span v-if="keywordsOf(target).length === 0" class="reseed-scan__kw-warn">
+              {{ t("MyClient.reseedScan.keywords.noTerms") }}
+            </span>
+          </div>
+        </div>
+        <a-button
+          v-if="activeTargets.length > KEYWORD_PREVIEW"
+          type="link"
+          class="reseed-scan__kw-more"
+          @click="keywordsExpanded = !keywordsExpanded"
+        >
+          {{ keywordsExpanded ? t("MyClient.reseedScan.keywords.collapse") : t("MyClient.reseedScan.keywords.showAll", { count: activeTargets.length }) }}
+        </a-button>
+      </div>
 
       <div class="reseed-scan__row">
         <a-button type="primary" :loading="running || starting" @click="startScan">
@@ -575,13 +724,21 @@ onUnmounted(stopPolling);
           </template>
 
           <template v-else-if="column.key === 'verdict'">
-            <!-- 说明只在「要说清为什么」的两档出现：那两句是给人决定要不要再查一次用的 -->
-            <HoverTip v-if="record.note" :text="record.note" placement="topLeft" :delay="0.4">
-              <a-tag :color="verdictColorOf(record)" class="reseed-scan__tag">{{ verdictTextOf(record) }}</a-tag>
-            </HoverTip>
-            <a-tag v-else :color="verdictColorOf(record)" class="reseed-scan__tag">
-              {{ verdictTextOf(record) }}
-            </a-tag>
+            <!-- 竖向排：这一列宽 150，横着再挂一枚会把整张 auto 布局的表撑宽（v0.110.1 那条溢出） -->
+            <div class="reseed-scan__verdict">
+              <!-- 说明只在「要说清为什么」的两档出现：那两句是给人决定要不要再查一次用的 -->
+              <HoverTip v-if="record.note" :text="record.note" placement="topLeft" :delay="0.4">
+                <a-tag :color="verdictColorOf(record)" class="reseed-scan__tag">{{ verdictTextOf(record) }}</a-tag>
+              </HoverTip>
+              <a-tag v-else :color="verdictColorOf(record)" class="reseed-scan__tag">
+                {{ verdictTextOf(record) }}
+              </a-tag>
+              <!-- 「未搜到」当时问的不是现在这一栏的词：这一档必然会被重查，不标出来就是
+                   「我改了词，结论却一动不动」那两句互相打脸 -->
+              <HoverTip v-if="isStaleRow(record)" :text="t('MyClient.reseedScan.keywords.staleTip')" placement="topLeft" :delay="0.4">
+                <a-tag color="warning" class="reseed-scan__tag">{{ t("MyClient.reseedScan.keywords.stale") }}</a-tag>
+              </HoverTip>
+            </div>
           </template>
 
           <template v-else-if="column.key === 'hit'">
@@ -627,6 +784,73 @@ onUnmounted(stopPolling);
 
 .reseed-scan__plan {
   margin: 0;
+}
+
+/**
+ * 「搜索词」那一栏：排在范围/计划之下、按钮之上 —— 它是**点开始扫描之前**要能改的输入，
+ * 放到按钮后面就会让人先点了扫描再回头找它。
+ */
+.reseed-scan__keywords {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--pt-color-border-light);
+  border-radius: 8px;
+}
+
+.reseed-scan__kw-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.reseed-scan__kw-icon {
+  color: var(--pt-color-text-secondary);
+}
+
+.reseed-scan__kw-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reseed-scan__kw-name {
+  /* 名称只当「这是哪一条」的锚，宽度让给词表；行高钉到 32 与旁边那颗输入控件同高 */
+  flex: 0 1 240px;
+  min-width: 0;
+  line-height: 32px;
+}
+
+.reseed-scan__kw-terms {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reseed-scan__kw-term {
+  display: flex;
+  align-items: center;
+}
+
+.reseed-scan__kw-warn {
+  color: var(--pt-color-danger);
+}
+
+.reseed-scan__kw-more {
+  align-self: flex-start;
+  padding-inline: 0;
+}
+
+/* 结论那一格：两枚标记竖向排。横着挂会把这张 auto 布局的表整个撑宽（v0.110.1 那条溢出形状） */
+.reseed-scan__verdict {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
 
 .reseed-scan__progress {

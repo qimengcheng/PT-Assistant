@@ -10,16 +10,21 @@ import { describe, expect, it } from "vitest";
 import {
   RESEED_SCAN_SIZE_TOLERANCE_RATIO,
   isReseedScanFresh,
+  isReseedScanRowCurrent,
+  normalizeReseedScanKeywords,
   planReseedScan,
   reconcileReseedScanJob,
   reseedScanContentKey,
   reseedScanKeywords,
+  reseedScanKeywordsOf,
+  reseedScanLastKeywordsByContent,
   reseedScanLocalGroup,
   reseedScanResultId,
   reseedScanScreen,
   reseedScanSeedOfTask,
   reseedScanTargetOfSeed,
   reseedScanVerdict,
+  sameReseedScanKeywords,
 } from "@/shared/reseedScanPlan.ts";
 import type { ILocalTorrentFingerprintEntry } from "@/shared/fingerprint/types.ts";
 import type { IReseedScanJob, IReseedScanResult, IReseedScanTarget } from "@/shared/types/storages/reseedScan.ts";
@@ -42,7 +47,13 @@ function entry(patch: Partial<ILocalTorrentFingerprintEntry> & Pick<ILocalTorren
   } as ILocalTorrentFingerprintEntry;
 }
 
-function result(siteId: string, at: number, verdict: IReseedScanResult["verdict"] = "no-match", withSite = true): IReseedScanResult {
+function result(
+  siteId: string,
+  at: number,
+  verdict: IReseedScanResult["verdict"] = "no-match",
+  withSite = true,
+  keywords?: string[],
+): IReseedScanResult {
   const out: IReseedScanResult = { id: reseedScanResultId("k", siteId), contentKey: "k", siteId, verdict, at };
   // v0.109.0 起「该站有这条」/「标题相符」带着可发送的那一半；`withSite: false` 复现老记录的形状
   if (withSite && (verdict === "has-it" || verdict === "suspect")) {
@@ -54,6 +65,8 @@ function result(siteId: string, at: number, verdict: IReseedScanResult["verdict"
       size: SIZE,
     };
   }
+  // v0.129.0 起存这一份；不传就是升级之前的形状（压根没有这个键，不是空数组）
+  if (keywords) out.keywords = keywords;
   return out;
 }
 
@@ -76,6 +89,54 @@ describe("reseedScanKeywords：最多两档，且不烧重复的请求", () => {
   });
 });
 
+/**
+ * v0.129.0：界面上能看、能改这一份词表（用户那句「如果用户发现不合适可以自己改」）。
+ * 下面三条是那条改动全部的算式，界面上那一栏只做展示与录入，不许自己再折一套。
+ */
+describe("normalizeReseedScanKeywords / reseedScanKeywordsOf / sameReseedScanKeywords", () => {
+  it("归一：逐条剥首尾空白、丢掉空的、按先后去重（不排序、不折大小写）", () => {
+    expect(normalizeReseedScanKeywords(["  嫁金钗 ", "", "Where.the.Mask", "嫁金钗", "MASK"])).toEqual(["嫁金钗", "Where.the.Mask", "MASK"]);
+    expect(normalizeReseedScanKeywords(undefined)).toEqual([]);
+    expect(normalizeReseedScanKeywords(null)).toEqual([]);
+  });
+
+  it("keywords 没给 → 按名字折；给了就照给的，**包括给成空表**", () => {
+    expect(reseedScanKeywordsOf({ name: "Movie 2024 1080p x264" })).toEqual(reseedScanKeywords("Movie 2024 1080p x264"));
+    expect(reseedScanKeywordsOf({ name: "Movie 2024", keywords: ["  别的词 "] })).toEqual(["别的词"]);
+    // 空表退回默认折法 = 人刚清空的那一栏自己长回来、而那两档他不要的词照样发出去
+    expect(reseedScanKeywordsOf({ name: "Movie 2024", keywords: [] })).toEqual([]);
+    expect(reseedScanKeywordsOf({ name: "Movie 2024", keywords: ["  ", ""] })).toEqual([]);
+  });
+
+  it("比先后：词表是「按顺序试」的，[a,b] 与 [b,a] 不是同一次查询；空行不算差异", () => {
+    expect(sameReseedScanKeywords(["a", "b"], ["a", "b"])).toBe(true);
+    expect(sameReseedScanKeywords(["a", "b"], ["b", "a"])).toBe(false);
+    expect(sameReseedScanKeywords(["a", "  "], ["a"])).toBe(true);
+    expect(sameReseedScanKeywords(undefined, [])).toBe(true);
+    expect(sameReseedScanKeywords(["a"], undefined)).toBe(false);
+  });
+});
+
+describe("reseedScanLastKeywordsByContent：上次真查用的是哪些词", () => {
+  it("按内容各取最近那次；没存词表的老记录与全空的都不算；别的键不串", () => {
+    const map = reseedScanLastKeywordsByContent([
+      { contentKey: "k1", at: 100, keywords: ["旧词"] },
+      { contentKey: "k1", at: 200, keywords: ["新词", "第二档"] },
+      { contentKey: "k2", at: 300 },
+      { contentKey: "k3", at: 400, keywords: ["  ", ""] },
+    ]);
+    expect(map.get("k1")).toEqual(["新词", "第二档"]);
+    expect(map.has("k2")).toBe(false);
+    expect(map.has("k3")).toBe(false);
+  });
+
+  it("认时间不认数组先后（IndexedDB 按主键返回，同一内容的几行既不按时间也不相邻）", () => {
+    expect(reseedScanLastKeywordsByContent([{ contentKey: "k", at: 400, keywords: ["早"] }, { contentKey: "k", at: 500, keywords: ["晚"] }]).get("k")).toEqual([
+      "晚",
+    ]);
+  });
+});
+
 describe("planReseedScan：哪几对要发出去", () => {
   const target = (patch: Partial<IReseedScanTarget> & Pick<IReseedScanTarget, "name">) =>
     ({
@@ -83,6 +144,9 @@ describe("planReseedScan：哪几对要发出去", () => {
       name: patch.name,
       size: patch.size ?? SIZE,
       knownSites: patch.knownSites ?? [],
+      // 没这一行就会把「界面上改过的词」在夹具里丢掉：undefined = 没给（退回折法），[] = 给了空表，
+      // 两者在判据里是两件事，夹具不许把它们抹成同一件
+      keywords: patch.keywords,
     }) satisfies IReseedScanTarget;
 
   it("已挂的那些站不再查，其余每个站排一对", () => {
@@ -142,6 +206,42 @@ describe("planReseedScan：哪几对要发出去", () => {
     expect(plan.pairs[0]).toMatchObject({ name: "Movie 2024", size: SIZE, siteId: "siteB" });
     expect(plan.pairs[0]!.keywords.length).toBeGreaterThan(0);
   });
+
+  it("界面上改过的词照发（归一后），不是拿名字重新折的那一份", () => {
+    const plan = planReseedScan({
+      targets: [target({ name: "Movie 2024", keywords: ["  换个词 ", "第二档", ""] })],
+      usableSites: ["siteB"],
+      cache: new Map(),
+    });
+    expect(plan.pairs[0]!.keywords).toEqual(["换个词", "第二档"]);
+  });
+
+  it("词表被清空 → 这一条整个不排，也不偷偷退回默认折法", () => {
+    const plan = planReseedScan({ targets: [target({ name: "Movie 2024", keywords: [] })], usableSites: ["siteB", "siteC"], cache: new Map() });
+    expect(plan.pairs).toEqual([]);
+    expect(plan.cached).toBe(0);
+  });
+
+  it("改词把原先被跳过的「未搜到」重新排进来；没改词一条都不多排", () => {
+    const now = 1_000_000_000_000;
+    const cache = new Map([[reseedScanResultId(reseedScanContentKey("Movie 2024", SIZE), "siteB"), result("siteB", now - 1000)]]);
+    const unchanged = planReseedScan({ targets: [target({ name: "Movie 2024" })], usableSites: ["siteB"], cache, now });
+    expect(unchanged.cached).toBe(1);
+    expect(unchanged.pairs).toEqual([]);
+    const edited = planReseedScan({ targets: [target({ name: "Movie 2024", keywords: ["换个词"] })], usableSites: ["siteB"], cache, now });
+    expect(edited.cached).toBe(0);
+    expect(edited.pairs.map((pair) => pair.siteId)).toEqual(["siteB"]);
+  });
+
+  it("换词不动「该站有这条」那几对：那一次请求是白烧的，结论也不会因换词变成没有", () => {
+    const now = 1_000_000_000_000;
+    const cache = new Map([
+      [reseedScanResultId(reseedScanContentKey("Movie 2024", SIZE), "siteB"), result("siteB", now - 1000, "has-it")],
+    ]);
+    const plan = planReseedScan({ targets: [target({ name: "Movie 2024", keywords: ["换个词"] })], usableSites: ["siteB"], cache, now });
+    expect(plan.cached).toBe(1);
+    expect(plan.pairs).toEqual([]);
+  });
 });
 
 describe("isReseedScanFresh", () => {
@@ -180,6 +280,48 @@ describe("isReseedScanFresh", () => {
   it("调用方给的更短 ttl 对 failed 仍然有效（只许收紧，不许放宽）", () => {
     const at = 1_000_000_000_000;
     expect(isReseedScanFresh(result("siteA", at, "failed"), at + 6 * 60 * 1000, 5 * 60 * 1000)).toBe(false);
+  });
+});
+
+/**
+ * v0.129.0：词表成了新鲜期的一维。
+ *
+ * 两头的代价都要钉住：改过词却还复用旧结论 = 用户的纠正当没发生（他那一屏 16 个「未搜到」
+ * 就是这一档）；反过来把「没存词表的老记录」一律判过期，等于升级后给每个人凭空加几百次
+ * 站点请求 —— 一次扫描就是几百次，那个代价不能偷偷摊给他。
+ */
+describe("isReseedScanRowCurrent / isReseedScanFresh 的词表那一维", () => {
+  const name = "The.Movie.2024.1080p.x264-GROUP";
+  const folded = reseedScanKeywords(name);
+  const at = 1_000_000_000_000;
+  const day = 24 * 60 * 60 * 1000;
+
+  it("只有「未搜到」吃词表这一维；老记录当初只会发按名字折的那一份", () => {
+    expect(isReseedScanRowCurrent(result("s", at, "no-match"), { name, keywords: folded })).toBe(true);
+    expect(isReseedScanRowCurrent(result("s", at, "no-match"), { name, keywords: ["别的词"] })).toBe(false);
+    expect(isReseedScanRowCurrent(result("s", at, "no-match", true, folded), { name, keywords: folded })).toBe(true);
+    expect(isReseedScanRowCurrent(result("s", at, "no-match", true, ["别的词"]), { name, keywords: folded })).toBe(false);
+    // 正向两档与 failed 与词表无关：那次查询真成了，换词不会让「那个站有这条」变成没有
+    expect(isReseedScanRowCurrent(result("s", at, "has-it"), { name, keywords: ["随便什么"] })).toBe(true);
+    expect(isReseedScanRowCurrent(result("s", at, "failed"), { name, keywords: ["随便什么"] })).toBe(true);
+  });
+
+  it("改了词 ⇒ 那份「未搜到」当场不新鲜（否则改了等于没改）", () => {
+    const row = result("siteA", at, "no-match", true, folded);
+    expect(isReseedScanFresh(row, at + day, 7 * day, { name, keywords: ["别的词"] })).toBe(false);
+  });
+
+  it("没改词的人一条都不多查：老记录 + 默认折法仍然按七天算新鲜", () => {
+    expect(isReseedScanFresh(result("siteA", at, "no-match"), at + day, 7 * day, { name, keywords: folded })).toBe(true);
+  });
+
+  it("「该站有这条」不因为换词被重查（那一次请求是白烧的）", () => {
+    expect(isReseedScanFresh(result("siteA", at, "has-it"), at + day, 7 * day, { name, keywords: ["别的词"] })).toBe(true);
+  });
+
+  it("调用方说不出会用哪些词时不比较这一维（与改前一字不差）", () => {
+    expect(isReseedScanFresh(result("siteA", at, "no-match", true, folded), at + day, 7 * day)).toBe(true);
+    expect(isReseedScanFresh(result("siteA", at, "no-match", true, folded), at + day, 7 * day, undefined)).toBe(true);
   });
 });
 

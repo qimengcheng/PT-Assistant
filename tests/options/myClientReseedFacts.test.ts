@@ -16,7 +16,7 @@ import {
   sortReseedScanRows,
   type IReseedRow,
 } from "@/options/views/Overview/MyClient/reseedCandidateView.ts";
-import { reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
+import { reseedScanContentKey, reseedScanKeywords } from "@/shared/reseedScanPlan.ts";
 import type { IReseedScanResult, TReseedScanVerdict } from "@/shared/types/storages/reseedScan.ts";
 
 const hostSiteEntries: [string, string][] = [
@@ -268,6 +268,52 @@ describe("扫描结论要盖掉待查数", () => {
 
   it("不传扫描事实时与 v0.109.7 一字不差（结论没读到不许把人挡在门外）", () => {
     expect(buildReseedFacts(twinRows(), hostSiteEntries, usable, twinTasks).get("r1")).toEqual(stillPending);
+  });
+
+  /**
+   * v0.129.0：词表参与新鲜期在**这一侧**的样子。
+   *
+   * 这里用 `copies()` 而不是 `twinRows()`：那条内容只有一个内容键、两个可查站（novahd / mteam），
+   * 于是「同一个键上两次结论各用了什么词」摆得开 —— 那正是改了搜索词之后场上的形状
+   * （改词之前查过一站、改完又查了一站）。
+   */
+  const singleKey = reseedScanContentKey("Some.Movie.2024.1080p", 8e9);
+  const singleRows = () => copies("https://tracker.pandapt.net/announce", undefined);
+
+  it("最近一次用的是别的词 ⇒ 旧词那一站退回待查（改了词必须看得见后果）", () => {
+    const results = [
+      { ...result(singleKey, "novahd", "no-match", now - 1000), keywords: ["新词"] },
+      { ...result(singleKey, "mteam", "no-match", now - 60_000), keywords: ["旧词"] },
+    ];
+    const facts = buildReseedFacts(singleRows(), hostSiteEntries, usable, [], { results, now });
+    // 只有「最近那次用的词」与这一行对得上的一站算查过；另一站必须重新变成待查
+    expect(facts.get("qb1:1")).toEqual({ kind: "candidate", pending: 1, covered: 1 });
+  });
+
+  it("没改词时一条都不许多算：老记录（没存词表）按当时只会发的默认折法算，两站都算查过", () => {
+    const results = [result(singleKey, "novahd", "no-match", now - 1000), result(singleKey, "mteam", "no-match", now - 60_000)];
+    const facts = buildReseedFacts(singleRows(), hostSiteEntries, usable, [], { results, now });
+    expect(facts.get("qb1:1")).toEqual({
+      kind: "scanned",
+      scanned: 2,
+      covered: 1,
+      tally: { hasIt: 0, suspect: 0, noMatch: 2, failed: 0 },
+    });
+  });
+
+  it("一半老记录、一半已经用默认折法重查过 ⇒ 两站都算查过（结论里只有键、名字要从行里拿，那一跳是承重的）", () => {
+    const folded = reseedScanKeywords("Some.Movie.2024.1080p");
+    const results = [
+      { ...result(singleKey, "novahd", "no-match", now - 1000), keywords: folded },
+      result(singleKey, "mteam", "no-match", now - 60_000),
+    ];
+    const facts = buildReseedFacts(singleRows(), hostSiteEntries, usable, [], { results, now });
+    expect(facts.get("qb1:1")).toEqual({
+      kind: "scanned",
+      scanned: 2,
+      covered: 1,
+      tally: { hasIt: 0, suspect: 0, noMatch: 2, failed: 0 },
+    });
   });
 });
 

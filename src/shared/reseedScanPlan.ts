@@ -23,7 +23,7 @@ export interface IReseedScanPair {
   name: string;
   /** 本地那份的字节数：候选粗筛的大小容差按它算 */
   size: number;
-  /** 按顺序试的搜索词（见 `reseedScanKeywords`） */
+  /** 按顺序试的搜索词（人改过就是改过的那一份，否则见 `reseedScanKeywords`） */
   keywords: string[];
 }
 
@@ -49,6 +49,10 @@ export function reseedScanContentKey(name: string, size: number): string {
  *
  * 第一档搜到相符条目就不再发第二档（省一次请求）；两档都没结果才敢记 `no-match` ——
  * 只按一档词判「没搜到」是把「我的词不对」说成「那个站没有」。
+ *
+ * ⚠️ 这一条只是**默认折法**。它算不准的时候界面上要能改（用户 2026-10-28：「这个界面能不能显示
+ * 实际搜索的关键词，如果用户发现不合适可以自己改」），改动走 `IReseedScanTarget.keywords`
+ * 与下面的 `reseedScanKeywordsOf`；改过之后 `no-match` 那档的新鲜期跟着换（见 `isReseedScanFresh`）。
  */
 export function reseedScanKeywords(name: string): string[] {
   const raw = (name ?? "").trim();
@@ -58,6 +62,91 @@ export function reseedScanKeywords(name: string): string[] {
   // 第二档只在「真的折掉了东西」时才发：`normalizeTitle` 必然转小写，所以光差大小写的两串
   // 是同一次查询（站点搜索不分大小写），发出去就是白烧一次请求配额。
   if (folded && folded !== raw.toLowerCase()) out.push(folded);
+  return out;
+}
+
+/**
+ * 词表归一：逐条剥首尾空白、丢掉空的、**按先后**去重。
+ *
+ * 去重保序是因为词表本身就是「按顺序试」的：同一串出现两次等于白烧一次站点请求配额，
+ * 而后面的词排在哪里有意义（先试谁），所以不许排序、不许折叠大小写。
+ */
+export function normalizeReseedScanKeywords(keywords?: readonly string[] | null): string[] {
+  const out: string[] = [];
+  for (const item of keywords ?? []) {
+    const one = (item ?? "").trim();
+    if (!one || out.includes(one)) continue;
+    out.push(one);
+  }
+  return out;
+}
+
+/**
+ * 这一条内容现在会用哪些词：`keywords` **给了就照给的**（包括给成空表 = 这一条不发查询），没给才按名字折。
+ *
+ * 为什么「空表」不能退回默认折法：人在界面上把那一栏清空是他主动表达「这一条别查」；
+ * 空表退回折法会让他刚清空的词自己长回来、而那两档他不想要的词照样被发出去。
+ * 界面上那一格摆的是**没归一**的那一份（正在输入的空格与空行都得留着，否则打字会被吞），
+ * 只有发出去与排计划用这一条的返回值。
+ */
+export function reseedScanKeywordsOf(target: { name: string; keywords?: readonly string[] | null }): string[] {
+  return target.keywords === undefined || target.keywords === null
+    ? reseedScanKeywords(target.name)
+    : normalizeReseedScanKeywords(target.keywords);
+}
+
+/** 两次查询是不是同一组词。先后顺序算在内（词表是「按顺序试」的，[a,b] 与 [b,a] 不是同一次查询） */
+export function sameReseedScanKeywords(a: readonly string[] | undefined, b: readonly string[] | undefined): boolean {
+  const x = normalizeReseedScanKeywords(a);
+  const y = normalizeReseedScanKeywords(b);
+  return x.length === y.length && x.every((item, index) => item === y[index]);
+}
+
+/**
+ * 这一行结论**是不是用现在这一栏的词查出来的**。
+ *
+ * 只有 `no-match` 吃这一维：那句真话是「这些词在那个站没搜到相符条目」，换词之后再拿它当答案
+ * 就是把人的纠正当没发生。正向的两档与词表无关（「那个站确有这条」不会因为换了词变成没有），
+ * `failed` 本来就不是结论。
+ * 老记录（v0.129.0 之前）没存词表 —— 那时只会发按名字折出来的那一份，所以那样算。
+ *
+ * 新鲜期判据（`isReseedScanFresh`）与界面上那枚「待重查」都读这一条，两处不许各比一套。
+ */
+export function isReseedScanRowCurrent(
+  result: { verdict: TReseedScanVerdict; keywords?: string[] },
+  query: { name: string; keywords: readonly string[] },
+): boolean {
+  if (result.verdict !== "no-match") return true;
+  return sameReseedScanKeywords(query.keywords, result.keywords ?? reseedScanKeywords(query.name));
+}
+
+/** 只用得到的那三个字段：这一条要在 Node 里被断言，不该拖整份结果类型 */
+export interface IReseedScanKeywordRow {
+  contentKey: string;
+  at: number;
+  keywords?: string[];
+}
+
+/**
+ * 每条内容**最近那次真查**用的是哪些词（没有带词表的记录的内容不进表）。
+ *
+ * 为什么界面上要读这个而不是每次都重新折：人改过的那个词落库时随结论一起存了（`IReseedScanResult.keywords`），
+ * 于是「上次用什么查的」本身就是这份数据的一部分 —— 拿它当默认值，改过的词关掉弹窗再开还在，
+ * 而且**不会**因为默认折法与它不一致而把整批结论判成过期（那会让人白打一遍几百次站点请求）。
+ * 老的记录没这一项，照旧走折出来的默认。一次整表读、按内容键折出，调用方别逐条重算。
+ */
+export function reseedScanLastKeywordsByContent(
+  results: readonly IReseedScanKeywordRow[],
+): Map<string, string[]> {
+  const newest = new Map<string, number>();
+  const out = new Map<string, string[]>();
+  for (const item of results) {
+    const keywords = normalizeReseedScanKeywords(item.keywords);
+    if (keywords.length === 0) continue;
+    if (newest.has(item.contentKey) && (newest.get(item.contentKey) ?? 0) >= item.at) continue;
+    newest.set(item.contentKey, item.at);
+    out.set(item.contentKey, keywords);
+  }
   return out;
 }
 
@@ -185,10 +274,29 @@ export function reseedScanTargetOfSeed(
  * 另外两档「该站有这条」/「标题相符」**必须带着可发送的那一半才算新鲜**：v0.109.0 之前的记录
  * 只存了标题与大小，拿它建不出任务（缺站点条目号与下载链接）。判成新鲜就会留下一屏查得到、
  * 却点不动的「一键辅种」—— 让它不新鲜，下一次扫描就自动重查那几对、把缺的那半补上。
+ *
+ * 第 4 个参数 `query` 是「**这一条内容现在**会用哪些词、以及按名字折出来会是哪些词」（界面可改，
+ * 用户 2026-10-28：「这个界面能不能显示实际搜索的关键词，如果用户发现不合适可以自己改」）。
+ * 它只管 `no-match` 那一档：那句真话是「**这些词**在那个站没搜到相符条目」，换了词还复用旧结论，
+ * 等于把用户的纠正当没发生（他那一屏就是默认折出的词带着 `[站点名]` 前缀与点分隔发布名，
+ * 16 个站全报「未搜到」）。正向的两档不吃这一维 —— 「那个站确有这条」不会因为后来换了一个词
+ * 就变成没有；`failed` 本来就不是结论。
+ *
+ * 老记录（v0.129.0 之前）没存词表，那一行的「当初用的词」= 按名字折出来的那一份（当时只会发那个）。
+ * 所以**没改词的人一条都不多查**（升级不会把攒了七天的那几百对全部重打一遍 —— 一次扫描是几百次
+ * 站点请求，那个代价不能偷偷摊给用户），改了词的人那一档立刻变过期、下一次扫描就按新词重查。
+ *
+ * `query` 不传 = 调用方说不出会用哪些词，跳过这一维比较（与改前行为一字不差）。
  */
-export function isReseedScanFresh(result: IReseedScanResult | undefined, now: number, ttlMs = RESEED_SCAN_TTL_MS): boolean {
+export function isReseedScanFresh(
+  result: IReseedScanResult | undefined,
+  now: number,
+  ttlMs = RESEED_SCAN_TTL_MS,
+  query?: { name: string; keywords: readonly string[] },
+): boolean {
   if (!result) return false;
   if ((result.verdict === "has-it" || result.verdict === "suspect") && !result.site?.title) return false;
+  if (query && !isReseedScanRowCurrent(result, query)) return false;
   const limit = result.verdict === "failed" ? Math.min(ttlMs, RESEED_SCAN_FAILED_RETRY_MS) : ttlMs;
   return now - result.at < limit;
 }
@@ -197,7 +305,8 @@ export function isReseedScanFresh(result: IReseedScanResult | undefined, now: nu
  * 排出这一轮要发哪些查询。
  *
  * 跳过三类：已经挂在的那个站（查了也是白查）、用户没添加 / 标了离线的站（不在目标集里）、
- * 新鲜期内查过的对子（直接复用上次结论）。
+ * 新鲜期内查过的对子（直接复用上次结论 —— 词表变了的 `no-match` 不算，见 `isReseedScanFresh`：
+ * 人在界面上改了搜索词，那几对立刻重新排进这一轮，不然改了就等于没改）。
  * 上限那条是硬闸：一次扫描发的请求数是要吃站点频率限制的，不能让人一口气点出几千次。
  */
 export function planReseedScan(input: {
@@ -217,13 +326,13 @@ export function planReseedScan(input: {
   let cached = 0;
 
   for (const target of targets) {
-    const keywords = reseedScanKeywords(target.name);
+    const keywords = reseedScanKeywordsOf(target);
     // 一个词都折不出来（空标题之类）就别发请求：发了只会得到一个假的「没搜到」
     if (keywords.length === 0) continue;
     for (const siteId of usableSites) {
       if (target.knownSites.includes(siteId)) continue;
       const id = reseedScanResultId(target.contentKey, siteId);
-      if (isReseedScanFresh(cache.get(id), now, ttlMs)) {
+      if (isReseedScanFresh(cache.get(id), now, ttlMs, { name: target.name, keywords })) {
         cached++;
         continue;
       }

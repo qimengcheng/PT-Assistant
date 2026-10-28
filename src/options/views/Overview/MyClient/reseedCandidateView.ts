@@ -9,7 +9,7 @@
  */
 import { judgeReseedCandidate, type IReseedScanTally, type TReseedCandidateVerdict } from "@/shared/reseedCandidate.ts";
 import { resolveTrackerHostSite, trackerFieldToHost } from "@/shared/trackerHost.ts";
-import { isReseedScanFresh, reseedScanContentKey } from "@/shared/reseedScanPlan.ts";
+import { isReseedScanFresh, reseedScanContentKey, reseedScanKeywords, reseedScanLastKeywordsByContent } from "@/shared/reseedScanPlan.ts";
 import type { IReseedHandoffBase } from "@/shared/reseedScanHandoff.ts";
 import type { IReseedScanResult, IReseedScanTarget, TReseedScanVerdict } from "@/shared/types/storages/reseedScan.ts";
 
@@ -56,17 +56,45 @@ const TALLY_KEY: Record<TReseedScanVerdict, keyof IReseedScanTally> = {
 };
 
 /**
+ * 内容键 → 那一行的名字。老扫描记录没存词表，判「当初用的是哪些词」要按名字重折一遍（见
+ * `isReseedScanFresh` 那一段），而结论表里只有键、没有名字，只能从表里的行拿。
+ * 同一个键的多行名字必然归一相同（键就是这么算出来的），取第一条即可。
+ */
+function nameOfContent(rows: IReseedRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const row of rows) {
+    const key = rowContentKey(row);
+    if (!out.has(key)) out.set(key, row.name);
+  }
+  return out;
+}
+
+/**
  * 扫描结论 → 「内容键 → 查过的站与各档计数」。
  *
  * 只收**还在新鲜期里**的那些（`isReseedScanFresh`，与排查询计划用的是同一个判据）：
  * 过期的结论下一轮会被重查，这时候还标「已查」就是把人挡在门外。
  * `failed` 那一档的新鲜期短得多（30 分钟），所以「某个站今天坏了」只会让那一档短暂地算已查，
  * 过了就重新变回待查 —— 这是要的，不是漏的。
+ *
+ * 词表那一维（v0.129.0）按**内容**取「上次真查用的那一份」，没有记录时退回按名字折：于是「人改了
+ * 搜索词」会让那些用旧词得到的 `no-match` 当场不算已查，而**没改词的人一条都不多算**。
+ * 与扫描面板排出来的计划是同一件事（判据都住在 `isReseedScanFresh`，两处不许各折一套）。
  */
-function scanFactsByContent(results: IReseedScanResult[], now: number): Map<string, IContentScanFacts> {
+function scanFactsByContent(
+  results: IReseedScanResult[],
+  now: number,
+  nameOf: Map<string, string>,
+): Map<string, IContentScanFacts> {
+  const lastTerms = reseedScanLastKeywordsByContent(results);
+  /** 这一条内容现在会用哪些词 —— 与扫描面板那一栏同一层取数（上次真查的那一份，没有才按名字折） */
+  const queryOf = (contentKey: string) => {
+    const name = nameOf.get(contentKey) ?? "";
+    return { name, keywords: lastTerms.get(contentKey) ?? reseedScanKeywords(name) };
+  };
   const out = new Map<string, IContentScanFacts>();
   for (const item of results) {
-    if (!isReseedScanFresh(item, now)) continue;
+    if (!isReseedScanFresh(item, now, undefined, queryOf(item.contentKey))) continue;
     let facts = out.get(item.contentKey);
     if (!facts) {
       facts = { scanned: new Set(), verdicts: [] };
@@ -134,7 +162,7 @@ export function buildReseedFacts(
   scan?: { results: IReseedScanResult[]; now: number },
 ): Map<string, TReseedCandidateVerdict> {
   const { groupKeyOf, covered } = coverOfGroups(rows, hostSiteEntries, tasks);
-  const byContent = scan ? scanFactsByContent(scan.results, scan.now) : null;
+  const byContent = scan ? scanFactsByContent(scan.results, scan.now, nameOfContent(rows)) : null;
 
   const scannedOfGroup = new Map<string, IContentScanFacts>();
   if (byContent) {

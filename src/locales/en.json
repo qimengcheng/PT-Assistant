@@ -477,7 +477,20 @@
         "selected": "{count} selected"
       },
       "refreshAll": "Ignore previous results, re-check everything",
-      "plan": "This run queues {pairs} content × site checks ({items} torrents across {sites} sites, {skipped} skipped as checked within 7 days). Limit per run: {max}; {remaining} not queued.",
+      "plan": "This run queues {pairs} content × site checks ({items} torrents across {sites} sites, {skipped} skipped as already checked with these keywords within 7 days). Limit per run: {max}; {remaining} not queued.",
+      "keywords": {
+        "title": "Search keywords",
+        "tip": "These are the terms actually sent to each site. By default they are derived from the torrent name in your downloader — up to two, tried in order (the second is skipped when the first finds a match). Edit them if they look wrong: the terms you keep are exactly what the next scan sends, and they are remembered with the results.",
+        "placeholder": "Search keyword",
+        "add": "Add a term",
+        "remove": "Remove this term",
+        "reset": "Restore default",
+        "noTerms": "This torrent has no search keyword, so no site will be queried",
+        "showAll": "Show all {count} torrents",
+        "collapse": "Collapse",
+        "stale": "Re-check",
+        "staleTip": "This result came from a previous run using different keywords, so that missing answer was not about the terms in this field. Start a scan to re-check it with the current keywords."
+      },
       "start": "Start Scan",
       "stop": "Stop",
       "reload": "Refresh Progress",

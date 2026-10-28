@@ -163,7 +163,8 @@ async function scanOnePair(input: {
   getSite: ReturnType<typeof createSiteCache>;
 }): Promise<IReseedScanResult> {
   const { contentKey, siteId, name, size, keywords, locals, getSite } = input;
-  const base = { id: reseedScanResultId(contentKey, siteId), contentKey, siteId, at: Date.now() };
+  // keywords 一起落库：`no-match` 那句真话是「**这些词**没搜到」，界面上要显示、换词后要判过期
+  const base = { id: reseedScanResultId(contentKey, siteId), contentKey, siteId, at: Date.now(), keywords: [...keywords] };
   const localFingerprints = new Set(locals.map((entry) => entry.files?.fingerprint).filter(Boolean) as string[]);
 
   let requestsSent = 0;

@@ -237,13 +237,12 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
        ⚠️ 这一档在 v0.127.6 跟着 @zboson/ui 0.0.2 的色板翻了一次向：旧版选中态 colorPrimaryBg 是
        #e6f4ff，我方悬停取 #f0f7ff（**比选中浅一档**）；0.0.2 的 blue-1 变成 #f0fbff（比旧的悬停还浅），
        留着 #f0f7ff 两态只差 1.0254:1（改前那对是 1.0376:1，本来就很窄，再窄就读不出来了），
-       所以改成 #e3f2fb —— 现在是**比选中深一档**。台架 .tmp-build/bench-palette 两处都从浏览器读回过：
-       选中底实测 #f0fbff（`.ant-table-row-selected > td` 的计算样式），悬停这一档读到的是 cssinjs 生成
-       的 `.ant-table-row > .ant-table-cell-row-hover { background: var(--ant-table-row-hover-bg) }` 与
-       该变量在同一颗 td 上的值 #e3f2fb；1.0865:1 是这两个数算出来的。
-       ⚠️ 「划过那一刻画什么」没有端到端量到：这份 fork 里合成派发 mouseover / mouseenter 都不会
-       给 td 加上 `.ant-table-cell-row-hover`（台架实测 元素不存在），而在同一页里改内联样式又读不回
-       新值（计算样式像是缓存的），所以那一档只有规则 + 变量两份实读，没有真指针验收。
+       所以改成 #e3f2fb —— 现在是**比选中深一档**。台架 .tmp-build/bench-palette 从浏览器读回过那一档
+       选中底 = #f0fbff（`.ant-table-row-selected > td` 的计算样式）；1.0865:1 是这两个数算出来的。
+       ⚠️ 界面上真正画悬停的是 `style.css` 里那条 `:hover`（v0.37.4 起，还有一条 0,4,1 把 antd 那个
+       JS 类的底色整条压成 transparent），所以这一格 token 对**普通行与选中行的悬停都没有可见消费者** ——
+       留着它是让 CSS 与 JS 两侧不许各说一套值。台架那份没引 style.css，它证不了悬停那一档；
+       真指针划过画什么仍然只有肉眼验收。
        Table.headerBg：表头底色。antd 默认同样是 colorFillAlterSolid≈#fafafa，跟当时那条斑马纹
        一个色 —— 表头和表体糊成一片，只有靠那条边框分隔。#eef2f7 是偏冷的蓝灰，和
        --pt-color-bg-content(#f5f6f8) / --pt-color-border-light(#eaeef2) 同一家族，比它们深一档，

@@ -239,10 +239,11 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
        留着 #f0f7ff 两态只差 1.0254:1（改前那对是 1.0376:1，本来就很窄，再窄就读不出来了），
        所以改成 #e3f2fb —— 现在是**比选中深一档**。台架 .tmp-build/bench-palette 从浏览器读回过那一档
        选中底 = #f0fbff（`.ant-table-row-selected > td` 的计算样式）；1.0865:1 是这两个数算出来的。
-       ⚠️ 界面上真正画悬停的是 `style.css` 里那条 `:hover`（v0.37.4 起，还有一条 0,4,1 把 antd 那个
+       ⚠️ 界面上真正画悬停的是 `style.css` 里那条 `:hover`（v0.37.4 起，还有一条 (0,4,1) 把 antd 那个
        JS 类的底色整条压成 transparent），所以这一格 token 对**普通行与选中行的悬停都没有可见消费者** ——
-       留着它是让 CSS 与 JS 两侧不许各说一套值。台架那份没引 style.css，它证不了悬停那一档；
-       真指针划过画什么仍然只有肉眼验收。
+       留着它是让 CSS 与 JS 两侧不许各说一套值。台架那份没引 style.css，它量到的是「token 那条路自己会画
+       什么」（给 td 补上 `.ant-table-cell-row-hover` 后实测 rgb(227,242,251) = #e3f2fb），
+       **不是**界面那一刻的颜色；真指针划过画什么仍然只有肉眼验收（合成派发 mouseover 加不上那个类）。
        Table.headerBg：表头底色。antd 默认同样是 colorFillAlterSolid≈#fafafa，跟当时那条斑马纹
        一个色 —— 表头和表体糊成一片，只有靠那条边框分隔。#eef2f7 是偏冷的蓝灰，和
        --pt-color-bg-content(#f5f6f8) / --pt-color-border-light(#eaeef2) 同一家族，比它们深一档，

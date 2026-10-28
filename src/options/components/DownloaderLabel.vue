@@ -32,7 +32,7 @@ const IconComponent = computed<Component | null>(() => {
   if (!downloaderConfig.value) return CloudOutlined;
   return null;
 });
-const iconColor = computed(() => (downloader === "local" ? "#faad14" : "#9e9e9e"));
+const iconColor = computed(() => (downloader === "local" ? "#cf850e" : "#9e9e9e"));
 </script>
 
 <template>

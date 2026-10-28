@@ -280,7 +280,7 @@ async function confirmDeleteBackupServer(id: TBackupServerKey) {
           >
             <FilterOutlined
               class="retention-icon"
-              :style="{ color: hasBackupRetentionToApply(record.retention) ? '#52c41a' : undefined }"
+              :style="{ color: hasBackupRetentionToApply(record.retention) ? '#429e15' : undefined }"
             />
           </HoverTip>
         </template>

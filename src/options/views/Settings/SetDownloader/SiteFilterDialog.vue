@@ -123,8 +123,8 @@ function save() {
   background: #fafafa;
 }
 .site-card.excluded {
-  border-color: #ffccc7;
-  background: #fff2f0;
+  border-color: #f2c5b8;
+  background: #fff4f0;
 }
 .site-meta {
   flex: 1;

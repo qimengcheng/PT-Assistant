@@ -368,7 +368,7 @@ const spanLine = computed(() =>
   justify-content: center;
   font-size: 13px;
   font-weight: 600;
-  color: #1677ff;
+  color: #3b8ece;
   background: #f0f6ff;
   border-radius: 10px;
 }
@@ -415,7 +415,7 @@ const spanLine = computed(() =>
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #1677ff;
+  color: #3b8ece;
 }
 .rank-bar {
   height: 4px;
@@ -427,7 +427,7 @@ const spanLine = computed(() =>
 .rank-bar > i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #69b1ff, #1677ff);
+  background: linear-gradient(90deg, #8ec7e8, #3b8ece);
   border-radius: 2px;
 }
 .rank-metrics {

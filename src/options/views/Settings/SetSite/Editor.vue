@@ -166,9 +166,9 @@ const uploadSpeedLimit = computed({
 });
 
 const timeoutColor = computed(() => {
-  if (timeout.value > 8 * 60e3) return "#cf1322";
-  if (timeout.value > 5 * 60e3) return "#faad14";
-  return "#52c41a";
+  if (timeout.value > 8 * 60e3) return "#a63126";
+  if (timeout.value > 5 * 60e3) return "#cf850e";
+  return "#429e15";
 });
 const intervalSliderMax = computed(() => (downloadInterval.value < 600 ? 600 : 1200));
 const intervalSliderStep = computed(() => (downloadInterval.value <= 60 ? 1 : 10));
@@ -536,7 +536,7 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
 
 .url-open {
   display: inline-flex;
-  color: #1677ff;
+  color: #3b8ece;
 }
 
 .custom-url-input {
@@ -583,7 +583,7 @@ const timezoneOptions = computed<SelectProps["options"]>(() =>
 
 .label-help {
   margin-left: 4px;
-  color: #1677ff;
+  color: #3b8ece;
   cursor: help;
 }
 </style>

@@ -862,7 +862,7 @@ async function submit() {
 .desc-host-error {
   margin-top: 4px;
   font-size: 12px;
-  color: #ff4d4f;
+  color: #cc4a39;
   word-break: break-all;
 }
 

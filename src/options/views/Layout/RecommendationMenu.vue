@@ -341,7 +341,7 @@ watch(isRecommendationMenuOpen, (isOpen) => {
 }
 
 .hot-recommendation-error {
-  color: #ff4d4f;
+  color: #cc4a39;
 }
 
 .hot-recommendation-body {

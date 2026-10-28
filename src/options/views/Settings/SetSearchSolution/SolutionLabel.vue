@@ -62,6 +62,6 @@ function removeSolution(solution: ISearchSolution) {
   cursor: pointer;
 }
 .close-icon:hover {
-  color: #ff4d4f;
+  color: #cc4a39;
 }
 </style>

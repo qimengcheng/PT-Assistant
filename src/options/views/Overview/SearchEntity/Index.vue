@@ -767,9 +767,11 @@ const hasSearchStatus = computed<boolean>(() => {
             @click="showSearchStatusDialog = true"
           >
             <!-- 三颗图标一律不写颜色，跟着按钮前景走（primary 蓝底上是白）。
-                 原来这两处内联色是 Vuetify 时代的 Material 残留，落在这颗蓝底上量到的对比度：
+                 原来这两处内联色是 Vuetify 时代的 Material 残留，落**在当时那颗蓝底 #1677ff** 上量到的对比度：
                  时钟 #607d8b = 1.07:1（等于看不见）、警告 #faad14 = 2.16:1，都低于非文本图形
-                 的 3:1 下限；继承白色是 4.10:1。要区分三种计数靠字形本身，不靠手挑色。 -->
+                 的 3:1 下限；继承白色是 4.10:1。要区分三种计数靠字形本身，不靠手挑色。
+                 v0.127.6 起主色换成 @zboson/ui 0.0.2 的 #3b8ece，白字在其上 3.53:1（比旧的 4.10:1 低一档），
+                 上面那三个旧数字说的是 #1677ff 那一档的现场，不要拿来当现在的主色读数。 -->
             <template v-if="searchPlanStatus.success > 0">
               <CheckOutlined class="mr-1" />{{ searchPlanStatus.success }}
             </template>
@@ -794,12 +796,12 @@ const hasSearchStatus = computed<boolean>(() => {
                v-show 落不到具体元素上会静默不生效，那一排就永远少不了一键。 -->
           <HoverTip :text="t('SearchEntity.index.action.start')">
             <a-button v-show="isSearchingParsed" type="text" @click="() => startSearchQueue()">
-              <template #icon><PlayCircleOutlined style="color: #52c41a" /></template>
+              <template #icon><PlayCircleOutlined style="color: #429e15" /></template>
             </a-button>
           </HoverTip>
           <HoverTip :text="t('SearchEntity.index.action.pause')">
             <a-button v-show="!isSearchingParsed" type="text" @click="() => pauseSearchQueue()">
-              <template #icon><PauseCircleOutlined style="color: #52c41a" /></template>
+              <template #icon><PauseCircleOutlined style="color: #429e15" /></template>
             </a-button>
           </HoverTip>
 
@@ -831,7 +833,7 @@ const hasSearchStatus = computed<boolean>(() => {
             <a-button
               :disabled="searchPlanStatus.error === 0"
               type="text"
-              style="color: #faad14"
+              style="color: #cf850e"
               @click="() => retrySearch()"
             >
               <template #icon><SyncOutlined /></template>
@@ -885,7 +887,7 @@ const hasSearchStatus = computed<boolean>(() => {
             </div>
           </template>
           <a-button type="text">
-            <template #icon><SettingOutlined style="color: #1677ff" /></template>
+            <template #icon><SettingOutlined style="color: #3b8ece" /></template>
           </a-button>
         </a-popover>
 

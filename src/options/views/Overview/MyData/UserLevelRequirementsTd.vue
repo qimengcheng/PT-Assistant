@@ -424,7 +424,7 @@ const visibleLevelRequirements = computed(() => {
   }
 
   &--current {
-    background: rgba(22, 119, 255, 0.06);
+    background: rgba(59, 142, 206, 0.06);
   }
 }
 
@@ -454,13 +454,13 @@ const visibleLevelRequirements = computed(() => {
      （列表之间靠 .level-requirement-row + .level-requirement-row 那条边线，第一条轮不到它） */
   border-block: 1px solid rgba(0, 0, 0, 0.06);
   background: none;
-  color: #1677ff;
+  color: #3b8ece;
   font-size: 12px;
   text-align: center;
   cursor: pointer;
 
   &:hover {
-    color: #4096ff;
+    color: #63abdb;
   }
 }
 </style>

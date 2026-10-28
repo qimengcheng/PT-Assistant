@@ -190,7 +190,7 @@ const activeIds = computed(() =>
   margin-top: 8px;
   padding: 6px 8px;
   border-radius: 4px;
-  background: rgba(250, 173, 20, 0.12);
+  background: rgba(207, 133, 14, 0.12);
   color: rgba(0, 0, 0, 0.75);
   font-size: 12px;
 }

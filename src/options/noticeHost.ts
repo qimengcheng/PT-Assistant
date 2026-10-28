@@ -7,7 +7,7 @@
  * 把实例交进来，这里存一份。
  *
  * 「同一类通知再来一次是替换、不是叠一张」这个语义必须自己做：
- * 实测 `@zboson/ui/dist/notice-group/NoticeGroup.js:79-91` 的 `open()` 是**往列表里 push**
+ * 实测 `@zboson/ui/dist/notice-group/NoticeGroup.js:79-103` 的 `open()` 是**往列表里 push**（那一行在 :100）
  * （只给缺 id 的补一个随机数），不像 `@v-c/notification` 的 `open` 按 `key` 原地换 ——
  * 所以这里先 `remove(id)` 再 `open({ id })`，让旧的 `key: reseed-<kind>` 语义原样保留。
  *
@@ -37,7 +37,7 @@ export interface INoticeCard {
    * 秒；0 = 不自动关。
    *
    * ⚠️ 传了它就等于绕开组件那颗「各类型停留时长」设置键 —— 实测
-   * `dist/notice-group/NoticeGroup.js:91` 取的是 `config.duration ?? settings[...] ?? 5`，
+   * `dist/notice-group/NoticeGroup.js:98` 取的是 `config.duration ?? settings[...] ?? 5`，
    * 显式值排在最前。辅种那一条按「不许改动已验收过的 8 秒」显式给着，代价写在那页的注释里。
    */
   duration?: number;

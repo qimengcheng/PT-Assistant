@@ -189,21 +189,21 @@ const releasesUrl = `${REPO_URL}/releases`;
 .update-card {
   display: block;
   padding: 6px 14px;
-  border: 1px solid #ffd591;
+  border: 1px solid #f5d687;
   border-radius: 10px;
-  background: #fffbe6;
+  background: #fff9e6;
   text-decoration: none;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
 }
 .update-card:hover {
-  border-color: #faad14;
-  box-shadow: 0 2px 8px rgba(250, 173, 20, 0.16);
+  border-color: #cf850e;
+  box-shadow: 0 2px 8px rgba(207, 133, 14, 0.16);
 }
 .update-label {
   font-size: 12px;
-  color: #ad6800;
+  color: #824800;
 }
 .update-value {
   font-size: 24px;
@@ -272,8 +272,8 @@ const releasesUrl = `${REPO_URL}/releases`;
   line-height: 18px;
 }
 .kind-added {
-  background: #f6ffed;
-  color: #389e0d;
+  background: #d6dece;
+  color: #2b780a;
 }
 .kind-improved {
   background: #f5f5f5;

@@ -237,12 +237,12 @@ async function confirmDelete(id: string) {
 .host-test {
   margin-top: 2px;
   font-size: 12px;
-  color: #52c41a;
+  color: #429e15;
   word-break: break-all;
 }
 
 .host-test.is-error {
-  color: #ff4d4f;
+  color: #cc4a39;
 }
 
 .text-break {

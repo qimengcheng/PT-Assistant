@@ -1889,10 +1889,10 @@ async function createKeepUploadTask() {
             <HoverTip :text="statusHintOf(record)">
               <a-button type="text" size="small" :loading="record.loading">
                 <template v-if="record.verified" #icon>
-                  <CheckOutlined style="color: #52c41a" />
+                  <CheckOutlined style="color: #429e15" />
                 </template>
                 <template v-else #icon>
-                  <CloseOutlined style="color: #ff4d4f" @click.stop="removeVerifiedItem(record.id)" />
+                  <CloseOutlined style="color: #cc4a39" @click.stop="removeVerifiedItem(record.id)" />
                 </template>
               </a-button>
             </HoverTip>

@@ -1019,7 +1019,7 @@ function dialogLeave() {
   cursor: pointer;
 
   &:hover {
-    color: #ff4d4f;
+    color: #cc4a39;
   }
 }
 

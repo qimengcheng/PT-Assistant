@@ -134,7 +134,7 @@ function onEnter() {
               {{ clientVersions[d.id] }}
             </span>
             <a-tooltip v-if="suspendedDownloaders.has(d.id)" :title="t('MyClient.autoRefresh.suspendedTip')">
-              <ReloadOutlined class="ml-1" :style="{ color: '#cf1322' }" />
+              <ReloadOutlined class="ml-1" :style="{ color: '#a63126' }" />
             </a-tooltip>
           </div>
           <a
@@ -239,7 +239,7 @@ function onEnter() {
 
 /* 对应 v-list-item 的 :active（已纳入当前筛选的下载器） */
 .client-row--active {
-  background: rgba(22, 119, 255, 0.1);
+  background: rgba(59, 142, 206, 0.1);
 }
 
 .client-icon {
@@ -259,7 +259,7 @@ function onEnter() {
 
 .client-address {
   display: inline-block;
-  color: #1677ff;
+  color: #3b8ece;
   text-decoration: underline;
   max-width: 100%;
   overflow: hidden;

@@ -444,10 +444,10 @@ function firstVideoTitle(item: IMediaServerItem): string | undefined {
   filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
 }
 .user-state.played {
-  color: #52c41a;
+  color: #429e15;
 }
 .user-state.favorite {
-  color: #ff4d4f;
+  color: #cc4a39;
 }
 .user-state.favorite-outline {
   color: rgba(255, 255, 255, 0.9);

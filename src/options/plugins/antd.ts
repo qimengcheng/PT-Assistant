@@ -12,7 +12,7 @@
  *   根入口的 `install` 会遍历 components_exports，对每个带 install 的组件调 app.use，
  *   组件自身的 name 是 "ACard" / "ATable" 这类，Vue 会同时接受 <ACard> 和 <a-card>。
  *
- * 样式走 CSS-in-JS（@antdv-next/cssinjs），运行时注入 <style>，没有 Vuetify 那种
+ * 样式走 CSS-in-JS（@zboson/cssinjs，0.0.2 起由 @antdv-next/cssinjs 改名而来、代码逐字节相同），运行时注入 <style>，没有 Vuetify 那种
  * 「构建期拆 CSS chunk + 动态 <link> 注入」的链路 —— 后者在扩展页里加载并不可靠
  * （表现为页面完全没有表格样式）。
  *

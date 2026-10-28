@@ -387,10 +387,10 @@ function itemClasses(index: number, item: ISiteMessage) {
   cursor: pointer;
 }
 .msg-item:hover {
-  background: #f0f7ff;
+  background: #e3f2fb;
 }
 .msg-item--active {
-  background: #e6f4ff;
+  background: #f0fbff;
 }
 .msg-item--read .msg-title {
   color: rgba(0, 0, 0, 0.45);
@@ -421,7 +421,7 @@ function itemClasses(index: number, item: ISiteMessage) {
 }
 .msg-link {
   margin-left: auto;
-  color: #1677ff;
+  color: #3b8ece;
   text-decoration: none;
 }
 .msg-detail-title {

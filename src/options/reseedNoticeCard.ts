@@ -12,7 +12,7 @@
  * 也没有插槽，多行展不开；那一份多行文本靠 `style.css` 里 `.ant-notice-modal-text` 才分行。
  *
  * ⚠️ 组件自己带一颗设置键（点开是「各类型停留时长」的抽屉），但**这颗卡片不受它影响**：
- * 实测 `dist/notice-group/NoticeGroup.js:91` 是 `config.duration ?? settings[type] ?? 5`，
+ * 实测 `dist/notice-group/NoticeGroup.js:98` 是 `config.duration ?? settings[type] ?? 5`，
  * 我们照旧显式传 8 秒（= 换组件前那张卡片的时长），于是设置那几档对本卡片永远读不到。
  * 要不要把它交给设置（success/info/warning 5 秒、error 10 秒、带详情的 30 秒），是一条用户可见的
  * 时长变化，没替他定 —— 见首页 v0.127.x 那条与 `./noticeHost.ts` 同一节。

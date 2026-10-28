@@ -233,12 +233,21 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
   <!-- Table.rowHoverBg：表格行悬停底色改成很淡的蓝（antd 默认是 colorFillAlterSolid≈#fafafa，
        而当时我方那条斑马纹的奇数行底色就是 #fafafa —— 悬停在奇数行上等于没反应。
        那条斑马纹已于 2026-10-26 删掉，现在用的是 fork 自带的第 2/4/6 行斜纹，
-       比 #f0f7ff 浅得多，所以这一档的理由仍然成立）。
-       #f0f7ff 比选中态 colorPrimaryBg #e6f4ff 浅一档，两态能分开。
+       比这一档浅得多，所以这一条的理由仍然成立）。
+       ⚠️ 这一档在 v0.127.6 跟着 @zboson/ui 0.0.2 的色板翻了一次向：旧版选中态 colorPrimaryBg 是
+       #e6f4ff，我方悬停取 #f0f7ff（**比选中浅一档**）；0.0.2 的 blue-1 变成 #f0fbff（比旧的悬停还浅），
+       留着 #f0f7ff 两态只差 1.0254:1（改前那对是 1.0376:1，本来就很窄，再窄就读不出来了），
+       所以改成 #e3f2fb —— 现在是**比选中深一档**。台架 .tmp-build/bench-palette 两处都从浏览器读回过：
+       选中底实测 #f0fbff（`.ant-table-row-selected > td` 的计算样式），悬停这一档读到的是 cssinjs 生成
+       的 `.ant-table-row > .ant-table-cell-row-hover { background: var(--ant-table-row-hover-bg) }` 与
+       该变量在同一颗 td 上的值 #e3f2fb；1.0865:1 是这两个数算出来的。
+       ⚠️ 「划过那一刻画什么」没有端到端量到：这份 fork 里合成派发 mouseover / mouseenter 都不会
+       给 td 加上 `.ant-table-cell-row-hover`（台架实测 元素不存在），而在同一页里改内联样式又读不回
+       新值（计算样式像是缓存的），所以那一档只有规则 + 变量两份实读，没有真指针验收。
        Table.headerBg：表头底色。antd 默认同样是 colorFillAlterSolid≈#fafafa，跟当时那条斑马纹
        一个色 —— 表头和表体糊成一片，只有靠那条边框分隔。#eef2f7 是偏冷的蓝灰，和
        --pt-color-bg-content(#f5f6f8) / --pt-color-border-light(#eaeef2) 同一家族，比它们深一档，
-       又能和白底行、fork 那条浅斜纹、#f0f7ff 悬停行几档都拉开。
+       又能和白底行、fork 那条浅斜纹、#e3f2fb 悬停行几档都拉开。
        headerSortHoverBg / headerSortActiveBg 必须跟着改：这两档默认是 colorFillContentSolid /
        colorFillSecondarySolid（从白色容器算出来的**灰**实心色），底色换成蓝灰后它们会退色成
        另一套色板，点一下排序表头就看见色差。hover 那档按 #eef2f7 往深取一档；
@@ -257,7 +266,7 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
       token: { fontSize: 13 },
       components: {
         Table: {
-          rowHoverBg: '#f0f7ff',
+          rowHoverBg: '#e3f2fb',
           headerBg: '#eef2f7',
           headerSortHoverBg: '#e4ebf3',
           headerSortActiveBg: '#eef2f7',

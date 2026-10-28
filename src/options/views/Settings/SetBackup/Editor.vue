@@ -527,7 +527,7 @@ async function checkConnect() {
 
 /* 已启用保留策略时，摘要使用成功色以突出状态 */
 .retention-summary {
-  color: #52c41a;
+  color: #429e15;
 }
 
 /* 数值输入框不铺满整行，避免数字输入框被拉得过长（与开关之间的间距由 a-col :flex="auto" 提供） */

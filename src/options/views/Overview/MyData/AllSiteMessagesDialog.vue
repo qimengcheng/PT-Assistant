@@ -709,7 +709,7 @@ watch(
    不给个持续的高亮就看不出这块正文是哪一行的 */
 .am-item-title--link:hover,
 .am-item-title--open {
-  color: #1677ff;
+  color: #3b8ece;
 }
 
 .am-item-body {

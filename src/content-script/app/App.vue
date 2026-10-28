@@ -306,7 +306,7 @@ onBeforeUnmount(() => stopSnakebarWatch());
       :theme="{
         components: {
           Table: {
-            rowHoverBg: '#f0f7ff',
+            rowHoverBg: '#e3f2fb',
             headerBg: '#eef2f7',
             headerSortHoverBg: '#e4ebf3',
             headerSortActiveBg: '#eef2f7',

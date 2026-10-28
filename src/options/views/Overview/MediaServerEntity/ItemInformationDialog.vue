@@ -202,10 +202,10 @@ function formatDuration(rawSeconds: number) {
   font-size: 28px;
 }
 .status-icon.played {
-  color: #52c41a;
+  color: #429e15;
 }
 .status-icon.favorite {
-  color: #ff4d4f;
+  color: #cc4a39;
 }
 .status-icon.favorite-outline {
   color: #bfbfbf;

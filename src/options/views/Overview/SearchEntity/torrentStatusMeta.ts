@@ -35,13 +35,13 @@ export const TORRENT_STATUS_META: ITorrentStatusMeta[] = [
     value: ETorrentStatus.downloading,
     labelKey: "torrent.status.downloading",
     icon: ArrowDownOutlined,
-    color: "#1677ff",
+    color: "#3b8ece",
   },
   {
     value: ETorrentStatus.seeding,
     labelKey: "torrent.status.seeding",
     icon: ArrowUpOutlined,
-    color: "#52c41a",
+    color: "#429e15",
   },
   {
     value: ETorrentStatus.inactive,

@@ -187,7 +187,7 @@ onMounted(async () => {
   margin-bottom: 4px;
 }
 .select-all-notice {
-  color: #ff7875;
+  color: #d9725f;
   font-weight: normal;
 }
 .option-grid {
@@ -204,6 +204,6 @@ onMounted(async () => {
   padding-top: 4px;
 }
 .add-btn {
-  color: #1677ff;
+  color: #3b8ece;
 }
 </style>

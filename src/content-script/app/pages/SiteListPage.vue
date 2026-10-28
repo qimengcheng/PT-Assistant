@@ -167,7 +167,7 @@ async function handleSearch() {
   <SpeedDialBtn
     key="save"
     :loading="localDownloadMultiStatus"
-    color="#1890ff"
+    color="#3b8ece"
     :icon="SaveOutlined"
     :title="t('downloaderLabel.localDownload')"
     @click="wrapperConfirmFn(handleLocalDownloadMulti)"
@@ -175,7 +175,7 @@ async function handleSearch() {
   <SpeedDialBtn
     key="copy"
     :loading="linkCopyMultiStatus"
-    color="#1890ff"
+    color="#3b8ece"
     :icon="CopyOutlined"
     :title="t('contentScript.copyLink')"
     @click="wrapperConfirmFn(handleLinkCopyMulti)"
@@ -183,7 +183,7 @@ async function handleSearch() {
   <SpeedDialBtn
     key="download"
     :disabled="enabledDownloadersBySite.length === 0"
-    color="#1890ff"
+    color="#3b8ece"
     :icon="CloudDownloadOutlined"
     :title="t('contentScript.pushTo')"
     @click="() => handleRemoteDownloadMulti()"
@@ -192,7 +192,7 @@ async function handleSearch() {
     v-if="metadataStore.defaultDownloader?.id"
     key="download_default"
     :disabled="enabledDownloadersBySite.length === 0"
-    color="#1890ff"
+    color="#3b8ece"
     :icon="DownloadOutlined"
     :title="t('contentScript.pushToDefault')"
     @click="() => handleRemoteDownloadMulti(true)"

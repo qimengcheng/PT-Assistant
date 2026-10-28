@@ -75,7 +75,7 @@ async function checkConnect() {
     <template #icon>
       <component :is="connectBtnMap[connectStatusRef].icon" />
     </template>
-    <span :style="connectBtnMap[connectStatusRef].color === 'success' ? 'color:#389e0d' : ''">
+    <span :style="connectBtnMap[connectStatusRef].color === 'success' ? 'color:#2b780a' : ''">
       {{ t("connectCheck." + connectStatusRef) }}
     </span>
   </a-button>

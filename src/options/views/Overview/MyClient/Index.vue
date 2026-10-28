@@ -1239,9 +1239,9 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
           <a-button size="small" type="primary" @click="showClientStatusDialog = true">
             <template #icon><ThunderboltOutlined /></template>
             {{ allTorrents.length }}
-            <ArrowUpOutlined style="color: #389e0d" />
+            <ArrowUpOutlined style="color: #2b780a" />
             {{ formatSize(totalUpSpeed) }}/s
-            <ArrowDownOutlined style="color: #cf1322" />
+            <ArrowDownOutlined style="color: #a63126" />
             {{ formatSize(totalDlSpeed) }}/s
           </a-button>
         </HoverTip>
@@ -1383,7 +1383,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
             type="circle"
             :percent="toPercent(record.progress) ?? 0"
             :size="28"
-            :stroke-color="record.isCompleted ? '#389e0d' : '#1890ff'"
+            :stroke-color="record.isCompleted ? '#2b780a' : '#3b8ece'"
           />
           <span v-else class="text-grey">-</span>
         </template>
@@ -1395,7 +1395,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
 
         <!-- upload speed -->
         <template v-else-if="column.key === 'uploadSpeed'">
-          <span v-if="record.uploadSpeed > 0" class="text-no-wrap" style="color: #389e0d">
+          <span v-if="record.uploadSpeed > 0" class="text-no-wrap" style="color: #2b780a">
             {{ formatSize(record.uploadSpeed) }}/s
           </span>
           <span v-else class="text-grey">-</span>
@@ -1403,7 +1403,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
 
         <!-- download speed -->
         <template v-else-if="column.key === 'downloadSpeed'">
-          <span v-if="record.downloadSpeed > 0" class="text-no-wrap" style="color: #1890ff">
+          <span v-if="record.downloadSpeed > 0" class="text-no-wrap" style="color: #3b8ece">
             {{ formatSize(record.downloadSpeed) }}/s
           </span>
           <span v-else class="text-grey">-</span>
@@ -1411,12 +1411,12 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
 
         <!-- total uploaded -->
         <template v-else-if="column.key === 'totalUploaded'">
-          <span class="text-no-wrap" style="color: #389e0d">{{ formatSize(record.totalUploaded) }}</span>
+          <span class="text-no-wrap" style="color: #2b780a">{{ formatSize(record.totalUploaded) }}</span>
         </template>
 
         <!-- total downloaded -->
         <template v-else-if="column.key === 'totalDownloaded'">
-          <span class="text-no-wrap" style="color: #1890ff">{{ formatSize(record.totalDownloaded) }}</span>
+          <span class="text-no-wrap" style="color: #3b8ece">{{ formatSize(record.totalDownloaded) }}</span>
         </template>
 
         <!-- ratio column -->
@@ -1766,7 +1766,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
 
 /* 整组底色。两条判据都是量出来的，不是排着好看：
    ① 不用灰 —— 全站口径是「灰只能当 8px 缝」，而这一档要说的是「这几条是一组」，
-      跟行底抢同一种颜色就永远说不清。取主色 rgba(22,119,255,…) 两档。
+      跟行底抢同一种颜色就永远说不清。取主色 rgba(59, 142, 206,…) 两档。
    ② 特异度必须**高于** style.css 那条悬停（0,4,2），否则组行会被悬停盖掉；
       编译后带 `[data-v-*]` 这一档属性选择器，基础那条正好 0,5,2、悬停那条 0,6,2。
       （原先这里还要压过我方那条奇数行斑马纹 0,3,2 —— 2026-10-26 那条已删，
@@ -1776,13 +1776,13 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
    所以 antd 自己的选中档一律赢 —— 选中态不需要再跟它比特异度。
    底色落在 <td> 上，和 style.css 那两条同一个元素（条纹落 <tr> 会被悬停/选中盖掉的教训见那里）。 */
 :deep(.ant-table-tbody > tr.ant-table-row.torrent-group-row:not(.ant-table-row-selected) > td) {
-  background: rgba(22, 119, 255, 0.08);
+  background: rgba(59, 142, 206, 0.08);
   /* 代表行是「一直在那儿」的那一条：它上色时没有入场动画可跟，靠这一条淡入才不会突然变一块蓝 */
   transition: background-color 180ms linear;
 }
 
 :deep(.ant-table-tbody > tr.ant-table-row.torrent-group-row:not(.ant-table-row-selected):hover > td) {
-  background: rgba(22, 119, 255, 0.15);
+  background: rgba(59, 142, 206, 0.15);
 }
 
 /* 退场那一档（收起）。两半分开挂：
@@ -1811,7 +1811,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
 
 @keyframes torrent-group-tint-out {
   from {
-    background: rgba(22, 119, 255, 0.08);
+    background: rgba(59, 142, 206, 0.08);
   }
 }
 

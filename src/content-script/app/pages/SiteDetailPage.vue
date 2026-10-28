@@ -84,7 +84,7 @@ function handleSearch() {
 <template>
   <SpeedDialBtn
     key="copy"
-    color="#1890ff"
+    color="#3b8ece"
     :icon="CopyOutlined"
     :title="t('contentScript.copyLink')"
     @click="handleLinkCopy"
@@ -92,7 +92,7 @@ function handleSearch() {
   <SpeedDialBtn
     key="download"
     :disabled="enabledDownloadersBySite.length === 0"
-    color="#1890ff"
+    color="#3b8ece"
     :icon="CloudDownloadOutlined"
     :title="t('contentScript.pushTo')"
     @click="() => handleRemoteDownload()"
@@ -101,7 +101,7 @@ function handleSearch() {
     v-if="metadataStore.defaultDownloader?.id"
     key="download_default"
     :disabled="enabledDownloadersBySite.length === 0"
-    color="#1890ff"
+    color="#3b8ece"
     :icon="DownloadOutlined"
     :title="t('contentScript.pushToDefault')"
     @click="handleRemoteDownload(true)"

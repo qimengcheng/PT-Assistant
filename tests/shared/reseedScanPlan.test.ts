@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   RESEED_SCAN_SIZE_TOLERANCE_RATIO,
   isReseedScanFresh,
+  isReseedScanQueryCovered,
   isReseedScanRowCurrent,
   normalizeReseedScanKeywords,
   planReseedScan,
@@ -17,6 +18,7 @@ import {
   reseedScanContentKey,
   reseedScanKeywords,
   reseedScanKeywordsOf,
+  reseedScanKeywordsRawFirst,
   reseedScanLastKeywordsByContent,
   reseedScanLocalGroup,
   reseedScanResultId,
@@ -70,22 +72,47 @@ function result(
   return out;
 }
 
-describe("reseedScanKeywords：最多两档，且不烧重复的请求", () => {
-  it("发布名 → 原串 + 折掉分辨率/编码/组名的核心词", () => {
-    const [first, second] = reseedScanKeywords("The.Movie.2024.1080p.x264-WEB-DL-GROUP");
-    expect(first).toBe("The.Movie.2024.1080p.x264-WEB-DL-GROUP");
-    expect(second).toBeDefined();
-    expect(second).not.toContain("1080p");
-    expect(second!.toLowerCase()).toBe(second);
+describe("reseedScanKeywords：默认只发折过的那一档", () => {
+  it("发布名 → 只发折掉前缀/点分隔/分辨率/编码/组名的那一档，原样名不再占一次请求", () => {
+    expect(reseedScanKeywords("The.Movie.2024.1080p.x264-WEB-DL-GROUP")).toEqual(["the movie 2024"]);
   });
 
-  it("名字本身已经干净（只差大小写）时只发一档：那是同一次查询", () => {
-    expect(reseedScanKeywords("Movie 2024")).toEqual(["Movie 2024"]);
+  it("带站点前缀的中文发布名同样只一档（用户 2026-10-29 那一屏的形状）", () => {
+    const terms = reseedScanKeywords("[嫁金钗].Where.the.Mask.Ends.2026.S01.1080p.NF.WEB-DL");
+    expect(terms).toHaveLength(1);
+    expect(terms[0]).not.toContain(".");
+    expect(terms[0]).not.toContain("[");
+  });
+
+  it("名字本身已经干净时那一档就是它自己（只差大小写，站点搜索不分大小写）", () => {
+    expect(reseedScanKeywords("Movie 2024")).toEqual(["movie 2024"]);
+  });
+
+  it("折不出东西时退回原样名 —— 否则这一条一个词都没有，会被计划整个跳过 = 静默不查", () => {
+    // 纯符号的名字 `normalizeTitle` 折成空串；退回原样名至少让人看得见这一条为什么没查
+    expect(reseedScanKeywords("...")).toEqual(["..."]);
   });
 
   it("空名 / 只有空格 → 一个词都不发（发了只会得到一个假的「没搜到」）", () => {
     expect(reseedScanKeywords("")).toEqual([]);
     expect(reseedScanKeywords("   ")).toEqual([]);
+  });
+});
+
+/**
+ * 两档那一份只剩两个消费者（转种那一跳 + 升级前老记录的判据），都不许退成一档：
+ * 退成一档 ⇒ 转种认不出来源；判据退成一档 ⇒ 存量整批判过期，一次整批就是几百次站点请求。
+ */
+describe("reseedScanKeywordsRawFirst：原样名打头那两档", () => {
+  it("发布名 → 原串 + 折过的那一档，顺序就是发出去的顺序", () => {
+    expect(reseedScanKeywordsRawFirst("The.Movie.2024.1080p.x264-WEB-DL-GROUP")).toEqual([
+      "The.Movie.2024.1080p.x264-WEB-DL-GROUP",
+      "the movie 2024",
+    ]);
+  });
+
+  it("只差大小写时不补第二档：那是同一次查询，补了就是白烧一次配额", () => {
+    expect(reseedScanKeywordsRawFirst("Movie 2024")).toEqual(["Movie 2024"]);
   });
 });
 
@@ -103,7 +130,7 @@ describe("normalizeReseedScanKeywords / reseedScanKeywordsOf / sameReseedScanKey
   it("keywords 没给 → 按名字折；给了就照给的，**包括给成空表**", () => {
     expect(reseedScanKeywordsOf({ name: "Movie 2024 1080p x264" })).toEqual(reseedScanKeywords("Movie 2024 1080p x264"));
     expect(reseedScanKeywordsOf({ name: "Movie 2024", keywords: ["  别的词 "] })).toEqual(["别的词"]);
-    // 空表退回默认折法 = 人刚清空的那一栏自己长回来、而那两档他不要的词照样发出去
+    // 空表退回默认折法 = 人刚清空的那一栏自己长回来、而那些他不要的词照样发出去
     expect(reseedScanKeywordsOf({ name: "Movie 2024", keywords: [] })).toEqual([]);
     expect(reseedScanKeywordsOf({ name: "Movie 2024", keywords: ["  ", ""] })).toEqual([]);
   });
@@ -157,6 +184,32 @@ describe("planReseedScan：哪几对要发出去", () => {
     });
     expect(plan.pairs.map((pair) => pair.siteId)).toEqual(["siteB", "siteC"]);
     expect(plan.truncated).toBe(0);
+    // 那一档既不排进计划、也不是「跳过（查过了）」：不单独报出来，界面那句「3 个站点 − 要查 2 组」
+    // 就凭空少了一个站（用户 2026-10-29 对着 21 / 16 / 2 三个数问的就是这个）
+    expect(plan.seeded).toBe(1);
+  });
+
+  it("已挂的站只在 usableSites 里才计数（knownSites 里那些没添加的站不该进那句「另有 N 组」）", () => {
+    const plan = planReseedScan({
+      targets: [target({ name: "Movie 2024", knownSites: ["siteA", "siteOff"] })],
+      usableSites: ["siteA", "siteB"],
+      cache: new Map(),
+    });
+    expect(plan.seeded).toBe(1);
+    expect(plan.pairs.map((pair) => pair.siteId)).toEqual(["siteB"]);
+  });
+
+  it("几条内容的 seeded 累加在一起（界面上那一句是整个范围的账，不是逐条的）", () => {
+    const plan = planReseedScan({
+      targets: [
+        target({ name: "Movie 2024", knownSites: ["siteA"] }),
+        target({ name: "Show 2025", knownSites: ["siteB"] }),
+      ],
+      usableSites: ["siteA", "siteB"],
+      cache: new Map(),
+    });
+    expect(plan.pairs.map((pair) => `${pair.name}@${pair.siteId}`)).toEqual(["Movie 2024@siteB", "Show 2025@siteA"]);
+    expect(plan.seeded).toBe(2);
   });
 
   it("新鲜期内查过的对子跳过并计入 skipped，过期的重查", () => {
@@ -284,19 +337,21 @@ describe("isReseedScanFresh", () => {
 });
 
 /**
- * v0.129.0：词表成了新鲜期的一维。
+ * v0.129.0 词表成了新鲜期的一维；v0.130.0 把它从「完全相等」放宽成「现在这一栏被那一次覆盖」。
  *
  * 两头的代价都要钉住：改过词却还复用旧结论 = 用户的纠正当没发生（他那一屏 16 个「未搜到」
  * 就是这一档）；反过来把「没存词表的老记录」一律判过期，等于升级后给每个人凭空加几百次
  * 站点请求 —— 一次扫描就是几百次，那个代价不能偷偷摊给他。
+ * 而 v0.130.0 那次「默认只发折过的那一档」恰好就是把词表**变短**，按相等判会当场撞上后半。
  */
 describe("isReseedScanRowCurrent / isReseedScanFresh 的词表那一维", () => {
   const name = "The.Movie.2024.1080p.x264-GROUP";
   const folded = reseedScanKeywords(name);
+  const bothTiers = reseedScanKeywordsRawFirst(name);
   const at = 1_000_000_000_000;
   const day = 24 * 60 * 60 * 1000;
 
-  it("只有「未搜到」吃词表这一维；老记录当初只会发按名字折的那一份", () => {
+  it("只有「未搜到」吃词表这一维；老记录当初发的是原样名打头那两档", () => {
     expect(isReseedScanRowCurrent(result("s", at, "no-match"), { name, keywords: folded })).toBe(true);
     expect(isReseedScanRowCurrent(result("s", at, "no-match"), { name, keywords: ["别的词"] })).toBe(false);
     expect(isReseedScanRowCurrent(result("s", at, "no-match", true, folded), { name, keywords: folded })).toBe(true);
@@ -304,6 +359,25 @@ describe("isReseedScanRowCurrent / isReseedScanFresh 的词表那一维", () => 
     // 正向两档与 failed 与词表无关：那次查询真成了，换词不会让「那个站有这条」变成没有
     expect(isReseedScanRowCurrent(result("s", at, "has-it"), { name, keywords: ["随便什么"] })).toBe(true);
     expect(isReseedScanRowCurrent(result("s", at, "failed"), { name, keywords: ["随便什么"] })).toBe(true);
+  });
+
+  it("词表变短不算换词：默认折法从两档收成一条那一档，存量一条都不许多查", () => {
+    // 老记录（没存词表）当初 = 两档；现在这一栏 = 只有折过那一档 ⇒ 仍然新鲜
+    expect(isReseedScanRowCurrent(result("s", at, "no-match"), { name, keywords: ["the movie 2024"] })).toBe(true);
+    // 存了词表的两档记录同理（他在界面上删掉一档，不该把整屏结论打成待重查）
+    expect(isReseedScanRowCurrent(result("s", at, "no-match", true, bothTiers), { name, keywords: folded })).toBe(true);
+    expect(isReseedScanFresh(result("s", at, "no-match"), at + day, 7 * day, { name, keywords: folded })).toBe(true);
+  });
+
+  it("但「少一档」不等于「多一档 / 换一档」：没查过的词进来立刻算换词", () => {
+    expect(isReseedScanRowCurrent(result("s", at, "no-match", true, folded), { name, keywords: [...folded, "另一个词"] })).toBe(false);
+    expect(isReseedScanRowCurrent(result("s", at, "no-match", true, folded), { name, keywords: ["the movie 2025"] })).toBe(false);
+  });
+
+  it("先后仍然算在内：调换顺序那一次没按这个顺序查过", () => {
+    expect(isReseedScanRowCurrent(result("s", at, "no-match", true, ["a", "b"]), { name, keywords: ["b", "a"] })).toBe(false);
+    // 反过来取中间一段是覆盖得到的（b 确实发出去过）
+    expect(isReseedScanRowCurrent(result("s", at, "no-match", true, ["a", "b"]), { name, keywords: ["b"] })).toBe(true);
   });
 
   it("改了词 ⇒ 那份「未搜到」当场不新鲜（否则改了等于没改）", () => {
@@ -322,6 +396,40 @@ describe("isReseedScanRowCurrent / isReseedScanFresh 的词表那一维", () => 
   it("调用方说不出会用哪些词时不比较这一维（与改前一字不差）", () => {
     expect(isReseedScanFresh(result("siteA", at, "no-match", true, folded), at + day, 7 * day)).toBe(true);
     expect(isReseedScanFresh(result("siteA", at, "no-match", true, folded), at + day, 7 * day, undefined)).toBe(true);
+  });
+});
+
+/**
+ * 「覆盖」这一条判据本体（新鲜期与界面那枚「待重查」共用它）。
+ *
+ * 它比相等宽，所以更要把「宽到哪」钉住：只有「那一次每一档都真发出去了」这个前提撑着才成立 ——
+ * `no-match` 是词表走完才记的档（命中就 break，那是 has-it / suspect），所以任何一段都查过。
+ */
+describe("isReseedScanQueryCovered", () => {
+  it("整份 / 取一段 / 取最后一段都算覆盖；插一个没查过的词就不算", () => {
+    expect(isReseedScanQueryCovered(["a", "b"], ["a", "b"])).toBe(true);
+    expect(isReseedScanQueryCovered(["b"], ["a", "b"])).toBe(true);
+    expect(isReseedScanQueryCovered(["a"], ["a", "b"])).toBe(true);
+    expect(isReseedScanQueryCovered(["a", "c"], ["a", "b", "c"])).toBe(true);
+    expect(isReseedScanQueryCovered(["c"], ["a", "b"])).toBe(false);
+    expect(isReseedScanQueryCovered([], ["a", "b"])).toBe(true);
+  });
+
+  it("先后不许颠倒（词表是按顺序试的），空行与首尾空白不算差异", () => {
+    expect(isReseedScanQueryCovered(["b", "a"], ["a", "b"])).toBe(false);
+    expect(isReseedScanQueryCovered(["  b "], ["a", "b", ""])).toBe(true);
+  });
+
+  it("大小写不算差异：站点搜索不分大小写，而 normalizeTitle 必然转小写", () => {
+    // 不折这一笔，一条本来就干净、只差大小写的名字会在升级后白重查一遍
+    expect(isReseedScanQueryCovered(["movie 2024"], ["Movie 2024"])).toBe(true);
+    expect(isReseedScanQueryCovered(["Movie 2024"], ["movie 2024"])).toBe(true);
+  });
+
+  it("两侧都先过一遍归一：重复的词被去掉、空行不算差异，所以「同一档查两遍」这种形状进不来", () => {
+    expect(isReseedScanQueryCovered(["a", "a"], ["a"])).toBe(true);
+    expect(isReseedScanQueryCovered(["a"], ["a", "a"])).toBe(true);
+    expect(isReseedScanQueryCovered(["a", "b"], ["a"])).toBe(false);
   });
 });
 

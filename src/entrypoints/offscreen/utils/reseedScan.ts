@@ -151,7 +151,7 @@ function toSiteRef(item: ITorrent, hash?: string): IReseedScanResult["site"] {
   };
 }
 
-/** 一次「内容 × 站点」的查询：搜（两档词）→ 粗筛候选 → 候选下 .torrent 比文件清单 */
+/** 一次「内容 × 站点」的查询：按词表逐档搜（命中就停，默认只有一档）→ 粗筛候选 → 候选下 .torrent 比文件清单 */
 async function scanOnePair(input: {
   contentKey: string;
   siteId: TSiteID;
@@ -223,7 +223,7 @@ async function scanOnePair(input: {
         if (filesMatched) break;
       }
       if (filesMatched) break;
-      // 候选验过但不是同一份：这条词的页面上没有相符条目，换第二档词再试一次
+      // 候选验过但不是同一份：这一档词的页面上没有相符条目，换下一档词再试一次
       if (filesCompared && !filesMatched) {
         candidates = 0;
         note = "页面上相符的那条验过文件清单，与本地这份不是同一组文件";

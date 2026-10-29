@@ -33,6 +33,13 @@ export interface IReseedScanPlan {
   cached: number;
   /** 计划条数超过上限被砍掉多少对 */
   truncated: number;
+  /**
+   * 因为「那个站上已经挂着这一条」而根本不排进来的对数。
+   *
+   * 界面那句计划必须报它：`sites − cached − pairs` 这一差值只有这里能解释，
+   * 不报出来读起来就像少了几个站（用户 2026-10-29 对着 21 / 16 / 2 三个数问的正是这个）。
+   */
+  seeded: number;
 }
 
 /** 内容键：与本地指纹索引那第 1 层同一个算法，两边不许各折一套 */
@@ -41,20 +48,43 @@ export function reseedScanContentKey(name: string, size: number): string {
 }
 
 /**
- * 把下载器里的种子名折成**按顺序试**的搜索词，最多两档，去重、去空。
+ * 把下载器里的种子名折成**按顺序试**的搜索词 —— 默认只有一档：`normalizeTitle` 折过的那一份。
  *
- * ① 原样：多数站对发布名（点分隔那串）容忍得好，先按原串试，命中率最高；
- * ② 归一核心词：`normalizeTitle` 去噪（分辨率 / 编码 / 组名 / 声道那一串）。
- *    这一档是给「站点那边写的是干净片名、下载器里是发布名」那种形状准备的。
+ * 为什么不再把原样名当第一档发出去（用户 2026-10-29：「默认就只查第二种，把第一种直接去掉」）：
+ * 发布名那一串带着站点前缀与点分隔（`[嫁金钗].Where.the.Mask.Ends.2026.S01.1080p.NF.WEB…`），
+ * 站点搜索框拿它基本搜不出东西，而它**每站都先占一次请求** —— 21 个站就是 21 次白烧的配额，
+ * 换来的结论与「压根没发这一档」一字不差。折过的那一档才是两边对得上的形状。
  *
- * 第一档搜到相符条目就不再发第二档（省一次请求）；两档都没结果才敢记 `no-match` ——
- * 只按一档词判「没搜到」是把「我的词不对」说成「那个站没有」。
+ * 两条边界：
+ * ① 折不出东西（`normalizeTitle` 给空串）时退回原样名 —— 否则这一条一个词都没有，
+ *    而 `planReseedScan` 那条「一个词都折不出来就别发请求」会把它整个跳过，变成静默不查；
+ * ② 名字本来就干净时折出来只差大小写（站点搜索不分大小写），那一档就是它自己，仍是一档。
  *
  * ⚠️ 这一条只是**默认折法**。它算不准的时候界面上要能改（用户 2026-10-28：「这个界面能不能显示
  * 实际搜索的关键词，如果用户发现不合适可以自己改」），改动走 `IReseedScanTarget.keywords`
  * 与下面的 `reseedScanKeywordsOf`；改过之后 `no-match` 那档的新鲜期跟着换（见 `isReseedScanFresh`）。
  */
 export function reseedScanKeywords(name: string): string[] {
+  const raw = (name ?? "").trim();
+  if (!raw) return [];
+  const folded = normalizeTitle(raw);
+  return folded ? [folded] : [raw];
+}
+
+/**
+ * 两档那一份：**原样名打头**，再补折过的那一档（真的折掉了东西才两档）。
+ *
+ * 两个消费者，都不许改成单档那份：
+ * ① 转种「回源站把这颗认出来」那一跳（`offscreen/utils/torrentUpload.ts`）—— 那里是**一个站、一颗种子**，
+ *    多一档的代价是最多多发一次请求，少一档的代价是认不出来源、整件事失败；扫描那边是 21 个站各先发一次
+ *    基本搜不出东西的原样名，两处成本完全不同形，所以不共用默认折法。
+ * ② 库里那些**没存词表**的老结论（v0.129.0 之前查的）当初发的就是这一份，
+ *    判「这一行是不是用现在这一栏的词查出来的」只能跟它比。拿今天的默认折法去比，
+ *    每条老记录都会被判成「换了词」，一升级就把存量整批判过期 —— 一次整批就是几百次站点请求。
+ *
+ * ⚠️ 别拿它当扫描的默认折法（那走 `reseedScanKeywords`），也别在界面上当默认值用。
+ */
+export function reseedScanKeywordsRawFirst(name: string): string[] {
   const raw = (name ?? "").trim();
   const folded = normalizeTitle(raw);
   const out: string[] = [];
@@ -85,7 +115,7 @@ export function normalizeReseedScanKeywords(keywords?: readonly string[] | null)
  * 这一条内容现在会用哪些词：`keywords` **给了就照给的**（包括给成空表 = 这一条不发查询），没给才按名字折。
  *
  * 为什么「空表」不能退回默认折法：人在界面上把那一栏清空是他主动表达「这一条别查」；
- * 空表退回折法会让他刚清空的词自己长回来、而那两档他不想要的词照样被发出去。
+ * 空表退回折法会让他刚清空的词自己长回来、而那些他不想要的词照样被发出去。
  * 界面上那一格摆的是**没归一**的那一份（正在输入的空格与空行都得留着，否则打字会被吞），
  * 只有发出去与排计划用这一条的返回值。
  */
@@ -103,12 +133,37 @@ export function sameReseedScanKeywords(a: readonly string[] | undefined, b: read
 }
 
 /**
+ * 现在这一栏的词（`wanted`）是不是**都被那一次查询覆盖**：每一个词都按先后出现在 `used` 里。
+ *
+ * 比相等宽一档，是因为「整份词表都没搜到」这句话对它的**任何一段**都成立：
+ * `no-match` 是词表走完、每一档都发出去且都没有相符条目才记的（命中就 `break`，那一档是
+ * `has-it` / `suspect`，压根不吃这一维）。所以拿它回答「现在这几个词也没搜到」不是扩大主张。
+ * 两条边界：
+ * ① 顺序仍然算在内（`[b,a]` 不被 `[a,b]` 覆盖）—— 人调换先后是想换先试谁，那一次没按这个顺序查过；
+ * ② 比较先折大小写：站点搜索不分大小写，而 `normalizeTitle` 必然转小写，
+ *    不折就会让一条本来就干净、只差大小写的名字在升级后被判成换了词、白重查一遍。
+ */
+export function isReseedScanQueryCovered(wanted: readonly string[], used: readonly string[]): boolean {
+  const need = normalizeReseedScanKeywords(wanted).map((item) => item.toLowerCase());
+  const sent = normalizeReseedScanKeywords(used).map((item) => item.toLowerCase());
+  let cursor = 0;
+  for (const item of need) {
+    const at = sent.slice(cursor).indexOf(item);
+    if (at < 0) return false;
+    cursor += at + 1;
+  }
+  return true;
+}
+
+/**
  * 这一行结论**是不是用现在这一栏的词查出来的**。
  *
  * 只有 `no-match` 吃这一维：那句真话是「这些词在那个站没搜到相符条目」，换词之后再拿它当答案
  * 就是把人的纠正当没发生。正向的两档与词表无关（「那个站确有这条」不会因为换了词变成没有），
  * `failed` 本来就不是结论。
- * 老记录（v0.129.0 之前）没存词表 —— 那时只会发按名字折出来的那一份，所以那样算。
+ * 老记录（v0.129.0 之前）没存词表 —— 那时只会发 `reseedScanKeywordsRawFirst` 那一份，所以跟那一份比。
+ * 现在这一栏比那一次**少几档**不算换词（见 `isReseedScanQueryCovered`）：默认折法从两档收成一条那一档
+ * 就是这个形状，一刀切按相等判会让存量用户整批重查。
  *
  * 新鲜期判据（`isReseedScanFresh`）与界面上那枚「待重查」都读这一条，两处不许各比一套。
  */
@@ -117,7 +172,7 @@ export function isReseedScanRowCurrent(
   query: { name: string; keywords: readonly string[] },
 ): boolean {
   if (result.verdict !== "no-match") return true;
-  return sameReseedScanKeywords(query.keywords, result.keywords ?? reseedScanKeywords(query.name));
+  return isReseedScanQueryCovered(query.keywords, result.keywords ?? reseedScanKeywordsRawFirst(query.name));
 }
 
 /** 只用得到的那三个字段：这一条要在 Node 里被断言，不该拖整份结果类型 */
@@ -324,13 +379,19 @@ export function planReseedScan(input: {
 
   const pairs: IReseedScanPair[] = [];
   let cached = 0;
+  let seeded = 0;
 
   for (const target of targets) {
     const keywords = reseedScanKeywordsOf(target);
     // 一个词都折不出来（空标题之类）就别发请求：发了只会得到一个假的「没搜到」
     if (keywords.length === 0) continue;
     for (const siteId of usableSites) {
-      if (target.knownSites.includes(siteId)) continue;
+      // 已经挂在着一条的那个站不必查：这一档既不排进计划、也不计进「跳过（查过了）」，
+      // 少一个计数器界面那句「N 个站点 − 跳过 M 组」就对不上账
+      if (target.knownSites.includes(siteId)) {
+        seeded++;
+        continue;
+      }
       const id = reseedScanResultId(target.contentKey, siteId);
       if (isReseedScanFresh(cache.get(id), now, ttlMs, { name: target.name, keywords })) {
         cached++;
@@ -342,7 +403,7 @@ export function planReseedScan(input: {
 
   // 上限是硬闸，砍掉的数量要如实报给界面（「还有 N 对没查」），不能让人以为查完了
   const kept = maxPairs === undefined ? pairs : pairs.slice(0, maxPairs);
-  return { pairs: kept, cached, truncated: pairs.length - kept.length };
+  return { pairs: kept, cached, truncated: pairs.length - kept.length, seeded };
 }
 
 /**

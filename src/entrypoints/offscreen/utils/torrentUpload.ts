@@ -33,7 +33,7 @@ import type {
   IUploadFormDescriptor,
   IUploadOption,
 } from "@/shared/upload/types.ts";
-import { reseedScanKeywords, reseedScanScreen } from "@/shared/reseedScanPlan.ts";
+import { reseedScanKeywordsRawFirst, reseedScanScreen } from "@/shared/reseedScanPlan.ts";
 
 import { getTorrentDownloadLink, getTorrentInfoForVerification } from "./download.ts";
 import { absolutize, normalizeText, textSummary, toDocument } from "./html.ts";
@@ -264,7 +264,9 @@ async function searchTorrentByInfoHash(input: ITransferSourceLocateRequest): Pro
   if (!targetHash) throw new Error("下载器没有报出 infoHash，无法确认要认的是哪一颗种子");
 
   const notes: string[] = [];
-  const keywords = reseedScanKeywords(input.name);
+  // 这里刻意用**两档**那一份，不跟扫描的默认折法（v0.130.0 起只发折过那一档）：
+  // 这一跳是一个站认一颗种子，多一档最多是多一次请求，少一档是认不出来源、整件转种失败。
+  const keywords = reseedScanKeywordsRawFirst(input.name);
 
   for (const keyword of keywords) {
     let items: ITorrent[];

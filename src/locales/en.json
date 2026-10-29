@@ -478,9 +478,10 @@
       },
       "refreshAll": "Ignore previous results, re-check everything",
       "plan": "This run queues {pairs} content × site checks ({items} torrents across {sites} sites, {skipped} skipped as already checked with these keywords within 7 days). Limit per run: {max}; {remaining} not queued.",
+      "planSeeded": " Another {seeded} need no check: that site already has this torrent.",
       "keywords": {
         "title": "Search keywords",
-        "tip": "These are the terms actually sent to each site. By default they are derived from the torrent name in your downloader — up to two, tried in order (the second is skipped when the first finds a match). Edit them if they look wrong: the terms you keep are exactly what the next scan sends, and they are remembered with the results.",
+        "tip": "These are the terms actually sent to each site. By default only one is sent: the torrent name from your downloader with the \"[site]\" prefix, the dot separators and the resolution/codec noise folded away (the raw release name matches almost nothing, and since v0.130.0 it is no longer sent by default). Add a term if you want more tried in order — the run stops at the first one that finds a match. Edit them if they look wrong: the terms you keep are exactly what the next scan sends, and they are remembered with the results.",
         "placeholder": "Search keyword",
         "add": "Add a term",
         "remove": "Remove this term",

@@ -119,8 +119,9 @@ const cacheMap = computed(() => new Map(results.value.map((item) => [item.id, it
 /**
  * 「这一条内容实际拿哪些词去搜」—— 面板上摆的就是逐站发出去的那一份，可以直接改
  * （用户 2026-10-28：「这个界面能不能显示实际搜索的关键词，如果用户发现不合适可以自己改」）。
- * 默认折法只有一条算式（`reseedScanKeywords`），而站点那边的写法千奇百怪：带着 `[站点名]` 前缀、
- * 点分隔发布名的那一串经常一个站都搜不到 —— 那一屏「未搜到 16」说的其实是「我的词不对」。
+ * 默认折法只有一条算式（`reseedScanKeywords`，v0.130.0 起只发**折过的那一档**）：下载器里的发布名
+ * 带着 `[站点名]` 前缀与点分隔，那一串经常一个站都搜不到，而它原先每站都先占一次请求 ——
+ * 那一屏「未搜到 16」说的其实是「我的词不对」。人想试原样名，界面上自己加一档。
  *
  * 三层取数，顺序不许换：① 这一屏里人改过的（`keywordEdits`，**原样**，正在输入的空串也得留着）；
  * ② 这条内容上次**真查**用的那一份（随结论落库，所以关掉弹窗再开还在）；③ 按名字折出来的默认。
@@ -560,7 +561,8 @@ onUnmounted(stopPolling);
         </a-checkbox>
       </div>
 
-      <!-- 计划说在事前：一次扫描是「条目 × 站点」次请求，点下去之前要看得见排了多少对、跳了多少对 -->
+      <!-- 计划说在事前：一次扫描是「条目 × 站点」次请求，点下去之前要看得见排了多少对、跳了多少对。
+           那句「N 个站点」与「要查 M 组」之间还差着一档「那个站已经挂着这条」，不报出来就是凭空少了几个站。 -->
       <a-alert type="info" class="reseed-scan__plan">
         <template #message>
           {{
@@ -571,7 +573,7 @@ onUnmounted(stopPolling);
               skipped: plan.cached,
               remaining: plan.truncated,
               max: RESEED_SCAN_MAX_PAIRS,
-            })
+            }) + (plan.seeded ? t("MyClient.reseedScan.planSeeded", { seeded: plan.seeded }) : "")
           }}
         </template>
       </a-alert>

@@ -157,8 +157,6 @@ const { pagination: fittedPagination, handleTableChange } = useTableBehavior("Se
   size: "small",
   totalRows: () => visible.value.length,
   autoFit: { container: () => pagePanel.value, rows: () => visible.value },
-  // 这一页没有默认排序档，「点第三下取消」要真能取消，否则存下来的档会把箭头按回去
-  clearOnEmpty: true,
 });
 
 /**

@@ -7,7 +7,7 @@
  * 修一处 bug 要改八九个文件，且很容易漏（MyClient 就是因为漏抄，表格完全没有排序功能）。
  * 这里收敛成单一实现，各页面只提供自己的表头定义与 key。
  */
-import type { TableColumnsType, TablePaginationConfig } from "@zboson/ui";
+import type { TableColumnsType, TablePaginationConfig, TableSorterResult } from "@zboson/ui";
 
 /** vuetify 的 order 是 asc/desc，antd 的 SortOrder 是 ascend/descend */
 export function toAntdSortOrder(order: "asc" | "desc" | undefined | null): "ascend" | "descend" | null {
@@ -116,13 +116,55 @@ export function toTableColumns<T>(
  * 把 configStore 里的 sortBy（[{key, order}]）转成 antd 的列 sortOrder map。
  */
 export function buildSortOrderMap(
-  sortBy: { key: string; order: "asc" | "desc" }[] | undefined,
+  sortBy: readonly TColumnSort[] | undefined,
 ): Record<string, "ascend" | "descend" | null> {
   const out: Record<string, "ascend" | "descend" | null> = {};
   for (const s of sortBy ?? []) {
     out[s.key] = s.order === "desc" ? "descend" : "ascend";
   }
   return out;
+}
+
+/**
+ * 持久化下来的一列排序，与 `configStore.tableBehavior[*].sortBy` 的元素同形。
+ * （`buildSortOrderMap` 吃它、`nextSortByOf` 产它，两头都在这一份文件里，不抄第二份形状。）
+ */
+export type TColumnSort = { key: string; order: "asc" | "desc" };
+
+/**
+ * 把 a-table `@change` 递回来的 sorter 折成「该写进持久化的那一份 sortBy」，
+ * 顺带判这次要不要写：返回 `null` = 不写。
+ *
+ * **取消排序必须写下去**（用户 2026-10-31 报「多点几次这个排序就失效了，再点就没有反应了」，
+ * 坏的就是这一档）。这一族页面的列都带受控 `sortOrder`（`buildSortOrderMap` / `sortOrderOf`
+ * 递进去的那一份），受控列的箭头与数据只认 props、不认组件内部状态：点第三下时 rc-table 内部
+ * 已经进到「取消」那一档，库里却还留着 descend，下一帧列定义又把它画回降序。而表头那颗箭头
+ * 下一步是什么，是由**当下这一档**算的（`@zboson/ui/dist/table/hooks/useSorter.js` 的
+ * `nextSortDirection`），于是它永远停在「取消排序」，而取消永远落不了地 —— 那一列就此点不动。
+ * 台架 `.tmp-build/bench-sortlock` 三栏并排真点过：改前第③、④两下读数一字不差，改后第③下清空、
+ * 第④下重新回到升序。
+ *
+ * 「不写」只剩一种正当理由：**这一趟压根没排序**（翻页、改每页条数也会带着「当前排序」回来，
+ * rc-table 的 triggerOnChange 一并递出来），照写就是每次翻页一次 `$save` 落盘。判据是
+ * 「折出来与场上那份逐列相同」，不是「折出来是空数组」。
+ */
+export function nextSortByOf(
+  sorter: TableSorterResult | TableSorterResult[] | undefined,
+  current: readonly TColumnSort[],
+  options: { multiSort?: boolean } = {},
+): TColumnSort[] | null {
+  // 压根没递 sorter = 这一趟没报排序，不替它决定清空（清空是真的会清掉界面）
+  if (sorter === undefined || sorter === null) return null;
+  const active = (Array.isArray(sorter) ? sorter : [sorter]).filter((item) => item?.order && item?.columnKey);
+  const next: TColumnSort[] = active.map((item) => ({
+    key: String(item.columnKey),
+    order: item.order === "descend" ? "desc" : "asc",
+  }));
+  const resolved = options.multiSort ? next : next.slice(0, 1);
+  const same =
+    resolved.length === current.length &&
+    resolved.every((s, i) => s.key === current[i]?.key && s.order === current[i]?.order);
+  return same ? null : resolved;
 }
 
 /**

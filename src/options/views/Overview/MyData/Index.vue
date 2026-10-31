@@ -148,7 +148,17 @@ const toggleColumn = (key: string, on: boolean) => {
   selectedColumnKeys.value = [...next];
 };
 
-/** 排序/分页行为统一收敛到 useTableBehavior（MyData 允许多列排序）；列生成走公共 toTableColumns */
+/**
+ * 排序/分页行为统一收敛到 useTableBehavior；列生成走公共 toTableColumns。
+ *
+ * ⚠️ 下面那句 `multiSort: true` **目前不生效**：多列排序的开关在列上（`toTableColumns`
+ * 的第三个参数会把 sorter 包成 `{ compare, multiple }`），而这里没给 —— 台架
+ * `.tmp-build/bench-sortlock` 的四栏探针量过：这一页点第二列会把第一列顶掉，
+ * 只有真给那一参数的那一栏留得住两列。composable 那侧的 `multiSort` 只决定
+ * 「报回来几条时留几条」，单列形状下它永远只有一条，所以两者互不矛盾、也不互相补位。
+ * 全站那颗「表格多列排序」开关（`configStore.enableTableMultiSort`，默认关）目前只有
+ * 搜索结果页接；这一页要不要一起接是取向问题，等用户定，不要顺手替他打开。
+ */
 const pagePanel = useTemplateRef<HTMLDivElement>("pagePanel");
 const { sortBy, pagination: tablePagination, handleTableChange } = useTableBehavior("MyData", {
   defaultPageSize: 20,

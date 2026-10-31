@@ -169,8 +169,6 @@ const {
   totalRows: () => visibleTasks.value.length,
   // 每页条数按面板实高算（用户 2026-10-08：「既不能出现滚动条又要把页面铺满」）
   autoFit: { container: () => pagePanel.value, rows: () => visibleTasks.value },
-  // 这页没有默认排序档，所以「点第三下取消」要真能取消，否则存的档会把箭头按回去
-  clearOnEmpty: true,
 });
 
 /**

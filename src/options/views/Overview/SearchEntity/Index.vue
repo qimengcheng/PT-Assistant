@@ -200,7 +200,6 @@ const fullTableHeader = computed(
 /**
  * 排序/分页行为统一收敛到 useTableBehavior：
  * - multiSort：搜索结果页允许多列排序
- * - clearOnEmpty：点第三下取消排序时写 [] 清掉持久化（本页旧实现就是这个语义）
  * 本地保留别名 tablePageSize/onTableChange，下方调用点无需改名。
  */
 const {
@@ -210,7 +209,6 @@ const {
 } = useTableBehavior("SearchEntity", {
   defaultPageSize: 50,
   multiSort: true,
-  clearOnEmpty: true,
 });
 
 const tableHeader = computed(() => {

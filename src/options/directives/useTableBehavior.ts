@@ -16,14 +16,8 @@ import { computed, ref, toValue, type ComputedRef, type MaybeRefOrGetter } from 
 import type { TablePaginationConfig, TableSorterResult } from "@zboson/ui";
 
 import { useConfigStore } from "@/options/stores/config.ts";
-import { toPagination } from "@/options/components/tableSorters.ts";
+import { nextSortByOf, toPagination, type TColumnSort } from "@/options/components/tableSorters.ts";
 import { useAutoFitPageSize } from "./useAutoFitPageSize.ts";
-
-type TSortOrder = "asc" | "desc";
-interface ISortBy {
-  key: string;
-  order: TSortOrder;
-}
 
 interface IUseTableBehaviorOptions {
   /** itemsPerPage 缺失或为非法值（Vuetify 遗留 -1/0）时的兜底 */
@@ -34,12 +28,6 @@ interface IUseTableBehaviorOptions {
   showTotal?: (total: number) => string;
   /** true 时持久化全部排序列（多列排序）；false（默认）只取第一列 */
   multiSort?: boolean;
-  /**
-   * 用户取消排序（sorter 为空）时是否写入 [] 清掉持久化排序。
-   * 默认 false，保留 DownloadHistory/SetSite 等旧页面的行为（只写非空排序）；
-   * SearchEntity / MyClient 需要「点第三下取消排序」，传 true。
-   */
-  clearOnEmpty?: boolean;
   /**
    * 当前要展示的条数（过滤后的）。传了就走「一页放得下就不出分页条」，
    * pagination 的类型也相应变成 `TablePaginationConfig | false`。
@@ -67,7 +55,6 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
     size,
     showTotal,
     multiSort = false,
-    clearOnEmpty = false,
     totalRows,
     autoFit,
     maxSinglePage,
@@ -77,7 +64,7 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
   const behavior: ComputedRef<{
     itemsPerPage?: number;
     columns?: string[];
-    sortBy?: ISortBy[];
+    sortBy?: TColumnSort[];
   }> = computed(() => configStore.tableBehavior[tableKey] ?? {});
 
   const itemsPerPage = computed(() => {
@@ -86,7 +73,7 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
     return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : defaultPageSize;
   });
 
-  const sortBy = computed<ISortBy[]>(() => behavior.value.sortBy ?? []);
+  const sortBy = computed<TColumnSort[]>(() => behavior.value.sortBy ?? []);
 
   /**
    * 本次进入这一页之内他挑的那一档。开了 autoFit 的页**只认这一份**，不读存下来的档 ——
@@ -139,28 +126,10 @@ export function useTableBehavior(tableKey: string, options: IUseTableBehaviorOpt
       }
     }
 
-    const sorters = (Array.isArray(sorter) ? sorter : [sorter]).filter(
-      (item) => item?.order && item?.columnKey,
-    );
-    if (sorters.length === 0 && !clearOnEmpty) {
-      return;
-    }
-
-    const next = sorters.map((item) => ({
-      key: String(item.columnKey),
-      order: item.order === "descend" ? ("desc" as const) : ("asc" as const),
-    }));
-    const resolved = multiSort ? next : next.slice(0, 1);
-    // 翻页 / 改每页条数也会带着「当前排序」回来（rc-table 的 triggerOnChange 一并递出来），
-    // 排序没变就别再写一次：开了 clearOnEmpty 的页每次翻页都会把同一个值重写进 configStore，
-    // 而每次写都跟着 $save 落盘（辅种任务页实测：点一下第 2 页就落一条 sortBy=[]）
-    const current = sortBy.value;
-    if (
-      resolved.length === current.length &&
-      resolved.every((s, i) => s.key === current[i]?.key && s.order === current[i]?.order)
-    ) {
-      return;
-    }
+    const resolved = nextSortByOf(sorter, sortBy.value, { multiSort });
+    // 折法与「这一次到底要不要写」都在 tableSorters.nextSortByOf 那一份判据里 ——
+    // 含「取消排序必须写空数组」的理由（不写就把那一列永久点死）与「翻页不许重复落盘」。
+    if (resolved === null) return;
     configStore.updateTableBehavior(tableKey, "sortBy", resolved);
   }
 

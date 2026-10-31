@@ -1,14 +1,10 @@
-import { computed, watch } from "vue";
+import { computed } from "vue";
 import { type ITorrentTag } from "@ptd/site";
 
-import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
-import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useTableCustomFilter } from "@/options/directives/useAdvanceFilter.ts";
 
 const runtimeStore = useRuntimeStore();
-const configStore = useConfigStore();
-const metadataStore = useMetadataStore();
 
 export const tableCustomFilter = useTableCustomFilter({
   parseOptions: {
@@ -16,7 +12,6 @@ export const tableCustomFilter = useTableCustomFilter({
     ranges: ["time", "size", "seeders", "leechers", "completed"],
   },
   titleFields: ["title", "subTitle"],
-  initialSearchValue: metadataStore.lastSearchFilter,
   initialItems: computed(() => runtimeStore.search.searchResult),
   format: {
     tags: {
@@ -49,9 +44,12 @@ export const tableCustomFilter = useTableCustomFilter({
   },
 });
 
-watch(tableCustomFilter.tableFilterRef, (newValue) => {
-  if (configStore.searchEntity.saveLastFilter) {
-    // noinspection JSIgnoredPromiseFromCall
-    metadataStore.setLastSearchFilter(newValue);
-  }
-});
+/**
+ * 这里**刻意不持久化**筛选词。
+ *
+ * `tableCustomFilter` 是模块级单例（本文件顶层调用，内部只有 ref/computed，不绑组件实例），
+ * 加上 `App.vue` 的 KeepAlive 白名单含 SearchEntity，切页、组件重建都不会丢；
+ * 而页面真正重建（刷新/重开）时 `runtimeStore.search.searchResult` 因为 `persistWebExt: false`
+ * 本来就是空的 —— 恢复一个筛选词去过滤空表没有意义。
+ * 原实现每 500ms 防抖后调 `metadataStore.setLastSearchFilter`，那是整份 metadata 全量落盘。
+ */

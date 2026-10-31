@@ -411,7 +411,6 @@ export const useConfigStore = defineStore("config", {
 
       treatTTQueryAsImdbSearch: true,
 
-      saveLastFilter: true,
       forceImdbIdMatchFilter: true,
       autoDetectOfficialGroupFromTitle: false,
 

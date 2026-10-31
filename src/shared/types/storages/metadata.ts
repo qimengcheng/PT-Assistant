@@ -144,9 +144,6 @@ export interface IMetadataPiniaStorageSchema {
   // 默认下载器配置
   defaultDownloader: IDefaultDownloaderConfig;
 
-  // 上一次搜索时在结果页面的筛选词，需要启用 configStore.searchEntity.saveLastFilter
-  lastSearchFilter?: string;
-
   /**
    * 此处仅存储站点最近一次的记录。
    *

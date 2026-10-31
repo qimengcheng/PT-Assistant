@@ -64,7 +64,6 @@ export const useMetadataStore = defineStore("metadata", {
     defaultSolutionId: "default",
     defaultDownloader: {},
 
-    lastSearchFilter: "",
     lastUserInfo: {},
     lastDownloader: {},
     lastKeepUpload: {},
@@ -623,11 +622,6 @@ export const useMetadataStore = defineStore("metadata", {
 
     async removeDownloader(downloaderId: TDownloaderKey) {
       delete this.downloaders[downloaderId];
-      await this.$save();
-    },
-
-    async setLastSearchFilter(filter: string) {
-      this.lastSearchFilter = (filter ?? "").replace(/\s*site:\S+/g, "").trim();
       await this.$save();
     },
 

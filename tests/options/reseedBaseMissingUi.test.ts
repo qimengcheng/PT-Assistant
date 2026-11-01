@@ -17,18 +17,38 @@ const read = (file: string) => readFileSync(file, "utf8").replace(/\r\n/g, "\n")
 const page = read("src/options/views/Overview/KeepUploadTask/Index.vue");
 const dialog = read("src/options/views/Overview/SearchEntity/KeepUploadDialog.vue");
 const offscreen = read("src/entrypoints/offscreen/utils/download.ts");
+const autoReseed = read("src/entrypoints/background/utils/autoReseed.ts");
+
+/** 只声明这一族走到的那三层，别的键不管 —— 用了 `any` 反而会把「键不存在」读成 `undefined` 之外的东西 */
+type LocaleSlice = {
+  KeepUploadTask: { pathMismatch: Record<string, string> };
+  SearchEntity: { KeepUploadDialog: { localBase: Record<string, string> } };
+};
+const zh = JSON.parse(read("src/locales/zh_CN.json")) as LocaleSlice;
+const en = JSON.parse(read("src/locales/en.json")) as LocaleSlice;
+
+/** 不在场那一支：从它的 `v-if` 起到 `<template v-else>` 为止的那一段模板 */
+function absentBranch() {
+  const from = page.indexOf('v-if="record.task.baseLocal?.missingInClient"');
+  const to = page.indexOf("<template v-else>", from);
+  expect(from).toBeGreaterThan(-1);
+  expect(to).toBeGreaterThan(from);
+  return page.slice(from, to);
+}
 
 describe("辅种任务那一格：不在场就说不在场", () => {
-  it("两种说法分开，且「目录不一致 + 正在搬 + 两颗处置键」整族留在 v-else 里", () => {
-    expect(page).toMatch(
-      /v-if="record\.task\.baseLocal\?\.missingInClient"[\s\S]{0,600}KeepUploadTask\.pathMismatch\.baseMissing"/,
-    );
+  it("两种说法分开，「目录不一致 + 正在搬」整族留在 v-else 里", () => {
+    expect(absentBranch()).toContain('KeepUploadTask.pathMismatch.baseMissing"');
     expect(page).toMatch(/<template v-else>[\s\S]{0,1200}KeepUploadTask\.pathMismatch\.short"/);
-    // 处置键画在 v-else 里面：不在场时点它们等于打在一条下载器里没有的种子上（移动要发那个 id）
-    const elseAt = page.indexOf("<template v-else>", page.indexOf("pathMismatch.baseMissing"));
-    expect(elseAt).toBeGreaterThan(-1);
-    expect(page.indexOf("moveLocalBaseToTaskPath(record.task)")).toBeGreaterThan(elseAt);
-    expect(page.indexOf("useLocalBasePath(record.task)")).toBeGreaterThan(elseAt);
+  });
+
+  it("不在场那一支只留「改用本地那份的目录」，不画那颗要发不存在 id 的移动键", () => {
+    // 这一支里唯一还能点得动的出路就是它：那颗键只改记录，不碰下载器
+    expect(absentBranch()).toContain("useLocalBasePath(record.task)");
+    // ⚠️ 反过来那颗移动键必须留在 v-else 里：它 `setClientTorrentLocation` 发的是基准那条的 id
+    const later = page.slice(page.indexOf("<template v-else>"));
+    expect(later).toContain("moveLocalBaseToTaskPath(record.task)");
+    expect(absentBranch()).not.toContain("moveLocalBaseToTaskPath(record.task)");
   });
 
   it("发送那道闸的措辞跟着分档：不能再让人「在那一行选一种处置」", () => {
@@ -41,6 +61,19 @@ describe("辅种任务那一格：不在场就说不在场", () => {
     const at = page.indexOf("if (task.baseLocal?.missingInClient) return;");
     expect(at).toBeGreaterThan(-1);
     expect(page.indexOf("pathMismatch.moveTimeout")).toBeGreaterThan(at);
+  });
+
+  it("那两句说明指的键，必须真是这一格里画得出来的那颗", () => {
+    // v0.131.0 那一版写的是「请在下面的条目行点「设为基准种子」」，而那颗键对 baseLocal 这种任务
+    // 整列是**禁用**的（下面那条 :disabled 判据就是它）—— 等于把人指到一个按不动的键上。
+    for (const key of ["baseMissingTip", "sendBlockedBaseMissing"]) {
+      // 指的名字要与界面那颗的**值**逐字同值，不是我自己印象里的那个词
+      expect(zh.KeepUploadTask.pathMismatch[key]).toContain(zh.KeepUploadTask.pathMismatch.useBase);
+      expect(en.KeepUploadTask.pathMismatch[key]).toContain(en.KeepUploadTask.pathMismatch.useBase);
+      expect(zh.KeepUploadTask.pathMismatch[key]).not.toContain("设为基准种子");
+      expect(en.KeepUploadTask.pathMismatch[key]).not.toContain("Set as base torrent");
+    }
+    expect(page).toMatch(/:disabled="record\.index === 0 \|\| !!record\.task\.baseLocal/);
   });
 });
 
@@ -70,15 +103,18 @@ describe("删除那一路：让那份缓存当场作废", () => {
   });
 });
 
-describe("两份 locale 的键必须成对（防线③看不见动态键，这一族是字面键，让它替我们查一遍）", () => {
-  /** 只声明这一族走到的那三层，别的键不管 —— 用了 `any` 反而会把「键不存在」读成 `undefined` 之外的东西 */
-  type LocaleSlice = {
-    KeepUploadTask: { pathMismatch: Record<string, string> };
-    SearchEntity: { KeepUploadDialog: { localBase: Record<string, string> } };
-  };
-  const zh = JSON.parse(read("src/locales/zh_CN.json")) as LocaleSlice;
-  const en = JSON.parse(read("src/locales/en.json")) as LocaleSlice;
+describe("后台那一轮：不在场就不催「立刻重查」", () => {
+  it("催那一趟的前提是「有人会把新路径报回来」，基准不在场时这条不成立", () => {
+    // 否则每一轮都白读一遍下载器列表，而结论一个字都不会变
+    expect(autoReseed).toMatch(
+      /if \(task\.baseLocal\?\.moveToTaskPath && !task\.baseLocal\.missingInClient\) quickRecheckPending = true/,
+    );
+    // 而「把实时路径写回任务」那一步仍然照跑 —— 那正是界面那句改口的来路
+    expect(autoReseed).toMatch(/if \(torrents\) await persistBaseLocalPath\(task, torrents, categories\);/);
+  });
+});
 
+describe("两份 locale 的键必须成对（防线③看不见动态键，这一族是字面键，让它替我们查一遍）", () => {
   for (const key of ["baseMissing", "baseMissingTip", "sendBlockedBaseMissing"]) {
     it(`KeepUploadTask.pathMismatch.${key} 两侧都在`, () => {
       expect(typeof zh.KeepUploadTask.pathMismatch[key]).toBe("string");

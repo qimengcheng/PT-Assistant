@@ -1748,18 +1748,24 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
             <div v-if="basePathMismatchOf(record.task)" class="path-mismatch">
               <!-- 基准那条已经不在下载器里（`missingInClient` 由回查/盯梢/后台那三趟刷写）：那两条路径里
                    基准这一头是一份**再也刷不到**的快照 —— 下载器不会再报它的路径，所以这一句既
-                   核对不了、也不会自己消失，而两颗处置点了都是打在一条不存在的种子上
-                   （移动要发那个 id）。所以这里改口说「核对不了」，不再假装「正在搬」。
+                   核对不了、也不会自己消失。那颗「把本地文件移到任务目录」点下去是打在一条不存在的
+                   种子上（要发那个 id），所以这一支只留「改用本地那份的目录」—— 它只改记录，
+                   不碰下载器，而它恰好是这种任务**唯一还能点得动**的出路（条目行那颗「设为基准种子」
+                   对 `baseLocal` 这种任务是禁用着的）。
                    ⚠️ 发送那道闸不在本轮改动范围（见 `IKeepUploadTaskLocalBase.missingInClient` 的注释）。 -->
-              <a-tooltip
-                v-if="record.task.baseLocal?.missingInClient"
-                :title="t('KeepUploadTask.pathMismatch.baseMissingTip')"
-              >
-                <span class="path-mismatch-text">
-                  <ExclamationCircleOutlined class="cell-icon" />
-                  {{ t("KeepUploadTask.pathMismatch.baseMissing") }}
-                </span>
-              </a-tooltip>
+              <template v-if="record.task.baseLocal?.missingInClient">
+                <a-tooltip :title="t('KeepUploadTask.pathMismatch.baseMissingTip')">
+                  <span class="path-mismatch-text">
+                    <ExclamationCircleOutlined class="cell-icon" />
+                    {{ t("KeepUploadTask.pathMismatch.baseMissing") }}
+                  </span>
+                </a-tooltip>
+                <div class="path-mismatch-actions">
+                  <a-button type="link" size="small" @click="useLocalBasePath(record.task)">
+                    {{ t("KeepUploadTask.pathMismatch.useBase") }}
+                  </a-button>
+                </div>
+              </template>
               <template v-else>
                 <a-tooltip :title="pathMismatchTip(record.task)">
                   <span class="path-mismatch-text">

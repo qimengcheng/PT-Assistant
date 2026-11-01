@@ -418,7 +418,8 @@ async function autoReseedTick() {
         if (torrents) await persistBaseLocalPath(task, torrents, categories);
         // 路径没落地时 `moveToTaskPath` 仍挂着（`refreshBaseLocalPaths` 只在**确定**一致时才清它）——
         // 这一轮就没法往下推，别等下一分钟的定时器，见 `scheduleQuickRecheck`。
-        if (task.baseLocal?.moveToTaskPath) quickRecheckPending = true;
+        // 基准已经不在下载器里时不催这一趟：没有任何东西会报回它的新路径，催了也是白读一遍列表。
+        if (task.baseLocal?.moveToTaskPath && !task.baseLocal.missingInClient) quickRecheckPending = true;
 
         // 没开自动辅种的到这儿就结束：**只看不动手** —— 不发种子、不暂停、不弹通知。
         // 「查」和「动他的种子」是两件事，用户关的是后者，不是前者。

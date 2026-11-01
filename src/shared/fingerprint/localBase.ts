@@ -134,3 +134,61 @@ export function compareAgainstLocalBase(
   if (a !== b) return { verdict: "different", pieces };
   return { verdict: pieces === "mismatch" ? "different" : "same", pieces };
 }
+
+/** 建任务那一刻，「基准那条本地副本」的三种下场 */
+export type TLiveLocalBase =
+  | { kind: "kept" }
+  | { kind: "replaced"; entry: ILocalTorrentFingerprintEntry }
+  | { kind: "blocked"; reason: TLiveLocalBaseBlock; liveCopies?: number };
+
+/**
+ * 拦下来的三种原因，界面要分开说 —— 它们给用户的出路不一样。
+ *
+ * - `no-evidence`：基准那条自己算不出第 2 层指纹，插件**没有任何依据**认另一条副本是同一份数据，
+ *   只能由人重挑（自动换 = 拿猜的当证据，误判的代价是挂错站重下整份）；
+ * - `no-live-copy`：算得出指纹，但下载器里此刻没有一条与它相同；
+ * - `ambiguous`：同内容的在场副本不止一条，取哪一条会影响「基准在哪个目录」那道判定，不替人挑。
+ */
+export type TLiveLocalBaseBlock = "no-evidence" | "no-live-copy" | "ambiguous";
+
+/**
+ * 建任务之前问一句：所选的那条基准**此刻还在下载器里吗**。
+ *
+ * 为什么必须有这一问（用户 2026-11-01：「基准不在，一开始建立任务的时候就不在……建任务的时候
+ * 缓存就是错的」）：界面上那条「本地已有」来自 IndexedDB 里那份本地指纹索引，它存 30 分钟，
+ * 而种子被删时过去没有任何一步让它作废。于是已删的那条会被继续列出来、被选中、被写进任务的
+ * `baseLocal.hash`；而任务上那条 hash **此后再也刷不回来** —— `refreshBaseLocalPaths` 在下载器里
+ * 找不到它就静默跳过，界面上会永久挂着一句基于旧快照的「目录不一致」，发送闸一直按着。
+ * 所以这一问要发生在**写入之前**，不是指望写入之后有人纠。
+ *
+ * 不在场时按用户定的口径换用**此刻在场的同内容副本**，但只认硬证据：
+ * 「同一份数据」的判据仍只有第 2 层文件清单指纹（`compareAgainstLocalBase` 的 `same`），
+ * 标题+大小那种第 1 层相似一律算「没有证据」—— 那条口径与 `pickLocalBaseCandidates` 只自动选中
+ * `files` 档是同一套，不在此处另判一套。
+ */
+export function resolveLiveLocalBase(
+  chosen: ILocalTorrentFingerprintEntry,
+  index: ILocalFingerprintIndex | ILocalTorrentFingerprintEntry[] | null | undefined,
+  liveHashes: Iterable<string>,
+): TLiveLocalBase {
+  const live = new Set<string>();
+  for (const raw of liveHashes) {
+    const key = String(raw ?? "").trim().toLowerCase();
+    if (key) live.add(key);
+  }
+  const chosenHash = String(chosen.hash ?? "").trim().toLowerCase();
+  if (chosenHash && live.has(chosenHash)) return { kind: "kept" };
+
+  const matches: ILocalTorrentFingerprintEntry[] = [];
+  for (const entry of toEntries(index)) {
+    if (!entry.isCompleted) continue;
+    const hash = String(entry.hash ?? "").trim().toLowerCase();
+    // 不写「也要排除基准自己」那一半：基准在场时上面已经 return kept，不在场时 `live.has` 就把它挡住了，
+    // 这一条结构上没有可达的场景（反证过一次：去掉它 18 条用例一条都不红）。
+    if (!hash || !live.has(hash)) continue;
+    if (compareAgainstLocalBase(chosen, entry).verdict === "same") matches.push(entry);
+  }
+  if (matches.length === 1) return { kind: "replaced", entry: matches[0] };
+  if (matches.length > 1) return { kind: "blocked", reason: "ambiguous", liveCopies: matches.length };
+  return { kind: "blocked", reason: chosen.files?.fingerprint ? "no-live-copy" : "no-evidence" };
+}

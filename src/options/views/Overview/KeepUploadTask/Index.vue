@@ -452,6 +452,10 @@ function baseLocalLine(record: IKeepUploadTask) {
  * 读的是任务上记的那份 `baseLocal.savePath`，它会在每次「回查」时被下载器报的实路径刷新
  * （见 `recheckSeeding` 与 `watchBaseMoveLanded` 那两处）—— 所以手动搬过文件的人点一次回查，
  * 这条提示就会自己消失；点过「把本地文件移到任务目录」的那几条不用点，页面会自己盯到它落地。
+ *
+ * ⚠️ 但基准那条**已经不在下载器里**时那句「自己消失」不成立：没有东西会再报它的路径，
+ * 那份快照就是终值。所以那一格改口说「无法核对目录」（`baseLocal.missingInClient`），
+ * 而这道闸本身不动 —— 一个认不出基准在哪的批次推下去就是 0% 卡住，拦住是对的。
  */
 function basePathMismatchOf(task: IKeepUploadTask) {
   return task.baseLocal
@@ -851,7 +855,14 @@ async function sendTorrentsToDownloader(
   // 基准在 A、这一批要挂到 B 时不必再推一遍：跳过校验的辅种在 B 里找不到数据，
   // 推多少条就废多少条（用户 2026-10-11 那条失败就是这个原因）。怎么处置写在同一行的提示里。
   if (basePathMismatchOf(task)) {
-    runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.sendBlocked"), { color: "error" });
+    // 基准那条已经不在下载器里时，那一行不给处置（两颗键都要打在一条不存在的种子上），
+    // 所以这句也不能说「先选一种处置」—— 说得出的是本轮修不回来，出路是换一条基准。
+    runtimeStore.showSnakebar(
+      task.baseLocal?.missingInClient
+        ? t("KeepUploadTask.pathMismatch.sendBlockedBaseMissing")
+        : t("KeepUploadTask.pathMismatch.sendBlocked"),
+      { color: "error" },
+    );
     return false;
   }
 
@@ -1113,6 +1124,12 @@ async function checkBaseMoveLanded(taskId: TKeepUploadTaskKey, attempt: number) 
       await advanceAutoReseed();
       return;
     }
+    /**
+     * 基准那条已经不在下载器里 ⇒ 没有任何东西会再报回它的新路径，「盯它落地」这一族
+     * 结构上没了载体。那句「下载器仍未把基准数据移到任务目录」不能说 —— 它把「查不到这条种子」
+     * 说成了「移动太慢」；这一行自己已经改口成「无法核对目录」（见模板里 `missingInClient` 那一支）。
+     */
+    if (task.baseLocal?.missingInClient) return;
   } catch {
     // 连不上下载器既不算落地也不算失败：下一趟再看，最后那趟仍然没落地才说一次
   }
@@ -1729,28 +1746,44 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                  要改的就是这一格写着的那两条路径。基准的实际路径原先整页都看不到
                  （上面那行只写基准的名字），所以那句说明里把两条都点出来。 -->
             <div v-if="basePathMismatchOf(record.task)" class="path-mismatch">
-              <a-tooltip :title="pathMismatchTip(record.task)">
+              <!-- 基准那条已经不在下载器里（`missingInClient` 由回查/盯梢/后台那三趟刷写）：那两条路径里
+                   基准这一头是一份**再也刷不到**的快照 —— 下载器不会再报它的路径，所以这一句既
+                   核对不了、也不会自己消失，而两颗处置点了都是打在一条不存在的种子上
+                   （移动要发那个 id）。所以这里改口说「核对不了」，不再假装「正在搬」。
+                   ⚠️ 发送那道闸不在本轮改动范围（见 `IKeepUploadTaskLocalBase.missingInClient` 的注释）。 -->
+              <a-tooltip
+                v-if="record.task.baseLocal?.missingInClient"
+                :title="t('KeepUploadTask.pathMismatch.baseMissingTip')"
+              >
                 <span class="path-mismatch-text">
                   <ExclamationCircleOutlined class="cell-icon" />
-                  {{ t("KeepUploadTask.pathMismatch.short") }}
+                  {{ t("KeepUploadTask.pathMismatch.baseMissing") }}
                 </span>
               </a-tooltip>
-              <div v-if="record.task.baseLocal?.moveToTaskPath" class="path-mismatch-hint">
-                {{ t("KeepUploadTask.pathMismatch.moving") }}
-              </div>
-              <div v-else class="path-mismatch-actions">
-                <a-button type="link" size="small" @click="useLocalBasePath(record.task)">
-                  {{ t("KeepUploadTask.pathMismatch.useBase") }}
-                </a-button>
-                <a-button
-                  type="link"
-                  size="small"
-                  :loading="!!movingBase[record.task.id]"
-                  @click="moveLocalBaseToTaskPath(record.task)"
-                >
-                  {{ t("KeepUploadTask.pathMismatch.moveBase") }}
-                </a-button>
-              </div>
+              <template v-else>
+                <a-tooltip :title="pathMismatchTip(record.task)">
+                  <span class="path-mismatch-text">
+                    <ExclamationCircleOutlined class="cell-icon" />
+                    {{ t("KeepUploadTask.pathMismatch.short") }}
+                  </span>
+                </a-tooltip>
+                <div v-if="record.task.baseLocal?.moveToTaskPath" class="path-mismatch-hint">
+                  {{ t("KeepUploadTask.pathMismatch.moving") }}
+                </div>
+                <div v-else class="path-mismatch-actions">
+                  <a-button type="link" size="small" @click="useLocalBasePath(record.task)">
+                    {{ t("KeepUploadTask.pathMismatch.useBase") }}
+                  </a-button>
+                  <a-button
+                    type="link"
+                    size="small"
+                    :loading="!!movingBase[record.task.id]"
+                    @click="moveLocalBaseToTaskPath(record.task)"
+                  >
+                    {{ t("KeepUploadTask.pathMismatch.moveBase") }}
+                  </a-button>
+                </div>
+              </template>
             </div>
           </div>
         </template>

@@ -19,6 +19,7 @@ import {
 import type { ITorrent } from "@ptd/site";
 
 import { onMessage, sendMessage } from "@/messages.ts";
+import { clearLocalFingerprintIndex } from "./fingerprint.ts";
 import { buildTorrentInfoForVerification } from "./torrentVerify.ts";
 import type {
   IConfigPiniaStorageSchema,
@@ -222,6 +223,29 @@ onMessage("deleteClientTorrent", async ({ data: { downloaderId, id, removeData }
   const downloaderInstance = await getDownloaderInstance(downloaderId);
   if (downloaderInstance) {
     deleteStatus = await downloaderInstance.removeTorrent(id, removeData ?? false);
+  }
+  if (deleteStatus) {
+    /**
+     * 删掉了种子，就要让那份**本地指纹索引**作废 —— 它是辅种检测弹窗里「本地已有」的唯一来路，
+     * 而那份索引在 IndexedDB 里存了 30 分钟、原先**没有任何失效触发点**（`clearLocalFingerprintIndex`
+     * 这条消息接口全仓零个发送方）。不作费的后果不是「晚 30 分钟」而是**永久**：已删的那条会被继续
+     * 列成「本地已有」、被选中、被写进任务的 `baseLocal.hash`，而任务上那条 hash 此后再也刷不回来
+     * （`refreshBaseLocalPaths` 在下载器里找不到它就静默跳过），界面上挂着一句基于旧快照的
+     * 「目录不一致」，发送闸一直按着（用户 2026-11-01：「建任务的时候缓存就是错的」）。
+     *
+     * 收口选在这里而不是各调用点：这是所有删除路径的必经之处（「我的下载器」逐条删与「移除已完成」、
+     * 辅种任务那颗「删旧基准」都走这一条消息）。
+     *
+     * 清整台而不只摘这一条，是因为消息里递的是 `CTorrent.id` —— 各家含义不同（qBittorrent 恰好
+     * 等于 infoHash，Transmission 是数字 gid），拿它去对索引里的 `hash` 会静默摘不掉。
+     * 代价可控：这里只删 IndexedDB 那一行，重建是**下次读时惰性发生**的，所以「移除已完成」连删
+     * 两百条也只是两百次小删除，不会打出两百趟 O(n) 的文件清单。
+     *
+     * ⚠️ 这一句与 `fingerprint.ts` 之间是**函数级循环**（那边 import 本文件的
+     * `getDownloaderInstance`）。两边都只在运行时调用、模块顶层不互相取值，所以安全；
+     * 别为了"消掉循环引用"把这一句挪回各调用点 —— 那正是它当初漏掉的原因。
+     */
+    await clearLocalFingerprintIndex(downloaderId);
   }
   return deleteStatus;
 });

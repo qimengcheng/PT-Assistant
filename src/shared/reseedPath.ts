@@ -146,6 +146,8 @@ export interface IBasePathBearer {
     savePath?: string | null;
     moveToTaskPath?: boolean;
     contentIsFile?: boolean;
+    /** 见 `IKeepUploadTaskLocalBase.missingInClient`：这一趟拿到了列表、而列表里没有这条基准 */
+    missingInClient?: boolean;
   } | null;
   downloadOptions?: { savePath?: string | null } | null;
 }
@@ -208,8 +210,8 @@ function isTaskPathResolvable(
 }
 
 /**
- * 按下载器刚报的那份列表，把「基准那份数据此刻在哪」刷新一遍，返回**真的改过路径**的那几条
- * （写回存储归调用方）。
+ * 按下载器刚报的那份列表，把「基准那份数据此刻在哪」刷新一遍，返回**需要写回存储**的那几条
+ * （写回归调用方）。要写回有两种：路径真的变了，或「基准在不在下载器里」这一位变了。
  *
  * 不刷的话，用户自己搬完文件、或刚点过那颗「把本地文件移到任务目录」已经落地，界面上那条
  * 「目录不一致」还会挂着 —— 拿一个建任务时记下的快照去判现在的事实，就是误报。
@@ -226,7 +228,26 @@ export function refreshBaseLocalPaths<T extends IBasePathBearer>(
   for (const task of list) {
     if (!task.baseLocal) continue;
     const baseHash = String(task.baseLocal.hash ?? "").toLowerCase();
+    // 没记 hash 的任务判不了在场性（空串会去匹配同样没报 infoHash 的那条，那是凭空造出来的「找到了」）
+    if (!baseHash) continue;
     const live = torrents.find((x) => String(x.infoHash ?? "").toLowerCase() === baseHash);
+    if (!live) {
+      /**
+       * 拿到了列表而列表里没有它 = 基准那条已经不在下载器里了。记一位，让界面改口说这句
+       * （不记的话 `savePath` 再也刷不到，那句「目录不一致」会永久挂成一句假话）。
+       * 返回它进 dirty 只多写一次存储，换的是那句说法能落地。
+       */
+      if (task.baseLocal.missingInClient !== true) {
+        task.baseLocal.missingInClient = true;
+        dirty.push(task);
+      }
+      continue;
+    }
+    if (task.baseLocal.missingInClient) {
+      // 又在场了（撤销删除、重新添加）：撤掉那句「不在」，路径照这一趟刷
+      delete task.baseLocal.missingInClient;
+      dirty.push(task);
+    }
     const livePath = pickBaseDataPath(live, task.downloadOptions?.savePath, task.baseLocal.contentIsFile);
     if (!livePath || livePath === task.baseLocal.savePath) continue;
     task.baseLocal.savePath = livePath;

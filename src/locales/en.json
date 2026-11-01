@@ -215,6 +215,8 @@
       "useBase": "Use the local folder",
       "moveBase": "Move the local files here",
       "moving": "Moving the local files into the task folder. Sending resumes on its own once they land.",
+      "baseMissing": "Base torrent is gone from the downloader; folders cannot be compared",
+      "baseMissingTip": "This task's base torrent is no longer in the downloader, so the extension cannot read where its files are now. The folder-mismatch notice can neither be checked nor clear itself, and entries that were never sent are not sent either. To recover, use Set as base torrent on one of the item rows below and pick a torrent that is present now.",
       "unsupported": "This downloader cannot move data that is already on disk. Move it yourself, or use the local folder.",
       "moveSent": "Asked the downloader to move the data. Nothing is sent until it lands — this page keeps checking and resumes on its own.",
       "moveSentCohort": "Asked the downloader to move all {n} copies of this content to the task folder. Nothing is sent until it lands — this page keeps checking and resumes on its own.",
@@ -223,7 +225,8 @@
       "moveFailed": "Move failed: {reason}",
       "movedLanded": "The base files are now in the task folder; the entries that had not been sent are being sent.",
       "moveTimeout": "The downloader has not finished moving the base files into the task folder. Use Check seeding later to confirm.",
-      "sendBlocked": "The reseed folder and the folder holding the base files differ, so sending would fail. Pick a fix on that row first."
+      "sendBlocked": "The reseed folder and the folder holding the base files differ, so sending would fail. Pick a fix on that row first.",
+      "sendBlockedBaseMissing": "The base torrent is no longer in the downloader, so the extension cannot verify its folder and this batch was not sent. Use Set as base torrent on one of the item rows below to pick a torrent that is present now."
     }
   },
   "Logger": {
@@ -849,6 +852,10 @@
         "byList": "Nothing picked - the first eligible entry in the list is the base",
         "bySize": "This one only matches by size, which is not enough evidence - check it yourself",
         "byTitleSize": "This one only matches by title and size, which is not enough evidence - check it yourself",
+        "goneAmbiguous": "That base torrent is no longer in the downloader, and {n} copies of the same data are. The plugin will not pick one for you. Please choose the base torrent again.",
+        "goneNoEvidence": "That base torrent is no longer in the downloader, and the plugin has no file-list fingerprint to compare, so it cannot confirm which copy holds the same data. Please choose the base torrent again.",
+        "goneNoLiveCopy": "That base torrent is no longer in the downloader, and no other copy of the same data is there either. Please choose another base torrent, or use the search results as the base.",
+        "goneSwapped": "The original base torrent is no longer in the downloader, so another copy of the same data was used instead: {name}",
         "noIndex": "The torrent list from this downloader has not been read yet. Try 'Rebuild local fingerprint index' above",
         "none": "No entry in the downloader has a matching size. Make sure that data really is downloaded, or pick another downloader",
         "optionalTitle": "Base torrent (optionally pick one your downloader already has)",

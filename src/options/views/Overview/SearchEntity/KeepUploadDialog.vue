@@ -25,6 +25,7 @@ import {
   diffFileLists,
   matchLocalFingerprint,
   pickLocalBaseCandidates,
+  resolveLiveLocalBase,
   type IFingerprintComparable,
   type IFingerprintIndexLookup,
   type IFingerprintMatchResult,
@@ -1455,8 +1456,44 @@ async function createKeepUploadTask() {
   }
 
   creating.value = true;
+  /** 基准换成在场副本时记下那条的名字，创建成功后要告诉他（不静默替他换） */
+  let swappedBaseName = "";
 
   try {
+    /**
+     * 建之前先问一句：所选的那条基准**此刻还在下载器里吗**（判据 `resolveLiveLocalBase`，
+     * 为什么必须问在写入之前见那份文件头）。
+     *
+     * 界面上那条「本地已有」来自 IndexedDB 里存 30 分钟的本地指纹索引，而种子被删时让它作废
+     * 是本轮（v0.131.0）才接上的 —— 在那之前建出来的任务，`baseLocal.hash` 可以指向一条根本
+     * 不在下载器里的种子，而任务页那条「目录不一致」会因此永久挂着（用户 2026-11-01）。
+     *
+     * 只要一次列表请求：不取文件清单，所以不是又一趟 O(n)。取列表失败**不拦** ——
+     * 「查不了」不能变成「建不了」，与下面那条重复任务检查同一口径。
+     */
+    let baseEntry = chosenLocalBase.value?.entry ?? null;
+    if (baseEntry) {
+      const live = await sendMessage("getClientTorrents", selectedDownloaderId.value).catch(() => null);
+      if (live) {
+        const resolved = resolveLiveLocalBase(baseEntry, localIndex.value, live.map((x) => x.infoHash ?? ""));
+        if (resolved.kind === "replaced") {
+          baseEntry = resolved.entry;
+          swappedBaseName = resolved.entry.name;
+        } else if (resolved.kind === "blocked") {
+          // 三条文案写字面 t()：防线③（check-locale-keys）看不见拼出来的键
+          runtimeStore.showSnakebar(
+            resolved.reason === "ambiguous"
+              ? t("SearchEntity.KeepUploadDialog.localBase.goneAmbiguous", { n: resolved.liveCopies ?? 0 })
+              : resolved.reason === "no-live-copy"
+                ? t("SearchEntity.KeepUploadDialog.localBase.goneNoLiveCopy")
+                : t("SearchEntity.KeepUploadDialog.localBase.goneNoEvidence"),
+            { color: "error", timeout: 12 },
+          );
+          return;
+        }
+      }
+    }
+
     const downloader = metadataStore.downloaders[selectedDownloaderId.value];
     const downloadOptions: IKeepUploadTaskDownloadOptions = {
       downloaderId: selectedDownloaderId.value,
@@ -1480,14 +1517,18 @@ async function createKeepUploadTask() {
       autoReseed: autoReseed.value,
       // 单条模式：基准是下载器里那条，不在 items 里。任务页靠这个标记决定
       // 「发送基准种子」那两颗要不要出现，并把基准的名字显示出来。
-      baseLocal: chosenLocalBase.value
+      baseLocal: baseEntry
         ? {
-            hash: chosenLocalBase.value.entry.hash,
-            name: chosenLocalBase.value.entry.name,
-            savePath: chosenLocalBase.value.entry.savePath,
+            hash: baseEntry.hash,
+            name: baseEntry.name,
+            savePath: baseEntry.savePath,
             // 用户挑的是「把本地那份搬过来」时带上这一项：任务页据此把提示写成「正在搬」而不是
             // 「请选一种处置」。它不是发送闸门 —— 那道闸看基准的实际路径，见 `shared/reseedPath.ts`
-            moveToTaskPath: baseMoveRequested.value || undefined,
+            //
+            // 基准被换成在场副本时**不带**这一项：那句「正在搬」说的得是他点过的那一条，
+            // 换过来这条我们什么都没发过，写上就是一句假话（任务页若仍判不一致，会照实
+            // 退回「请选一种处置」）。
+            moveToTaskPath: baseMoveRequested.value && !swappedBaseName ? true : undefined,
           }
         : undefined,
       items: verifiedList.map((item) => ({
@@ -1556,6 +1597,14 @@ async function createKeepUploadTask() {
       await metadataStore.$save();
     }
     runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.createSuccess"), { color: "success" });
+    // 换过基准必须单独说一句：任务里记的基准已经不是他在界面上挑的那一条了，
+    // 不说的话他下一次看「目录不一致」会以为插件在骗他
+    if (swappedBaseName) {
+      runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.localBase.goneSwapped", { name: swappedBaseName }), {
+        color: "warning",
+        timeout: 12,
+      });
+    }
     closeDialog();
   } catch (e) {
     runtimeStore.showSnakebar(t("SearchEntity.KeepUploadDialog.createError"), { color: "error" });

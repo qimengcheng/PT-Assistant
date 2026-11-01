@@ -427,20 +427,7 @@ const rowCheckboxProps = (row: TTableRow) =>
 const rowTitle = (row: TTableRow) => (row.kind === "item" ? row.item.title : row.task.title);
 const rowSubTitle = (row: TTableRow) => (row.kind === "item" ? row.item.subTitle : row.task.subTitle);
 const rowLink = (row: TTableRow) => (row.kind === "item" ? row.item.link : row.task.items[0]?.link);
-/**
- * 「站点」那一列在任务行上取的是**基准那一条**的站。
- *
- * 基准取自条目列表那种任务里基准就是 `items[0]`（`sendTorrentsToDownloader` 与后台发送闸都按
- * 这一条认基准，`setAsBaseTorrent` 换基准时也是先把它挪到第一位），所以取第一条就是取基准。
- *
- * `baseLocal`（基准取自下载器）那种任务的基准**不在这份列表里**，原先只能退回 `items[0]` ——
- * 于是「把某一条待辅条目提成新基准」之后，那一列照旧是换之前显示的那一站，读起来就是
- * 「图标还是老基准的站」（用户 2026-11-01）。提成去那一条自己带着 `site`，判据把它写进
- * `baseLocal.site`，这里优先读它；建任务那一路挑的是下载器里已有的一条，它挂的站要靠
- * tracker 反解、可能空也可能多个，**不猜**，所以那一路没有这一项，退回原读法（与改前一字不差）。
- */
-const rowSiteId = (row: TTableRow) =>
-  row.kind === "item" ? row.item.site : (row.task.baseLocal?.site ?? row.task.items[0]?.site);
+const rowSiteId = (row: TTableRow) => (row.kind === "item" ? row.item.site : row.task.items[0]?.site);
 const rowSize = (row: TTableRow) => (row.kind === "item" ? row.item.size : row.task.size);
 
 /**
@@ -1211,7 +1198,7 @@ async function promoteItemToBase(task: IKeepUploadTask, itemIndex: number) {
   promotingBase.value[task.id] = true;
   try {
     const torrents = await sendMessage("getClientTorrents", task.downloadOptions.downloaderId).catch(() => null);
-    const decided = decidePromoteItemToBase({ hash: item.hash, title: item.title, site: item.site }, torrents);
+    const decided = decidePromoteItemToBase({ hash: item.hash, title: item.title }, torrents);
     if (decided.kind === "blocked") {
       runtimeStore.showSnakebar(promoteBaseBlockedText(decided.reason), { color: "warning", timeout: 12 });
       return;

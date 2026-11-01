@@ -227,6 +227,18 @@
       "moveTimeout": "The downloader has not finished moving the base files into the task folder. Use Check seeding later to confirm.",
       "sendBlocked": "The reseed folder and the folder holding the base files differ, so sending would fail. Pick a fix on that row first.",
       "sendBlockedBaseMissing": "The base torrent is no longer in the downloader, so the extension cannot verify its folder and this batch was not sent. Use the \"Use the local folder\" button on that row, or add the base torrent back into the downloader."
+    },
+    "promoteBase": {
+      "tip": "Use this entry's own data in the downloader as the new base: it stops being a reseed entry and the remaining ones attach to its folder. The previous base is only unreferenced by this task — it is not removed from the downloader.",
+      "confirm": "Make \"{name}\" the new base of this batch? It will leave the reseed list and the other {n} entries will attach to {path}; the previous base torrent is not deleted.",
+      "ok": "Change base",
+      "done": "The base is now \"{name}\"; the remaining entries can attach to it",
+      "failed": "Could not change the base: {reason}",
+      "noHash": "This entry has no infoHash recorded; use Check seeding first so it can be linked",
+      "unreachable": "The downloader is unreachable, so whether this entry is there right now cannot be verified. Try again later.",
+      "notInClient": "This entry is not in the downloader right now, so there would be no data to attach to",
+      "incomplete": "This entry has not finished downloading (or only some files were selected), so the others would attach to partial data",
+      "noPath": "The downloader did not report this entry's save folder, so the folder could not be verified after the change either"
     }
   },
   "Logger": {

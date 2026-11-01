@@ -35,6 +35,7 @@ import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
 import { reseedScanSeedOfTask } from "@/shared/reseedScanPlan.ts";
 import { decideOldBaseRemoval } from "@/shared/rebaseOldBase.ts";
+import { decidePromoteItemToBase, type TPromoteBaseBlock } from "@/shared/reseedPromoteBase.ts";
 import {
   detectBasePathMismatch,
   isCategorySavePath,
@@ -1050,6 +1051,70 @@ async function dropOldBase(task: IKeepUploadTask, oldBase: IKeepUploadTaskItem |
   }
 }
 
+/** 正在换基准的那几条任务（只影响那颗键的 loading，不是闸门） */
+const promotingBase = ref<Record<string, boolean>>({});
+
+/** 五种拦下来的原因各说各的出路（写成字面 t()：防线③ 看不见拼出来的键） */
+function promoteBaseBlockedText(reason: TPromoteBaseBlock): string {
+  if (reason === "noHash") return t("KeepUploadTask.promoteBase.noHash");
+  if (reason === "unreachable") return t("KeepUploadTask.promoteBase.unreachable");
+  if (reason === "notInClient") return t("KeepUploadTask.promoteBase.notInClient");
+  if (reason === "incomplete") return t("KeepUploadTask.promoteBase.incomplete");
+  return t("KeepUploadTask.promoteBase.noPath");
+}
+
+/**
+ * 把某一条待辅条目换成这一批的新基准 —— `baseLocal`（基准取自下载器）那种任务专用。
+ * 用户 2026-11-01 那一屏：基准那条被删了，7 条里只剩 1 条在做种，他问「是不是得增加个编辑任务的功能」，
+ * 拍下来的是这个最小形状 —— 那一条在做种的条目脚下就有完整数据，让它当新基准，其余各条才挂得上。
+ *
+ * 与上面那颗 `setAsBaseTorrent` 三处不同，都要说清：
+ * - **不发任何东西，也不删原基准那条**。原基准要么已经没了（正是这一档的来由），要么还在为别的站
+ *   做种 —— 顺手把它从下载器删掉是往用户数据上做一件他没要求的事；
+ * - 被提上去的那一条**从 items 里移出**：`baseLocal` 型任务的基准不在这份列表里
+ *   （判据在 `reseedStage` —— 那种任务的 others 就是整份 items），留着它等于让这一条自己挂自己；
+ * - 换完**不催发送**：目录对不对由那一行按新基准的实时路径当场重判，不一致时照旧给那两颗处置键。
+ */
+async function promoteItemToBase(task: IKeepUploadTask, itemIndex: number) {
+  const item = task.items[itemIndex];
+  if (!item || promotingBase.value[task.id]) return;
+
+  promotingBase.value[task.id] = true;
+  try {
+    const torrents = await sendMessage("getClientTorrents", task.downloadOptions.downloaderId).catch(() => null);
+    const decided = decidePromoteItemToBase({ hash: item.hash, title: item.title }, torrents);
+    if (decided.kind === "blocked") {
+      runtimeStore.showSnakebar(promoteBaseBlockedText(decided.reason), { color: "warning", timeout: 12 });
+      return;
+    }
+    const { baseLocal } = decided;
+    const ok = await confirmDanger(
+      t("KeepUploadTask.promoteBase.confirm", {
+        name: baseLocal.name,
+        n: task.items.length - 1,
+        path: baseLocal.savePath,
+      }),
+      "primary",
+      t("KeepUploadTask.promoteBase.ok"),
+    );
+    if (!ok) return;
+
+    const items = task.items.filter((_, i) => i !== itemIndex);
+    // 整块换掉：`moveToTaskPath` / `missingInClient` 都是**上一条基准**的记账，留着就是假话
+    await sendMessage("updateKeepUploadTask", { ...task, items, baseLocal });
+    task.items = items;
+    task.baseLocal = baseLocal;
+    runtimeStore.showSnakebar(t("KeepUploadTask.promoteBase.done", { name: baseLocal.name }), { color: "success" });
+  } catch (e) {
+    runtimeStore.showSnakebar(
+      t("KeepUploadTask.promoteBase.failed", { reason: e instanceof Error ? e.message : String(e) }),
+      { color: "error" },
+    );
+  } finally {
+    promotingBase.value[task.id] = false;
+  }
+}
+
 /**
  * 发送之后过一会儿自动回查一次。18 秒不是拍的：qBittorrent 那份列表走 `/sync/maindata`，
  * 客户端实例是带缓存复用的，而它自己那条闸写死 15 秒（`qBittorrent.ts:419`）——
@@ -1967,7 +2032,9 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                「设为基准后就会自动发送」，两颗键的差别没了。
                图标不另造一套语义，按**同一列父行已有的**复用：DownloadOutlined 在那边就是「发到下载器」，
                NumberOutlined 在那边就是「基准」。
-               按住不给点而不是藏起来：第一条本来就是基准、基准在下载器里时换基准也没有对象。 -->
+               按住不给点而不是藏起来：第一条本来就是基准（那种任务里 items[0] 就是基准）。
+               ⚠️ `baseLocal` 那种任务这一颗**不是**没对象，而是走另一套语义（用户 2026-11-01 拍的方向）：
+               它的基准不在 items 里，所以每一条都可以被提上去当新基准，第 0 条也不例外。 -->
           <a-space v-else :size="0">
             <a-tooltip :title="t('KeepUploadTask.sendThisOne')">
               <a-button
@@ -1982,12 +2049,21 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
                 </template>
               </a-button>
             </a-tooltip>
-            <a-tooltip :title="t('KeepUploadTask.setAsBaseTip')">
+            <a-tooltip
+              :title="
+                record.task.baseLocal ? t('KeepUploadTask.promoteBase.tip') : t('KeepUploadTask.setAsBaseTip')
+              "
+            >
               <a-button
                 size="small"
                 type="text"
-                :disabled="record.index === 0 || !!record.task.baseLocal || !!sendingOf(record.task.id)"
-                @click="setAsBaseTorrent(record.task, record.index)"
+                :loading="!!promotingBase[record.task.id]"
+                :disabled="(record.index === 0 && !record.task.baseLocal) || !!sendingOf(record.task.id)"
+                @click="
+                  record.task.baseLocal
+                    ? promoteItemToBase(record.task, record.index)
+                    : setAsBaseTorrent(record.task, record.index)
+                "
               >
                 <template #icon>
                   <NumberOutlined />

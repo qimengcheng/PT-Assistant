@@ -21,7 +21,7 @@ const autoReseed = read("src/entrypoints/background/utils/autoReseed.ts");
 
 /** 只声明这一族走到的那三层，别的键不管 —— 用了 `any` 反而会把「键不存在」读成 `undefined` 之外的东西 */
 type LocaleSlice = {
-  KeepUploadTask: { pathMismatch: Record<string, string> };
+  KeepUploadTask: { pathMismatch: Record<string, string>; promoteBase: Record<string, string> };
   SearchEntity: { KeepUploadDialog: { localBase: Record<string, string> } };
 };
 const zh = JSON.parse(read("src/locales/zh_CN.json")) as LocaleSlice;
@@ -63,9 +63,10 @@ describe("辅种任务那一格：不在场就说不在场", () => {
     expect(page.indexOf("pathMismatch.moveTimeout")).toBeGreaterThan(at);
   });
 
-  it("那两句说明指的键，必须真是这一格里画得出来的那颗", () => {
-    // v0.131.0 那一版写的是「请在下面的条目行点「设为基准种子」」，而那颗键对 baseLocal 这种任务
-    // 整列是**禁用**的（下面那条 :disabled 判据就是它）—— 等于把人指到一个按不动的键上。
+  it("那两句说明指的键，必须真是那一格里画得出来、且**有文字**的那颗", () => {
+    // v0.131.0 那一版写的是「请在下面的条目行点「设为基准种子」」—— 那是一颗**图标键**，
+    // 界面上没有那几个字，而且当时它对 baseLocal 任务还是禁用的。两句都指错了东西。
+    // （v0.132.0 起那颗键对这种任务可点了，但它仍然没有文字可指，所以说明照旧指这一格那颗有文字的。）
     for (const key of ["baseMissingTip", "sendBlockedBaseMissing"]) {
       // 指的名字要与界面那颗的**值**逐字同值，不是我自己印象里的那个词
       expect(zh.KeepUploadTask.pathMismatch[key]).toContain(zh.KeepUploadTask.pathMismatch.useBase);
@@ -73,7 +74,8 @@ describe("辅种任务那一格：不在场就说不在场", () => {
       expect(zh.KeepUploadTask.pathMismatch[key]).not.toContain("设为基准种子");
       expect(en.KeepUploadTask.pathMismatch[key]).not.toContain("Set as base torrent");
     }
-    expect(page).toMatch(/:disabled="record\.index === 0 \|\| !!record\.task\.baseLocal/);
+    // 那颗有文字的键确实画在这一格里
+    expect(page).toMatch(/>\s*\{\{ t\("KeepUploadTask\.pathMismatch\.useBase"\) \}\}/);
   });
 });
 
@@ -114,6 +116,39 @@ describe("后台那一轮：不在场就不催「立刻重查」", () => {
   });
 });
 
+describe("条目行那颗「换基准」对 baseLocal 任务放开，且走的是另一套语义", () => {
+  /** 那颗键的整块模板：从它的 tooltip 起往后 1400 字（够包住两颗键的 disabled 与 click） */
+  const tipAt = page.indexOf("KeepUploadTask.promoteBase.tip");
+  const baseKey = page.slice(tipAt - 120, tipAt + 1400);
+  /** 换基准那一条链：文案函数 + 事件处理函数（两者之间没有别的东西，切一起最省事） */
+  const promoteFn = page.slice(
+    page.indexOf("function promoteBaseBlockedText"),
+    page.indexOf("const AUTO_RECHECK_DELAY_MS"),
+  );
+
+  it("不再整列禁用：baseLocal 任务里第 0 条也可以被提上去", () => {
+    expect(baseKey).toMatch(/:disabled="\(record\.index === 0 && !record\.task\.baseLocal\) \|\| !!sendingOf/);
+    expect(baseKey).toMatch(/record\.task\.baseLocal\s*\?\s*promoteItemToBase\(record\.task, record\.index\)/);
+    expect(baseKey).toMatch(/:\s*setAsBaseTorrent\(record\.task, record\.index\)/);
+    expect(baseKey).toMatch(/record\.task\.baseLocal \? t\('KeepUploadTask\.promoteBase\.tip'\)/);
+  });
+
+  it("换成功那一路不删原基准、不发种子（那是 `setAsBaseTorrent` 的语义，两件事不许并成一套）", () => {
+    expect(promoteFn.length).toBeGreaterThan(100);
+    expect(promoteFn).not.toContain("deleteClientTorrent");
+    expect(promoteFn).not.toContain("sendTorrentsToDownloader");
+    // 被提上去那条从 items 移出，而 baseLocal 是**整块换掉**（上一条基准的记账不能留着）
+    expect(promoteFn).toMatch(/const items = task\.items\.filter\(\(_, i\) => i !== itemIndex\);/);
+    expect(promoteFn).toMatch(/updateKeepUploadTask", \{ \.\.\.task, items, baseLocal \}/);
+    // 五种拦下来的原因各写各的字面 t()（防线③看不见拼出来的键）
+    for (const key of ["noHash", "unreachable", "notInClient", "incomplete", "noPath"]) {
+      expect(promoteFn).toContain(`KeepUploadTask.promoteBase.${key}`);
+    }
+    // 动手之前要问一句：这条会把一条待辅条目从任务里移出去
+    expect(promoteFn).toMatch(/await confirmDanger\([\s\S]{0,400}"primary",\s*t\("KeepUploadTask\.promoteBase\.ok"\)/);
+  });
+});
+
 describe("两份 locale 的键必须成对（防线③看不见动态键，这一族是字面键，让它替我们查一遍）", () => {
   for (const key of ["baseMissing", "baseMissingTip", "sendBlockedBaseMissing"]) {
     it(`KeepUploadTask.pathMismatch.${key} 两侧都在`, () => {
@@ -128,6 +163,25 @@ describe("两份 locale 的键必须成对（防线③看不见动态键，这�
       expect(typeof en.SearchEntity.KeepUploadDialog.localBase[key]).toBe("string");
     });
   }
+
+  for (const key of ["tip", "confirm", "ok", "done", "failed", "noHash", "unreachable", "notInClient", "incomplete", "noPath"]) {
+    it(`KeepUploadTask.promoteBase.${key} 两侧都在`, () => {
+      expect(typeof zh.KeepUploadTask.promoteBase[key]).toBe("string");
+      expect(typeof en.KeepUploadTask.promoteBase[key]).toBe("string");
+    });
+  }
+
+  it("换基准那两句要人填的槽，与调用点传的参对得上", () => {
+    for (const side of [zh, en]) {
+      for (const slot of ["{name}", "{n}", "{path}"]) expect(side.KeepUploadTask.promoteBase.confirm).toContain(slot);
+      expect(side.KeepUploadTask.promoteBase.done).toContain("{name}");
+      expect(side.KeepUploadTask.promoteBase.failed).toContain("{reason}");
+      // 五种「不换」是终句，不该留槽（留了就等于调用点少传参，界面表现为括号空着）
+      for (const key of ["noHash", "unreachable", "notInClient", "incomplete", "noPath"]) {
+        expect(side.KeepUploadTask.promoteBase[key]).not.toMatch(/\{[a-z]+}/i);
+      }
+    }
+  });
 
   it("带插值的那几条，占位符与调用点传的参数对得上", () => {
     expect(zh.KeepUploadTask.pathMismatch.baseMissingTip).not.toMatch(/\{[a-z]+}/i);

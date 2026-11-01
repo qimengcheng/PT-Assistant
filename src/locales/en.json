@@ -239,6 +239,17 @@
       "notInClient": "This entry is not in the downloader right now, so there would be no data to attach to",
       "incomplete": "This entry has not finished downloading (or only some files were selected), so the others would attach to partial data",
       "noPath": "The downloader did not report this entry's save folder, so the folder could not be verified after the change either"
+    },
+    "withData": {
+      "label": "Also remove these torrents from the downloader and delete their files",
+      "shared": "Those copies all point at one set of data: once it is gone, any other reseed task on this content will stall.",
+      "noFileDelete": "{count} of these downloaders only expose a “remove task” call, so their files stay on disk.",
+      "removed": "Removed {count} torrent(s) from the downloader and deleted their files",
+      "unreachable": "{count} downloader(s) could not be reached, so none of their copies were deleted",
+      "refused": "{count} torrent(s) were refused by the downloader",
+      "notFound": "{count} recorded infoHash(es) were not in the downloader (probably already removed)",
+      "noHash": "{count} entry(ies) recorded no infoHash, so there was nothing to match them against",
+      "detailJoin": "; "
     }
   },
   "Logger": {

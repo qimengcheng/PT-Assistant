@@ -119,9 +119,14 @@ describe("辅种任务页的模板与调用顺序", () => {
     expect(sfc).not.toContain("sendAndSetBase");
   });
 
-  it("删除那一步必须写着 removeData: false —— 改成 true 就是把整批副本的数据删了", () => {
-    expect(sfc).toMatch(/removeData: false/);
-    expect(sfc).not.toMatch(/removeData:\s*true/);
+  it("换基准那一步必须写着 removeData: false —— 改成 true 就是把整批副本的数据删了", () => {
+    // 按**函数体**判，而不是按整个文件判（v0.133.0）：「删除辅种任务」那颗新的勾选框会在另一条链上写
+    // `removeData: true`，它删的是用户明确勾过的那一份。整文件级的 not.toMatch 会把两条链并成一档 ——
+    // 那条断言当初的意思也只是「换基准这一条不许删文件」，而不是「全文件只许出现一个 removeData」。
+    const body = /async function dropOldBase[\s\S]*?\n\}/.exec(sfc);
+    expect(body, "找不到 dropOldBase 本体").toBeTruthy();
+    expect(body![0]).toMatch(/removeData: false/);
+    expect(body![0]).not.toMatch(/removeData:\s*true/);
   });
 
   it("换基准那一趟的先后：先存顺序 → 再发送 → 发成功才删原基准", () => {

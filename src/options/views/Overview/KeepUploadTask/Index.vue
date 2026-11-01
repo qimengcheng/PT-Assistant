@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
+import { computed, h, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { debounce } from "es-toolkit";
 import { type TableColumnsType, type TablePaginationConfig, type TableSorterResult } from "@zboson/ui";
@@ -32,9 +32,11 @@ import ReseedScanDialog from "@/options/views/Overview/MyClient/ReseedScanDialog
 import type { IReseedScanScope } from "@/options/views/Overview/MyClient/reseedCandidateView.ts";
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
+import DeleteTaskConfirm from "./DeleteTaskConfirm.vue";
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
 import { reseedScanSeedOfTask } from "@/shared/reseedScanPlan.ts";
 import { decideOldBaseRemoval } from "@/shared/rebaseOldBase.ts";
+import { ignoresRemoveData, planReseedCopyRemoval } from "@/shared/reseedCopyRemoval.ts";
 import { decidePromoteItemToBase, type TPromoteBaseBlock } from "@/shared/reseedPromoteBase.ts";
 import {
   detectBasePathMismatch,
@@ -425,7 +427,20 @@ const rowCheckboxProps = (row: TTableRow) =>
 const rowTitle = (row: TTableRow) => (row.kind === "item" ? row.item.title : row.task.title);
 const rowSubTitle = (row: TTableRow) => (row.kind === "item" ? row.item.subTitle : row.task.subTitle);
 const rowLink = (row: TTableRow) => (row.kind === "item" ? row.item.link : row.task.items[0]?.link);
-const rowSiteId = (row: TTableRow) => (row.kind === "item" ? row.item.site : row.task.items[0]?.site);
+/**
+ * 「站点」那一列在任务行上取的是**基准那一条**的站。
+ *
+ * 基准取自条目列表那种任务里基准就是 `items[0]`（`sendTorrentsToDownloader` 与后台发送闸都按
+ * 这一条认基准，`setAsBaseTorrent` 换基准时也是先把它挪到第一位），所以取第一条就是取基准。
+ *
+ * `baseLocal`（基准取自下载器）那种任务的基准**不在这份列表里**，原先只能退回 `items[0]` ——
+ * 于是「把某一条待辅条目提成新基准」之后，那一列照旧是换之前显示的那一站，读起来就是
+ * 「图标还是老基准的站」（用户 2026-11-01）。提成去那一条自己带着 `site`，判据把它写进
+ * `baseLocal.site`，这里优先读它；建任务那一路挑的是下载器里已有的一条，它挂的站要靠
+ * tracker 反解、可能空也可能多个，**不猜**，所以那一路没有这一项，退回原读法（与改前一字不差）。
+ */
+const rowSiteId = (row: TTableRow) =>
+  row.kind === "item" ? row.item.site : (row.task.baseLocal?.site ?? row.task.items[0]?.site);
 const rowSize = (row: TTableRow) => (row.kind === "item" ? row.item.size : row.task.size);
 
 /**
@@ -753,8 +768,105 @@ async function advanceAutoReseed() {
 // 统一走公共实现（原先这里是本仓库第一份手写副本，现已抽到 components/useConfirmDanger.ts）
 const { confirmDanger } = useConfirmDanger();
 
+/** 确认框那一下的三种答案：取消 / 只删任务记录 / 连下载器里的副本和数据文件一起删 */
+type TRemovalChoice = "cancel" | "taskOnly" | "withFiles";
+
+/**
+ * 删除辅种任务的确认框（用户 2026-11-01：「增加一个把下载器里的任务也删除、文件也删除的开关，默认关闭」）。
+ *
+ * 那句「删不了文件的下载器」必须在**点下去之前**说：群晖与 Aria2 的 `removeTorrent` 压根不读
+ * 第二个参数（判据在 `ignoresRemoveData`），勾了也只有任务记录没了、几十 GB 照旧留在盘上。
+ * 事后报等于让他以为自己已经腾出空间。
+ *
+ * @param downloaderIds 这些任务用到的那几台 —— 批量删除可以跨下载器，所以那一句话按「有几台不删文件」说，
+ * 而不是按第一条任务的下载器说。
+ */
+async function confirmRemoval(text: string, downloaderIds: string[]): Promise<TRemovalChoice> {
+  let withFiles = false;
+  const ignoreCount = downloaderIds.filter((id) => ignoresRemoveData(metadataStore.downloaders[id]?.type)).length;
+  const ok = await confirmDanger(
+    h(DeleteTaskConfirm, {
+      text,
+      noFileDelete: ignoreCount > 0 ? t("KeepUploadTask.withData.noFileDelete", { count: ignoreCount }) : undefined,
+      onPick: (on: boolean) => {
+        withFiles = on;
+      },
+    }),
+    "danger",
+    t("common.remove"),
+  );
+  if (!ok) return "cancel";
+  return withFiles ? "withFiles" : "taskOnly";
+}
+
+/**
+ * 勾了那颗勾选框之后的一步：把这些任务在下载器里的副本连数据文件一起删掉，并把结果一次说全。
+ *
+ * **排在任务记录删除之后**是刻意的：反过来说（先删下载器、记录还留着），后台每分钟那一轮自动辅种
+ * 会把它刚删掉的种子重新发回去 —— `autoReseed` 只看记录，不看盘。
+ * 按下载器分组、每组只取一次列表：批量删跨三台时不许逐条重取。
+ *
+ * `removeData: true` 是这一整段与 `dropOldBase` 唯一不同的地方，而那一段的 `false` 是有断言钉着的
+ * （`tests/shared/rebaseOldBase.test.ts`）：那一路的目的是「换掉一条基准、数据留着给其余副本」，
+ * 这一路的目的是「这份内容我不要了」。两档不许并成一套参数。
+ */
+async function removeClientCopies(targets: IKeepUploadTask[]): Promise<void> {
+  const byDownloader = new Map<string, IKeepUploadTask[]>();
+  for (const task of targets) {
+    const id = task.downloadOptions.downloaderId;
+    const group = byDownloader.get(id);
+    if (group) group.push(task);
+    else byDownloader.set(id, [task]);
+  }
+
+  let removed = 0;
+  let refused = 0;
+  let noHash = 0;
+  let notFound = 0;
+  let unreachable = 0;
+
+  for (const [downloaderId, group] of byDownloader) {
+    const torrents = await sendMessage("getClientTorrents", downloaderId).catch(() => null);
+    const plan = planReseedCopyRemoval(
+      group,
+      torrents ? torrents.map((one: CTorrent) => ({ hash: one.infoHash, id: one.id })) : null,
+    );
+    noHash += plan.noHash;
+    notFound += plan.notFound;
+    if (plan.unreachable) {
+      unreachable += 1;
+      continue;
+    }
+    for (const id of plan.matched) {
+      try {
+        if (await sendMessage("deleteClientTorrent", { downloaderId, id, removeData: true })) removed += 1;
+        else refused += 1;
+      } catch {
+        refused += 1;
+      }
+    }
+  }
+
+  // 四档「没删成」各说各的：连不上 / 下载器拒绝 / 记了 hash 但列表里没有 / 压根没记 hash。
+  // 混成一句「部分失败」他就不知道该去下载器里核对哪几台（这一条删的是他的数据，核对得起）。
+  const details: string[] = [];
+  if (unreachable > 0) details.push(t("KeepUploadTask.withData.unreachable", { count: unreachable }));
+  if (refused > 0) details.push(t("KeepUploadTask.withData.refused", { count: refused }));
+  if (notFound > 0) details.push(t("KeepUploadTask.withData.notFound", { count: notFound }));
+  if (noHash > 0) details.push(t("KeepUploadTask.withData.noHash", { count: noHash }));
+  const join = t("KeepUploadTask.withData.detailJoin");
+  if (removed > 0) {
+    // 一条都没删成却带着「连不上」这类细节时，那句不能画成绿色 —— 他读到的是「失败了」
+    const text = [t("KeepUploadTask.withData.removed", { count: removed }), ...details].join(join);
+    runtimeStore.showSnakebar(text, { color: details.length ? "warning" : "success" });
+  } else if (details.length) {
+    runtimeStore.showSnakebar(details.join(join), { color: "warning" });
+  }
+}
+
 async function deleteTask(task: IKeepUploadTask) {
-  if (!(await confirmDanger(t("KeepUploadTask.deleteConfirm"), "danger", t("common.remove")))) return;
+  const choice = await confirmRemoval(t("KeepUploadTask.deleteConfirm"), [task.downloadOptions.downloaderId]);
+  if (choice === "cancel") return;
 
   try {
     await sendMessage("deleteKeepUploadTask", task.id);
@@ -762,19 +874,23 @@ async function deleteTask(task: IKeepUploadTask) {
     listEpoch += 1;
     tasks.value = tasks.value.filter((item) => item.id !== task.id);
     runtimeStore.showSnakebar(t("KeepUploadTask.deleteSuccess"), { color: "success" });
+    if (choice === "withFiles") await removeClientCopies([task]);
   } catch (e) {
     runtimeStore.showSnakebar(t("KeepUploadTask.deleteError"), { color: "error" });
   }
 }
 
 /**
- * 逐条删，一条失败不影响其余，返回真删掉的条数。
+ * 逐条删，一条失败不影响其余，返回**真删掉的那些 id**。
  *
  * 原先这两处批量删除是整段包一个 try/catch：第一条抛错就跳出循环，后面的本轮不再试，
  * 而且紧跟其后的 `tasks.value` 过滤也一起被跳过 —— 界面上会留着**已经真删掉**的那几条
  * （刷新一次它们才消失）。同 v0.66.0 后台那条发送链上修掉的是同一个形状。
+ *
+ * 返回 id 而不是条数（v0.133.0）：勾了「连数据一起删」时，下载器那一步只许打在真删掉的这几条上 ——
+ * 记录还在的任务被把数据删了，后台那一轮就会拿它去重下。
  */
-async function deleteTasksByIds(ids: TKeepUploadTaskKey[]): Promise<number> {
+async function deleteTasksByIds(ids: TKeepUploadTaskKey[]): Promise<TKeepUploadTaskKey[]> {
   const removed: TKeepUploadTaskKey[] = [];
   for (const id of ids) {
     try {
@@ -786,7 +902,7 @@ async function deleteTasksByIds(ids: TKeepUploadTaskKey[]): Promise<number> {
   }
   tasks.value = tasks.value.filter((item) => !removed.includes(item.id));
   listEpoch += 1;
-  return removed.length;
+  return removed;
 }
 
 /** 删完那一句反馈：全删掉 / 一条都没删掉 / 只删掉一部分，三种话不一样，不许都报「删除成功」 */
@@ -802,15 +918,28 @@ function reportRemoval(removed: number, attempted: number) {
 
 async function deleteSelectedTasks() {
   if (selectedTasks.value.length === 0) return;
-  const msg = t("KeepUploadTask.deleteSelectedConfirm", { count: selectedTasks.value.length });
-  if (!(await confirmDanger(msg, "danger", t("common.remove")))) return;
-
   const ids = [...selectedTasks.value];
-  reportRemoval(await deleteTasksByIds(ids), ids.length);
+  // 记录删完 tasks.value 就换了，下载器那一步要用的那几条任务对象得在这儿先抄一份
+  const targets = tasks.value.filter((task) => ids.includes(task.id));
+  const downloaderIds = [...new Set(targets.map((task) => task.downloadOptions.downloaderId))];
+  const msg = t("KeepUploadTask.deleteSelectedConfirm", { count: ids.length });
+  // 整批只问一次，那颗勾选框对这一批一起生效：一台一台问等于把一次勾选拆成几十次点击
+  const choice = await confirmRemoval(msg, downloaderIds);
+  if (choice === "cancel") return;
+
+  const removed = await deleteTasksByIds(ids);
+  reportRemoval(removed.length, ids.length);
   selectedTasks.value = [];
+  if (choice === "withFiles") await removeClientCopies(targets.filter((task) => removed.includes(task.id)));
 }
 
-/** 工具栏那颗「移除已完成」：吃的是 `doneTasks`，也就是那一列正写着「辅种完成」的那一批 */
+/**
+ * 工具栏那颗「移除已完成」：吃的是 `doneTasks`，也就是那一列正写着「辅种完成」的那一批。
+ *
+ * 这一颗与下面那颗「清空全部」**不给**「连下载器副本和数据一起删」那个勾选框（用户 2026-11-01 要的是
+ * 「删除辅种任务时的确认框」，而这两颗点的是一整批）：一次点掉几十条 = 几十份内容的数据一起没了，
+ * 而那两句话原先承诺的就是「只从助手的列表里去掉，下载器那些不受影响」。要删数据得逐条从他勾的任务上删。
+ */
 async function removeDoneTasks() {
   const ids = doneTasks.value.map((task) => task.id);
   if (ids.length === 0) return;
@@ -818,10 +947,10 @@ async function removeDoneTasks() {
   if (!(await confirmDanger(msg, "danger", t("common.remove")))) return;
 
   const removed = await deleteTasksByIds(ids);
-  if (removed === ids.length) {
-    runtimeStore.showSnakebar(t("KeepUploadTask.removeDoneSuccess", { count: removed }), { color: "success" });
+  if (removed.length === ids.length) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.removeDoneSuccess", { count: removed.length }), { color: "success" });
   } else {
-    reportRemoval(removed, ids.length);
+    reportRemoval(removed.length, ids.length);
   }
 }
 
@@ -1082,7 +1211,7 @@ async function promoteItemToBase(task: IKeepUploadTask, itemIndex: number) {
   promotingBase.value[task.id] = true;
   try {
     const torrents = await sendMessage("getClientTorrents", task.downloadOptions.downloaderId).catch(() => null);
-    const decided = decidePromoteItemToBase({ hash: item.hash, title: item.title }, torrents);
+    const decided = decidePromoteItemToBase({ hash: item.hash, title: item.title, site: item.site }, torrents);
     if (decided.kind === "blocked") {
       runtimeStore.showSnakebar(promoteBaseBlockedText(decided.reason), { color: "warning", timeout: 12 });
       return;

@@ -37,6 +37,21 @@ describe("换得成的那一档", () => {
     if (out.kind !== "promoted") throw new Error(`应当判成 promoted，实际 ${out.reason}`);
     expect(Object.keys(out.baseLocal).sort()).toEqual(["hash", "name", "savePath"]);
   });
+
+  it("条目带着自己的站 → 一起交回来（任务行那一列靠它跟着新基准走）", () => {
+    const out = decidePromoteItemToBase({ ...item, site: "hhanclub" }, list({}));
+    if (out.kind !== "promoted") throw new Error(`应当判成 promoted，实际 ${out.reason}`);
+    expect(out.baseLocal.site).toBe("hhanclub");
+    expect(Object.keys(out.baseLocal).sort()).toEqual(["hash", "name", "savePath", "site"]);
+  });
+
+  it("报不出站时**那一整项不写**，不是写空串 —— 空串会让界面去查一个不存在的站", () => {
+    for (const site of [undefined, null, "", "   "]) {
+      const out = decidePromoteItemToBase({ ...item, site }, list({}));
+      if (out.kind !== "promoted") throw new Error(`应当判成 promoted，实际 ${out.reason}`);
+      expect("site" in out.baseLocal).toBe(false);
+    }
+  });
 });
 
 describe("五种不换，各说清一个原因（出路不同，不许并档）", () => {

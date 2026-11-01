@@ -18,10 +18,17 @@
  *   见 `reseedTargetDir.ts` 的 ④），这里没有文件清单，就没有资格写它。
  */
 
-/** 条目那一侧我们吃得下的两点（`IKeepUploadTaskItem` 的子集，方便造夹具） */
+import type { TSiteID } from "@ptd/site";
+
+/** 条目那一侧我们吃得下的三点（`IKeepUploadTaskItem` 的子集，方便造夹具） */
 export interface IPromoteBaseItem {
   hash?: string | null;
   title?: string | null;
+  /**
+   * 这一条是哪一个站的那一种子 —— 提成基准之后，界面上「站点」那一列靠它跟着新基准走。
+   * 报不出（旧任务没记这一项）时产出里就不写它，那一列退回改之前的读法。
+   */
+  site?: TSiteID | null;
 }
 
 /** 下载器那一侧吃得下的四点（`CTorrent` 的子集） */
@@ -32,11 +39,16 @@ export interface IPromoteBaseTorrent {
   isCompleted?: boolean | null;
 }
 
-/** 换成的新基准，形状与 `IKeepUploadTaskLocalBase` 对齐（少的那几项一律不写） */
+/**
+ * 换成的新基准，形状与 `IKeepUploadTaskLocalBase` 对齐。
+ * `site` 只在条目报得出时写（那一整项省略，不写 `undefined`）；`moveToTaskPath` /
+ * `missingInClient` / `contentIsFile` 是**上一条基准**的记账，一律不带。
+ */
 export interface IPromoteBaseResultBase {
   hash: string;
   name: string;
   savePath: string;
+  site?: TSiteID;
 }
 
 /**
@@ -75,8 +87,15 @@ export function decidePromoteItemToBase(
   if (live.isCompleted !== true) return { kind: "blocked", reason: "incomplete" };
   const savePath = String(live.savePath ?? "").trim();
   if (!savePath) return { kind: "blocked", reason: "noPath" };
+  // 报不出站就不写那一整项（写 `site: ""` 会让界面那一列去查一个不存在的站，比留空更坏）
+  const site = String(item.site ?? "").trim();
   return {
     kind: "promoted",
-    baseLocal: { hash, name: String(live.name ?? "").trim() || String(item.title ?? ""), savePath },
+    baseLocal: {
+      hash,
+      name: String(live.name ?? "").trim() || String(item.title ?? ""),
+      savePath,
+      ...(site ? { site } : {}),
+    },
   };
 }

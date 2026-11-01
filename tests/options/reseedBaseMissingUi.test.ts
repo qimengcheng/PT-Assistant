@@ -147,6 +147,18 @@ describe("条目行那颗「换基准」对 baseLocal 任务放开，且走的�
     // 动手之前要问一句：这条会把一条待辅条目从任务里移出去
     expect(promoteFn).toMatch(/await confirmDanger\([\s\S]{0,400}"primary",\s*t\("KeepUploadTask\.promoteBase\.ok"\)/);
   });
+
+  it("换成功之后「站点」那一列跟着新基准走（用户 2026-11-01：图标还是老基准的站）", () => {
+    // ① 判据的输入里有这一条自己的站
+    expect(promoteFn).toMatch(/decidePromoteItemToBase\(\s*\{[^}]*site:\s*item\.site\s*\}/);
+    // ② 任务行优先读 `baseLocal.site`，读不到才退回 items[0]（建任务那一路没有这一项，照旧）
+    expect(page).toMatch(
+      /const rowSiteId[\s\S]{0,200}row\.kind === "item" \? row\.item\.site[^\n]*baseLocal\?\.site \?\?[^\n]*items\[0\]\?\.site/,
+    );
+    // ③ 那一格的图标与悬停那句吃同一个取值（只改一处就是界面和浮层各说一套）
+    expect(page).toMatch(/:site-id="rowSiteId\(record\)"/);
+    expect(page).toMatch(/:text="siteNameOf\(rowSiteId\(record\)\)"/);
+  });
 });
 
 describe("两份 locale 的键必须成对（防线③看不见动态键，这一族是字面键，让它替我们查一遍）", () => {

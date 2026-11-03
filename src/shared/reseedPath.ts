@@ -14,6 +14,14 @@
  */
 
 /**
+ * 这一串是不是「发送时才展开」的占位符。它不是一个目录，所以既不能拿来比路径，
+ * 也**不能当移动目标发出去**（见 `reseedMoveTarget.ts` 的 `judgeMoveTarget`）。
+ */
+export function hasPathPlaceholder(raw?: string | null): boolean {
+  return typeof raw === "string" && PATH_PLACEHOLDER.test(raw);
+}
+
+/**
  * 发送时才展开的占位符：`$torrent.title$` / `$date:YYYY$` 这类宏，以及 `<...>` 那个
  * 「弹输入框现填」的写法（见 `SentToDownloaderDialog/utils.ts`）。两种都会让这一格在
  * 每条种子上展开成不同目录，没法拿来跟基准比。
@@ -130,7 +138,7 @@ export function detectBasePathMismatch(input: {
   const { basePath, categories } = input;
   let taskPath = input.taskPath;
   if (!basePath || !taskPath) return null;
-  if (PATH_PLACEHOLDER.test(taskPath)) return null;
+  if (hasPathPlaceholder(taskPath)) return null;
   if (isCategorySavePath(taskPath)) {
     const resolved = resolveCategoryTaskPath(taskPath, categories);
     if (!resolved) return null;
@@ -205,7 +213,7 @@ function isTaskPathResolvable(
   taskPath?: string | null,
   categories?: Record<string, IClientCategory> | null,
 ): boolean {
-  if (!taskPath || PATH_PLACEHOLDER.test(taskPath)) return false;
+  if (!taskPath || hasPathPlaceholder(taskPath)) return false;
   return !isCategorySavePath(taskPath) || !!resolveCategoryTaskPath(taskPath, categories);
 }
 

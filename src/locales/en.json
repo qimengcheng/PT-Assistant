@@ -228,6 +228,27 @@
       "sendBlocked": "The reseed folder and the folder holding the base files differ, so sending would fail. Pick a fix on that row first.",
       "sendBlockedBaseMissing": "The base torrent is no longer in the downloader, so the extension cannot verify its folder and this batch was not sent. Use the \"Use the local folder\" button on that row, or add the base torrent back into the downloader."
     },
+    "movePath": {
+      "title": "Move this task's data",
+      "current": "The data is currently in: {path}",
+      "currentUnknown": "This downloader did not report the folder it is in",
+      "task": "Task save path: {path}",
+      "target": "Destination folder",
+      "confirm": "Move",
+      "hint": "The other copies of the same content on other sites move along with it, otherwise this move would pull their files out from under them. The task's save path is set to the folder above as well.",
+      "hintTiming": "Only torrents that have finished downloading are moved on disk right away; ones still downloading only get a new destination until they finish.",
+      "empty": "Enter a destination folder first",
+      "category": "That is a category name rather than a folder. Enter a full path instead.",
+      "placeholder": "That string contains a placeholder expanded only at send time, so it cannot serve as one destination folder",
+      "noHash": "This task did not record the base torrent's infoHash, so there is nothing to tell which torrent to move",
+      "notFound": "This task's base torrent is no longer in the downloader, so there is no data to move",
+      "unreachable": "The torrent list from that downloader could not be read, so the move cannot start",
+      "sent": "Asked the downloader to move that data to {path}; the task's save path was set to it as well",
+      "sentCohort": "Asked the downloader to move all {n} copies of that content to {path}; the task's save path was set to it as well",
+      "sentAll": "Asked the downloader to move all {n} copies of that content to {path} ({extra} of them belong to other tasks); the task's save path was set to it as well",
+      "alreadyThere": "That data was already in {path}; the task's save path was set to it",
+      "partial": "{n} of the other copies could not be pointed at {path}; please check their folders in the downloader"
+    },
     "promoteBase": {
       "tip": "Use this entry's own data in the downloader as the new base: it stops being a reseed entry and the remaining ones attach to its folder. The previous base is only unreferenced by this task — it is not removed from the downloader.",
       "confirm": "Make \"{name}\" the new base of this batch? It will leave the reseed list and the other {n} entries will attach to {path}; the previous base torrent is not deleted.",

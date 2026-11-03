@@ -7,6 +7,7 @@ import {
   CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  EditOutlined,
   ExclamationCircleOutlined,
   LinkOutlined,
   NumberOutlined,
@@ -33,6 +34,7 @@ import type { IReseedScanScope } from "@/options/views/Overview/MyClient/reseedC
 import { useConfirmDanger } from "@/options/components/useConfirmDanger.ts";
 
 import DeleteTaskConfirm from "./DeleteTaskConfirm.vue";
+import MoveTaskPathDialog from "./MoveTaskPathDialog.vue";
 import { buildReseedAddTorrentOptions } from "./autoReseed.ts";
 import { reseedScanSeedOfTask } from "@/shared/reseedScanPlan.ts";
 import { decideOldBaseRemoval } from "@/shared/rebaseOldBase.ts";
@@ -44,7 +46,7 @@ import {
   refreshBaseLocalPaths,
   type IClientCategory,
 } from "@/shared/reseedPath.ts";
-import { pickRelocateCohort, type IRelocateCohort } from "@/shared/reseedMoveCohort.ts";
+import { pickLivePath, pickMoveBaseHash, type TMoveTargetVerdict } from "@/shared/reseedMoveTarget.ts";
 import {
   categoryKindChoices,
   filterKeepUploadTasks,
@@ -55,7 +57,7 @@ import {
 import { categoryKindLabelKey, type TCategoryKind } from "@/shared/category.ts";
 import { watchReseedNotice } from "@/shared/reseedPresence.ts";
 import { loadCategoryTable } from "@/options/utils/categoryPaths.ts";
-import { moveReseedCohort } from "@/options/utils/reseedMove.ts";
+import { relocateTaskBase } from "@/options/utils/reseedMove.ts";
 import {
   baseAlreadySent,
   judgeReseedTorrent,
@@ -535,8 +537,9 @@ async function useLocalBasePath(task: IKeepUploadTask) {
  *
  * ⚠️ 一起搬的不止基准：同一份内容在下载器里往往是好几条种子（每站一条，共用盘上同一个文件夹），
  * 只搬基准那一条会把那个文件夹从其余那几条脚下抽走 —— 用户 2026-10-14 报的「今天重新打开
- * qbittorrent 这些种子就因为找不到文件报错了」就是这个。哪些算相关由
- * `@/shared/reseedMoveCohort.ts` 判（同目录 + 同种子名，外加这条任务自己记着的那几条）。
+ * qbittorrent 这些种子就因为找不到文件报错了」就是这个。哪些算相关、基准为什么必须先发、
+ * `moved === false` 是"没能力"而不是"搬输了"，三条都收在
+ * `@/options/utils/reseedMove.ts` 的 `relocateTaskBase`（新入口那颗键共用同一份）。
  */
 async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
   const mismatch = basePathMismatchOf(task);
@@ -545,38 +548,34 @@ async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
 
   movingBase.value[task.id] = true;
   try {
-    const downloaderId = task.downloadOptions.downloaderId;
-    const cohort = await pickTaskCohort(task, mismatch, downloaderId);
-
-    // 基准先走：真挪文件的是它，后面那几条只是把落点改过来。顺序反了基准的源就没了，
-    // 发送那道闸会永远不放行。
-    const moved = await sendMessage("setClientTorrentLocation", {
-      downloaderId,
-      id: cohort.hashes[0],
-      // 取 mismatch 里那一份：它和 downloadOptions.savePath 同值，但类型上是确定的字符串
-      location: mismatch.taskPath,
+    const outcome = await relocateTaskBase({
+      downloaderId: task.downloadOptions.downloaderId,
+      baseHash: hash,
+      oldPath: mismatch.basePath,
+      newPath: mismatch.taskPath,
+      itemHashes: task.items.map((item) => item.hash),
     });
-    if (moved === false) {
-      // false 只表示这台客户端没有移动数据的能力（各驱动的默认实现），不是搬输了
+    if (outcome.kind === "unsupported") {
       runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.unsupported"), { color: "warning" });
       return;
     }
-
-    const { failed } = await moveReseedCohort(downloaderId, cohort.hashes.slice(1), mismatch.taskPath);
 
     task.baseLocal!.moveToTaskPath = true;
     await sendMessage("updateKeepUploadTask", task).catch(() => {});
     runtimeStore.showSnakebar(
       // 三条措辞按"带上了几条、其中几条不是这条任务的"分档，写全 literal 键好让防线③ 查得到
-      cohort.hashes.length === 1
+      outcome.cohort.hashes.length === 1
         ? t("KeepUploadTask.pathMismatch.moveSent")
-        : cohort.outsideTaskCount > 0
-          ? t("KeepUploadTask.pathMismatch.moveSentAll", { n: cohort.hashes.length, extra: cohort.outsideTaskCount })
-          : t("KeepUploadTask.pathMismatch.moveSentCohort", { n: cohort.hashes.length }),
+        : outcome.cohort.outsideTaskCount > 0
+          ? t("KeepUploadTask.pathMismatch.moveSentAll", {
+              n: outcome.cohort.hashes.length,
+              extra: outcome.cohort.outsideTaskCount,
+            })
+          : t("KeepUploadTask.pathMismatch.moveSentCohort", { n: outcome.cohort.hashes.length }),
       { color: "success" },
     );
-    if (failed > 0) {
-      runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveCohortPartial", { n: failed }), {
+    if (outcome.failed > 0) {
+      runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.moveCohortPartial", { n: outcome.failed }), {
         color: "warning",
         timeout: 12,
       });
@@ -586,36 +585,140 @@ async function moveLocalBaseToTaskPath(task: IKeepUploadTask) {
     watchBaseMoveLanded(task.id);
     await advanceAutoReseed();
   } catch (e) {
-    runtimeStore.showSnakebar(
-      t("KeepUploadTask.pathMismatch.moveFailed", { reason: e instanceof Error ? e.message : String(e) }),
-      { color: "error" },
-    );
+    showRelocateFailure(e);
   } finally {
     movingBase.value[task.id] = false;
   }
 }
 
+/** 搬运请求本身出错（不是「这台没能力」那一档）：两颗键共用同一句，失败原因要原样带出来 */
+function showRelocateFailure(e: unknown) {
+  runtimeStore.showSnakebar(
+    t("KeepUploadTask.pathMismatch.moveFailed", { reason: e instanceof Error ? e.message : String(e) }),
+    { color: "error" },
+  );
+}
+
+/** 弹窗里要摆的「此刻在哪个目录」由点键那一刻现查，所以那一趟的取数结果先存在这一格 */
+const moveTargetTask = ref<IKeepUploadTask | null>(null);
+const moveCurrentPath = ref("");
+const moveDialog = ref(false);
+/** 正在现查目录的那一条（这颗键点下去到弹窗出现之间要转圈） */
+const probingPath = ref<TKeepUploadTaskKey | null>(null);
+
 /**
- * 这一条任务该带上哪几条种子。列表拿不到时退回「只搬基准」—— 那等于今天的老行为，
- * 比猜一批不相干的 hash 出去改路径安全。
+ * 新入口的开门：确认「要挪哪一条」和「它此刻在哪个目录」都拿得到，才开那个弹窗。
+ *
+ * 不开空壳弹窗：那一行「现在在：?」的弹窗比不点更让人困惑。三档挡在门外各给一句不同的话 ——
+ * 「这条任务没记基准的 infoHash」「这一条已经不在下载器里」「那台现在连不上」。
+ * 后两句**必须是两句**：「查不了」不等于「没有」，把它们并成一句就是把一次网络故障报成
+ * 用户把种子删了（本仓在这条上栽过不止一次，见 `pickLivePath` 的注释）。
  */
-async function pickTaskCohort(
-  task: IKeepUploadTask,
-  mismatch: { basePath: string; taskPath: string },
-  downloaderId: string,
-): Promise<IRelocateCohort> {
-  const baseHash = task.baseLocal?.hash ?? "";
+async function openMovePathDialog(task: IKeepUploadTask) {
+  if (probingPath.value) return;
+
+  const base = pickMoveBaseHash(task);
+  if ("block" in base) {
+    runtimeStore.showSnakebar(t("KeepUploadTask.movePath.noHash"), { color: "warning" });
+    return;
+  }
+
+  probingPath.value = task.id;
   try {
-    const torrents = await sendMessage("getClientTorrents", downloaderId);
-    return pickRelocateCohort({
-      torrents: torrents.map((x) => ({ hash: x.infoHash ?? "", name: x.name, savePath: x.savePath })),
-      baseHash,
-      oldPath: mismatch.basePath,
-      newPath: mismatch.taskPath,
-      itemHashes: task.items.map((item) => item.hash),
-    });
+    const torrents = await sendMessage("getClientTorrents", task.downloadOptions.downloaderId);
+    const live = pickLivePath(torrents, base.hash);
+    if ("block" in live) {
+      runtimeStore.showSnakebar(t("KeepUploadTask.movePath.notFound"), { color: "warning" });
+      return;
+    }
+    moveTargetTask.value = task;
+    moveCurrentPath.value = live.path;
+    moveDialog.value = true;
   } catch {
-    return { hashes: [baseHash], outsideTaskCount: 0 };
+    runtimeStore.showSnakebar(t("KeepUploadTask.movePath.unreachable"), { color: "error" });
+  } finally {
+    probingPath.value = null;
+  }
+}
+
+/**
+ * 新入口：把这条任务的那份数据搬到**人自己填的**目录，并把任务的「保存路径」一起改成它。
+ *
+ * 「记录跟着改」不只是他选的一种语义，它还是这一族**能复用既有盯梢**的前提：搬完之后
+ * `downloadOptions.savePath` 就等于他填的那一份，所以那句「正在把本地那份移到任务目录」
+ * 在这里恰好为真，不需要另造一套「正在搬」的措辞和第二条落地判据 —— 落地与否仍然只有
+ * `refreshBaseLocalPaths` 那一条（两条判据迟早互相打脸，见 v0.93.1 那一轮）。
+ *
+ * ⚠️ 三档「什么都没改」的出口，每一档都不许顺手改记录：
+ * - 这台下载器没能力搬（`moved === false`）：改了记录等于把一条本来一致的任务改成不一致，
+ *   发送那道闸当场把它按住 —— 比不点这颗键更坏；
+ * - 请求抛错：同上；
+ * - 数据本来就在目标目录（`needRelocate` 为假）：这一趟没发任何搬运，所以**不置**
+ *   `moveToTaskPath`（那位说的是「正在往任务目录搬」，没搬就不能说），只把记录改成那一串。
+ *
+ * 只有 `baseLocal` 型任务才置那位、才盯落地：非 `baseLocal` 型压根没有那道目录闸
+ * （`basePathMismatchOf` 对它返回 null），也没有地方存那位，盯它结构上是空转。
+ */
+async function moveTaskToChosenPath(verdict: Extract<TMoveTargetVerdict, { kind: "ok" }>) {
+  const task = moveTargetTask.value;
+  if (!task) return;
+  const base = pickMoveBaseHash(task);
+  if ("block" in base) return;
+  if (movingBase.value[task.id]) return;
+
+  movingBase.value[task.id] = true;
+  try {
+    let cohortSize = 1;
+    let outsideTaskCount = 0;
+    let failed = 0;
+    if (verdict.needRelocate) {
+      const outcome = await relocateTaskBase({
+        downloaderId: task.downloadOptions.downloaderId,
+        baseHash: base.hash,
+        // 现查那一份，不拿任务上的快照：这一趟「带走了谁」必须由当下的目录定
+        oldPath: moveCurrentPath.value,
+        newPath: verdict.path,
+        itemHashes: task.items.map((item) => item.hash),
+      });
+      if (outcome.kind === "unsupported") {
+        runtimeStore.showSnakebar(t("KeepUploadTask.pathMismatch.unsupported"), { color: "warning" });
+        return;
+      }
+      cohortSize = outcome.cohort.hashes.length;
+      outsideTaskCount = outcome.cohort.outsideTaskCount;
+      failed = outcome.failed;
+    }
+
+    task.downloadOptions.savePath = verdict.path;
+    const willWatch = verdict.needRelocate && !!task.baseLocal;
+    if (willWatch) task.baseLocal!.moveToTaskPath = true;
+    await sendMessage("updateKeepUploadTask", task).catch(() => {});
+
+    runtimeStore.showSnakebar(
+      // 四条措辞按「要不要挪 / 带上了几条 / 其中几条不是这条任务的」分档，
+      // 写全 literal 键好让防线③ 查得到（那一族漏过一次「一键辅种（）」）
+      !verdict.needRelocate
+        ? t("KeepUploadTask.movePath.alreadyThere", { path: verdict.path })
+        : cohortSize === 1
+          ? t("KeepUploadTask.movePath.sent", { path: verdict.path })
+          : outsideTaskCount > 0
+            ? t("KeepUploadTask.movePath.sentAll", { n: cohortSize, extra: outsideTaskCount, path: verdict.path })
+            : t("KeepUploadTask.movePath.sentCohort", { n: cohortSize, path: verdict.path }),
+      { color: "success" },
+    );
+    if (failed > 0) {
+      runtimeStore.showSnakebar(t("KeepUploadTask.movePath.partial", { n: failed, path: verdict.path }), {
+        color: "warning",
+        timeout: 12,
+      });
+    }
+    if (willWatch) watchBaseMoveLanded(task.id);
+    // 目录一改，原先被那道闸按住的几条就有条件发了 —— 当场催一轮，不让他等下一分钟的定时器
+    await advanceAutoReseed();
+  } catch (e) {
+    showRelocateFailure(e);
+  } finally {
+    movingBase.value[task.id] = false;
   }
 }
 
@@ -1924,10 +2027,28 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
         <!-- 保存路径是任务级的：条目行不重复父任务那一格（两行一样的字只会把行撑高） -->
         <template v-else-if="column.key === 'savePath'">
           <div v-if="record.kind === 'task'">
-            <div>
+            <div class="path-line">
               <a-typography-text class="task-line" :ellipsis="{ tooltip: savePathLine(record.task) }">
                 {{ savePathLine(record.task) }}
               </a-typography-text>
+              <!-- 「移到哪个目录」的常规入口（用户 2026-11-03）。下面那两颗键只在系统判出「目录不一致」
+                   时才画，而且方向是写死的（只能往任务目录那一个方向挪）；这一颗什么时候都在，目标由他填。
+                   ⚠️ 必须与那个 typography **并排**、不许塞进它的默认插槽：`:ellipsis` 要把子节点折成
+                   纯文本去量宽度，元素子节点整个丢掉（AGENTS §3.4），表现是文字照常显示而这颗键点不动。
+                   也没有做成「整格可点」—— 这一格在下面那一支还挂着两颗 link 键，外层 @click 会和它们
+                   抢一次点击（点「改用本地那份的目录」会同时弹出这个框）。 -->
+              <a-tooltip :title="t('KeepUploadTask.editSavePath')">
+                <a-button
+                  size="small"
+                  type="text"
+                  :loading="probingPath === record.task.id"
+                  @click="openMovePathDialog(record.task)"
+                >
+                  <template #icon>
+                    <EditOutlined />
+                  </template>
+                </a-button>
+              </a-tooltip>
             </div>
             <!-- 基准不在任务里的那种任务：数据是下载器里已有的另一条，得说清楚是哪条，
                  否则用户看到的是「只有一颗种子的辅种任务」，不知道它在往什么上挂 -->
@@ -2215,6 +2336,15 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
   <!-- 弹窗是 portal，不参与 .page 网格布局，所以挂在根级而不是 .page 直接子节点 ——
        后者会被排进隐式第三行、把面板那一行挤窄（同 MyData/Index.vue 的写法） -->
   <KeepUploadUsageDialog v-model="showUsageDialog" />
+  <!-- 「移到哪个目录」那个框。它只收串，搬运与写回都在上面 `moveTaskToChosenPath` 里 ——
+       判据与副作用都不在组件里，那样才进得了 Node 断言与反证。 -->
+  <MoveTaskPathDialog
+    v-model="moveDialog"
+    :downloader-id="moveTargetTask?.downloadOptions.downloaderId ?? ''"
+    :current-path="moveCurrentPath"
+    :task-path="moveTargetTask?.downloadOptions.savePath ?? ''"
+    @confirm="moveTaskToChosenPath"
+  />
   <!-- 逐站真查那一屏（从「我的下载器」复用）：`queryOnly` 让它只给结论、不画一键辅种那排 -->
   <ReseedScanDialog
     v-model="scanDialog"
@@ -2240,6 +2370,21 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 .task-line {
   font-size: 12px;
   color: #6b7280;
+}
+
+/* 「保存路径」那一格第一行：路径文字 + 行尾那颗「移到哪个目录」。
+   `min-width: 0` 两条都要：flex 子项默认按内容收缩，不给它 typography 就算不出可截断的宽度
+   （于是长路径把那颗键顶到第二行），而 typography 自己不缩就整行溢出 220px 的列宽。 */
+.path-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.path-line .task-line {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* 「目录不一致」那一格：这一行本来就是失败的来源，所以宁可把行撑高也要把两条路和两颗处置摆全。

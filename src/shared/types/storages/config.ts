@@ -180,6 +180,12 @@ export interface IConfigPiniaStorageSchema {
     uploadAtFormatAsAlive: boolean;
     // 是否限制种子标题列的最大宽度，防止过长导致表格布局混乱
     limitTorrentTitleTdWidth: boolean;
+    /**
+     * 「可选的辅种组合」那张表的「内容」列显示副标题而不是主标题。
+     * 只管这一列：上面那颗 showTorrentSubtitle 管的是搜索列表标题格里多出来的那一行，
+     * 两者语义不同（一行 vs 整列），不许合并成一颗。
+     */
+    reseedGroupsShowSubtitle: boolean;
     // 种子标签数量超过多少个时使用分组显示（0表示不限制）
     maxTagCountBeforeGroup: number;
     // 默认隐藏的标签名称列表

@@ -369,6 +369,8 @@ export const useConfigStore = defineStore("config", {
       socialInformationSearchOnNewTab: true,
       uploadAtFormatAsAlive: false,
       limitTorrentTitleTdWidth: false,
+      // 存量用户的这份对象里没有这一键，读出来是 undefined（假）= 关，不需要回填
+      reseedGroupsShowSubtitle: false,
       maxTagCountBeforeGroup: 0,
       hiddenTagNames: [],
     },

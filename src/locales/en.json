@@ -1019,6 +1019,8 @@
       "intro": "One row per copy carried by 2 or more sites (rows whose Size column shows the same value count as the same data). Groups you are already seeding come first; the row tagged \"Most sites\" is the best-reseed chip next to this button — pick a smaller one when that package is too big to fetch again.",
       "best": "Most sites",
       "use": "Use group",
+      "showSubtitle": "Show subtitle in content column",
+      "showSubtitleTip": "Sites fill in the subtitle themselves, so some report it and some do not. A row whose whole group has no subtitle keeps showing the main title.",
       "colSize": "Size",
       "colRows": "Rows",
       "colSeeding": "Seeding",

@@ -6,7 +6,10 @@ import { BranchesOutlined } from "@zboson/icons";
 import { ETorrentStatus } from "@ptd/site";
 
 import { formatSize } from "@/options/utils.ts";
+import { useConfigStore } from "@/options/stores/config.ts";
+import HoverTip from "@/options/components/HoverTip.vue";
 import { torrentStatusMeta } from "./torrentStatusMeta.ts";
+import { reseedGroupCellText } from "./reseedGroupCellText.ts";
 import type { IReseedGroup } from "@/shared/bestReseed.ts";
 import type { ISearchResultTorrent } from "@/shared/types/storages/runtime.ts";
 
@@ -31,6 +34,22 @@ const { groups } = defineProps<{
 const emit = defineEmits<{ (e: "pick", group: IReseedGroup<ISearchResultTorrent>): void }>();
 
 const { t } = useI18n();
+const configStore = useConfigStore();
+
+/**
+ * 「内容」那一列显示副标题还是主标题 —— 存在设置里（用户 2026-11-06 拍的两条：切换整列、要记住）。
+ *
+ * 与搜索页那颗 `showTorrentSubtitle` 是两件事，不共用：那颗管搜索列表标题格下面多出来的那一行，
+ * 这颗管这一列换成什么字。所以它被列进 `Index.vue` 的 `hiddenDisplayPreferenceKeys`，
+ * 不会自己冒进工具条那个「显示偏好」面板。
+ */
+const showSubtitle = computed({
+  get: () => configStore.searchEntifyControl.reseedGroupsShowSubtitle,
+  set: (value: boolean) => {
+    configStore.searchEntifyControl.reseedGroupsShowSubtitle = value;
+    configStore.$save();
+  },
+});
 
 /** 一行 = 一档。界面上要读的东西在这里一次算完，模板里不再做判据 */
 interface IRow {
@@ -47,7 +66,8 @@ interface IRow {
   icons: string[];
   /** 没画成图标的那些还剩几个 */
   restSites: number;
-  title: string;
+  /** 「内容」那一列显示的字：随那颗开关在主标题 / 副标题之间换（判据在 `reseedGroupCellText.ts`） */
+  text: string;
   /** 旁边那颗 chip 给的就是这一档（按传进来的名次判，不看界面第几行） */
   isBest: boolean;
   /** 传进来的名次（站点数 → 条数 → 大小），重排后分区内部照它排 */
@@ -78,8 +98,7 @@ const rows = computed<IRow[]>(() => {
       statusKnown: group.statusKnown,
       icons: seen,
       restSites: Math.max(0, group.siteCount - seen.length),
-      // 一组里各条标题通常不同（各站自己写的），取第一条当这一档的"这是什么内容"
-      title: String(group.items[0]?.title ?? ""),
+      text: reseedGroupCellText(group.items, showSubtitle.value),
       isBest: rank === 0,
       rank,
       group,
@@ -142,9 +161,20 @@ function rowOf(record: unknown): IRow {
 <template>
   <a-modal v-model:open="showDialog" :title="t('SearchEntity.reseedGroups.title')" :width="960">
     <!-- 说明条写在内容区，不塞 #title：那个标题栏没有内衬，塞东西必和右上角 X 相撞 -->
-    <a-alert type="info" show-icon class="intro">
-      <template #message>{{ t("SearchEntity.reseedGroups.intro") }}</template>
-    </a-alert>
+    <div class="intro-row">
+      <a-alert type="info" show-icon class="intro">
+        <template #message>{{ t("SearchEntity.reseedGroups.intro") }}</template>
+      </a-alert>
+
+      <!-- 那颗开关只管这一列。浮层说清「翻了还是英文」那一档：副标题由各站自己填，
+           报不报得出不一致，整组都没报出时这一格退回主标题而不是留空白。 -->
+      <HoverTip :text="t('SearchEntity.reseedGroups.showSubtitleTip')">
+        <span class="sub-toggle">
+          <a-switch v-model:checked="showSubtitle" size="small" />
+          <span>{{ t("SearchEntity.reseedGroups.showSubtitle") }}</span>
+        </span>
+      </HoverTip>
+    </div>
 
     <!-- table-layout 必须显式给 fixed：不给档位时 rc-table 判出来是 auto（这张表没有 scroll.y、
          没有固定列、没有 resizable、列上也没写 ellipsis），而 auto 档位下 <table> 是按内容长出来的 ——
@@ -203,9 +233,9 @@ function rowOf(record: unknown): IRow {
                  popover 在子节点在位时不生成包装元素，所以这一颗 span 就是 .title-line 的 flex item。 -->
             <a-popover trigger="hover" placement="topLeft" :mouse-enter-delay="0.4">
               <template #content>
-                <div class="reveal-text">{{ rowOf(record).title }}</div>
+                <div class="reveal-text">{{ rowOf(record).text }}</div>
               </template>
-              <span class="title-text text-truncate">{{ rowOf(record).title }}</span>
+              <span class="title-text text-truncate">{{ rowOf(record).text }}</span>
             </a-popover>
           </span>
         </template>
@@ -221,8 +251,26 @@ function rowOf(record: unknown): IRow {
 </template>
 
 <style scoped lang="scss">
-.intro {
+.intro-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
+}
+
+.intro {
+  flex: 1 1 auto;
+}
+
+/**
+ * 开关 + 它那行名字。HoverTip 在子节点在位时不生成包装元素，所以这一层 span 直接就是
+ * .intro-row 的 flex item —— 不给 flex: 0 0 auto 会被说明条挤掉（AGENTS §3.4 那条）。
+ */
+.sub-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
 }
 
 .size-text {

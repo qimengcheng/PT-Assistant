@@ -641,16 +641,22 @@ type TSearchEntifyControl = IConfigPiniaStorageSchema["searchEntifyControl"];
  * 这个开关失去了意义；config 字段保留，不动存量数据（同 UiWindow 里那两个已摘掉的开关的做法）。
  * maxTagCountBeforeGroup / hiddenTagNames 由「值为布尔」这一条自然筛掉，不必点名 ——
  * 原来它们写在一张字符串排除表里，表写错一个键名就会把数字/数组字段当开关写回。
+ *
+ * reseedGroupsShowSubtitle 也排掉：那颗开关长在「可选的辅种组合」弹窗里（只管那一列），
+ * 摆进这一排就成了「搜索页的一个开关改弹窗的列」，两处都读不出它在说什么。
  */
 type TDisplayPreferenceKey = Exclude<
   {
     [K in keyof TSearchEntifyControl]-?: TSearchEntifyControl[K] extends boolean ? K : never;
   }[keyof TSearchEntifyControl],
-  "limitTorrentTitleTdWidth"
+  "limitTorrentTitleTdWidth" | "reseedGroupsShowSubtitle"
 >;
 
 /** 值确实是布尔、但界面上不给开关的那几键（它们已经不在 TDisplayPreferenceKey 里，所以按全键名写） */
-const hiddenDisplayPreferenceKeys: (keyof TSearchEntifyControl)[] = ["limitTorrentTitleTdWidth"];
+const hiddenDisplayPreferenceKeys: (keyof TSearchEntifyControl)[] = [
+  "limitTorrentTitleTdWidth",
+  "reseedGroupsShowSubtitle",
+];
 
 const filteredTableBooleanControlKeys = computed(() => {
   const control = configStore.searchEntifyControl as Record<string, unknown>;

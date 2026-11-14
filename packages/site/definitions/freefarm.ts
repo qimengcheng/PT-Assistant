@@ -21,7 +21,14 @@ export const siteMetadata: ISiteMetadata = {
   type: "private",
   schema: "NexusPHP",
 
-  urls: ["uggcf://cg.0ss.pp/"],
+  /**
+   * 第二条是 announce 那个域名（`https://tracker0ff.cc/announce.php?passkey=…`）。
+   * 本站的 announce 不在首页 `pt.0ff.cc` 的子域上，而是另一个独立注册域，所以「Tracker → 站点」
+   * 那套父子域兜底认不到它。少了这一条，下载器里挂在它上面的种子既补不上「按所属站点自动补标签」，
+   * 行上那枚「做种中」与站点归属也标不出来（用户 2026-11-14 指着 tracker0ff.cc 那几条问
+   * 「明明可以补标签，为什么提示没有可以补的呢」）。与 PandaPT / NovaHD 同写法。
+   */
+  urls: ["uggcf://cg.0ss.pp/", "uggcf://genpxre0ss.pp/"],
 
   category: [
     {

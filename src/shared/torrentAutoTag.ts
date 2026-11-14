@@ -34,10 +34,25 @@ export interface IAutoTagRow {
 /** 没能补上的那一档叫什么。两档都不许并：「已经有标签」和「认不出站」是两句不同的话 */
 export type TAutoTagSkip = "hasTags" | "noSite";
 
+/**
+ * 一条没补上的记录。
+ *
+ * `host` 只在 `noSite` 那一档有值，是**折过之后的 tracker 主机名**（不是整串 announce —— 那里面
+ * 带着 passkey，属凭据，不进界面）。界面靠它说清「到底是哪几个域名没被认领」：
+ * 用户 2026-11-14 那句「明明可以补标签，为什么提示没有可以补的呢」当时无法回答，就是因为
+ * 「一条都补不了」那句话说不出是 201 条全有标签，还是 50 条全认不出站、认不出的是哪几个站。
+ * 这一格为空串 = 下载器压根没报 tracker，与「报了个认不出的域名」是两件事，所以不并档。
+ */
+export interface IAutoTagSkipItem {
+  id: string | number;
+  reason: TAutoTagSkip;
+  host?: string;
+}
+
 export interface IAutoTagPlan {
   /** 要打的：一条一个标签，站名各按各的 tracker 算 */
   adds: { downloaderId: string; id: string | number; tag: string }[];
-  skipped: { id: string | number; reason: TAutoTagSkip }[];
+  skipped: IAutoTagSkipItem[];
 }
 
 /**
@@ -68,7 +83,7 @@ export function planAutoTagRows(
     const siteId = host ? resolveTrackerHostSite(host, opts.hostSiteEntries) : null;
     const tag = siteId ? opts.siteNameOf(siteId).trim() : "";
     if (!tag) {
-      skipped.push({ id: row.id, reason: "noSite" });
+      skipped.push({ id: row.id, reason: "noSite", host });
       continue;
     }
     adds.push({ downloaderId: row.downloaderId, id: row.id, tag });
@@ -84,4 +99,27 @@ export function countAutoTagSkips(
   const out: Record<TAutoTagSkip, number> = { hasTags: 0, noSite: 0 };
   for (const item of skipped) out[item.reason] += 1;
   return out;
+}
+
+/**
+ * 把「认不出站点」的那些 tracker 主机名按条数折一遍，从多到少。
+ *
+ * 为什么不停在「认不出 N 条」这个总数上：总数说不出**是哪个域名**没被站点认领，而修这件事要的恰恰
+ * 是域名本身（把它补进对应站点定义的 `urls`）。没有这份清单时，每一轮排查都得靠人截图、再靠肉眼
+ * 从下载器那一列里认串 —— 用户 2026-11-14 这次就是这么绕过来的。
+ *
+ * 空串单独成一档：那是下载器压根没报 tracker，与「报了个认不出的域名」是两句不同的话。
+ */
+export function unresolvedAutoTagHosts(
+  skipped: readonly { reason: TAutoTagSkip; host?: string }[],
+): { host: string; count: number }[] {
+  const tally = new Map<string, number>();
+  for (const item of skipped) {
+    if (item.reason !== "noSite") continue;
+    const host = item.host ?? "";
+    tally.set(host, (tally.get(host) ?? 0) + 1);
+  }
+  return [...tally]
+    .map(([host, count]) => ({ host, count }))
+    .sort((a, b) => b.count - a.count || a.host.localeCompare(b.host));
 }

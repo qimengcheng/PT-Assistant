@@ -46,7 +46,7 @@ import type { IKeepUploadTask } from "@/shared/types/storages/keepUploadTask.ts"
 import type { IReseedScanResult } from "@/shared/types/storages/reseedScan.ts";
 import type { ITransferSourceRow } from "@/shared/upload/types.ts";
 import { reseedHandoffLabelOf } from "@/shared/reseedScanHandoff.ts";
-import { countAutoTagSkips, planAutoTagRows } from "@/shared/torrentAutoTag.ts";
+import { countAutoTagSkips, planAutoTagRows, unresolvedAutoTagHosts } from "@/shared/torrentAutoTag.ts";
 import { SUB_ROW_FLAG, useAutoFitPageSize } from "@/options/directives/useAutoFitPageSize.ts";
 
 import DeleteDialog from "./DeleteDialog.vue";
@@ -433,6 +433,9 @@ const autoTagPlan = computed(() =>
 );
 
 const autoTagSkipped = computed(() => countAutoTagSkips(autoTagPlan.value.skipped));
+
+/** 认不出站点的那几个 tracker 域名，弹窗要说得出名字（判据见 `unresolvedAutoTagHosts`） */
+const autoTagUnknownHosts = computed(() => unresolvedAutoTagHosts(autoTagPlan.value.skipped));
 
 /**
  * 行上那枚标记吃三档：`candidate` 说「还差 N 站没查」，`scanned` 说「没挂的那些站都查过了」，
@@ -1606,6 +1609,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
     :suggest-labels="existingLabels"
     :auto-tag-adds="autoTagPlan.adds"
     :auto-tag-skipped="autoTagSkipped"
+    :auto-tag-unknown-hosts="autoTagUnknownHosts"
     :auto-tag-scope="autoTagSource.length"
     @done="loadTorrents"
   />

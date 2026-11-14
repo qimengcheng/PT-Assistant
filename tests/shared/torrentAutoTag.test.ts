@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { countAutoTagSkips, planAutoTagRows, type IAutoTagRow } from "@/shared/torrentAutoTag.ts";
+import { countAutoTagSkips, planAutoTagRows, unresolvedAutoTagHosts, type IAutoTagRow } from "@/shared/torrentAutoTag.ts";
 
 /** 合成表：主机名 → 站点 id（与 `metadataStore.siteHostMap` 同形状） */
 const HOSTS: [string, string][] = [
@@ -58,7 +58,7 @@ describe("planAutoTagRows · 认不出站点就不写", () => {
   it("tracker 为空 → 跳过，不猜、不写空标签", () => {
     const plan = planAutoTagRows([row({ id: "h1", tracker: "" })], { hostSiteEntries: HOSTS, siteNameOf });
     expect(plan.adds).toEqual([]);
-    expect(plan.skipped).toEqual([{ id: "h1", reason: "noSite" }]);
+    expect(plan.skipped).toEqual([{ id: "h1", reason: "noSite", host: "" }]);
   });
 
   it("tracker 是不认识的站 → 跳过（不许退回到下载链接或分类去猜）", () => {
@@ -144,5 +144,54 @@ describe("countAutoTagSkips · 两档不许并成一档", () => {
 
   it("空数组两档都是 0（不是 undefined）", () => {
     expect(countAutoTagSkips([])).toEqual({ hasTags: 0, noSite: 0 });
+  });
+});
+
+describe("unresolvedAutoTagHosts · 认不出的域名逐个点名", () => {
+  it("noSite 那一条带上折好的主机名，而不是整串 announce（那里面带 passkey，属凭据）", () => {
+    const plan = planAutoTagRows([row({ id: "h1", tracker: "https://x.example/announce.php?passkey=abc" })], {
+      hostSiteEntries: HOSTS,
+      siteNameOf,
+    });
+    expect(plan.skipped).toEqual([{ id: "h1", reason: "noSite", host: "x.example" }]);
+  });
+
+  it("同一个域名的多条折成一项，条数累加", () => {
+    const skipped = planAutoTagRows(
+      [row({ id: "h1", tracker: "https://x.example/announce" }), row({ id: "h2", tracker: "https://x.example/announce" })],
+      { hostSiteEntries: HOSTS, siteNameOf },
+    ).skipped;
+    expect(unresolvedAutoTagHosts(skipped)).toEqual([{ host: "x.example", count: 2 }]);
+  });
+
+  it("按条数从多到少排，让最该修的那个域名排第一个", () => {
+    const skipped = [
+      { id: 1, reason: "noSite" as const, host: "few.example" },
+      { id: 2, reason: "noSite" as const, host: "many.example" },
+      { id: 3, reason: "noSite" as const, host: "many.example" },
+    ];
+    expect(unresolvedAutoTagHosts(skipped)).toEqual([
+      { host: "many.example", count: 2 },
+      { host: "few.example", count: 1 },
+    ]);
+  });
+
+  it("hasTags 那一条不进这份清单 —— 它不是「认不出」", () => {
+    const skipped = planAutoTagRows([row({ id: "h1", tags: ["已有"] })], {
+      hostSiteEntries: HOSTS,
+      siteNameOf,
+    }).skipped;
+    expect(unresolvedAutoTagHosts(skipped)).toEqual([]);
+  });
+
+  it("下载器没报 tracker 的那一档折成空串，与「报了个认不出的域名」不并档", () => {
+    const skipped = planAutoTagRows(
+      [row({ id: "h1", tracker: "" }), row({ id: "h2", tracker: "https://x.example/announce" })],
+      { hostSiteEntries: HOSTS, siteNameOf },
+    ).skipped;
+    expect(unresolvedAutoTagHosts(skipped)).toEqual([
+      { host: "", count: 1 },
+      { host: "x.example", count: 1 },
+    ]);
   });
 });

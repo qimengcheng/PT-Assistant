@@ -15,7 +15,7 @@ interface IAutoTagAdd {
 }
 
 const showDialog = defineModel<boolean>();
-const { torrents, suggestLabels, autoTagAdds, autoTagSkipped, autoTagScope } = defineProps<{
+const { torrents, suggestLabels, autoTagAdds, autoTagSkipped, autoTagUnknownHosts, autoTagScope } = defineProps<{
   /** 勾选的那几条（分类那一档只吃这个；自动那一档的范围由页面算好） */
   torrents: CTorrent[];
   suggestLabels?: string[];
@@ -23,6 +23,11 @@ const { torrents, suggestLabels, autoTagAdds, autoTagSkipped, autoTagScope } = d
   autoTagAdds: IAutoTagAdd[];
   /** 两档各多少条，界面分开报（并成「N 条没动」就看不出是哪种没动） */
   autoTagSkipped: { hasTags: number; noSite: number };
+  /**
+   * 认不出站点的那几个 tracker 域名（页面从同一份判据里折好传进来）。
+   * 只有总数说不出「是哪个域名没被站点认领」，而修这件事要的恰恰是域名本身。
+   */
+  autoTagUnknownHosts: { host: string; count: number }[];
   /** 自动那一档这次扫过了多少条，给上面那句范围用 */
   autoTagScope: number;
 }>();
@@ -39,6 +44,17 @@ const mode = ref<"auto" | "category">("auto");
 
 /** 上面那格当前的值 —— chip 的高亮档按它判（比 trim 后的，输入框里带空格不算换了标签） */
 const picked = computed(() => labelInput.value.trim());
+
+/**
+ * 认不出的 tracker 域名逐个点名（`host ×条数`）。
+ *
+ * 空串那一档是「下载器压根没报 Tracker」，换成一句人话 —— 直接画出来会是一个空名字后面跟着条数。
+ */
+const unknownHostsText = computed(() =>
+  autoTagUnknownHosts
+    .map((item) => `${item.host || t("MyClient.label.autoUnknownHostNoTracker")} ×${item.count}`)
+    .join(", "),
+);
 
 /**
  * `a-auto-complete` 的 options 要的是 `{ value, label }[]`：直接喂 `string[]` 会把整个控件
@@ -169,7 +185,16 @@ function onOk() {
           })
         }}
       </div>
+      <div v-else-if="autoTagSkipped.hasTags + autoTagSkipped.noSite > 0" class="label-auto-summary">
+        {{ t("MyClient.label.autoNothingCounted", { hasTags: autoTagSkipped.hasTags, noSite: autoTagSkipped.noSite }) }}
+      </div>
       <div v-else class="label-auto-summary">{{ t("MyClient.label.autoNothing") }}</div>
+
+      <!-- 认不出站点的那几个域名逐个点名。只报总数说不出是哪一个站没被认领，而修这件事要的恰恰是域名
+           本身（把它补进对应站点定义的 urls）—— 用户 2026-11-14 这轮排查就是缺这句话才绕了远路。 -->
+      <div v-if="autoTagUnknownHosts.length > 0" class="label-auto-hosts">
+        {{ t("MyClient.label.autoUnknownHosts", { hosts: unknownHostsText }) }}
+      </div>
     </template>
 
     <template v-else>
@@ -222,6 +247,15 @@ function onOk() {
 
 .label-auto-summary {
   margin-top: 4px;
+}
+
+/* 域名一串可能很长，让它自己换行而不是把弹窗撑宽 */
+.label-auto-hosts {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--pt-color-text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .label-category-hint {

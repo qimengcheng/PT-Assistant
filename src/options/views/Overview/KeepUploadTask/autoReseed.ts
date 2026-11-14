@@ -496,6 +496,10 @@ export function buildReseedAddTorrentOptions(params: {
     savePath: task.downloadOptions.savePath || "",
     ...task.downloadOptions.addTorrentOptions,
   };
+  // 默认带「这一条所属站点」的站名标签（用户 2026-11-14：辅种推下去的种子不该没标签）。
+  // 补在发送这一刻而不是建任务时：存量任务、手动与后台两条路都吃得到；任务上显式填过的标签优先。
+  // 空串也走默认 —— 空串会被下载器当成一次「清空标签」的指令（与 reseedScanHandoff.ts 同一口径）。
+  if (!plainOptions.label) plainOptions.label = siteName;
   const addTorrentOptions: CAddTorrentOptions = skipCheckingFor(task, item, baseEntry)
     ? withReseedSkipChecking(plainOptions)
     : plainOptions;

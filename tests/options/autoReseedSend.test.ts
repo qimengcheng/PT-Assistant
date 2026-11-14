@@ -14,11 +14,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildReseedAddTorrentOptions,
   othersStillPending,
   othersStillToSend,
   planAutoReseed,
 } from "@/options/views/Overview/KeepUploadTask/autoReseed.ts";
 import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
+import type { IKeepUploadTask, IKeepUploadTaskItem } from "@/shared/types.ts";
 
 const seeding = (): IReseedItemStatus => ({ verdict: "seeding", rawState: "uploading", progress: 100, completed: true });
 const notFound = (): IReseedItemStatus => ({ verdict: "notFound", rawState: "" });
@@ -100,5 +102,76 @@ describe("与 planAutoReseed 的接合：闸真的改变了这一轮的结论", 
     const next = othersStillToSend({ state: emptyLedger, items, statuses });
     expect(next.map((i) => i.hash)).toEqual(["h2"]);
     expect(tick(next.length, statuses).sendOthers).toBe(true);
+  });
+});
+
+/**
+ * 发送那份选项里的默认标签（用户 2026-11-14：「辅种任务推送的种子没有带标签，应该是默认带一个
+ * 站点名称的标签」）。补在 `buildReseedAddTorrentOptions` 这一刻，所以存量任务也吃得到;
+ * 这里钉住「默认 / 显式优先 / 空串不清空 / 逐条各按各的站」四条口径。
+ */
+describe("buildReseedAddTorrentOptions：默认标签 = 这一条所属站点的站名", () => {
+  const task = (over: Partial<IKeepUploadTask> = {}): IKeepUploadTask => ({
+    id: "t1",
+    time: 1_700_000_000_000,
+    title: "玩具总动员4 2019 2160p",
+    size: 8_000_000_000,
+    downloadOptions: { downloaderId: "d1" },
+    items: [
+      {
+        site: "ptzone",
+        title: "玩具总动员4 2019 2160p",
+        link: "https://ptzone.invalid/detail/101",
+        url: "https://ptzone.invalid/download/101",
+        size: 8_000_000_000,
+      },
+    ],
+    ...over,
+  });
+  const build = (t: IKeepUploadTask, siteName = "PT Zone") =>
+    buildReseedAddTorrentOptions({ task: t, item: t.items[0]!, baseEntry: null, downloader: undefined, siteName });
+
+  it("任务没写标签时默认带站名（存量任务同判）", () => {
+    expect(build(task()).label).toBe("PT Zone");
+  });
+
+  it("任务上显式填过的标签优先于默认", () => {
+    const t = task({ downloadOptions: { downloaderId: "d1", addTorrentOptions: { label: "我的标签" } } });
+    expect(build(t).label).toBe("我的标签");
+  });
+
+  it("空串也走默认：空串是「清空标签」的指令，不许发下去", () => {
+    const t = task({ downloadOptions: { downloaderId: "d1", addTorrentOptions: { label: "" } } });
+    expect(build(t).label).toBe("PT Zone");
+  });
+
+  it("逐条各按各的站名，不是任务级一个标签贴全批", () => {
+    const t = task();
+    const second: IKeepUploadTaskItem = { ...t.items[0]!, site: "mteam" };
+    const opts = buildReseedAddTorrentOptions({
+      task: t,
+      item: second,
+      baseEntry: null,
+      downloader: undefined,
+      siteName: "M-Team",
+    });
+    expect(opts.label).toBe("M-Team");
+  });
+
+  it("基准那条同样带默认标签，但不跳过校验（默认标签不动跳过校验那档）", () => {
+    const t = task();
+    const opts = buildReseedAddTorrentOptions({
+      task: t,
+      item: t.items[0]!,
+      baseEntry: t.items[0]!,
+      downloader: undefined,
+      siteName: "PT Zone",
+    });
+    expect(opts.label).toBe("PT Zone");
+    expect(opts.advanceAddTorrentOptions?.skip_checking).toBeUndefined();
+  });
+
+  it("非基准条目照旧跳过校验", () => {
+    expect(build(task()).advanceAddTorrentOptions?.skip_checking).toBe(true);
   });
 });

@@ -343,6 +343,18 @@ onMessage("getClientTorrentCategories", async ({ data: downloaderId }) => {
   }
 });
 
+// 默认下载目录：拿不到一律回 null（同分类表那条），调用方按「留空走 autoTMM」兜底。
+onMessage("getClientDefaultSavePath", async ({ data: downloaderId }) => {
+  const downloaderInstance = await getDownloaderInstance(downloaderId);
+  if (!downloaderInstance) return null;
+  try {
+    return await downloaderInstance.getClientDefaultSavePath();
+  } catch (e) {
+    console.error("[offscreen] 获取下载器默认目录失败：", e);
+    return null;
+  }
+});
+
 /**
  * 新建分类。这里**不**像上面那条一样把失败吞成 null/false：那是一条只读判据，拿不到就按
  * 「判不出」走；而这是用户点了一下要看到结果的动作 —— 没连上、被下载器拒掉都必须把原因带回去，

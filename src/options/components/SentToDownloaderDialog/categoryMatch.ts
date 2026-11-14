@@ -17,7 +17,7 @@
  * `autoTMM = true` + `category = 前缀后面那段`，所以这里挑出来的必须原样带回前缀。
  */
 import { categorizeCategory, type TCategoryKind } from "@/shared/category.ts";
-import { CATEGORY_FOLDER_PREFIX } from "@/shared/reseedPath.ts";
+import { CATEGORY_FOLDER_PREFIX, type IClientCategory } from "@/shared/reseedPath.ts";
 
 /**
  * `category:` 前缀的推荐目录单独成组：这批是分类目录，和按盘符列出来的具体路径不是一类东西。
@@ -167,11 +167,99 @@ export function newCategoryFolder(raw: string): string {
 }
 
 /**
+ * 新建分类表单里「该分类的下载目录」那一栏的预填值：**默认下载路径 + 分类名**
+ * （用户 2026-11-14：「新建界面默认的路径就是默认下载路径加分类的名字」）。
+ *
+ * 分隔符跟着默认路径走 —— qBittorrent 在 Windows 上报 `D:\Downloads`、Linux 上报 `/downloads`，
+ * 拼错分隔符建出来的分类目录指不到地方。末尾已有的分隔符不重复拼。
+ * 默认路径取不到（空 / null）时回空串：界面留空走 autoTMM（默认目录下的分类文件夹），
+ * 不拼一条只有分类名的假路径。
+ */
+export function joinCategoryPath(base: string | null | undefined, name: string): string {
+  const trimmedBase = (base ?? "").trim().replace(/[\\/]+$/, "");
+  const trimmedName = name.trim();
+  if (!trimmedBase) return "";
+  if (!trimmedName) return trimmedBase;
+  const sep = trimmedBase.includes("\\") ? "\\" : "/";
+  return `${trimmedBase}${sep}${trimmedName}`;
+}
+
+/** 下载器实时报回来的分类表（键是分类名；`savePath` 是它真正的落盘目录，可能为空串） */
+export type TClientCategoryTable = Record<string, IClientCategory>;
+
+/**
+ * 分类表 → 带 `category:` 前缀的候选目录。
+ *
+ * 「发送到下载器」2026-11-14 起每次打开都真去下载器取一次分类表，而**不再只靠手工导入的
+ * `suggestFolders`**：用户在那边建好的分类，这边不该因为没点过设置页的「一键导入」就看不见。
+ * 键就是分类名（qBittorrent `/torrents/categories` 的形状是 `{ "电影": { name, savePath } }`），
+ * 前缀必须原样带上 —— 发送时命中前缀才会转成 autoTMM + category。
+ */
+export function categoryFoldersFromTable(table?: TClientCategoryTable | null): string[] {
+  if (!table) return [];
+  return Object.keys(table)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map(newCategoryFolder);
+}
+
+/**
+ * 把实时拉到的分类候选并进手工维护的推荐目录：已有顺序不动，只往后追加没见过的。
+ *
+ * 故意**不删**手工项：那份列表是用户自己维护的（也可能带 `$torrent.title$` 这类模板），
+ * 下载器里暂时查不到不等于该删；删了就是替他把配置抹掉。
+ */
+export function mergeCategoryFolders(existing: readonly string[], live: readonly string[]): string[] {
+  return [...new Set([...existing, ...live])];
+}
+
+/** 一条保存路径若是分类写法，返回它指的分类名；具体路径返回 null */
+export function categoryFolderName(folder: string): string | null {
+  if (!folder.startsWith(CATEGORY_FOLDER_PREFIX)) return null;
+  return folder.slice(CATEGORY_FOLDER_PREFIX.length).trim() || null;
+}
+
+/**
+ * 选中的那条分类目录，下载器报的真实落盘目录；查不到 / 是空串都返回 null。
+ *
+ * 空串不是「没有目录」，是 qBittorrent 的 autoTMM 规则：分类不设 savePath 时，
+ * 种子落到 `<默认下载目录>/<分类名>`。调用方按这一档把「默认目录下的分类文件夹」说给用户听，
+ * 不许拿 `category:电影` 这串假路径当目录显示。
+ */
+export function categorySavePathOf(folder: string, table?: TClientCategoryTable | null): string | null {
+  const name = categoryFolderName(folder);
+  if (!name || !table) return null;
+  // 与 `resolveCategoryTaskPath` 同一份口径：表的键就是分类名，不再去翻值里的 name
+  return table[name]?.savePath?.trim() || null;
+}
+
+/**
  * 一条保存路径「自己声称属于哪类内容」：带 `category:` 前缀的按前缀后面那段折类。
  * 两类返回 null，也就是**不表态**，谈不上和某批种子矛盾：
  *  - 按盘符列出来的具体路径（`/volume1/downloads`）；
  *  - 折不出类别的那条（`other`）。
  */
+/**
+ * 这一趟要不要为这批种子**补一条分类**（用户 2026-11-14：「如果本身没有就提示用户新建」）。
+ * 返回要建的名字，调用方据此自动弹出预填好的新建表单（不再静默写下载器）。
+ *
+ * 三条里有一条不满足就不弹：
+ *  - 分类表必须真的拉到了（`null` 是接口失败 / 这台不支持，不能拿「没取到」当「确实没有」）；
+ *  - 这批种子报得出了分类叫法（没分类就没名字，凭空造一个不算自动匹配）；
+ *  - 表里没有同名分类（大小写敏感，与 qBittorrent 的分类名口径一致）。
+ *
+ * 调用方另判「三档判据没命中」「用户没按忽略」「这台认 category: 前缀」。
+ * 单独成函数是为了不必挂起整个弹窗就能验这三条。
+ */
+export function autoCreateCategoryName(
+  table?: TClientCategoryTable | null,
+  categoryName?: string | null,
+): string | null {
+  const name = categoryName?.trim();
+  if (!name || !table) return null;
+  return Object.keys(table).some((key) => key.trim() === name) ? null : name;
+}
+
 export function folderCategoryKind(folder: string): TCategoryKind | null {
   if (!folder.startsWith(CATEGORY_FOLDER_PREFIX)) return null;
   const name = folder.slice(CATEGORY_FOLDER_PREFIX.length).trim();

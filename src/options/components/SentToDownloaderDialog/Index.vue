@@ -10,6 +10,7 @@ import {
   CloseOutlined,
   EditOutlined,
   EllipsisOutlined,
+  FolderAddOutlined,
   LinkOutlined,
 } from "@zboson/icons";
 
@@ -25,12 +26,21 @@ import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { usePromptInDialog } from "@/options/components/usePromptInDialog.ts";
 import { useRatioGuard } from "@/options/components/useRatioGuard.ts";
+import { invalidateCategoryTable, loadCategoryTable } from "@/options/utils/categoryPaths.ts";
+import { sendMessage } from "@/messages.ts";
+import type { IClientCategory } from "@/shared/reseedPath.ts";
 import type { IDownloaderMetadata } from "@/shared/types.ts";
 
 import {
   CATEGORY_FOLDER_PREFIX,
+  autoCreateCategoryName,
   batchCategoryRaws,
   categoryAssocKey,
+  categoryFolderName,
+  categoryFoldersFromTable,
+  categorySavePathOf,
+  joinCategoryPath,
+  mergeCategoryFolders,
   newCategoryFolder,
   resolveCategoryFolder,
   supportsCategoryFolders,
@@ -68,7 +78,32 @@ const addTorrentOptions = ref<Required<Omit<CAddTorrentOptions, "localDownloadOp
   advanceAddTorrentOptions: {},
 });
 
-const suggestFolders = computed(() => selectedDownloader.value?.suggestFolders ?? []);
+/**
+ * 本次从下载器实时取回的分类表（分类名 → 真实落盘目录）。
+ * 声明排在 suggestFolders 之前：那份候选列表要读它，不能等后面的取数块才定义。
+ */
+const liveCategoryTable = ref<Record<string, IClientCategory> | null>(null);
+const loadingCategories = ref(false);
+/** 这台下载器的默认下载目录：新建表单预填「默认路径/分类名」要用；取不到留空走 autoTMM */
+const defaultSavePath = ref("");
+/** 分类表没取到（连不上 / 客户端不支持）：不给一条静默的空界面，界面上要把原因说出来 */
+const categorySyncFailed = ref(false);
+/** 这批种子压根没报分类叫法：自动新建没有名字可用，同样得说清楚 */
+const categoryNoInfo = ref(false);
+/** 每趟同步一个号：异步回来时下载器可能已经换了、弹窗也可能已经关了 */
+let categorySyncSeq = 0;
+
+/**
+ * 保存路径的候选 = 手工维护的推荐目录 + 本次从下载器实时拉到的分类。
+ * 界面上那一排、三档匹配、黄色提示里的「关联到已有分类」都读这一份，不走两条链：
+ * 写回 suggestFolders 万一没成（存储写失败），本次拉到的分类照样要看得见、选得中。
+ */
+const suggestFolders = computed(() =>
+  mergeCategoryFolders(
+    selectedDownloader.value?.suggestFolders ?? [],
+    categoryFoldersFromTable(liveCategoryTable.value),
+  ),
+);
 const suggestTags = computed(() => selectedDownloader.value?.suggestTags ?? []);
 
 /**
@@ -199,11 +234,85 @@ interface ICategoryDecision {
   needPrompt: boolean;
 }
 
+/**
+ * 打开弹窗 / 换下载器时，真去下载器把分类表取回来（用户 2026-11-14：
+ * 「发送到下载器时也要像辅种那样自动获取分类，选择对应的下载路径」）。
+ *
+ * 两件事一起做，缺一件界面就是假的：
+ *  ① 生成 `category:名称` 候选并**写回这台下载器的 suggestFolders** —— 三档判据读的正是
+ *     那份列表，不写回的话这一趟拉到的分类只在本弹窗里活着，辅种检测那一屏仍然看不见；
+ *  ② 拉完再跑 `applyAutoCategoryPath` —— 顺序反了，新拉到的分类这一趟就不参与预选。
+ *
+ * 取失败 / 这台没有分类概念时安静退回原来的手工候选，不弹错：推送种子不该被一次只读请求挡住。
+ */
+async function syncLiveCategories(downloader?: IDownloaderMetadata | null) {
+  const d = downloader ?? selectedDownloader.value;
+  const seq = ++categorySyncSeq;
+  if (!d?.id || !supportsCategoryFolders(d.type)) {
+    liveCategoryTable.value = null;
+    loadingCategories.value = false;
+    categorySyncFailed.value = false;
+    return;
+  }
+
+  loadingCategories.value = true;
+  categorySyncFailed.value = false;
+  try {
+    // 每次打开都真取一次：那份缓存是给辅种两处判「目录一致」用的、页面存活期内不重取，
+    // 而用户可能刚在下载器里手工建过分类，拿旧表就会漏掉。
+    invalidateCategoryTable(d.id);
+    const table = await loadCategoryTable(d.id);
+    if (seq !== categorySyncSeq || !showDialog.value) return;
+    liveCategoryTable.value = table;
+    // `null` 是没取到，不是「这台一条分类都没有」：不能据此自动新建，界面上也要说出来
+    if (!table) {
+      categorySyncFailed.value = true;
+      return;
+    }
+
+    // 顺手取默认下载目录：缺分类自动弹出的新建表单要预填「默认路径/分类名」。
+    // 取不到不挡流程，留空走 autoTMM（默认目录下的分类文件夹）。
+    const defaultPath = await sendMessage("getClientDefaultSavePath", d.id).catch(() => null);
+    if (seq !== categorySyncSeq || !showDialog.value) return;
+    defaultSavePath.value = defaultPath ?? "";
+
+    const current = metadataStore.downloaders[d.id] ?? d;
+    const merged = mergeCategoryFolders(current.suggestFolders ?? [], categoryFoldersFromTable(table));
+    // 只追加、不删手工项：那份列表是用户自己维护的，下载器里暂时查不到不等于该删
+    if (merged.length !== (current.suggestFolders ?? []).length) {
+      await metadataStore.addDownloader({ ...current, suggestFolders: merged });
+      if (seq !== categorySyncSeq || !showDialog.value) return;
+      selectedDownloader.value = metadataStore.downloaders[d.id] ?? selectedDownloader.value;
+    }
+  } catch (e) {
+    // 只读取数 / 写回失败都不挡推送：本次拉到的候选仍在，只是没记进配置
+    if (seq === categorySyncSeq) categorySyncFailed.value = true;
+    console.error("[SentToDownloaderDialog] 同步下载器分类失败:", e);
+  } finally {
+    if (seq === categorySyncSeq) loadingCategories.value = false;
+  }
+}
+
+/** 拉完分类再按这批种子预选；缺的那条分类自动弹出预填好的新建表单。打开弹窗 / 换下载器都走这一条 */
+async function refreshCategorySelection(downloader?: IDownloaderMetadata | null) {
+  await syncLiveCategories(downloader);
+  if (!showDialog.value) return;
+  applyAutoCategoryPath();
+  syncChoiceFields();
+  // 用户 2026-11-14：「如果本身没有就提示用户新建，新建界面默认的路径就是默认下载路径加分类的名字」——
+  // 不再静默写下载器，而是自动弹出新建表单（名称 + 默认路径/分类名 已预填），让他确认或改完点确定。
+  autoOpenCategoryDialogIfNeeded();
+}
+
 /** 命中就把它填成保存路径；没命中不动当前值（沿用上次记住的那一档 / 下载器默认） */
 function applyAutoCategoryPath(downloader?: IDownloaderMetadata) {
   const d = downloader ?? selectedDownloader.value;
   const res = resolveCategoryFolder(
-    d?.suggestFolders ?? [],
+    // 实时候选只对「当前这一台」有效：传进来的下载器换了，旧那台的分类表不能跟着串过去
+    mergeCategoryFolders(
+      d?.suggestFolders ?? [],
+      categoryFoldersFromTable(d?.id === selectedDownloader.value?.id ? liveCategoryTable.value : null),
+    ),
     torrentItems,
     d?.categoryAssoc,
     (siteId) => siteCategoryMaps.value[siteId],
@@ -227,6 +336,9 @@ function applyAutoCategoryPath(downloader?: IDownloaderMetadata) {
         needPrompt: !res.folder && supportsCategoryFolders(d?.type),
       }
     : null;
+  // 连一个原样叫法、一个折得出的规范类别都没有：自动新建没有名字可用，
+  // 界面上要明确说「这批种子没报分类」，别让他对着只有「默认路径 / 手动输入」的空界面猜。
+  categoryNoInfo.value = !name && torrentItems.length > 0;
 }
 
 /**
@@ -248,7 +360,7 @@ const showCategoryPrompt = computed(
 
 /** 「关联到已有分类」的候选：只有带前缀那几条是分类，按盘符列的具体路径不算 */
 const categoryFolderCandidates = computed(() =>
-  (selectedDownloader.value?.suggestFolders ?? [])
+  suggestFolders.value
     .filter((f) => f.startsWith(CATEGORY_FOLDER_PREFIX))
     .filter((f) => f.slice(CATEGORY_FOLDER_PREFIX.length).trim() !== ""),
 );
@@ -302,8 +414,159 @@ function dismissCategoryPrompt() {
   if (categoryDecision.value) dismissedPromptKey.value = categoryDecision.value.promptKey;
 }
 
+/** 这一台认不认 `category:` 前缀（只有 qBittorrent 认，别处的「建分类」是假动作） */
+const canCreateCategory = computed(() => supportsCategoryFolders(selectedDownloader.value?.type));
+
+/** 当前选中的那条分类目录叫什么；不是分类写法时为 null */
+const selectedCategoryName = computed(() => categoryFolderName(addTorrentOptions.value.savePath));
+
+/**
+ * 选中的分类对应哪个真实下载目录。查不到 / 是空串都不是「没目录」—— qBittorrent 的分类
+ * 不设 savePath 时走 autoTMM，落到 `<默认下载目录>/<分类名>`，按这一档说给用户听。
+ */
+const categoryPathText = computed(() => {
+  const name = selectedCategoryName.value;
+  if (!name) return "";
+  return (
+    categorySavePathOf(addTorrentOptions.value.savePath, liveCategoryTable.value) ??
+    t("SentToDownloaderDialog.categoryDefaultFolder", { name })
+  );
+});
+
+/** 「增加分类」那张表单：挂在主弹窗默认插槽里（ZIndexProvider 那条理由同 KeepUploadDialog） */
+const showCategoryDialog = ref(false);
+const newCategoryName = ref("");
+const newCategoryPath = ref("");
+const categorySaving = ref(false);
+/** 这张表单是「缺分类自动弹出来的」还是用户手动点的：前者在表单顶部说一句为什么弹 */
+const categoryDialogAutoOpened = ref(false);
+
+/** 该分类的目录候选：手工配的普通路径 + 下载器里已有分类的目录，去重 */
+const categoryPathOptions = computed(() => {
+  const paths = [
+    ...suggestFolders.value.filter((f) => !f.startsWith(CATEGORY_FOLDER_PREFIX)),
+    ...Object.values(liveCategoryTable.value ?? {}).map((c) => c?.savePath ?? ""),
+  ];
+  return [...new Set(paths.map((p) => p.trim()).filter(Boolean))].map((value) => ({ value, label: value }));
+});
+
+function openCategoryDialog() {
+  categoryDialogAutoOpened.value = false;
+  const name = categoryDecision.value?.name ?? "";
+  newCategoryName.value = name;
+  // 目录预填「默认下载路径 + 分类名」（用户 2026-11-14 定的口径），让他确认或改完点确定。
+  // 默认路径取不到时退回：当前手输的是普通路径就带出它，否则留空走 autoTMM。
+  const typed = addTorrentOptions.value.savePath.trim();
+  if (name && defaultSavePath.value) {
+    newCategoryPath.value = joinCategoryPath(defaultSavePath.value, name);
+  } else {
+    newCategoryPath.value = typed && !typed.startsWith(CATEGORY_FOLDER_PREFIX) ? typed : "";
+  }
+  showCategoryDialog.value = true;
+}
+
+/**
+ * 建一条分类。和辅种检测那一栏同一套动作，只是目录预填「默认下载路径/分类名」（那边辅种要挂
+ * 盘上现成的数据，必须指到数据所在目录；这里普通推送预填默认目录下的分类文件夹，仍可改可留空）。
+ *
+ * 四件事按顺序做：真去下载器建（不然那串只是个名字）→ 丢掉分类表缓存 → 记进这台下载器的
+ * 候选目录 → 选中它并按需记住关联。少一件界面上就是假状态。
+ */
+async function submitCategoryDialog() {
+  const name = newCategoryName.value.trim();
+  if (!name) {
+    runtimeStore.showSnakebar(t("SentToDownloaderDialog.categoryNameRequired"), { color: "warning" });
+    return;
+  }
+  const current = selectedDownloader.value;
+  if (!current?.id) return;
+
+  categorySaving.value = true;
+  try {
+    const created = await sendMessage("createTorrentCategory", {
+      downloaderId: current.id,
+      name,
+      savePath: newCategoryPath.value.trim(),
+    });
+    // false 只表示这台客户端没有分类概念（基类默认实现）；连不上、被拒都是抛错，走下面那支
+    if (!created) {
+      runtimeStore.showSnakebar(t("SentToDownloaderDialog.categoryUnsupported"), { color: "error" });
+      return;
+    }
+
+    invalidateCategoryTable(current.id);
+    const folder = newCategoryFolder(name);
+    const stored = metadataStore.downloaders[current.id] ?? current;
+    if (!(stored.suggestFolders ?? []).includes(folder)) {
+      await metadataStore.addDownloader({ ...stored, suggestFolders: [...(stored.suggestFolders ?? []), folder] });
+      selectedDownloader.value = metadataStore.downloaders[current.id] ?? selectedDownloader.value;
+    }
+
+    // 黄色提示那颗「新建分类」也走这里，收尾共用：填路径、按需记住关联、收掉提示、对齐分段按钮。
+    // 没有 decision 时（种子压根没报分类、用户自己想建一个）造一条最小结论，别让关联写空。
+    if (!categoryDecision.value) {
+      const raws = batchCategoryRaws(torrentItems);
+      categoryDecision.value = {
+        raws,
+        name,
+        folder: null,
+        fromMemory: false,
+        promptKey: `${current.id}::${raws.join("|")}`,
+        needPrompt: false,
+      };
+    }
+    await chooseCategoryFolder(folder);
+
+    showCategoryDialog.value = false;
+    runtimeStore.showSnakebar(t("SentToDownloaderDialog.categoryCreated", { name }), { color: "success" });
+    // 重取一次分类表：界面上那行「该分类的下载目录」要显示下载器报的真路径，不是我们猜的
+    void syncLiveCategories();
+  } catch (e) {
+    runtimeStore.showSnakebar(
+      t("SentToDownloaderDialog.categoryFailed", { msg: e instanceof Error ? e.message : String(e) }),
+      { color: "error" },
+    );
+  } finally {
+    categorySaving.value = false;
+  }
+}
+
 /** 高级设置面板默认展开：这里存的是 a-collapse 的 activeKey */
 const advancedActiveKeys = ref<string[]>(["advanced"]);
+
+/**
+ * 缺分类时自动弹出新建表单（用户 2026-11-14：「如果本身没有就提示用户新建」）。
+ *
+ * 不静默写下载器：弹出来的表单名称 + 「默认下载路径/分类名」都已预填，用户确认或改完点确定
+ * 才真去建（走 submitCategoryDialog）。闸口与上一版自动建一致：只在分类表**成功拉到**之后弹
+ * （连不上时 `null` 不能当成「确实没有」）、只认 qBittorrent、用户按过「忽略」就不弹、
+ * 同一台 + 同名在组件存活期内只弹一次。取消表单后黄色提示仍在，可再次手动打开。
+ */
+const autoOpenedCategoryKeys = new Set<string>();
+
+/** 保存路径标签旁那行状态：自动流程卡在哪一步要看得见，不许静默退回空界面 */
+const categoryStatusText = computed(() => {
+  if (loadingCategories.value) return t("SentToDownloaderDialog.loadingCategories");
+  if (categorySyncFailed.value) return t("SentToDownloaderDialog.categoryFetchFailed");
+  if (categoryNoInfo.value) return t("SentToDownloaderDialog.categoryNoInfo");
+  return "";
+});
+
+function autoOpenCategoryDialogIfNeeded() {
+  const decision = categoryDecision.value;
+  const downloader = selectedDownloader.value;
+  if (!showDialog.value || !downloader?.id || !decision?.needPrompt || decision.folder) return;
+  if (dismissedPromptKey.value === decision.promptKey) return;
+  const name = autoCreateCategoryName(liveCategoryTable.value, decision.name);
+  if (!name) return;
+
+  const key = `${downloader.id}::${name}`;
+  if (autoOpenedCategoryKeys.has(key)) return;
+  autoOpenedCategoryKeys.add(key);
+
+  openCategoryDialog();
+  categoryDialogAutoOpened.value = true;
+}
 
 /** 编辑推荐目录：打开后每个候选变成带叉的可删块，选择功能整排停掉 */
 const editingPaths = ref(false);
@@ -336,9 +599,8 @@ const downloaderOptions = computed(() => sortedEnabledDownloadersBySite.value.ma
 
 function onDownloaderChange() {
   restoreAddTorrentOptions(selectedDownloader.value ?? undefined);
-  // 分类目录是每个下载器自己配的一批，换了就按新那批重新预选一次
-  applyAutoCategoryPath();
-  syncChoiceFields();
+  // 分类表按下载器取，换了就重新拉一次、写回候选，再按新那批预选
+  void refreshCategorySelection();
 }
 
 /** 字段值被程序改过（重置、合并上次的选择）之后，把两个分段按钮的选中态对齐回去 */
@@ -444,6 +706,10 @@ function dialogEnter() {
   editingPaths.value = false;
   categoryDecision.value = null;
   dismissedPromptKey.value = "";
+  liveCategoryTable.value = null;
+  defaultSavePath.value = "";
+  showCategoryDialog.value = false;
+  categoryDialogAutoOpened.value = false;
 
   // 如果是默认下载发送，则直接设置为快速发送到客户端模式
   if (isDefaultSend) {
@@ -478,8 +744,7 @@ function dialogEnter() {
         metadataStore.lastDownloader?.options ?? {},
       ) as Required<Omit<CAddTorrentOptions, "localDownloadOption">>;
       // 排在合并之后：这一档要盖过「记住上次选项」里那条路径 —— 上次的种子和这次不一定是同一类内容
-      applyAutoCategoryPath();
-      syncChoiceFields();
+      void refreshCategorySelection();
     }
   }
 }
@@ -636,6 +901,11 @@ function dialogLeave() {
           <template #label>
             <span class="field-label">
               {{ t("SentToDownloaderDialog.savePath") }}
+              <a-tooltip v-if="canCreateCategory" :title="t('SentToDownloaderDialog.addCategoryHint')">
+                <a-button type="text" size="small" @click="openCategoryDialog">
+                  <template #icon><FolderAddOutlined /></template>
+                </a-button>
+              </a-tooltip>
               <a-tooltip
                 :title="editingPaths ? t('SentToDownloaderDialog.finishEdit') : t('SentToDownloaderDialog.editPaths')"
               >
@@ -646,6 +916,7 @@ function dialogLeave() {
                   </template>
                 </a-button>
               </a-tooltip>
+              <span v-if="categoryStatusText" class="category-loading">{{ categoryStatusText }}</span>
             </span>
           </template>
 
@@ -697,10 +968,15 @@ function dialogLeave() {
             :placeholder="t('SentToDownloaderDialog.customPathPlaceholder')"
           />
 
-          <!-- 三档判据和「记住的关联」都没挑出来，而这个下载器认 `category:` 前缀：不再静默走过，
-               问用户「新建分类」还是「关联到已有分类」。新建那条不需要额外调 API —— 保存路径填成
-               `category:叫法`，发送时 qBittorrent 适配层会转成 autoTMM + category，分类不存在就由
-               客户端在添加种子时建出来。 -->
+          <!-- 选中的是分类目录：把下载器报的真实落盘目录写出来。`category:电影` 这串只是发送时
+               给 qBittorrent 的 autoTMM 暗号，不是目录，不能当路径显示给他看。 -->
+          <div v-if="selectedCategoryName" class="category-path-hint">
+            {{ t("SentToDownloaderDialog.categoryPathOf", { path: categoryPathText }) }}
+          </div>
+
+          <!-- 兜底提示：缺分类时 `autoOpenCategoryDialogIfNeeded` 已自动弹出预填好的新建表单，
+               这条只在表单被取消、分类表没取到 / 客户端不支持，或用户按过「忽略」时出现。
+               两颗都走真动作：新建打开表单、真去下载器建一条分类，关联复用下面那颗下拉。 -->
           <a-alert
             v-if="showCategoryPrompt"
             type="warning"
@@ -727,7 +1003,7 @@ function dialogLeave() {
                 <a-button
                   type="primary"
                   size="small"
-                  @click="chooseCategoryFolder(newCategoryFolder(categoryDecision?.name ?? ''))"
+                  @click="openCategoryDialog"
                 >
                   {{ t("SentToDownloaderDialog.categoryCreate", { category: categoryDecision?.name ?? "" }) }}
                 </a-button>
@@ -830,6 +1106,55 @@ function dialogLeave() {
         </a-collapse>
       </div>
     </a-form>
+
+    <!-- 「增加分类」的表单挂在主弹窗的默认插槽里，不当根级兄弟节点：内层要走 antd 的
+         ZIndexProvider 才压得住外层（同 KeepUploadDialog 那两处弹窗的实测理由）。
+         缺分类时它会自动弹出来，名称与「默认下载路径/分类名」已预填；目录仍可改，
+         留空则走 qBittorrent autoTMM（默认目录下的分类文件夹）。 -->
+    <a-modal
+      v-model:open="showCategoryDialog"
+      :title="t('SentToDownloaderDialog.addCategory')"
+      :width="480"
+      :ok-text="t('common.dialog.ok')"
+      :cancel-text="t('common.dialog.cancel')"
+      :confirm-loading="categorySaving"
+      @ok="submitCategoryDialog"
+    >
+      <a-form layout="vertical">
+        <!-- 自动弹出来时说一句为什么弹：下载器里没有这条分类，目录已按默认路径预填，可改后确定。
+             Alert 只读具名插槽（默认插槽的文字进不了界面），正文走 #message。 -->
+        <a-alert
+          v-if="categoryDialogAutoOpened && newCategoryName"
+          type="info"
+          show-icon
+          style="margin-bottom: 12px"
+        >
+          <template #message>
+            {{ t("SentToDownloaderDialog.categoryMissingNotice", { name: newCategoryName }) }}
+          </template>
+        </a-alert>
+        <a-form-item :label="t('SentToDownloaderDialog.categoryName')">
+          <a-input v-model:value="newCategoryName" />
+        </a-form-item>
+        <a-form-item
+          :label="t('SentToDownloaderDialog.categoryPath')"
+          :extra="t('SentToDownloaderDialog.categoryPathHint')"
+        >
+          <a-auto-complete
+            v-model:value="newCategoryPath"
+            :options="categoryPathOptions"
+            :popup-match-select-width="false"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item>
+          <div class="switch-item">
+            <a-switch v-model:checked="rememberCategoryAssoc" size="small" />
+            <span class="switch-label">{{ t("SentToDownloaderDialog.categoryRemember") }}</span>
+          </div>
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     <template #footer>
       <div style="display: flex; align-items: center">
@@ -1028,6 +1353,23 @@ function dialogLeave() {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 16px;
+}
+
+// 「正在获取下载器分类…」贴在保存路径标签后面，跟着那一行的字号，别把表单 label 撑高
+.category-loading {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+// 选中分类目录时那行「该分类的下载目录：…」：路径常是无空格长串，要能换行，
+// 否则会把 800px 弹窗撑出横向滚动条
+.category-path-hint {
+  margin-top: 8px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  overflow-wrap: anywhere;
 }
 
 // 分类那两条提示挂在「保存路径」的候选底下，和上面的按钮行留 10px 缝（全站口径：不许零间距贴边）

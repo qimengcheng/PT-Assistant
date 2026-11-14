@@ -586,6 +586,14 @@ export abstract class AbstractBittorrentClient<T extends DownloaderBaseConfig = 
   }
 
   /**
+   * 这台客户端的**默认下载目录**（qBittorrent 设置里的 Default Save Path），默认拿不到（null）。
+   * 「发送到下载器」新建分类时要把它预填成「默认目录/分类名」让用户确认；拿不到就留空走 autoTMM。
+   */
+  public async getClientDefaultSavePath(): Promise<string | null> {
+    return null;
+  }
+
+  /**
    * 新建一个分类（名字 + 它的落盘目录），默认不支持，由各客户端 override。
    *
    * 辅种要它：保存路径那一格能写 `category:电影`，可候选里只有下载器**已经有**的分类，

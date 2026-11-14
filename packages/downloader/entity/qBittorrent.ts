@@ -803,6 +803,15 @@ export default class QBittorrent extends AbstractBittorrentClient<TorrentClientC
   }
 
   /**
+   * 默认下载目录。`/app/defaultSavePath` 回的是纯文本路径串（WebAPI 2.0 起就有，无需版本门）。
+   * 空串按「拿不到」回 null，调用方留空走 autoTMM，不拿空串去拼「默认目录/分类名」。
+   */
+  public override async getClientDefaultSavePath(): Promise<string | null> {
+    const { data } = await this.request<string>("/app/defaultSavePath");
+    return data?.trim() || null;
+  }
+
+  /**
    * 建一个带目录的分类。`/torrents/createCategory` 成功时回空 body，失败是非 2xx
    * （`request` 会抛），所以「没抛」就是建好了 —— 不去看 body 里有没有 "Ok."。
    *

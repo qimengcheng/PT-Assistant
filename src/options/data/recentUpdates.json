@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-11-14 17:20:19",
-  "headSha": "d680a27",
+  "generatedAt": "2026-11-14 17:41:54",
+  "headSha": "2eb1292",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.136.4",
+      "date": "2026-11-14 17:42:30",
+      "added": [],
+      "improved": [
+        "全站界面字体统一为微软雅黑：设置页各页、站点页上的悬浮球、各类弹窗，以及分类标签、路径提示、时间线和统计图里的文字都换成同一套字，中英文和数字的读感更整齐"
+      ],
+      "addedTotal": 0,
+      "improvedTotal": 1
+    },
     {
       "version": "0.136.3",
       "date": "2026-11-14 17:20:11",

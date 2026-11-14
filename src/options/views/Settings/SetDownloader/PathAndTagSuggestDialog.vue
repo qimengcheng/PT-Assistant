@@ -258,7 +258,7 @@ function saveClientConfig() {
   margin-bottom: 6px;
 }
 .field-textarea {
-  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .chip-group {
   display: flex;
@@ -269,7 +269,7 @@ function saveClientConfig() {
 .kw-chip {
   cursor: pointer;
   margin-inline-end: 0;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .example-pre {
   margin: 0;

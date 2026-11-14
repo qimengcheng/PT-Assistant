@@ -1286,8 +1286,9 @@ function dialogLeave() {
   opacity: 0.55;
 }
 
+// 类名沿用 mono，但用户 2026-11-14 要求全站微软雅黑，等宽档取消
 .choice-mono {
-  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 // 两个开关并成一条，省掉 a-form-item 上下各一段的垂直留白
@@ -1377,7 +1378,7 @@ function dialogLeave() {
 // 否则会把 800px 弹窗撑出横向滚动条
 .category-path-hint {
   margin-top: 8px;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   overflow-wrap: anywhere;

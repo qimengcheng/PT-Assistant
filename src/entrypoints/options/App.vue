@@ -35,6 +35,7 @@ import { i18nInstance } from "@/options/plugins/i18n.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { moveNavItem, navOrderChanged, orderNavByPaths } from "@/options/navOrder.ts";
+import { PT_FONT_FAMILY } from "@/shared/font";
 
 const version = browser.runtime.getManifest().version;
 const route = useRoute();
@@ -263,7 +264,7 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
   <a-config-provider
     :locale="antdLocale"
     :theme="{
-      token: { fontSize: 13 },
+      token: { fontSize: 13, fontFamily: PT_FONT_FAMILY },
       components: {
         Table: {
           rowHoverBg: '#e3f2fb',

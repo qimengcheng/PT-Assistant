@@ -387,7 +387,7 @@ function rowExpandable(record: IFieldRow) {
 }
 
 .site-defs-key {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 12px;
   line-height: 1.4;
 }
@@ -405,7 +405,7 @@ function rowExpandable(record: IFieldRow) {
   overflow: auto;
   background: var(--pt-color-bg-hover);
   border-radius: 4px;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -413,7 +413,7 @@ function rowExpandable(record: IFieldRow) {
 }
 
 .mono {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 12px;
 }
 </style>

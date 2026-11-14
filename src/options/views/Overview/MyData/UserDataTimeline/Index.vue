@@ -510,9 +510,9 @@ function saveControl() {
                             y: 0,
                             text: `${allAddedSiteMetadata[userInfo.site]?.isDead ? '󰖛' : ''}${allAddedSiteMetadata[userInfo.site]?.siteName ?? userInfo.site}`,
                             fill: allAddedSiteMetadata[userInfo.site]?.isDead ? '#9E9E9E' : '#fff',
-                            fontFamily: allAddedSiteMetadata[userInfo.site]?.isDead
-                              ? 'Material Design Icons For PTD'
-                              : undefined,
+                            ...(allAddedSiteMetadata[userInfo.site]?.isDead
+                              ? { fontFamily: 'Material Design Icons For PTD' }
+                              : {}),
                             fontStyle: 'bold',
                           })
                         "

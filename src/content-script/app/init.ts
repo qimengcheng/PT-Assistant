@@ -24,6 +24,7 @@ import { i18nInstance as i18n } from "@/options/plugins/i18n.ts";
 // content 侧不共用 options 的全量 antd install：整包 antd 会让 content-app 单个 chunk
 // 涨到 4.3MB（每个站点都要背），改按需注册见 @/content-script/antd-lite.ts。
 import { antdLiteInstance as antd } from "@/content-script/antd-lite.ts";
+import { PT_FONT_FAMILY } from "@/shared/font";
 // 同理，语言包只注册 content 闭包用到的 6 个命名空间，其余被 tree-shake（见 i18n-lite.ts）
 import "@/content-script/i18n-lite.ts";
 
@@ -100,7 +101,10 @@ export function mountApp(document: Document, data: Record<string, unknown> = {})
    * 重挂时这里会重新执行，指向新的 shadowRoot —— 旧的连同宿主一起被丢弃，正是想要的。
    */
   ConfigProvider.config({
-    holderRender: (node) => h(StyleProvider, { container: shadowRoot }, () => node),
+    holderRender: (node) =>
+      h(StyleProvider, { container: shadowRoot }, () =>
+        h(ConfigProvider, { theme: { token: { fontFamily: PT_FONT_FAMILY } } }, () => node),
+      ),
   });
   // 静态 message 的容器是全局配置，不读 ConfigProvider 的 getPopupContainer
   message.config({ getContainer: () => overlayElement });

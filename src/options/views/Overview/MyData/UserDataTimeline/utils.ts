@@ -11,6 +11,7 @@ import type { IStoredUserInfo } from "@/shared/types.ts";
 import { fixUserInfo, realFormatRatio } from "../utils/format.ts";
 import { allAddedSiteMetadata, type TOptionSiteMetadatas } from "../utils/siteMetadata.ts";
 import { readAllArchive } from "@/shared/userInfoArchive.ts";
+import { PT_FONT_FAMILY } from "@/shared/font";
 
 const metadataStore = useMetadataStore();
 
@@ -246,7 +247,7 @@ export const timelineDataRef = useResetableRef<ITimelineData>(
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type TKonvaConfig = Record<string, any>;
-export const text = (config: TKonvaConfig) => ({ x: 0, y: 0, fontSize: 24, fill: "#fff", ...config });
+export const text = (config: TKonvaConfig) => ({ x: 0, y: 0, fontSize: 24, fill: "#fff", fontFamily: PT_FONT_FAMILY, ...config });
 export const divider = (config: TKonvaConfig) => ({ x: 0, y: 0, stroke: "#0000001f", strokeWidth: 2, ...config });
 export const image = (config: TKonvaConfig) => {
   const imageBaseSize = config.size ?? 24;

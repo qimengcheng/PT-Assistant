@@ -181,6 +181,6 @@ async function doSubmit() {
 
 <style scoped>
 .json-textarea {
-  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 </style>

@@ -20,6 +20,7 @@ import { type ITorrent } from "@ptd/site";
 import { sendMessage } from "@/messages.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
+import { PT_FONT_FAMILY } from "@/shared/font";
 
 import type { IRemoteDownloadDialogData } from "./types.ts";
 import { contentOverlay, currentView, type IPtdData, pageType, updatePageType } from "./utils.ts";
@@ -304,6 +305,7 @@ onBeforeUnmount(() => stopSnakebarWatch());
     <a-config-provider
       :get-popup-container="getPopupContainer"
       :theme="{
+        token: { fontFamily: PT_FONT_FAMILY },
         components: {
           Table: {
             rowHoverBg: '#e3f2fb',

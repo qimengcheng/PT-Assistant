@@ -33,6 +33,7 @@ import { NO_IMAGE } from "@ptd/site";
 
 import { formatSize, formatDate } from "@/options/utils.ts";
 import { type IStoredUserInfo } from "@/shared/types.ts";
+import { PT_FONT_FAMILY } from "@/shared/font";
 
 import { useRuntimeStore } from "@/options/stores/runtime.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
@@ -164,6 +165,7 @@ const totalSiteBaseInfoChartOptions = computed(() => {
   const seedingBonus = getTotalDataByField("seedingBonus");
 
   return {
+    textStyle: { fontFamily: PT_FONT_FAMILY },
     title: {
       text: `[${configStore.getUserName}] ${t("UserDataStatistic.chart.totalSiteBase")}`,
       subtext: `${t("UserDataStatistic.chart.uploadLabel")}: ${formatSize(uploaded.at(-1) ?? 0)}, ${t("UserDataStatistic.chart.downloadLabel")}: ${formatSize(downloaded.at(-1) ?? 0)}, ${t("levelRequirement.bonus")}: ${(bonus.at(-1) ?? 0).toFixed(2)}, ${t("levelRequirement.seedingBonus")}: ${(seedingBonus.at(-1) ?? 0).toFixed(2)}`,
@@ -213,6 +215,7 @@ const totalSiteSeedingInfoChartOptions = computed(() => {
   const seedingSize = getTotalDataByField("seedingSize");
 
   return {
+    textStyle: { fontFamily: PT_FONT_FAMILY },
     title: {
       text: `[${configStore.getUserName}] ${t("UserDataStatistic.chart.totalSiteSeeding")}`,
       subtext: `${t("UserDataStatistic.chart.seedingSizeLabel")}: ${formatSize(seedingSize.at(-1) ?? 0)}, ${t("common.count")}: ${(seeding.at(-1) ?? 0).toFixed(2)}`,
@@ -298,6 +301,7 @@ function createPerSiteChartOptionsFn(
     const seriesTotal = series.map((x) => ({ name: x.name, value: x.data.reduce((a, b) => a + b, 0) }));
 
     return {
+      textStyle: { fontFamily: PT_FONT_FAMILY },
       title: {
         text: `[${configStore.getUserName}] ${t("UserDataStatistic.chart.perSiteK" + field + (incr ? "Incr" : ""))}`,
         left: "center",
@@ -551,7 +555,7 @@ async function exportStatisticImg() {
   }
 
   // 在 canvas 上添加右对齐文字
-  ctx.font = "12px Arial";
+  ctx.font = `12px ${PT_FONT_FAMILY}`;
   ctx.fillStyle = "#b5b5b5";
   ctx.textAlign = "right";
 

@@ -31,11 +31,13 @@
 }
 
 body {
+  /* 微软雅黑置顶（用户 2026-11-14 全站统一），其余仅作非 Windows 兜底；与 @/shared/font.ts 同值 */
   font-family:
+    "Microsoft YaHei",
+    "微软雅黑",
     system-ui,
     -apple-system,
     "Segoe UI",
-    "Microsoft YaHei",
     sans-serif;
   font-size: 13px;
   color: var(--pt-color-text);
@@ -532,7 +534,7 @@ body {
 .site-list li {
   padding: 6px 14px;
   cursor: pointer;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 12px;
 }
 

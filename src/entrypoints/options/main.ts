@@ -1,4 +1,5 @@
-import { createApp, watchEffect } from "vue";
+import { createApp, h, watchEffect } from "vue";
+import { ConfigProvider } from "@zboson/ui";
 
 import App from "./App.vue";
 
@@ -8,6 +9,7 @@ import { routerInstance } from "@/options/plugins/router.ts";
 import { i18nInstance, mergeLocaleMessages } from "@/options/plugins/i18n.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { installConsoleLogGate } from "@/shared/consoleLog.ts";
+import { PT_FONT_FAMILY } from "@/shared/font";
 
 // options 页面注册全量语言包（消息与 i18n 单例解耦，见 plugins/i18n.ts）
 import en from "~/locales/en.json";
@@ -19,6 +21,12 @@ mergeLocaleMessages("zh_CN", zh_CN);
 // `Restoring state for key: config from storage: local` 就是在 store 创建时打的，
 // 晚一步装就等于漏掉用户截图里最吵的那一条。
 installConsoleLogGate();
+
+// 静态弹层（Modal.confirm 等）走 detached 渲染树，读不到 App.vue 那层 ConfigProvider，
+// 不补这份 token 它们就落回 antd 默认字体栈（微软雅黑统一口径见 @/shared/font.ts）。
+ConfigProvider.config({
+  holderRender: (node) => h(ConfigProvider, { theme: { token: { fontFamily: PT_FONT_FAMILY } } }, () => node),
+});
 
 import "./style.css";
 import "./vuetify-compat.css";

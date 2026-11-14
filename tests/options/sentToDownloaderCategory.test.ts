@@ -274,3 +274,28 @@ describe("弹窗接线：一键新建是真去下载器建分类", () => {
     }
   });
 });
+
+describe("弹窗接线：快速发送切回普通模式要补跑下载器初始化（用户 2026-11-14：快速模式打开后切普通，分类 UI 整个不出）", () => {
+  const code = codeLines(read("src/options/components/SentToDownloaderDialog/Index.vue"));
+
+  it("切换键走 toggleQuickSend，不再是裸翻转", () => {
+    expect(code).toContain('@click="toggleQuickSend"');
+    expect(code).not.toContain('@click="quickSendToClient = !quickSendToClient"');
+  });
+
+  it("切回普通模式且还没选下载器时补跑初始化", () => {
+    const fn = code.slice(code.indexOf("function toggleQuickSend"));
+    const body = fn.slice(0, fn.indexOf("\n}"));
+    expect(body).toContain("quickSendToClient.value = !quickSendToClient.value");
+    expect(body).toContain("!selectedDownloader.value");
+    expect(body).toContain("initDownloaderSelection()");
+  });
+
+  it("普通模式打开与切换补跑共用同一份初始化，且含分类预选", () => {
+    const fn = code.slice(code.indexOf("function initDownloaderSelection"));
+    const body = fn.slice(0, fn.indexOf("\n}"));
+    expect(body).toContain("selectedDownloader.value = remembered");
+    expect(body).toContain("void refreshCategorySelection()");
+    expect(code).toContain("if (!quickSendToClient.value) initDownloaderSelection()");
+  });
+});

@@ -728,25 +728,36 @@ function dialogEnter() {
   } else {
     restoreAddTorrentOptions(); // 先重置所有选项，然后如果需要则从uiStore中获取历史情况
     quickSendToClient.value = configStore.download.useQuickSendToClient;
-
-    // 如果不是快速发送到客户端模式，则尝试设置默认下载器
-    if (!quickSendToClient.value) {
-      // 上次的下载器必须在本次的候选里：单选列表只会渲染候选，选中一个不在列表里的 id
-      // 会让界面看起来一个都没勾上，而「完成」按钮又是可点的。
-      const candidates = sortedEnabledDownloadersBySite.value;
-      const lastId = metadataStore.lastDownloader?.id;
-      const remembered = lastId ? candidates.find((d) => d.id === lastId) : undefined;
-      selectedDownloader.value = remembered ?? (candidates.length === 1 ? candidates[0] : null);
-
-      // 将上一次的下载器选项通过 toMerged 合并到当前选项中，而不是直接覆盖
-      addTorrentOptions.value = toMerged(
-        addTorrentOptions.value,
-        metadataStore.lastDownloader?.options ?? {},
-      ) as Required<Omit<CAddTorrentOptions, "localDownloadOption">>;
-      // 排在合并之后：这一档要盖过「记住上次选项」里那条路径 —— 上次的种子和这次不一定是同一类内容
-      void refreshCategorySelection();
-    }
+    if (!quickSendToClient.value) initDownloaderSelection();
   }
+}
+
+/** 普通模式的下载器初始化：选上次/唯一候选、合并上次选项、跑分类预选。 */
+function initDownloaderSelection() {
+  // 上次的下载器必须在本次的候选里：单选列表只会渲染候选，选中一个不在列表里的 id
+  // 会让界面看起来一个都没勾上，而「完成」按钮又是可点的。
+  const candidates = sortedEnabledDownloadersBySite.value;
+  const lastId = metadataStore.lastDownloader?.id;
+  const remembered = lastId ? candidates.find((d) => d.id === lastId) : undefined;
+  selectedDownloader.value = remembered ?? (candidates.length === 1 ? candidates[0] : null);
+
+  // 将上一次的下载器选项通过 toMerged 合并到当前选项中，而不是直接覆盖
+  addTorrentOptions.value = toMerged(
+    addTorrentOptions.value,
+    metadataStore.lastDownloader?.options ?? {},
+  ) as Required<Omit<CAddTorrentOptions, "localDownloadOption">>;
+  // 排在合并之后：这一档要盖过「记住上次选项」里那条路径 —— 上次的种子和这次不一定是同一类内容
+  void refreshCategorySelection();
+}
+
+/**
+ * 快速发送 ↔ 普通模式切换。快速模式打开时 dialogEnter 跳过了下载器初始化，
+ * 切回普通模式必须补上：否则 selectedDownloader 为空，分类 UI（增加分类按钮、
+ * 自动选分类、缺分类自动弹新建表单）整个不出，「完成」键也点不动。
+ */
+function toggleQuickSend() {
+  quickSendToClient.value = !quickSendToClient.value;
+  if (!quickSendToClient.value && !selectedDownloader.value) initDownloaderSelection();
 }
 
 function dialogLeave() {
@@ -1159,7 +1170,7 @@ function dialogLeave() {
     <template #footer>
       <div style="display: flex; align-items: center">
         <a-tooltip :title="t('SentToDownloaderDialog.moreOptions')">
-          <a-button type="text" @click="quickSendToClient = !quickSendToClient">
+          <a-button type="text" @click="toggleQuickSend">
             <template #icon><AppstoreOutlined /></template>
           </a-button>
         </a-tooltip>

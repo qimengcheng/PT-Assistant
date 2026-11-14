@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-11-14 17:43:37",
-  "headSha": "b317e1b",
+  "generatedAt": "2026-11-14 20:32:40",
+  "headSha": "422e73a",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.137.1",
+      "date": "2026-11-14 18:26:37",
+      "added": [],
+      "improved": [
+        "界面配色跟随组件库新色板做了一轮微调：表格选中行的底色、成功/警告/错误等状态文字与标签的颜色统一刷新，整体观感更一致；表格悬停底色、表头底色和主色按钮经实测保持原样，读感不受影响"
+      ],
+      "addedTotal": 0,
+      "improvedTotal": 1
+    },
     {
       "version": "0.137.0",
       "date": "2026-11-14 17:43:26",

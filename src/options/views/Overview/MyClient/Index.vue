@@ -1239,9 +1239,9 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
           <a-button size="small" type="primary" @click="showClientStatusDialog = true">
             <template #icon><ThunderboltOutlined /></template>
             {{ allTorrents.length }}
-            <ArrowUpOutlined style="color: #2b780a" />
+            <ArrowUpOutlined style="color: #2e7d00" />
             {{ formatSize(totalUpSpeed) }}/s
-            <ArrowDownOutlined style="color: #a63126" />
+            <ArrowDownOutlined style="color: #ac2b1c" />
             {{ formatSize(totalDlSpeed) }}/s
           </a-button>
         </HoverTip>
@@ -1383,7 +1383,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
             type="circle"
             :percent="toPercent(record.progress) ?? 0"
             :size="28"
-            :stroke-color="record.isCompleted ? '#2b780a' : '#3b8ece'"
+            :stroke-color="record.isCompleted ? '#2e7d00' : '#3b8ece'"
           />
           <span v-else class="text-grey">-</span>
         </template>
@@ -1395,7 +1395,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
 
         <!-- upload speed -->
         <template v-else-if="column.key === 'uploadSpeed'">
-          <span v-if="record.uploadSpeed > 0" class="text-no-wrap" style="color: #2b780a">
+          <span v-if="record.uploadSpeed > 0" class="text-no-wrap" style="color: #2e7d00">
             {{ formatSize(record.uploadSpeed) }}/s
           </span>
           <span v-else class="text-grey">-</span>
@@ -1411,7 +1411,7 @@ function handleTableChange(_pagination: unknown, _filters: unknown, sorter: TSor
 
         <!-- total uploaded -->
         <template v-else-if="column.key === 'totalUploaded'">
-          <span class="text-no-wrap" style="color: #2b780a">{{ formatSize(record.totalUploaded) }}</span>
+          <span class="text-no-wrap" style="color: #2e7d00">{{ formatSize(record.totalUploaded) }}</span>
         </template>
 
         <!-- total downloaded -->

@@ -427,7 +427,7 @@ const spanLine = computed(() =>
 .rank-bar > i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #8ec7e8, #3b8ece);
+  background: linear-gradient(90deg, #69bbfe, #3b8ece);
   border-radius: 2px;
 }
 .rank-metrics {

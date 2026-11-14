@@ -460,7 +460,7 @@ const visibleLevelRequirements = computed(() => {
   cursor: pointer;
 
   &:hover {
-    color: #63abdb;
+    color: #52a4e6;
   }
 }
 </style>

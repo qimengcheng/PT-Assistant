@@ -240,6 +240,9 @@ const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value
        留着 #f0f7ff 两态只差 1.0254:1（改前那对是 1.0376:1，本来就很窄，再窄就读不出来了），
        所以改成 #e3f2fb —— 现在是**比选中深一档**。台架 .tmp-build/bench-palette 从浏览器读回过那一档
        选中底 = #f0fbff（`.ant-table-row-selected > td` 的计算样式）；1.0865:1 是这两个数算出来的。
+       ⚠️ 0.0.3（OKLab 色板重写）把 blue-1 挪到 #f3f9ff，选中底跟着变；悬停 #e3f2fb 经重测**保留不动**——
+       对新选中底 #f3f9ff 对比度 1.0787:1（旧 1.0865），仍远高于「读不出」的 1.0376 阈值，
+       「比选中深一档」方向不变（台架 contrast.mjs 算，WCAG 相对亮度法已复现旧值 1.0865/1.0376/3.53）。
        ⚠️ 界面上真正画悬停的是 `style.css` 里那条 `:hover`（v0.37.4 起，还有一条 (0,4,1) 把 antd 那个
        JS 类的底色整条压成 transparent），所以这一格 token 对**普通行与选中行的悬停都没有可见消费者** ——
        留着它是让 CSS 与 JS 两侧不许各说一套值。台架那份没引 style.css，它量到的是「token 那条路自己会画

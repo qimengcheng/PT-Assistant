@@ -166,7 +166,7 @@ const uploadSpeedLimit = computed({
 });
 
 const timeoutColor = computed(() => {
-  if (timeout.value > 8 * 60e3) return "#a63126";
+  if (timeout.value > 8 * 60e3) return "#ac2b1c";
   if (timeout.value > 5 * 60e3) return "#cf850e";
   return "#429e15";
 });

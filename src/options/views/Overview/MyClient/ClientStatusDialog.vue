@@ -134,7 +134,7 @@ function onEnter() {
               {{ clientVersions[d.id] }}
             </span>
             <a-tooltip v-if="suspendedDownloaders.has(d.id)" :title="t('MyClient.autoRefresh.suspendedTip')">
-              <ReloadOutlined class="ml-1" :style="{ color: '#a63126' }" />
+              <ReloadOutlined class="ml-1" :style="{ color: '#ac2b1c' }" />
             </a-tooltip>
           </div>
           <a

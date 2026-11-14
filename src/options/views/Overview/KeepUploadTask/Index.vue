@@ -2395,7 +2395,7 @@ async function copyLinksToClipboard(task: IKeepUploadTask) {
 }
 
 .path-mismatch-text {
-  color: #d46b08;
+  color: #c36a00;
   font-size: 12px;
 }
 

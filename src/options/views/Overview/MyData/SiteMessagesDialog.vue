@@ -390,7 +390,7 @@ function itemClasses(index: number, item: ISiteMessage) {
   background: #e3f2fb;
 }
 .msg-item--active {
-  background: #f0fbff;
+  background: #f3f9ff;
 }
 .msg-item--read .msg-title {
   color: rgba(0, 0, 0, 0.45);

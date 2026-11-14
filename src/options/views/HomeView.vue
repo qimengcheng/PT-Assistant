@@ -189,9 +189,9 @@ const releasesUrl = `${REPO_URL}/releases`;
 .update-card {
   display: block;
   padding: 6px 14px;
-  border: 1px solid #f5d687;
+  border: 1px solid #ffc47f;
   border-radius: 10px;
-  background: #fff9e6;
+  background: #fff7ee;
   text-decoration: none;
   transition:
     border-color 0.2s,
@@ -203,7 +203,7 @@ const releasesUrl = `${REPO_URL}/releases`;
 }
 .update-label {
   font-size: 12px;
-  color: #824800;
+  color: #774a00;
 }
 .update-value {
   font-size: 24px;
@@ -272,8 +272,8 @@ const releasesUrl = `${REPO_URL}/releases`;
   line-height: 18px;
 }
 .kind-added {
-  background: #d6dece;
-  color: #2b780a;
+  background: #edffe7;
+  color: #2e7d00;
 }
 .kind-improved {
   background: #f5f5f5;

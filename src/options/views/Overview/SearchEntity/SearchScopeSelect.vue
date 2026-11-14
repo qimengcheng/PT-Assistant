@@ -335,7 +335,7 @@ watch(searchPlanKey, (key) => (checkedSiteIds.value = key.startsWith("site:") ? 
 }
 
 .search-scope-plan.is-active {
-  background: #f0fbff;
+  background: #f3f9ff;
   color: #3b8ece;
 }
 
@@ -378,7 +378,7 @@ watch(searchPlanKey, (key) => (checkedSiteIds.value = key.startsWith("site:") ? 
 /* 拖到哪一行：class 是命令式加在 a-table 渲染的 tr 上的，不带本组件 scope id，得 :deep；
    antd 的行底色画在单元格上而不是 tr 上，所以命中的是 td */
 :deep(tr.scope-row-drop-target > td) {
-  background: #f0fbff;
+  background: #f3f9ff;
 }
 
 .search-scope-footer {

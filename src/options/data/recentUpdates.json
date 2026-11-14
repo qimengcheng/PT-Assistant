@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-11-14 17:10:51",
-  "headSha": "879ba55",
+  "generatedAt": "2026-11-14 17:13:52",
+  "headSha": "bebf762",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.136.2",
+      "date": "2026-11-14 17:13:44",
+      "added": [],
+      "improved": [
+        "qBittorrent 5.3.0 把添加种子时「跳过哈希校验」的接口参数改了名，扩展发的旧名字被它静默忽略，辅种任务推过去的种子于是整批重新全量校验。现在新旧两个参数名一起发，5.3 及以上恢复跳过校验、直接挂磁盘上现成的数据，老版本行为不变"
+      ],
+      "addedTotal": 0,
+      "improvedTotal": 1
+    },
     {
       "version": "0.136.1",
       "date": "2026-11-14 17:10:51",

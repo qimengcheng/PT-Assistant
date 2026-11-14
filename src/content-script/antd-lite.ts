@@ -1,5 +1,5 @@
 /**
- * content script 侧的 antdv-next **按需注册**。
+ * content script 侧的 @zboson/ui **按需注册**。
  *
  * 为什么不用 `@/options/plugins/antd.ts` 的全量 `install`：
  * 全量 install 会遍历 `@zboson/ui/dist/components.js` 里全部 76 个可安装组件

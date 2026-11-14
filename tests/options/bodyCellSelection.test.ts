@@ -6,7 +6,7 @@
  * `.tmp-build/bench-mydata/probe4.{html,mjs}`，挂的是没改过的真页面）。
  *
  * 机制（两处源码，都不是猜的）：
- *   `antdv-next@1.6.0` 的 `TableCell` —— `if (bodyCell && column) { const t = bodyCell({column,text,record}); … g = t }`：
+ *   `@zboson/ui`（源自上游 antdv-next 1.6.0）的 `TableCell` —— `if (bodyCell && column) { const t = bodyCell({column,text,record}); … g = t }`：
  *   **插槽返回了东西就整格替换**，包括 antd 自己为勾选列渲染的那颗 checkbox；
  *   `vue` 的 `flattenChildren` —— 把注释节点滤掉、把组件 vnode 留下。
  *   于是同一句 `v-if` 写在页面上和写在子组件里，结果相反：

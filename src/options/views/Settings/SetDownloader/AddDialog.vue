@@ -41,7 +41,7 @@ const currentStep = ref<0 | 1>(0);
 const isFormValid = ref<boolean>(false);
 
 /**
- * antdv-next 的 Steps 只有 `items` 写法（1.5.6 注册名里根本没有 `a-step`，
+ * @zboson/ui 的 Steps 只有 `items` 写法（注册名里根本没有 `a-step`，
  * 全量 install 也只有 ASteps），照 Vuetify 的 v-stepper 那样写子组件会渲染成
  * 未知元素、步骤条整条空白。
  */

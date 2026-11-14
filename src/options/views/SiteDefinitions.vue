@@ -353,7 +353,7 @@ function rowExpandable(record: IFieldRow) {
   overflow: hidden;
 }
 
-/* 右卡多一层 a-spin。antdv-next 的嵌套 Spin 是 `.ant-spin` > `.ant-spin-container`
+/* 右卡多一层 a-spin。@zboson/ui 的嵌套 Spin 是 `.ant-spin` > `.ant-spin-container`
    （dist/spin/index.js:85-107），**没有** React 版那个 `.ant-spin-nested-loading`，
    照旧类名写选择器会静默落空、高度链在这里断掉。两层都要传高度。 */
 .site-defs-detail :deep(.ant-spin),

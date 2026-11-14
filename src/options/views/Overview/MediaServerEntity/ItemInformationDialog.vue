@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 媒体条目详情对话框（antdv-next 平移）。
+ * 媒体条目详情对话框（@zboson/ui 平移）。
  * 封面、简介、标签、时长/大小、媒体流信息（音轨/字幕悬停展开）、观看与喜欢状态。
  */
 import { computed } from "vue";

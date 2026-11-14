@@ -2,7 +2,7 @@
  * 全仓扫描：把模板里写的 `a-*` 标签对着 @zboson/ui 的真实注册名表比一遍。
  *
  * 为什么需要：Vuetify 的 `v-list` / `v-stepper` 系列照搬成 `a-list` / `a-step` 时，
- * antdv-next 里根本没有这些组件（List 只有虚拟滚动的 `AListy`，Steps 走 `:items`），
+ * @zboson/ui 里根本没有这些组件（List 只有虚拟滚动的 `AListy`，Steps 走 `:items`），
  * 而 Vue 对未注册标签**只发一条 DEV 警告**就按原生未知元素渲染：带命名插槽
  * （`#extra`/`#avatar`）时 children 是对象、原生元素分支只吃数组，整块内容直接丢掉，
  * 页面表现为一片空白却还留着点击区域。生产包里没有任何提示。

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 下载器预设下载路径 / 标签对话框（antdv-next 平移）。
+ * 下载器预设下载路径 / 标签对话框（@zboson/ui 平移）。
  * suggestFolders / suggestTags 用于推送种子时的路径与标签候选，支持关键字模板与一键导入客户端已有配置。
  */
 import { computed, ref, watch } from "vue";
@@ -135,7 +135,7 @@ function saveClientConfig() {
     @ok="saveClientConfig"
   >
     <a-collapse v-model:active-key="activeKeys">
-      <!-- antdv-next 的 CollapsePanel 没有 `disabled` 这个 prop，写上去会被当普通 attr 塞进
+      <!-- @zboson/ui 的 CollapsePanel 没有 `disabled` 这个 prop，写上去会被当普通 attr 塞进
            根 div（SSR 实测渲染成 <div disabled ... aria-disabled="false" tabindex="0">，照样能折叠）。
            真正的开关是 `collapsible`：`'disabled'` 会加 ant-collapse-item-disabled、
            aria-disabled=true、tabindex=-1。见 scripts/check-dead-props.mjs。 -->

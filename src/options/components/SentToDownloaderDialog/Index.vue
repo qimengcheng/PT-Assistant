@@ -520,7 +520,7 @@ function dialogLeave() {
       <!-- 快速下载选项 -->
       <div v-if="quickSendToClient" style="padding: 0">
         <!--
-          这里原来写的是 <a-list>/<a-list-item>/<a-list-item-meta>：antdv-next 1.5.6 根本没有这些
+          这里原来写的是 <a-list>/<a-list-item>/<a-list-item-meta>：@zboson/ui 里根本没有这些
           组件（根入口导出的是虚拟滚动的 `Listy`，全量 install 注册名里也只有 AListy），
           未注册的标签会被 Vue 当原生未知元素渲染，而命名插槽（#avatar/#extra/#title）的内容
           在原生元素上根本挂不上去 —— 结果这一栏是一片可以点击的空白。

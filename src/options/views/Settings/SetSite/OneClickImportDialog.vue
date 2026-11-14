@@ -79,7 +79,7 @@ const isFiltering = computed(() => keyword.value.trim() !== "");
 const siteTotal = computed(() => Object.keys(canAddSites.value).length);
 
 /**
- * 旧版返回 mdi-xxx 字符串图标，antdv-next 要求组件对象；
+ * 旧版返回 mdi-xxx 字符串图标，@zboson/ui 要求组件对象；
  * 分支条件与旧版逐条对应（helper/close/wrench/check/alert/pencil）。
  *
  * ⚠️ 这里原来写的是 `(site) => computed(() => …)`，而模板里每张卡取三次 ——

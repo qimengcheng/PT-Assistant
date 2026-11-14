@@ -46,7 +46,7 @@ const meta = computed<{ text: string; color?: string; title?: string }>(() => {
 
 <template>
   <!-- 这条曾经写 `bordered` prop，已删。删的理由不是「死属性」—— 那个说法是错的：
-     antdv-next 1.5.6 的 Tag 确实声明了 bordered?: boolean（dist/tag/index.d.ts:37，
+     @zboson/ui 0.0.2 的 Tag 确实声明了 bordered?: boolean（dist/tag/index.d.ts:37，
      无 @deprecated），hooks/useColor.js:16 真读它，语义是**降级**：
      bordered === false 时强制把 variant 压成 filled（默认值就是 true）。
      也就是说它能「取消描边」，但永远造不出描边 —— 要描边请写 variant="outlined" -->

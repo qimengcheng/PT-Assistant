@@ -216,7 +216,7 @@ CI 的 `scripts/smoke-background.mjs` 守的就是这一类，见 README「工�
 
 ### 11. `dayjs` 是未声明的传递依赖
 
-**现象**：它只是 antdv-next 的传递依赖，没写进 `package.json`，在 hoisted 布局下被顺手扁平上来才一直能被裸 `import`（§3）。
+**现象**：它只是 @zboson/ui 的传递依赖，没写进 `package.json`，在 hoisted 布局下被顺手扁平上来才一直能被裸 `import`（§3）。
 
 **现在的做法**：不要直接 `import dayjs`。日期区间用 range-picker `@change` 的第二参数 `dateStrings` + 原生 `Date`。
 2026-10-12 起这条不再只靠口头约定 —— 布局换成 isolated 后顶层没有 `dayjs` 了（实测），裸 `import` 会直接报模块找不到；
@@ -231,7 +231,7 @@ v0.90.5 起另有一条 `no-restricted-imports` 点名禁它，并把「改用 d
 **现在的做法**：`.content`（flex 子项）必须 `min-width: 0`；`a-table` 需 `:scroll="{ x, y }"`
 —— `y` 固定后横向滚动条才常驻可见，antd 不像 `v-data-table` 那样自带滚动。
 
-### 16. antdv-next 的 prop 名与 ant-design-vue 旧版不一致，且写错不报错
+### 16. @zboson/ui 的 prop 名与 ant-design-vue 旧版不一致，且写错不报错
 
 **现象**：`check-dead-props.mjs` 上线时一次扫出 6 处真 bug，形态全是「组件根本不认这个 prop」：
 
@@ -245,7 +245,7 @@ v0.90.5 起另有一条 `no-restricted-imports` 点名禁它，并把「改用 d
 **现在的做法**：防线 ④ `scripts/check-dead-props.mjs`（CI 已挂）。**新增 `a-*` 用法后跑一次**。
 更多 antdv 迁移坑（footer、auto-complete、a-table sorter、未注册标签）的成文规则见 AGENTS.md §3.4。
 
-### 17. antdv-next 没有 `customRender` 这个列 API
+### 17. @zboson/ui 没有 `customRender` 这个列 API
 
 **现象**：照搬 `v-data-table` / 旧 antd 的 `customRender`，整列**静默退化成原始值**。
 
@@ -755,7 +755,7 @@ v0.20.0 整站接入 i18n 时，`check-locale-keys.mjs` 扫出 `ExportUserInfoDi
 - mediaServer / backupServer 包平移（v0.2.0）
 - offscreen 入口（页面解析宿主）+ 搜索流程（v0.3.0）
 - 数据备份/导入：本地导出(zip) + 文件恢复 + WebDAV/S3/B2 远程备份（加密/保留策略/历史）（v0.4.0）
-- UI 框架迁移 Vuetify → antdv-next 全量收尾（v0.7.0）
+- UI 框架迁移 Vuetify → antdv-next（当时的上游库；2026-10-26 起改用其 fork @zboson/ui）全量收尾（v0.7.0）
 - 下载器配置页与种子推送流程 UI（SetDownloader + MyClient）（v0.13.1）
 - content script（引导 + 懒加载 app，站点浮窗/推送）（v0.13.1）
 - 站点图标资源目录平移（`public/icons/site`，`__RESOURCE_SITE_ICONS__`）（v0.13.1）

@@ -116,7 +116,7 @@ function onEnter() {
 
     <a-divider class="ma-0" />
 
-    <!-- 原 <v-list>/<v-list-item>：antdv-next 没有 a-list（只有虚拟滚动的 AList），改用普通 div -->
+    <!-- 原 <v-list>/<v-list-item>：@zboson/ui 没有 a-list（只有虚拟滚动的 AList），改用普通 div -->
     <div class="client-list">
       <div
         v-for="d in enabledDownloaders"

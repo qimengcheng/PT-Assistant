@@ -339,13 +339,13 @@ const visibleLevelRequirements = computed(() => {
 }
 
 /* 原 v-card max-height/max-width + content-class="bg-white pa-0"。
-   浮层本体已由 a-tooltip 的 color="#fff" 刷白（antdv-next 的 parseColor 会同步
+   浮层本体已由 a-tooltip 的 color="#fff" 刷白（@zboson/ui 的 parseColor 会同步
    改掉 container 背景、arrow 背景和按亮度反推的 overlay-color），所以这里不再
    自带白底 —— 那圈「黑边包白块」就是旧写法留下的：卡片是白的，卡片外的
    tooltip padding 和箭头仍是 colorBgSpotlight 近黑。
 
    ⚠️ 面板宽度必须和 a-tooltip 上的 `styles.root.maxWidth: 'none'` 配套看。
-   antdv-next 把 `max-width: 250px` 挂在 .ant-tooltip 根节点上，而承载内容的
+   @zboson/ui 把 `max-width: 250px` 挂在 .ant-tooltip 根节点上，而承载内容的
    unique-container 是绝对定位、宽度走 shrink-to-fit，可用宽度仍被那 250px 限住。
    迁移前这份浮层能撑到 ~500px，靠的是等级串上的 white-space:nowrap 把
    min-content 顶过 250px 这个上限 —— 也就是说 nowrap 一旦去掉，宽度立刻塌回 250px，

@@ -627,7 +627,7 @@ function torrentRowClass(record: CTorrent) {
  * 是从代表行下面**长出来的一组**。序号取组内位置（代表行 0，组员从 1 起），并且钉到 6 为止 ——
  * 再往后只是让最后几条白等，19 条一组时那已经是一秒开外了。
  *
- * 走 `on-row` 而不是给每个序号写一条 class：antdv-next 的 Table 声明了 `onRow`
+ * 走 `on-row` 而不是给每个序号写一条 class：@zboson/ui 的 Table 声明了 `onRow`
  * （`dist/table/Table.js`），它返回的 `style` 由 @v-c/table 的 BodyRow 合进 `<tr>`。
  */
 function torrentRowAttrs(record: CTorrent) {

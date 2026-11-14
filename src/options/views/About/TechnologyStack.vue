@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 项目参考与引用页（antdv-next 平移）。
+ * 项目参考与引用页（@zboson/ui 平移）。
  * PT 助手历代项目时间线 + 依赖清单（localStorage 缓存，异步补全 npm homepage）。
  *
  * 这张表是「**当前** package.json 依赖清单」+ 几个常驻的关联项目（见 SEED_ITEMS）：

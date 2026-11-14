@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 下载器站点过滤对话框（antdv-next 平移）。
+ * 下载器站点过滤对话框（@zboson/ui 平移）。
  * 勾选 = 排除该站点：被排除的站点页面不再展示此下载器（聚合搜索页不生效）。
  */
 import { computed, ref, watch } from "vue";

@@ -9,9 +9,9 @@
  *  4. 比对：模板用到但按需清单没注册的 → FAIL 并非零退出（这类漏注册在线上表现为
  *     Vue 把标签当原生元素渲染：无样式、slot 静默失效，很难在站点页面上看出来）。
  *
- * 为什么不用静态 grep 就够了：antdv-next 的父组件 install 会连带注册子组件
+ * 为什么不用静态 grep 就够了：@zboson/ui 的父组件 install 会连带注册子组件
  * （Menu → AMenuItem/ASubMenu/AMenuDivider，Table → ATableColumn/ATableSummary…），
- * 只对照 import 名字会误报；而且 `a-list` 这类标签在 antdv-next 里根本不存在
+ * 只对照 import 名字会误报；而且 `a-list` 这类标签在 @zboson/ui 里根本不存在
  * （只有 AListy），需要权威名单而不是猜。
  *
  * 用法：`node scripts/check-content-antd-lite.mjs`（在项目根目录跑）

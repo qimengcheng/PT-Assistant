@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 搜索方案条目标签组（antdv-next 平移）。
+ * 搜索方案条目标签组（@zboson/ui 平移）。
  * 展示形式：站点名 -> 方案详情；closable 时标签可关闭并向父组件抛出移除事件。
  * groupProps.column=true 时纵向排列（用于编辑对话框右侧已选列表）。
  */

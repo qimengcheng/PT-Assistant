@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-// 注意：antdv-next 根入口把这几个类型做了别名再导出（ColumnType -> TableColumnType 等）
+// 注意：@zboson/ui 根入口把这几个类型做了别名再导出（ColumnType -> TableColumnType 等）
 import type { TableColumnsType } from "@zboson/ui";
 import {
   AlertOutlined,
@@ -181,7 +181,7 @@ const tableColumns = computed<TableColumnsType<IUserInfoItem>>(() =>
  *
  * 为什么必须有一道名单（v0.99.4 把逐格渲染搬进 UserInfoCell 时把行首的复选框整列弄没了，
  * 用户 2026-10-24 报「多选框怎么没有了」）：rc-table 的合成逻辑是**插槽返回了东西就整格替换**
- * （`antdv-next@1.6.0` 的 `TableCell`：`if (bodyCell && column) { … g = 插槽返回值 }`），
+ * （`@zboson/ui`（源自上游 antdv-next 1.6.0）的 `TableCell`：`if (bodyCell && column) { … g = 插槽返回值 }`），
  * 而 Vue 的 `flattenChildren` 会把注释节点滤掉、把组件 vnode 留下。于是：
  *   - 插槽里是一串 `v-if="column.key === …"`（各档都不命中 → 只剩注释）→ 长度 0 → 内置那颗复选框留下；
  *   - 插槽里是 `<UserInfoCell />`（组件 vnode，不管它自己渲染出什么）→ 长度 ≥ 1 → 复选框被顶掉。
@@ -528,7 +528,7 @@ const showLevelProgressDialog = ref(false);
 
         <a-divider type="vertical" class="mx-2" />
 
-        <!-- 表格设置面板：原 v-menu + v-list，antdv-next 没有 a-list，改用 a-popover + 普通 div -->
+        <!-- 表格设置面板：原 v-menu + v-list，@zboson/ui 没有 a-list，改用 a-popover + 普通 div -->
         <a-popover trigger="click" placement="bottomLeft">
           <template #default>
             <a-button class="mr-1"><template #icon><SettingOutlined /></template><span>{{ t('MyData.index.setting') }}</span></a-button>

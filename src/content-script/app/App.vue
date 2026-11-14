@@ -102,7 +102,7 @@ configStore.$onReady(() => {
  *
  * 为什么需要显式写：上游（PT-Plugin-Plus）用的是 `<v-speed-dial v-model="openSpeedDial">`
  * （该标签在本仓历史里从未存在，git log -S 只命中写这条注释的那次提交，仅作外部线索），
- * 开合由 Vuetify 组件自己接管；迁到 antdv-next 后没有 speed-dial 组件，外层换成裸 div，
+ * 开合由 Vuetify 组件自己接管；迁到 @zboson/ui 后没有 speed-dial 组件，外层换成裸 div，
  * v-model 那条翻转**在移植时就没接上**（不是「随组件一起丢了」——本仓从头到尾没有过那个组件），
  * openSpeedDial 只剩「声明 + 从配置读初值」两处，于是球能画出来但点了永远没反应。
  * 点子按钮不自动收起，对应上游的 :close-on-content-click="false"。

@@ -1,5 +1,5 @@
 /**
- * 媒体服务器浏览页搜索工具（antdv-next 平移）。
+ * 媒体服务器浏览页搜索工具（@zboson/ui 平移）。
  * 模块级单例：选中的服务器列表 + 串行 PQueue，结果按 url 全局去重后写入 runtimeStore.mediaServerSearch。
  */
 import PQueue from "p-queue";

@@ -204,7 +204,7 @@ const activePath = computed(() => route.path);
 
 // ============================================================================
 // 全局提示条：各页面 runtimeStore.showSnakebar() 的出口。
-// 原先是 Vuetify 的 <v-snackbar-queue>；现在桥接到 antdv-next 的 message API，
+// 原先是 Vuetify 的 <v-snackbar-queue>；现在桥接到 @zboson/ui 的 message API，
 // 保证所有既有调用点（showSnakebar(text, {color})）无需改动。
 // ============================================================================
 watch(
@@ -225,7 +225,7 @@ watch(
   },
 );
 
-// antdv-next 的 locale 跟随项目自身的 i18n 语言
+// @zboson/ui 的 locale 跟随项目自身的 i18n 语言
 const antdLocale = computed(() => antdLocaleMap[i18nInstance.global.locale.value as "zh_CN" | "en"]);
 </script>
 

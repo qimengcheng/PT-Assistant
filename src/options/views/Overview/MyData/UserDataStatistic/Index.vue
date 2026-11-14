@@ -396,7 +396,7 @@ const perSiteCharts = perSiteChartField.flatMap(([field, format]) => [
   { key: `perSiteK${field}Incr`, options: createPerSiteChartOptionsFn(field, format, true) },
 ]);
 
-// ===== 控制面板（antdv-next 适配） =====
+// ===== 控制面板（@zboson/ui 适配） =====
 
 const userNameOptions = computed(() =>
   Object.keys(configStore.getUserNames.names).map((name) => ({ value: name })),
@@ -447,7 +447,7 @@ function selectDateRangeAll() {
   selectedDateRanges.value = allDateRanges.value;
 }
 
-// 不直引 dayjs（它只是 antdv-next 的传递依赖）：区间值取 picker 回调的 dateStrings
+// 不直引 dayjs（它只是 @zboson/ui 的传递依赖）：区间值取 picker 回调的 dateStrings
 function applyCustomDateRange(dateStrings: [string, string] | null) {
   const [start, end] = dateStrings ?? [];
   if (!start || !end) return;

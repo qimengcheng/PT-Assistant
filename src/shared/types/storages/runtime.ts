@@ -47,7 +47,7 @@ export interface ISearchData {
 }
 
 /**
- * 全局提示条选项。原先是 Vuetify VSnackbar 的 props 子集，改为按 antdv-next 的
+ * 全局提示条选项。原先是 Vuetify VSnackbar 的 props 子集，改为按 @zboson/ui 的
  * message API 收敛：`color` 决定提示类型，`timeout` 为 0 表示不自动关闭。
  * 全量提示条在 App.vue 里被转成 antd 的 message 调用。
  *

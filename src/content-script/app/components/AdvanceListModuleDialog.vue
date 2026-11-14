@@ -270,7 +270,7 @@ const rowSelection = computed(() => ({
       </a-table>
     </div>
 
-    <!-- 不设 :footer="null"：那会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...） -->
+    <!-- 不设 :footer="null"：那会连 #footer slot 一起吞掉（@zboson/ui: footer: d !== null && ...） -->
     <template #footer>
       <div style="display: flex; align-items: center; gap: 8px">
         <span v-show="hasSelectedTorrent">

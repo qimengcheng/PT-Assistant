@@ -43,7 +43,7 @@ watch(formValid, (v) => emits("update:form-valid", v), { immediate: true });
 /**
  * 把 formValidateRules 的判据包成 a-form 认得的返回形状。
  *
- * ⚠️ 这条不是风格问题，是「校验整条死掉」和「能用」的区别：antdv-next 的
+ * ⚠️ 这条不是风格问题，是「校验整条死掉」和「能用」的区别：@zboson/ui 的
  * `dist/form/utils/validateUtil.js` 里对 rule.validator 的那层包装，只在返回值是
  * Promise 时才调用 callback（`hasPromise = promise && typeof promise.then === "function"`），
  * 而 formValidateRules 的 validator 同步返回 boolean|string。直接挂进 :rules 的话，

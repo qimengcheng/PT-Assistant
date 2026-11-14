@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 平移自 PT-depiler 的同名对话框，控件层由 Vuetify 换为 antdv-next。
+ * 平移自 PT-depiler 的同名对话框，控件层由 Vuetify 换为 @zboson/ui。
  * 与 SearchEntity 版共用 src/options/components/AdvanceFilter 下的零件：
  * 关键词输入、三态复选区、区间滑块、底栏。
  */

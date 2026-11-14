@@ -83,7 +83,7 @@ async function loadPTPPBackupFile(file: File) {
 
 /**
  * 导入的触发点。上游那份是 v-file-input 的 `@update:model-value="loadPTPPBackupFile"`，
- * antdv-next 的 a-upload 没有对应事件：beforeUpload 返回 false 时 rc-upload 不建条目，
+ * @zboson/ui 的 a-upload 没有对应事件：beforeUpload 返回 false 时 rc-upload 不建条目，
  * change 事件里的 fileList 也就取不到 File（同仓 PushToDownloaderDialog.vue 记过同一件事），
  * 所以在这里直接把 File 接住。返回 false 表示不发任何上传请求。
  */

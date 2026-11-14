@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * PT-Plugin-Plus 用户数据导入对话框（antdv-next 实现）。
+ * PT-Plugin-Plus 用户数据导入对话框（@zboson/ui 实现）。
  * 解析 PTPP dump 的用户信息，按内置站点定义映射 host → siteId，
  * 逐站点勾选后写入 userInfo storage（可选覆盖已有数据）。
  * 平移自 PT-depiler views/Settings/SetBase/RestorePtppUserDataDialog.vue。
@@ -306,7 +306,7 @@ function toggleAll(checked: boolean) {
 
     <!-- ⚠️ 必须是 a-checkbox-group + 内部 a-checkbox :value 的写法。
          原来是一个独立 a-checkbox 绑 `v-model:checked="toImportSite"`（ref<string[]>）
-         还带 :value —— 没有 group 时 antdv-next 走 isValueEqual(currentValue, true)
+         还带 :value —— 没有 group 时 @zboson/ui 走 isValueEqual(currentValue, true)
          分支，勾选后 emit 出来的是布尔值，整个数组被覆盖成 true/false，
          随后的 .includes 直接抛 TypeError，这条 PTPP 迁移路径实际不可用。 -->
     <a-checkbox-group v-model:value="toImportSite">

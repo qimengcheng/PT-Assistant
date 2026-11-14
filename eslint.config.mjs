@@ -165,7 +165,7 @@ export default tseslint.config(
         },
         {
           argument: "/^okType$/",
-          message: "同上，改用 :ok-button-props（okType 是 antdv-next 确认框的 legacy 入口）",
+          message: "同上，改用 :ok-button-props（okType 是 @zboson/ui 确认框的 legacy 入口）",
         },
       ],
 
@@ -202,7 +202,7 @@ export default tseslint.config(
           paths: [
             {
               name: "dayjs",
-              message: "dayjs 没写进 package.json（它只是 antdv-next 的传递依赖）。日期区间用 range-picker @change 的第二参数 dateStrings + 原生 Date；真要用的话得先显式声明（PLAYBOOK §11）",
+              message: "dayjs 没写进 package.json（它只是 @zboson/ui 的传递依赖）。日期区间用 range-picker @change 的第二参数 dateStrings + 原生 Date；真要用的话得先显式声明（PLAYBOOK §11）",
             },
           ],
         },

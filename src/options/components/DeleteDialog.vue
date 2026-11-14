@@ -54,7 +54,7 @@ async function dialogEnter() {
 </script>
 
 <template>
-  <!-- footer prop 传 null 会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...），底部按钮全消失，故不设 footer -->
+  <!-- footer prop 传 null 会连 #footer slot 一起吞掉（@zboson/ui: footer: d !== null && ...），底部按钮全消失，故不设 footer -->
   <a-modal
     v-model:open="showDialog"
     :title="t('common.dialog.title.confirmAction')"

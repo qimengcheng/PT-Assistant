@@ -4,7 +4,7 @@
  * 替换掉原先的 Vuetify。
  *
  * ⚠️ 必须用根入口导出的全量 `install`，不能用 `App`：
- *   antdv-next 的 `App` 是 `<a-app>` 那个 Provider 包装组件，
+ *   @zboson/ui 的 `App` 是 `<a-app>` 那个 Provider 包装组件，
  *   它的 install 只做一件事 `app.component(App.name, App)` —— 只注册 `a-app` 一个，
  *   所有 a-table / a-card / a-modal / a-tag / a-config-provider 运行时都解析不到，
  *   只会 warn 并渲染成未知原生标签（页面看着像"完全没样式/是裸标签"）。

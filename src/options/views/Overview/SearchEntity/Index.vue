@@ -1151,7 +1151,7 @@ const hasSearchStatus = computed<boolean>(() => {
    口径统一成 8px —— 与 .page 的 grid gap、.content 的 padding、.page-panel 的 padding 同一档。
    原来这三段之间是 10px / 0px / 0px：搜索条离提示条差 2px 看不出来，
    提示条和下面的卡片、站点筛选条和表格则是**完全贴死**（a-alert、a-card、a-tag 在
-   antdv-next 里都不带默认 margin，所以那两处真的是 0）。 */
+   @zboson/ui 里都不带默认 margin，所以那两处真的是 0）。 */
 /* 整页列向布局：三段之间的 8px 全部交给 gap，不再各写各的 margin-bottom。
    与 .page 骨架（grid gap: 8px + 1fr 面板行）同一套口径，只是这里结构不是「工具条 + 面板」
    两行，而是 搜索条 / 状态提示 / 结果卡片 三段。 */

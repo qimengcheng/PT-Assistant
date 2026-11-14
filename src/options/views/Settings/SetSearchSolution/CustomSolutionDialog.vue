@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 自定义搜索方案对话框（antdv-next 平移）。
+ * 自定义搜索方案对话框（@zboson/ui 平移）。
  * 基于当前站点分类选择生成一份方案，并允许直接编辑其 requestConfig JSON 后回传父组件。
  */
 import { computed, ref, watch } from "vue";
@@ -34,7 +34,7 @@ const metadataStore = useMetadataStore();
 
 /**
  * 站点名要拼进标题：原先用 <SiteName> 组件塞在 #title 插槽里，
- * 而 antdv-next 的 modal header 无 padding、关闭按钮绝对定位在右上角，插槽内容会压到 X 上。
+ * 而 @zboson/ui 的 modal header 无 padding、关闭按钮绝对定位在右上角，插槽内容会压到 X 上。
  */
 const siteName = ref<string>("");
 watch(

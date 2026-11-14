@@ -38,7 +38,7 @@ const allBackupServerMetaData = computedAsync(async () => {
 }, {});
 
 /**
- * 必须走 `:options`：antdv-next 的 Select **完全不读默认插槽里的 `a-select-option`**
+ * 必须走 `:options`：@zboson/ui 的 Select **完全不读默认插槽里的 `a-select-option`**
  * （dist 里 Select 的实现没有 `children` / `slots.default`，整个包也找不到
  * 旧版那套 `convertChildrenToData`）。`ASelectOption` 虽然还注册着，渲染进去的子节点
  * 会被静默丢掉 —— 表现就是下拉打开「暂无数据」，不报错也不警告。

@@ -29,7 +29,7 @@ function getByPath(row: unknown, path: string): unknown {
  *
  * ⚠️ antd 受控排序必须提供真正的 compare 函数——`sorter: true` 无 compare 时
  * antd 内部 getSortFunction 返回 false，排序器被静默跳过（箭头动、数据不排）。
- * 见 AGENTS.md 里记的 antdv-next 踩坑表。
+ * 见 AGENTS.md 里记的 @zboson/ui 踩坑表。
  */
 export function makeSorter<T>(path: string) {
   return (a: T, b: T): number => {

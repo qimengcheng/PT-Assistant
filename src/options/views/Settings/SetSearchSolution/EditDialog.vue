@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 搜索方案编辑对话框（antdv-next 平移，旧版为全屏 dialog）。
+ * 搜索方案编辑对话框（@zboson/ui 平移，旧版为全屏 dialog）。
  * 左侧按站点折叠选择搜索分类生成条目，右侧维护已选条目；保存为一条 ISearchSolutionMetadata。
  */
 import { computed, ref, shallowRef, watch } from "vue";

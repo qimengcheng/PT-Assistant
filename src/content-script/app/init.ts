@@ -1,10 +1,10 @@
 /**
  * 把 Vue 应用挂到 shadow DOM 里。
  *
- * 平移自 PT-depiler `entries/content-script/app/init.ts`，针对 antdv-next 做了调整：
+ * 平移自 PT-depiler `entries/content-script/app/init.ts`，针对 @zboson/ui 做了调整：
  *
  * - Vuetify 原本靠「把 #vuetify-theme-stylesheet 搬进 shadow root」来隔离样式。
- *   antdv-next 走 CSS-in-JS，官方提供了 `<a-style-provider :container="shadowRoot">`
+ *   @zboson/ui 走 CSS-in-JS，官方提供了 `<a-style-provider :container="shadowRoot">`
  *   （@zboson/cssinjs 的 StyleContext.container 类型是 `Element | ShadowRoot`），
  *   直接指定注入目标即可，不需要再搬运任何样式表。
  * - mdi webfont 那段 FontFace 逻辑随之删除，图标统一用 @zboson/icons 的 SVG 组件。
@@ -95,7 +95,7 @@ export function mountApp(document: Document, data: Record<string, unknown> = {})
    * <a-style-provider>，CSS-in-JS 因此注进 document.head —— 而 shadow DOM 不继承
    * light DOM 的样式表，于是 toast 的容器虽然指对了位置，样式仍然是丢的。
    *
-   * antdv-next 为此留的口子是 ConfigProvider.config({ holderRender })：静态树渲染前
+   * @zboson/ui 为此留的口子是 ConfigProvider.config({ holderRender })：静态树渲染前
    * 会过一遍 global.holderRender（message/index.js 与 modal/confirm.js 都读它）。
    * 重挂时这里会重新执行，指向新的 shadowRoot —— 旧的连同宿主一起被丢弃，正是想要的。
    */

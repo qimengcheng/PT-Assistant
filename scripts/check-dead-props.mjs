@@ -4,14 +4,14 @@
  * 为什么需要这条防线：
  * `vue-tsc` 抓不到它（`a-tag` 的类型来自 `GlobalComponents` 声明，宽松且允许任意 attr），
  * `check-antd-tags.mjs` 也抓不到它（那条只查「标签名存不存在」）。
- * 而 antdv-next 的运行时是 `inheritAttrs` 默认行为：没声明的 prop 会被当普通 attr
+ * 而 @zboson/ui 的运行时是 `inheritAttrs` 默认行为：没声明的 prop 会被当普通 attr
  * 原样塞进根 DOM 元素，**不报错、不警告、生产环境完全静默**；没匹配的命名插槽则直接
  * 渲染成空。二者症状都是「写了等于没写」。
  * 典型就是 v0.20.3 修掉的 `a-select` 的 options 用 `title` 键、
- * `<a-collapse-panel #label>`（antdv-next 只有 `#header`）。
+ * `<a-collapse-panel #label>`（@zboson/ui 只有 `#header`）。
  *
  * ⚠️ **别把「已声明但语义弱」当成死属性** —— 本项目真犯过这个错。`a-tag :bordered` 曾被
- * 一并算进「antd5 早删了」，但 antdv-next 1.5.6 的 Tag 确实声明了 `bordered?: boolean`
+ * 一并算进「antd5 早删了」，但 @zboson/ui 0.0.2 的 Tag 确实声明了 `bordered?: boolean`
  * 且**无 @deprecated**，`hooks/useColor.js:16` 真读它（`false` → 强制 filled）。
  * 判据是「运行时 props 声明里有没有这一项」，不是「它好不好用」：
  * bordered 造不出描边（那是 variant="outlined" 的事），可它确实是活的 prop。
@@ -195,7 +195,7 @@ function scanTags(html) {
  * 写清验证方式，否则就是凭空放行。
  */
 const SLOT_ALIAS = new Map([
-  // antdv-next 的 TimelineItem 内部走 rc-timeline，`#label` 与 `#title`
+  // @zboson/ui 的 TimelineItem 内部走 rc-timeline，`#label` 与 `#title`
   // 的 SSR 渲染输出逐字符相同（2026-10-04 实测），所以 d.ts 只声明 `title` 也认 `label`。
   ["a-timeline-item", new Set(["label"])],
 ]);

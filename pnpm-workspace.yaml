@@ -10,8 +10,8 @@
 # package.json + pnpm-lock.yaml 装 isolated，11.2s 退出 0，**46 个声明过的直接依赖逐条查到有链接、
 # 一个不缺**（判据是 `node_modules/<名>/package.json` 读得开，不是数目录条目 —— @types/* 与
 # ESM-only 包用 require.resolve 会误报缺件）。防线② ④ 随后实跑 `createApp().use(Antd)` 注册 139 个名字。
-# 顺带订正 README 那条警告：`@ant-design/fast-color` 是 antdv-next 自己 dependencies 里声明过的
-# （^3.0.1），顶层没有它、但由 antdv-next 目录内照常解析得到，「改回 isolated 就 ERR_MODULE_NOT_FOUND」不成立。
+# 顺带订正 README 那条警告：`@ant-design/fast-color` 是 @zboson/ui 自己 dependencies 里声明过的
+# （^3.0.1），顶层没有它、但由 @zboson/ui 目录内照常解析得到，「改回 isolated 就 ERR_MODULE_NOT_FOUND」不成立。
 #
 # 【这一档的真正用处】isolated 会把「import 了但没声明」的幽灵依赖当场照出来。
 # 本仓历史上那两起（§4 的 tinyexec、§11 的 dayjs）在 hoisted 下都是静默蒙对的。

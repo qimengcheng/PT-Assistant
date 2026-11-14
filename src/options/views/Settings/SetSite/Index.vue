@@ -665,7 +665,7 @@ function keywordChecked(keyword: string) {
   padding-left: 16px;
 }
 
-/* 宽度写在这里而不是 popover 的 :overlay-style —— antdv-next 的 Popover/Tooltip 已经没有
+/* 宽度写在这里而不是 popover 的 :overlay-style —— @zboson/ui 的 Popover/Tooltip 已经没有
    overlayStyle 这个 prop（tooltip/index.js 里唯一的 overlayStyle 是内部取色器用的），
    写上去是死属性。面板宽度由内容决定，直接给面板本身。 */
 .filter-panel {

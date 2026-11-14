@@ -33,7 +33,7 @@ const metadataStore = useMetadataStore();
 
 /**
  * 站点名要拼进 title：原来把 <SiteName> 组件塞在 #title 插槽里，
- * 而 antdv-next 的 modal header 没有 padding、关闭按钮是绝对定位在右上角，
+ * 而 @zboson/ui 的 modal header 没有 padding、关闭按钮是绝对定位在右上角，
  * 插槽里的额外内容会压到 X 上。改成 title 属性后站点名得自己解析（getSiteName 内部带缓存）。
  */
 const siteName = ref<string>("");
@@ -173,7 +173,7 @@ function afterEnter() {
 </script>
 
 <template>
-  <!-- footer prop 传 null 会连 #footer slot 一起吞掉（antdv-next: footer: d !== null && ...），底部按钮全消失，故不设 footer -->
+  <!-- footer prop 传 null 会连 #footer slot 一起吞掉（@zboson/ui: footer: d !== null && ...），底部按钮全消失，故不设 footer -->
   <a-modal
     v-model:open="showDialog"
     :title="dialogTitle"

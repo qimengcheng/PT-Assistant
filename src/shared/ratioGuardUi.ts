@@ -152,7 +152,7 @@ export function makeRatioGuardUi(deps: {
         key: NOTICE_KEY,
         duration: 8,
         placement: "topRight",
-        // 标题这档叫 `title` 不叫 `message`（antdv-next dist/notification/interface.d.ts:36，
+        // 标题这档叫 `title` 不叫 `message`（@zboson/ui dist/notification/interface.d.ts:44，
         // ArgsProps 里根本没有 message）；写错不报错、不进 vue-tsc（下面那个端口的形参是 any），
         // 整张卡片只剩图标和底色。
         title: warn.length > 0 ? t("common.ratioGuard.warnTitle") : t("common.ratioGuard.unknownOnlyTitle"),

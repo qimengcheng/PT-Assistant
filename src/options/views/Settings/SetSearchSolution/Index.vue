@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 搜索方案管理页（antdv-next 平移）。
+ * 搜索方案管理页（@zboson/ui 平移）。
  * 自定义搜索方案的增删改、启用/设默、JSON 导入导出；表格首行为固定的「全部站点」自动生成方案。
  */
 import { computed, ref, useTemplateRef } from "vue";

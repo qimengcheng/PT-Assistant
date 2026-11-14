@@ -549,7 +549,7 @@ function formatTimestamp(timestamp: number | undefined): string {
 </template>
 
 <style scoped lang="scss">
-// 原 <v-list>/<v-list-item>：antdv-next 没有 a-list（只有虚拟滚动的 AList），改用普通 div
+// 原 <v-list>/<v-list-item>：@zboson/ui 没有 a-list（只有虚拟滚动的 AList），改用普通 div
 .detail-row {
   display: flex;
   align-items: center;

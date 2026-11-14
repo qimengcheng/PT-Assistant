@@ -1,8 +1,18 @@
 {
-  "generatedAt": "2026-11-14 17:13:52",
-  "headSha": "bebf762",
+  "generatedAt": "2026-11-14 17:20:19",
+  "headSha": "d680a27",
   "appendOnly": "这个文件是累积档案：每条只能往最前面加，任何一条都不许删 —— 见 AGENTS.md §3.7 与 scripts/check-recent-updates.mjs",
   "versions": [
+    {
+      "version": "0.136.3",
+      "date": "2026-11-14 17:20:11",
+      "added": [],
+      "improved": [
+        "修复辅种任务的一个误报：qBittorrent 5.0 起「暂停且没下完」的状态改了名，扩展没认出新名字，把暂停着的 0% 空种子当成「数据齐全只是停着」，整批暂停后浮动通知反而报「全部完成」。现在新旧名字都认，这种情况会如实报异常、提示哪几条没在做种，不会再算进完成数"
+      ],
+      "addedTotal": 0,
+      "improvedTotal": 1
+    },
     {
       "version": "0.136.2",
       "date": "2026-11-14 17:13:44",

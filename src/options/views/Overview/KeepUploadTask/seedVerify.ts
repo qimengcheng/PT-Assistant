@@ -65,6 +65,9 @@ const WRONG_RAW = new Set([
   "missingFiles",
   "error",
   "pausedDL",
+  // qBittorrent 5.0 起 pausedDL 改名 stoppedDL。漏认它会让它落进归一 `paused` 那一档，
+  // 被当成「有全量数据但停着」计进完成数 —— 暂停一批 0% 的空种子反而报「全部完成」。
+  "stoppedDL",
   "downloading",
   "stalledDL",
   "forcedDL",
@@ -74,19 +77,28 @@ const WRONG_RAW = new Set([
 ]);
 
 /** `WRONG_RAW` 里「数据不全」那一半：对基准来说正常，对辅种那条才是故障 */
-const INCOMPLETE_RAW = new Set(["pausedDL", "downloading", "stalledDL", "forcedDL", "metaDL", "allocating", "queuedDL"]);
+const INCOMPLETE_RAW = new Set([
+  "pausedDL",
+  "stoppedDL",
+  "downloading",
+  "stalledDL",
+  "forcedDL",
+  "metaDL",
+  "allocating",
+  "queuedDL",
+]);
 
 /** qBittorrent 里算「正常做种」的（`queuedUP` 只是排队等上传，数据是齐的） */
 const SEEDING_RAW = new Set(["uploading", "stalledUP", "forcedUP", "queuedUP"]);
 
 /**
- * `INCOMPLETE_RAW` 里「真的正在下」那一半（`pausedDL` 除外 —— 那是停着的，报「下载中」是骗人）。
+ * `INCOMPLETE_RAW` 里「真的正在下」那一半（停着的 `pausedDL` / `stoppedDL` 除外 —— 报「下载中」是骗人）。
  *
  * 只给界面用，见 `IReseedItemStatus.downloading`：基准那条「还在下」在判据里翻成 `pending`
  * 只是为了不去触发自动暂停，可 `pending` 那个词（界面上写「待确认」）说的是「还没判出来」，
  * 而这一半恰恰是**已经判出来了：它正在下载**。
  */
-const ACTIVE_DL_RAW = new Set([...INCOMPLETE_RAW].filter((raw) => raw !== "pausedDL"));
+const ACTIVE_DL_RAW = new Set([...INCOMPLETE_RAW].filter((raw) => raw !== "pausedDL" && raw !== "stoppedDL"));
 
 /** 「有全部数据但停着」 */
 const PAUSED_RAW = new Set(["pausedUP", "stoppedUP"]);

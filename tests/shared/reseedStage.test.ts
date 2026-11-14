@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { reseedStage, baseAlreadySent, nothingLeftToReseed } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
+import { reseedStage, baseAlreadySent, nothingLeftToReseed, judgeReseedTorrent } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 import type { IReseedItemStatus } from "@/options/views/Overview/KeepUploadTask/seedVerify.ts";
 
 const seeding = (): IReseedItemStatus => ({ verdict: "seeding", rawState: "uploading", progress: 100, completed: true });
@@ -111,5 +111,55 @@ describe("baseAlreadySent / nothingLeftToReseed：发送键的闸跟着档位走
     expect(info.stage).toBe("reseeding");
     expect(baseAlreadySent(info.stage)).toBe(true);
     expect(nothingLeftToReseed(info.stage)).toBe(false);
+  });
+});
+
+/**
+ * qBittorrent 5.0 把 `pausedDL` 改名 `stoppedDL`。漏认新名字时它会落进归一 `paused` 那一档，
+ * 被当成「有全量数据但停着」计进完成数 —— 用户把一批 0% 的空种子暂停，浮动通知反而报
+ * 「全部完成」（2026-11-14 报的）。这里把新旧两个名字、以及「停着但齐全」那一半都钉住。
+ */
+describe("judgeReseedTorrent：暂停且没数据 ≠ 有数据但停着", () => {
+  const pausedEmpty = { state: "paused", rawState: "stoppedDL", progress: 0, isCompleted: false };
+
+  it("stoppedDL（5.x 暂停且没下完）判异常，且不算「正在下」", () => {
+    const s = judgeReseedTorrent(pausedEmpty);
+    expect(s.verdict).toBe("wrong");
+    expect(s.downloading).toBe(false);
+  });
+
+  it("旧名 pausedDL 同判（4.x 不许回归）", () => {
+    expect(judgeReseedTorrent({ ...pausedEmpty, rawState: "pausedDL" }).verdict).toBe("wrong");
+  });
+
+  it("stoppedUP / pausedUP 才是「有全量数据但停着」，计进完成数", () => {
+    for (const rawState of ["stoppedUP", "pausedUP"]) {
+      const s = judgeReseedTorrent({ state: "paused", rawState, progress: 100, isCompleted: true });
+      expect(s.verdict).toBe("paused");
+    }
+    const info = reseedStage({
+      checked: true,
+      baseLocal: {},
+      others: [judgeReseedTorrent({ state: "paused", rawState: "stoppedUP", progress: 100, isCompleted: true })],
+    });
+    expect(info.stage).toBe("done");
+  });
+
+  it("整批暂停的空种子：档位报异常，不许报「全部完成」", () => {
+    const info = reseedStage({
+      checked: true,
+      baseLocal: {},
+      others: [judgeReseedTorrent(pausedEmpty), judgeReseedTorrent(pausedEmpty)],
+    });
+    expect(info.stage).toBe("wrong");
+    expect(info.doneCount).toBe(0);
+  });
+
+  it("基准那条暂停且没数据是进度不是故障", () => {
+    expect(judgeReseedTorrent(pausedEmpty, { isBase: true }).verdict).toBe("pending");
+  });
+
+  it("正在校验仍是 pending，不提前下结论", () => {
+    expect(judgeReseedTorrent({ state: "checking", rawState: "checkingDL", progress: 0 }).verdict).toBe("pending");
   });
 });
